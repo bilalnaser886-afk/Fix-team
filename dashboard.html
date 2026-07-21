@@ -446,7 +446,6 @@
     <button onclick="openTechEval()">🏆 تقييم الفنيين</button>
     <button onclick="openSummaries()">📋 الجرد</button>
     <button onclick="openAccounts()">🧾 الحسابات</button>
-    <button onclick="openPrintPage()">🖨 الطباعة والمسح الضوئي</button>
     <button onclick="logout()" style="color:#DC2626;">🚪 تسجيل الخروج</button>
   </div>
 </div>
@@ -585,26 +584,6 @@
     <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
-
-<!-- Print & scan page -->
-<div id="printOverlay" class="overlay hidden no-print" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
-  <div class="summaries-page">
-    <div class="modal-head" style="padding:16px 20px;">
-      <h2>🖨 الطباعة والمسح الضوئي</h2>
-      <button class="close-btn" onclick="closePrintPage()">×</button>
-    </div>
-    <div style="padding:0 20px;">
-      <input id="scanInput" autocomplete="off" placeholder="امسح كود جهاز موجود، أو دور بالاسم لطباعة ليبل جديد..."
-        onkeydown="if(event.key==='Enter') handleScanEnter()" oninput="renderPrintList()"
-        style="width:100%; border:2px solid var(--accent); border-radius:8px; padding:12px 14px; font-size:14px; margin-bottom:6px;" />
-      <div style="font-size:11px;color:#94A3B8;margin-bottom:14px;">امسح باركود ملزوق على جهاز عشان يفتحلك تفاصيله على طول، أو اكتب اسم/موديل عشان تطبع ليبل جديد</div>
-    </div>
-    <div id="printListArea" style="padding:0 20px 20px;"></div>
-    <div id="labelPreviewArea" style="padding:0 20px 40px;"></div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
 // ============================================================
@@ -1697,16 +1676,9 @@ function expandEmpStatus(statusKey, query){
     `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('')}</div>`;
 }
 
-function openPrintPage(){
-  document.getElementById('menuDropdown').classList.add('hidden');
-  document.getElementById('scanInput').value = '';
-  document.getElementById('printListArea').innerHTML = `<div class="empty-col">اكتب اسم عميل أو موديل، أو امسح كود جهاز موجود</div>`;
-  document.getElementById('labelPreviewArea').innerHTML = '';
-  document.getElementById('printOverlay').classList.remove('hidden');
-  setTimeout(() => document.getElementById('scanInput').focus(), 100);
-}
 function closePrintPage(){
-  document.getElementById('printOverlay').classList.add('hidden');
+  const o = document.getElementById('printOverlay');
+  if(o) o.classList.add('hidden');
 }
 
 // ============================================================
@@ -1817,62 +1789,9 @@ function initGlobalScanner(){
   }, true);
 }
 
-function handleScanEnter(){
-  const raw = document.getElementById('scanInput').value;
-  const match = findDeviceByScan(raw);
-  if(match){
-    document.getElementById('scanInput').value = '';
-    closePrintPage();
-    openDetail(match.id);
-    return;
-  }
-  // مفيش نتيجة: نصلّح النص لو كان عربي بالغلط عشان البحث بالاسم يشتغل
-  const fixed = fromArabicKeyboard(String(raw||'').trim());
-  if(fixed !== String(raw||'').trim()){
-    document.getElementById('scanInput').value = fixed;
-    renderPrintList();
-  }
-}
 
-function renderPrintList(){
-  const rawQ = document.getElementById('scanInput').value.trim();
-  // لو النص ممسوح بكيبورد عربي وبيطابق جهاز، نفتحه على طول
-  if(rawQ.length >= 8){
-    const auto = findDeviceByScan(rawQ);
-    if(auto){
-      document.getElementById('scanInput').value = '';
-      closePrintPage();
-      openDetail(auto.id);
-      return;
-    }
-  }
-  const q = rawQ;
-  const area = document.getElementById('printListArea');
-  document.getElementById('labelPreviewArea').innerHTML = '';
-  if(!q){
-    area.innerHTML = `<div class="empty-col">اكتب اسم عميل أو موديل، أو امسح كود جهاز موجود</div>`;
-    return;
-  }
-  const list = devices.filter(d => matchesSearch(d, q)).slice(0, 20);
-  area.innerHTML = list.length === 0
-    ? `<div class="empty-col">مفيش نتائج</div>`
-    : list.map(d => printCandidateHtml(d)).join('');
-}
 
-function printCandidateHtml(d){
-  const s = statusInfo(d.status);
-  return `<div class="day-card" onclick="selectPrintDevice('${d.id}')">
-    <div class="day-card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
-    <div class="day-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
-    <span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>
-  </div>`;
-}
 
-function selectPrintDevice(id){
-  const d = devices.find(x => x.id === id);
-  if(!d) return;
-  renderLabelInto('labelPreviewArea', d);
-}
 
 // ============================================================
 // طباعة الليبل — نافذة مستقلة بمقاس الليبل الحقيقي
@@ -1969,9 +1888,16 @@ function printLabel(){
   const fDate = Math.max(1.6, sz.h * 0.090).toFixed(2);   // تاريخ الدخول
   const fBrand= Math.max(1.5, sz.h * 0.088).toFixed(2);   // اسم I FIX TEAM تحت الباركود
 
-  const w = window.open('', '_blank', 'width=420,height=320');
-  if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
+  // إطار مخفي بدل نافذة منفصلة — نافذة طباعة واحدة بس تظهر للمستخدم
+  const old = document.getElementById('labelPrintFrame');
+  if(old) old.remove();
+  const fr = document.createElement('iframe');
+  fr.id = 'labelPrintFrame';
+  fr.style.cssText = 'position:fixed; width:0; height:0; border:0; visibility:hidden;';
+  document.body.appendChild(fr);
+  const w = fr.contentWindow;
 
+  w.document.open();
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <title>ليبل ${esc(devRef(d))}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
@@ -2027,14 +1953,19 @@ function printLabel(){
     ${d.reportedIssue ? `<div class="issue">${esc(d.reportedIssue)}</div>` : ''}
     <div class="date">${esc(shortDateTime(d.intakeDate))}</div>
   </div>
-<script>
-  window.onload = function(){
-    setTimeout(function(){ window.print(); }, 350);
-    window.onafterprint = function(){ window.close(); };
-  };
-<\/script>
 </body></html>`);
   w.document.close();
+
+  // نستنى الخطوط وصورة الباركود تجهز قبل ما نطبع
+  setTimeout(() => {
+    try{
+      w.focus();
+      w.print();
+    }catch(e){
+      alert('حصل خطأ في الطباعة، جرّب تاني');
+    }
+    setTimeout(() => { const f = document.getElementById('labelPrintFrame'); if(f) f.remove(); }, 2000);
+  }, 450);
 }
 
 // عرض الرقم بالأرقام الإنجليزية زي ما هو من غير كود دولة
