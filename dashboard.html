@@ -532,7 +532,9 @@
       <h2>📋 الجرد</h2>
       <button class="close-btn" onclick="closeSummaries()">×</button>
     </div>
-    <div style="padding:0 20px;">
+    <div style="padding:0 20px 4px;">
+      <input id="invSearch" oninput="renderSummaries()" placeholder="🔍 دور بإسم عميل، محل، فني، موديل، رقم تليفون، أو امسح الباركود..."
+             style="width:100%; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
     </div>
     <div id="summariesBody" style="padding:16px 20px 40px;"></div>
   </div>
@@ -1044,8 +1046,11 @@ function renderBoard(){
 
 function matchesSearch(d, q){
   if(!q) return true;
-  return [d.customerName,d.shopName,d.customerPhone,d.serialNumber,d.deviceType,d.model]
-    .some(v => v && v.includes(q));
+  const up = q.toUpperCase();
+  if(d.id === q || d.id.toUpperCase() === up) return true;
+  if(devRef(d).toUpperCase() === up || devRef(d).toUpperCase() === '#' + up) return true;
+  return [d.customerName,d.shopName,d.customerPhone,d.serialNumber,d.deviceType,d.model,d.reportedIssue,d.technician]
+    .some(v => v && String(v).includes(q));
 }
 
 function openColumn(statusKey){
@@ -1558,6 +1563,7 @@ function openSummaries(){
 }
 function closeSummaries(){
   invOpenCard = null;
+  invOpenTech = null;
   document.getElementById('summariesOverlay').classList.add('hidden');
 }
 
@@ -1740,6 +1746,44 @@ function findDeviceByScan(raw){
   return null;
 }
 
+// ============================================================
+// الماسح العام: يقرا الباركود من أي مكان في السيستم
+// (الماسح بيكتب بسرعة جداً وينهي بـ Enter — ده اللي بنميّزه بيه)
+// ============================================================
+let gScanBuf = '', gScanLast = 0;
+
+function initGlobalScanner(){
+  document.addEventListener('keydown', (e) => {
+    const now = Date.now();
+    if(now - gScanLast > 120) gScanBuf = '';   // فاصل كبير = كتابة بشرية، نبدأ من جديد
+    gScanLast = now;
+
+    if(e.key === 'Enter'){
+      const buf = gScanBuf;
+      gScanBuf = '';
+      if(buf.length < 6) return;
+      const hit = findDeviceByScan(buf);
+      if(!hit) return;
+
+      e.preventDefault();
+      // نفضّي الخانة اللي الكود اتكتب فيها بالغلط
+      const el = document.activeElement;
+      if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')){
+        el.value = '';
+        try{ el.dispatchEvent(new Event('input', { bubbles:true })); }catch(err){}
+        el.blur();
+      }
+      // نقفل أي شاشة مفتوحة ونفتح الجهاز
+      ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
+        .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
+      openDetail(hit.id);
+      return;
+    }
+
+    if(e.key && e.key.length === 1) gScanBuf += e.key;
+  }, true);
+}
+
 function handleScanEnter(){
   const raw = document.getElementById('scanInput').value;
   const match = findDeviceByScan(raw);
@@ -1841,6 +1885,7 @@ function renderLabelInto(containerId, d){
       ${d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : ''}
       <div class="label-row">${esc(shortDateTime(d.intakeDate))}</div>
       <div id="qrHolder"></div>
+      <div style="font-family:'Cairo',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
     </div>
     <div class="label-size-row">
       <label>عرض الليبل (مم)<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
@@ -1889,6 +1934,7 @@ function printLabel(){
   const fDev  = Math.max(2.1, sz.h * 0.122).toFixed(2);   // نوع الجهاز والموديل
   const fIssue= Math.max(1.8, sz.h * 0.100).toFixed(2);   // المشكلة
   const fDate = Math.max(1.6, sz.h * 0.090).toFixed(2);   // تاريخ الدخول
+  const fBrand= Math.max(1.5, sz.h * 0.088).toFixed(2);   // اسم I FIX TEAM تحت الباركود
 
   const w = window.open('', '_blank', 'width=420,height=320');
   if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
@@ -1904,8 +1950,17 @@ function printLabel(){
     font-family:'Tajawal', sans-serif; color:#000; background:#fff;
     padding:${pad}mm; display:flex; align-items:center; gap:${pad}mm;
   }
-  .qr{ width:${qrSz}mm; height:${qrSz}mm; flex-shrink:0; }
+  .qrbox{
+    flex-shrink:0; display:flex; flex-direction:column; align-items:center;
+    width:${qrSz}mm;
+  }
+  .qr{ width:${qrSz}mm; height:${qrSz}mm; }
   .qr img{ width:100%; height:100%; display:block; }
+  .brand{
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fBrand}mm;
+    letter-spacing:.15mm; margin-top:${(sz.h*0.022).toFixed(2)}mm;
+    white-space:nowrap; direction:ltr;
+  }
   .info{ flex:1; min-width:0; line-height:1.3; }
   .shop{
     font-family:'Cairo',sans-serif; font-weight:900; font-size:${fShop}mm;
@@ -1928,7 +1983,10 @@ function printLabel(){
     white-space:nowrap; overflow:hidden;
   }
 </style></head><body>
-  ${qr ? `<div class="qr"><img src="${qr}" alt=""></div>` : ''}
+  <div class="qrbox">
+    ${qr ? `<div class="qr"><img src="${qr}" alt=""></div>` : ''}
+    <div class="brand">I FIX TEAM</div>
+  </div>
   <div class="info">
     <div class="shop">${esc(d.shopName || '')}</div>
     <div class="cust">${esc(d.customerName || '')}</div>
@@ -2617,6 +2675,8 @@ function stuckDevices(){
 
 let invOpenCard = null;
 let invLists = {};
+let invOpenTech = null;
+let invTechLists = {};
 function toggleInvCard(key){
   invOpenCard = (invOpenCard === key) ? null : key;
   renderSummaries();
@@ -2677,12 +2737,60 @@ function renderSummaries(){
         </div>`;
       }).join('');
 
+  // ===== نتائج البحث =====
+  const q = (document.getElementById('invSearch')?.value || '').trim();
+  let searchHtml = '';
+  if(q){
+    const found = devices.filter(d => matchesSearch(d, q));
+    searchHtml = `
+      <div class="inv-section-title">🔍 نتائج البحث عن "${esc(q)}" — ${found.length}</div>
+      <div class="inv-open-list">
+        ${found.length === 0 ? '<div class="empty-col">مفيش نتائج</div>' : found.map(d => dayCardHtml(d)).join('')}
+      </div>`;
+  }
+
+  // ===== كروت الفنيين: الأجهزة اللي معاهم ولسه ما اتسلمتش =====
+  const withTech = {};
+  devices.forEach(d => {
+    if(!d.technician) return;
+    if(!ACTIVE_STATUSES.includes(d.status)) return;   // المتسلّم والمرفوض بيخرجوا
+    (withTech[d.technician] = withTech[d.technician] || []).push(d);
+  });
+  invTechLists = withTech;
+  const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
+
+  const techCards = techNames.length === 0
+    ? `<div class="empty-col">مفيش أجهزة مع فنيين دلوقتي</div>`
+    : `<div class="inv-cards">
+        ${techNames.map(t => {
+          const late = withTech[t].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
+          const safe = esc(t).replace(/'/g, "\\'");
+          return `<div class="inv-card ${invOpenTech===t ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="اضغط لعرض أجهزته">
+            <div class="inv-card-num" style="color:#0891A8;">${withTech[t].length}</div>
+            <div class="inv-card-label">🔧 ${esc(t)}</div>
+            ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} واقف بقاله كتير</div>` : ''}
+            <div class="inv-card-more">${invOpenTech===t ? 'إخفاء ▲' : 'عرض الأجهزة ▼'}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${invOpenTech && withTech[invOpenTech] ? `<div class="inv-open-list">
+        ${withTech[invOpenTech].map(d => dayCardHtml(d)).join('')}
+      </div>` : ''}`;
+
   document.getElementById('summariesBody').innerHTML = `
     ${filterBar}
+    ${searchHtml}
     ${cards}
+    <div class="inv-section-title">🔧 الأجهزة مع الفنيين (لسه ما اتسلّمتش)</div>
+    ${techCards}
     <div class="inv-section-title" style="color:#DC2626;">⚠ أجهزة واقفة بقالها كتير</div>
     ${stuckHtml}
   `;
+}
+
+function toggleInvTech(name){
+  invOpenTech = (invOpenTech === name) ? null : name;
+  renderSummaries();
 }
 
 
@@ -3030,6 +3138,7 @@ requireAccess().then(ok => {
   loadShopPhones();
   startRealtimeSync();
   setupAddFormEnterNav();
+  initGlobalScanner();
   claimSession();
   setInterval(checkSessionStillMine, 20000); // فحص كل ٢٠ ثانية
 });
