@@ -332,6 +332,17 @@
     padding:14px; margin-bottom:16px;
   }
 
+  /* ===== كروت الجرد القابلة للفتح ===== */
+  .inv-card{cursor:pointer; transition:transform .12s, box-shadow .12s;}
+  .inv-card:hover{transform:translateY(-2px); box-shadow:0 6px 18px rgba(16,16,20,.10);}
+  .inv-card.open{border-color:var(--accent); box-shadow:0 4px 16px rgba(8,145,168,.18);}
+  .inv-card-more{font-size:11.5px; color:#94A3B8; margin-top:7px; font-weight:700;}
+  .inv-open-list{
+    background:#fff; border:1px solid #EEF0F3; border-radius:14px;
+    padding:12px; margin:-8px 0 18px; box-shadow:0 2px 8px rgba(16,16,20,.04);
+    max-height:52vh; overflow-y:auto;
+  }
+
   /* ===== تقييم الفنيين ===== */
   .te-note{
     background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px;
@@ -1546,6 +1557,7 @@ function openSummaries(){
   document.getElementById('summariesOverlay').classList.remove('hidden');
 }
 function closeSummaries(){
+  invOpenCard = null;
   document.getElementById('summariesOverlay').classList.add('hidden');
 }
 
@@ -1683,17 +1695,81 @@ function closePrintPage(){
   document.getElementById('printOverlay').classList.add('hidden');
 }
 
+// ============================================================
+// قراءة الباركود — بتشتغل حتى لو الكيبورد على العربي
+// (الماسح بيبعت الكود ككتابة، فلو اللغة عربي بيتحول لحروف عربية)
+// ============================================================
+const AR_KEY_MAP = {
+  'ض':'q','ص':'w','ث':'e','ق':'r','ف':'t','غ':'y','ع':'u','ه':'i','خ':'o','ح':'p','ج':'[','د':']',
+  'ش':'a','س':'s','ي':'d','ب':'f','ل':'g','ا':'h','ت':'j','ن':'k','م':'l','ك':';','ط':"'",
+  'ئ':'z','ء':'x','ؤ':'c','ر':'v','ى':'n','ة':'m','و':',','ز':'.','ظ':'/',
+  'َ':'Q','ً':'W','ُ':'E','ٌ':'R','ﻹ':'T','إ':'Y','`':'ذ','ذ':'`','أ':'H','ـ':'B','،':'/','؛':'P'
+};
+
+function fromArabicKeyboard(str){
+  return String(str||'').split('').map(ch => AR_KEY_MAP[ch] !== undefined ? AR_KEY_MAP[ch] : ch).join('');
+}
+
+// كل الاحتمالات الممكنة للنص الممسوح
+function scanCandidates(raw){
+  const base = String(raw||'').trim();
+  const out = new Set();
+  [base, fromArabicKeyboard(base), enDigits(base), fromArabicKeyboard(enDigits(base))].forEach(v => {
+    if(!v) return;
+    out.add(v);
+    out.add(v.replace(/^#/, ''));      // من غير علامة #
+    out.add(v.replace(/\s+/g, ''));    // من غير مسافات
+  });
+  return [...out].filter(Boolean);
+}
+
+function findDeviceByScan(raw){
+  const cands = scanCandidates(raw);
+  for(const c of cands){
+    const up = c.toUpperCase();
+    const hit = devices.find(d =>
+      d.id === c ||
+      d.id.toUpperCase() === up ||
+      (d.serialNumber && d.serialNumber.toUpperCase() === up) ||
+      devRef(d).toUpperCase() === up ||
+      devRef(d).toUpperCase() === '#' + up ||
+      d.id.slice(-5).toUpperCase() === up
+    );
+    if(hit) return hit;
+  }
+  return null;
+}
+
 function handleScanEnter(){
-  const val = document.getElementById('scanInput').value.trim();
-  const match = devices.find(d => d.id === val || (d.serialNumber && d.serialNumber === val));
+  const raw = document.getElementById('scanInput').value;
+  const match = findDeviceByScan(raw);
   if(match){
+    document.getElementById('scanInput').value = '';
     closePrintPage();
     openDetail(match.id);
+    return;
+  }
+  // مفيش نتيجة: نصلّح النص لو كان عربي بالغلط عشان البحث بالاسم يشتغل
+  const fixed = fromArabicKeyboard(String(raw||'').trim());
+  if(fixed !== String(raw||'').trim()){
+    document.getElementById('scanInput').value = fixed;
+    renderPrintList();
   }
 }
 
 function renderPrintList(){
-  const q = document.getElementById('scanInput').value.trim();
+  const rawQ = document.getElementById('scanInput').value.trim();
+  // لو النص ممسوح بكيبورد عربي وبيطابق جهاز، نفتحه على طول
+  if(rawQ.length >= 8){
+    const auto = findDeviceByScan(rawQ);
+    if(auto){
+      document.getElementById('scanInput').value = '';
+      closePrintPage();
+      openDetail(auto.id);
+      return;
+    }
+  }
+  const q = rawQ;
   const area = document.getElementById('printListArea');
   document.getElementById('labelPreviewArea').innerHTML = '';
   if(!q){
@@ -1725,6 +1801,15 @@ function selectPrintDevice(id){
 // طباعة الليبل — نافذة مستقلة بمقاس الليبل الحقيقي
 // (الطريقة القديمة كانت بتطبع الداشبورد كله وتطلع صفحات فاضية)
 // ============================================================
+// تاريخ مختصر لليبل: 21/7 11:52
+function shortDateTime(iso){
+  if(!iso) return '';
+  const dt = new Date(iso);
+  if(isNaN(dt)) return '';
+  const p = n => String(n).padStart(2,'0');
+  return `${dt.getDate()}/${dt.getMonth()+1} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+}
+
 const LABEL_SIZE_KEY = 'ifix_label_size';
 let labelDeviceId = null;
 
@@ -1750,12 +1835,12 @@ function renderLabelInto(containerId, d){
   const container = document.getElementById(containerId);
   container.innerHTML = `
     <div class="print-label" id="printLabel">
-      <div class="label-row-title">${esc(d.deviceType)} ${esc(d.model)}</div>
-      <div class="label-row">${esc(d.customerName)}${d.customerPhone ? ' — '+esc(d.customerPhone) : ''}</div>
-      ${d.shopName ? `<div class="label-row">${esc(d.shopName)}</div>` : ''}
-      ${d.serialNumber ? `<div class="label-row mono">SN: ${esc(d.serialNumber)}</div>` : ''}
+      <div class="label-row-title">${esc(d.shopName || '—')}</div>
+      <div class="label-row" style="font-weight:800;">${esc(d.customerName)}</div>
+      <div class="label-row" style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)}</div>
+      ${d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : ''}
+      <div class="label-row">${esc(shortDateTime(d.intakeDate))}</div>
       <div id="qrHolder"></div>
-      <div class="label-id">${devRef(d)}</div>
     </div>
     <div class="label-size-row">
       <label>عرض الليبل (مم)<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
@@ -1798,10 +1883,12 @@ function printLabel(){
 
   // المقاسات بتتحسب من ارتفاع الليبل — فأي مقاس يطلع مظبوط
   const pad   = Math.max(0.8, sz.h * 0.045).toFixed(2);
-  const qrSz  = Math.min(sz.h * 0.58, sz.w * 0.31).toFixed(2);
-  const fTitle= Math.max(2.2, sz.h * 0.132).toFixed(2);
-  const fRow  = Math.max(1.8, sz.h * 0.094).toFixed(2);
-  const fRef  = Math.max(2.3, sz.h * 0.142).toFixed(2);
+  const qrSz  = Math.min(sz.h * 0.62, sz.w * 0.32).toFixed(2);
+  const fShop = Math.max(2.4, sz.h * 0.148).toFixed(2);   // اسم المحل — الأكبر
+  const fCust = Math.max(2.1, sz.h * 0.122).toFixed(2);   // اسم العميل
+  const fDev  = Math.max(2.1, sz.h * 0.122).toFixed(2);   // نوع الجهاز والموديل
+  const fIssue= Math.max(1.8, sz.h * 0.100).toFixed(2);   // المشكلة
+  const fDate = Math.max(1.6, sz.h * 0.090).toFixed(2);   // تاريخ الدخول
 
   const w = window.open('', '_blank', 'width=420,height=320');
   if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
@@ -1819,28 +1906,35 @@ function printLabel(){
   }
   .qr{ width:${qrSz}mm; height:${qrSz}mm; flex-shrink:0; }
   .qr img{ width:100%; height:100%; display:block; }
-  .info{ flex:1; min-width:0; line-height:1.35; }
-  .t{
-    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fTitle}mm;
+  .info{ flex:1; min-width:0; line-height:1.3; }
+  .shop{
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fShop}mm;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .r{
-    font-size:${fRow}mm; font-weight:700;
+  .cust{
+    font-family:'Cairo',sans-serif; font-weight:700; font-size:${fCust}mm;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .mono{ font-family:'Courier New',monospace; }
-  .ref{
-    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fRef}mm;
-    letter-spacing:.4px; margin-top:${(sz.h*0.02).toFixed(2)}mm;
+  .dev{
+    font-family:'Cairo',sans-serif; font-weight:700; font-size:${fDev}mm;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .issue{
+    font-size:${fIssue}mm; font-weight:700;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .date{
+    font-size:${fDate}mm; font-weight:700; direction:ltr; text-align:right;
+    white-space:nowrap; overflow:hidden;
   }
 </style></head><body>
   ${qr ? `<div class="qr"><img src="${qr}" alt=""></div>` : ''}
   <div class="info">
-    <div class="t">${esc(d.deviceType)} ${esc(d.model)}</div>
-    <div class="r">${esc(d.customerName)}</div>
-    ${d.customerPhone ? `<div class="r mono">${esc(waPhoneDisplay(d.customerPhone))}</div>` : ''}
-    ${d.shopName ? `<div class="r">${esc(d.shopName)}</div>` : ''}
-    <div class="ref">${esc(devRef(d))}</div>
+    <div class="shop">${esc(d.shopName || '')}</div>
+    <div class="cust">${esc(d.customerName || '')}</div>
+    <div class="dev">${esc(d.deviceType)} ${esc(d.model)}</div>
+    ${d.reportedIssue ? `<div class="issue">${esc(d.reportedIssue)}</div>` : ''}
+    <div class="date">${esc(shortDateTime(d.intakeDate))}</div>
   </div>
 <script>
   window.onload = function(){
@@ -2521,6 +2615,13 @@ function stuckDevices(){
     .sort((a,b) => b.days - a.days);
 }
 
+let invOpenCard = null;
+let invLists = {};
+function toggleInvCard(key){
+  invOpenCard = (invOpenCard === key) ? null : key;
+  renderSummaries();
+}
+
 function renderSummaries(){
   const chip = (mode, label) =>
     `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
@@ -2537,13 +2638,31 @@ function renderSummaries(){
   const delivered = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inRange(dd); });
   const inProgress = devices.filter(d => ACTIVE_STATUSES.includes(d.status));
   const stuck = stuckDevices();
+  // الكروت قابلة للضغط — تفتح قائمة الأجهزة اللي جواها
+  invLists = {
+    received: received,
+    delivered: delivered,
+    progress: inProgress,
+    stuck: stuck.map(x => x.d),
+  };
+  const card = (key, num, color, label) => `
+    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="اضغط لعرض الأجهزة">
+      <div class="inv-card-num" style="color:${color};">${num}</div>
+      <div class="inv-card-label">${label}</div>
+      <div class="inv-card-more">${invOpenCard===key ? 'إخفاء ▲' : 'عرض الأجهزة ▼'}</div>
+    </div>`;
   const cards = `
     <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${received.length}</div><div class="inv-card-label">جهاز استُلم في الفترة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${delivered.length}</div><div class="inv-card-label">جهاز اتسلّم في الفترة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${inProgress.length}</div><div class="inv-card-label">جهاز شغال عليه دلوقتي</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#DC2626;">${stuck.length}</div><div class="inv-card-label">جهاز واقف من ${STUCK_DAYS} أيام أو أكتر</div></div>
-    </div>`;
+      ${card('received', received.length, '#2563EB', 'جهاز استُلم في الفترة')}
+      ${card('delivered', delivered.length, '#16A34A', 'جهاز اتسلّم في الفترة')}
+      ${card('progress', inProgress.length, '#B45309', 'جهاز شغال عليه دلوقتي')}
+      ${card('stuck', stuck.length, '#DC2626', `جهاز واقف من ${STUCK_DAYS} أيام أو أكتر`)}
+    </div>
+    ${invOpenCard ? `<div class="inv-open-list">
+      ${(invLists[invOpenCard] || []).length === 0
+        ? '<div class="empty-col">مفيش أجهزة في الخانة دي</div>'
+        : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
+    </div>` : ''}`;
 
   const stuckHtml = stuck.length === 0
     ? `<div class="empty-col">مفيش أجهزة واقفة — كله ماشي 👌</div>`
