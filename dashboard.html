@@ -318,6 +318,31 @@
   }
   .acc-mini-btn:hover{background:#F8FAFC;}
 
+  /* ===== كبار العملاء ===== */
+  .cust-item{
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    background:#fff; border:1px solid #EEF0F3; border-radius:12px;
+    padding:13px 15px; margin-bottom:8px; box-shadow:0 2px 8px rgba(16,16,20,.04);
+  }
+  .cust-rank{
+    width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;
+  }
+  .cust-item:nth-child(1) .cust-rank{background:#BE8A1C;}
+  .cust-item:nth-child(2) .cust-rank{background:#94A3B8;}
+  .cust-item:nth-child(3) .cust-rank{background:#B45309;}
+
+  /* ===== شريط وضع الأوفلاين ===== */
+  .offline-bar{
+    position:fixed; top:0; inset-inline:0; z-index:300;
+    background:#B45309; color:#fff; text-align:center;
+    padding:9px 14px calc(9px + env(safe-area-inset-top) * 0);
+    padding-top:calc(9px + env(safe-area-inset-top));
+    font-size:13.5px; font-weight:700;
+    box-shadow:0 3px 12px rgba(180,83,9,.4);
+  }
+
   /* ===== الزرار العائم لرسالة الواتساب ===== */
   .wa-pending{
     position:fixed; inset-inline:14px; bottom:calc(16px + env(safe-area-inset-bottom));
@@ -379,6 +404,7 @@
   </div>
   <button class="menu-btn" onclick="toggleMenu()">⋮</button>
   <div id="menuDropdown" class="menu-dropdown hidden">
+    <button onclick="openAnalytics()">📊 الملخص</button>
     <button onclick="openSummaries()">📋 الجرد</button>
     <button onclick="openAccounts()">🧾 الحسابات</button>
     <button onclick="openPrintPage()">🖨 الطباعة والمسح الضوئي</button>
@@ -467,6 +493,17 @@
   </div>
 </div>
 
+<!-- Analytics (الملخص) page -->
+<div id="analyticsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>📊 الملخص</h2>
+      <button class="close-btn" onclick="closeAnalytics()">×</button>
+    </div>
+    <div id="analyticsBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
 <!-- Accounts (الحسابات) page -->
 <div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
@@ -515,6 +552,10 @@
 // ============================================================
 // الاتصال بـ Supabase + حماية الدخول والاشتراك
 // ============================================================
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
 const sb = supabase.createClient(
   "https://ujpnewqqdkmiedtwvdsy.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
@@ -525,6 +566,18 @@ let currentUser = { name: '', email: '' };
 
 // ممنوع الدخول من غير تسجيل + اشتراك المحل ساري
 async function requireAccess(){
+  // مفيش نت؟ لو فيه كاش وجلسة سابقة → ندخل وضع الأوفلاين
+  if(!isOnline()){
+    const cachedUser = localStorage.getItem('ifix_user');
+    if(cachedUser && localStorage.getItem(DEVICES_CACHE_KEY)){
+      try{ currentUser = JSON.parse(cachedUser); }catch(e){}
+      enterOfflineMode();
+      return true;
+    }
+    window.location.href = 'index.html';
+    return false;
+  }
+
   const { data: { session } } = await sb.auth.getSession();
   if(!session){ window.location.href = 'index.html'; return false; }
   try{
@@ -533,6 +586,7 @@ async function requireAccess(){
     currentUser.name = (prof && prof.full_name && prof.full_name.trim())
       ? prof.full_name.trim()
       : (currentUser.email.split('@')[0] || 'مستخدم');
+    try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
 
     const { data, error } = await sb.from('shop').select('paid_until').eq('id', 1).single();
     if(error || !data || new Date(data.paid_until) <= new Date()){
@@ -574,20 +628,40 @@ window.storage = {
 // ============================================================
 function startRealtimeSync(){
   try{
+    // مزامنة الأجهزة لحظياً — صف بصف
+    sb.channel('devices_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devices_data' }, (payload) => {
+        if(payload.eventType === 'DELETE'){
+          const id = payload.old && payload.old.id;
+          if(id && lastSynced[id] !== undefined){
+            devices = devices.filter(d => d.id !== id);
+            delete lastSynced[id];
+            writeCache(); render();
+          }
+          return;
+        }
+        const row = payload.new;
+        if(!row || !row.id) return;
+        const j = JSON.stringify(row.data);
+        if(lastSynced[row.id] === j) return;   // التغيير أصلاً من عندنا
+        devices = [row.data, ...devices.filter(d => d.id !== row.id)];
+        devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
+        lastSynced[row.id] = j;
+        writeCache(); render();
+      })
+      .subscribe();
+
+    // مزامنة دفتر الحسابات
     sb.channel('app_data_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, (payload) => {
         const row = payload.new;
-        if(!row) return;
-        if(row.key === STORAGE_KEY){
-          if(row.value === JSON.stringify(devices)) return; // التغيير أصلاً من عندنا
-          try{ devices = JSON.parse(row.value); render(); }catch(e){}
-        } else if(row.key === LEDGER_KEY){
-          if(row.value === JSON.stringify(ledger)) return;
-          try{
-            ledger = JSON.parse(row.value);
-            if(!document.getElementById('accountsOverlay').classList.contains('hidden')) renderAccounts();
-          }catch(e){}
-        }
+        if(!row || row.key !== LEDGER_KEY) return;
+        if(row.value === JSON.stringify(ledger)) return;
+        try{
+          ledger = JSON.parse(row.value);
+          try{ localStorage.setItem('ifix_ledger_cache', row.value); }catch(e){}
+          if(!document.getElementById('accountsOverlay').classList.contains('hidden')) renderAccounts();
+        }catch(e){}
       })
       .subscribe();
   }catch(e){ /* المزامنة اللحظية اختيارية — السيستم شغال من غيرها */ }
@@ -626,28 +700,173 @@ function setSaving(on){
   document.getElementById('saveIndicator').textContent = on ? 'جاري الحفظ...' : '';
 }
 
+// ============================================================
+// طبقة التخزين الجديدة: صف مستقل لكل جهاز (devices_data)
+// + وضع الأوفلاين: كاش محلي، طابور تعديلات، مزامنة تلقائية
+// ============================================================
+const DEVICES_CACHE_KEY = 'ifix_devices_cache';
+const PENDING_KEY = 'ifix_pending_ops';
+let lastSynced = {};          // id → JSON string لآخر نسخة اتحفظت على السيرفر
+let offlineMode = false;
+
+const isOnline = () => (typeof navigator === 'undefined') || navigator.onLine !== false;
+
+function writeCache(){
+  try{ localStorage.setItem(DEVICES_CACHE_KEY, JSON.stringify(devices)); }catch(e){}
+}
+function readCache(){
+  try{ return JSON.parse(localStorage.getItem(DEVICES_CACHE_KEY) || '[]'); }catch(e){ return []; }
+}
+function snapshotSynced(){
+  lastSynced = {};
+  devices.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
+}
+function readQueue(){
+  try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '{"upserts":{},"deletes":[]}'); }
+  catch(e){ return {upserts:{}, deletes:[]}; }
+}
+function writeQueue(q){
+  try{ localStorage.setItem(PENDING_KEY, JSON.stringify(q)); }catch(e){}
+}
+function queueOps(changed, removed){
+  const q = readQueue();
+  changed.forEach(d => { q.upserts[d.id] = d; delete q.deletes; q.deletes = (q.deletes||[]).filter(x => x !== d.id); });
+  removed.forEach(id => { delete q.upserts[id]; if(!q.deletes.includes(id)) q.deletes.push(id); });
+  writeQueue(q);
+  updateOfflineBar();
+}
+function pendingCount(){
+  const q = readQueue();
+  return Object.keys(q.upserts).length + q.deletes.length;
+}
+
+// شريط الأوفلاين
+function updateOfflineBar(){
+  let bar = document.getElementById('offlineBar');
+  const n = pendingCount();
+  const show = offlineMode || n > 0;
+  if(!show){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'offlineBar';
+    bar.className = 'offline-bar';
+    document.body.appendChild(bar);
+  }
+  bar.textContent = offlineMode
+    ? `📴 شغال أوفلاين — التعديلات محفوظة على الجهاز${n ? ` (${n} في انتظار الرفع)` : ''} وهتترفع أول ما النت يرجع`
+    : `🔄 جاري رفع ${n} تعديل معلّق...`;
+}
+function enterOfflineMode(){
+  offlineMode = true;
+  updateOfflineBar();
+}
+function exitOfflineMode(){
+  offlineMode = false;
+  updateOfflineBar();
+}
+
 async function loadDevices(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, true);
-    devices = res ? JSON.parse(res.value) : [];
+    const { data, error } = await sb.from('devices_data').select('id,data');
+    if(error) throw error;
+
+    if(data && data.length){
+      devices = data.map(r => r.data);
+    } else {
+      // الترحيل التلقائي من البنية القديمة (الكتلة الواحدة) — مرة واحدة بس
+      let old = null;
+      try{ old = await window.storage.get(STORAGE_KEY); }catch(e){}
+      devices = old ? JSON.parse(old.value) : [];
+      if(devices.length){
+        await sb.from('devices_data').upsert(
+          devices.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
+        );
+      }
+    }
+    devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
+    exitOfflineMode();
   }catch(e){
-    devices = [];
+    // مفيش نت أو السيرفر مش متاح → نشتغل من الكاش المحلي
+    devices = readCache();
+    enterOfflineMode();
   }
+  snapshotSynced();
+  writeCache();
   render();
 }
 
 async function persist(){
   setSaving(true);
   showError('');
+  writeCache();   // الكاش المحلي دايماً محدث — ده اللي بيشتغل منه الأوفلاين
+
+  // حساب الفرق: مين اتغير ومين اتمسح
+  const changed = [], removed = [];
+  const ids = new Set(devices.map(d => d.id));
+  devices.forEach(d => { if(lastSynced[d.id] !== JSON.stringify(d)) changed.push(d); });
+  Object.keys(lastSynced).forEach(id => { if(!ids.has(id)) removed.push(id); });
+
+  if(!changed.length && !removed.length){ setSaving(false); return; }
+
+  if(!isOnline()){
+    queueOps(changed, removed);
+    enterOfflineMode();
+    setSaving(false);
+    return;
+  }
+
   try{
-    const res = await window.storage.set(STORAGE_KEY, JSON.stringify(devices), true);
-    if(!res) throw new Error('save failed');
+    if(changed.length){
+      const { error } = await sb.from('devices_data').upsert(
+        changed.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
+      );
+      if(error) throw error;
+    }
+    for(const id of removed){
+      await sb.from('devices_data').delete().eq('id', id);
+    }
+    changed.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
+    removed.forEach(id => { delete lastSynced[id]; });
   }catch(e){
-    showError('حصل خطأ في الحفظ، حاول تاني');
+    // فشل الحفظ = نعامله كأوفلاين: التعديل ميضيعش أبداً
+    queueOps(changed, removed);
+    enterOfflineMode();
   }finally{
     setSaving(false);
   }
 }
+
+// رفع الطابور المعلّق أول ما النت يرجع
+async function flushQueue(){
+  if(!isOnline()) return;
+  const q = readQueue();
+  const ups = Object.values(q.upserts);
+  if(!ups.length && !q.deletes.length){
+    if(offlineMode){ exitOfflineMode(); loadDevices(); }
+    return;
+  }
+  try{
+    if(ups.length){
+      const { error } = await sb.from('devices_data').upsert(
+        ups.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
+      );
+      if(error) throw error;
+    }
+    for(const id of q.deletes){
+      await sb.from('devices_data').delete().eq('id', id);
+    }
+    writeQueue({upserts:{}, deletes:[]});
+    exitOfflineMode();
+    // نحدّث صفحات متابعة الأجهزة اللي اترفعت
+    ups.forEach(d => { if(d.trackToken) syncTrack(d); });
+    await loadDevices();   // نجيب أحدث نسخة من السيرفر (فيها شغل باقي الموظفين)
+  }catch(e){ /* لسه مفيش نت فعلي — هنحاول تاني */ }
+}
+if(typeof window !== 'undefined'){
+  window.addEventListener('online', () => setTimeout(flushQueue, 1500));
+  window.addEventListener('offline', () => enterOfflineMode());
+}
+setInterval(flushQueue, 30000);
 
 const BACKUP_SETTINGS_KEY = "backup-settings";
 let backupSettings = { frequency: 'off', lastAutoBackupAt: null };
@@ -1511,6 +1730,10 @@ async function copyTrackLink(id){
 function openWa(phone, msg){
   const p = waPhone(phone);
   if(!p) return false;
+  if(!isOnline()){
+    alert('النت مقطوع — رسالة الواتساب مش هتتبعت دلوقتي.\nلما النت يرجع ابعتها من زرار "💬 واتساب العميل" جوه تفاصيل الجهاز.');
+    return false;
+  }
   const text = encodeURIComponent(msg);
   const webUrl = 'https://wa.me/' + p + '?text=' + text;
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -1667,7 +1890,11 @@ async function loadLedger(){
   try{
     const r = await window.storage.get(LEDGER_KEY);
     ledger = r ? JSON.parse(r.value) : [];
-  }catch(e){ ledger = []; }
+    try{ localStorage.setItem('ifix_ledger_cache', JSON.stringify(ledger)); }catch(e){}
+  }catch(e){
+    // أوفلاين → قراءة فقط من الكاش
+    try{ ledger = JSON.parse(localStorage.getItem('ifix_ledger_cache') || '[]'); }catch(e2){ ledger = []; }
+  }
 }
 async function persistLedger(){
   try{ await window.storage.set(LEDGER_KEY, JSON.stringify(ledger)); }catch(e){}
@@ -1688,6 +1915,7 @@ function addLedgerDebit(d, price){
 }
 
 async function recordPayment(){
+  if(!isOnline()){ alert('تسجيل الدفعات محتاج نت — استنى النت يرجع الأول عشان الفلوس متتسجلش مرتين بالغلط.'); return; }
   const shop = document.getElementById('payShop').value.trim();
   const amount = parseInt(document.getElementById('payAmount').value) || 0;
   const note = document.getElementById('payNote').value.trim();
@@ -2050,6 +2278,178 @@ function expandTech(name){
   const list = devices.filter(d => d.technician === name && (ACTIVE_STATUSES.includes(d.status) || (deliveredDateOf(d) && inRange(deliveredDateOf(d)))));
   document.getElementById('techExpanded').innerHTML =
     `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('') || '<div class="empty-col">مفيش أجهزة</div>'}</div>`;
+}
+
+// ============================================================
+// صفحة الملخص: الفلوس + سرعة الفنيين ونسبة المرتجع + كبار العملاء
+// ============================================================
+let anPeriod = { mode: 'month', from: '', to: '' };
+
+function openAnalytics(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  document.getElementById('analyticsOverlay').classList.remove('hidden');
+  renderAnalytics();
+}
+function closeAnalytics(){ document.getElementById('analyticsOverlay').classList.add('hidden'); }
+
+function setAnPeriod(mode){ anPeriod.mode = mode; renderAnalytics(); }
+function setAnCustom(){
+  anPeriod.mode = 'custom';
+  anPeriod.from = document.getElementById('anFrom').value;
+  anPeriod.to = document.getElementById('anTo').value;
+  renderAnalytics();
+}
+function anRange(){
+  const now = new Date();
+  const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  if(anPeriod.mode === 'today') return [startOfDay(now), null];
+  if(anPeriod.mode === 'week'){ const s2 = startOfDay(now); s2.setDate(s2.getDate() - 6); return [s2, null]; }
+  if(anPeriod.mode === 'month'){ const s2 = startOfDay(now); s2.setDate(s2.getDate() - 29); return [s2, null]; }
+  if(anPeriod.mode === 'custom'){
+    const f = anPeriod.from ? startOfDay(new Date(anPeriod.from)) : null;
+    let t = null;
+    if(anPeriod.to){ t = new Date(anPeriod.to); t.setHours(23,59,59,999); }
+    return [f, t];
+  }
+  return [null, null];
+}
+function inAnRange(iso){
+  if(!iso) return false;
+  const [f, t] = anRange();
+  const d = new Date(iso);
+  if(f && d < f) return false;
+  if(t && d > t) return false;
+  return true;
+}
+
+// المرتجع بتعريفنا: جهاز اتسلّم فعلاً وبعدها رجع لحالة "المرتجعات"
+// بيرجع تاريخ الرجوع لو حصل، أو null
+function returnAfterDeliveryDate(d){
+  const h = d.statusHistory || [];
+  let deliveredAt = -1;
+  for(let i = 0; i < h.length; i++){
+    if(h[i].status === 'delivered') deliveredAt = i;
+    if(h[i].status === 'returned' && deliveredAt !== -1 && i > deliveredAt) return h[i].date;
+  }
+  return null;
+}
+
+// مدة الصيانة بالأيام: من الاستلام لأول تسليم
+function repairDays(d){
+  const dd = deliveredDateOf(d);
+  if(!dd || !d.intakeDate) return null;
+  const days = (new Date(dd) - new Date(d.intakeDate)) / 86400000;
+  return days >= 0 ? days : null;
+}
+
+function renderAnalytics(){
+  const chip = (mode, label) =>
+    `<button class="inv-chip ${anPeriod.mode===mode?'active':''}" onclick="setAnPeriod('${mode}')">${label}</button>`;
+  const filterBar = `
+    <div class="inv-filter">
+      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      <span class="inv-custom">
+        من <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
+        إلى <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
+      </span>
+    </div>`;
+
+  // ===== الفلوس =====
+  const deliveredInRange = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inAnRange(dd); });
+  const cashCollected = deliveredInRange
+    .filter(d => d.paymentStatus === 'paid' && d.paymentType !== 'deferred')
+    .reduce((t, d) => t + (parseInt(d.agreedPrice) || 0), 0);
+  const deferredAdded = ledger
+    .filter(e => e.type === 'debit' && inAnRange(e.date))
+    .reduce((t, e) => t + (e.amount || 0), 0);
+  const shopPayments = ledger
+    .filter(e => e.type === 'credit' && inAnRange(e.date))
+    .reduce((t, e) => t + (e.amount || 0), 0);
+  const totalCashIn = cashCollected + shopPayments;
+  const totalOutstanding = ledger.reduce((t, e) => t + (e.type === 'debit' ? (e.amount||0) : -(e.amount||0)), 0);
+
+  const fmt = n => n.toLocaleString('en-EG');
+  const moneyCards = `
+    <div class="inv-section-title">💰 الفلوس</div>
+    <div class="inv-cards">
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${fmt(totalCashIn)}</div><div class="inv-card-label">إجمالي الكاش المحصّل في الفترة (ج.م)</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${fmt(cashCollected)}</div><div class="inv-card-label">منها فوري من التسليمات</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">ومنها دفعات من المحلات</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${fmt(deferredAdded)}</div><div class="inv-card-label">آجل اتسجل في الفترة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">إجمالي المتبقي على المحلات (كل الوقت)</div></div>
+    </div>`;
+
+  // ===== الفنيين: السرعة والمرتجع =====
+  const techs = [...new Set(devices.map(d => d.technician).filter(Boolean))];
+  const techRows = techs.map(t => {
+    const done = deliveredInRange.filter(d => d.technician === t);
+    const durations = done.map(repairDays).filter(x => x !== null);
+    const avg = durations.length ? (durations.reduce((a,b) => a+b, 0) / durations.length) : null;
+    const returns = devices.filter(d => {
+      if(d.technician !== t) return false;
+      const rd = returnAfterDeliveryDate(d);
+      return rd && inAnRange(rd);
+    }).length;
+    const rate = done.length ? Math.round((returns / done.length) * 100) : (returns ? 100 : 0);
+    return { t, count: done.length, avg, returns, rate };
+  }).filter(r => r.count || r.returns)
+    .sort((a,b) => b.count - a.count);
+
+  const avgFmt = v => v === null ? '—' : (v < 1 ? 'أقل من يوم' : v.toFixed(1) + ' يوم');
+  const techTable = techRows.length === 0
+    ? `<div class="empty-col">مفيش تسليمات في الفترة دي</div>`
+    : `<table class="inv-table">
+        <tr><th>الفني</th><th>سلّم في الفترة</th><th>متوسط مدة الصيانة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
+        ${techRows.map(r => `<tr>
+          <td style="font-weight:800;">🔧 ${esc(r.t)}</td>
+          <td style="font-weight:800; color:#16A34A;">${r.count}</td>
+          <td>${avgFmt(r.avg)}</td>
+          <td style="font-weight:800; color:${r.returns ? '#DC2626' : '#64748B'};">${r.returns}</td>
+          <td style="font-weight:800; color:${r.rate >= 20 ? '#DC2626' : r.rate > 0 ? '#B45309' : '#16A34A'};">${r.rate}%</td>
+        </tr>`).join('')}
+      </table>`;
+
+  // ===== كبار العملاء =====
+  const byCustomer = {};
+  devices.forEach(d => {
+    if(!inAnRange(d.intakeDate)) return;
+    const phone = waPhone(d.customerPhone || '');
+    const key = phone || ('name:' + (d.customerName || '').trim());
+    if(!key || key === 'name:') return;
+    byCustomer[key] = byCustomer[key] || { name: d.customerName || '', phone: d.customerPhone || '', shop: d.shopName || '', count: 0, paid: 0 };
+    byCustomer[key].count++;
+    if(d.paymentStatus === 'paid' && d.paymentType !== 'deferred') byCustomer[key].paid += (parseInt(d.agreedPrice) || 0);
+    if(d.customerName) byCustomer[key].name = d.customerName;
+  });
+  const topCustomers = Object.values(byCustomer).sort((a,b) => b.count - a.count).slice(0, 10);
+
+  const custList = topCustomers.length === 0
+    ? `<div class="empty-col">مفيش عملاء في الفترة دي</div>`
+    : topCustomers.map((c, i) => `
+      <div class="cust-item">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="cust-rank">${i + 1}</div>
+          <div>
+            <div style="font-weight:800;">${esc(c.name || 'بدون اسم')}${c.shop ? ` <span style="color:#94A3B8; font-weight:500; font-size:13px;">— ${esc(c.shop)}</span>` : ''}</div>
+            <div style="font-size:13px; color:#64748B;">${c.count} جهاز في الفترة${c.paid ? ` — دفع فوري ${fmt(c.paid)} ج.م` : ''}</div>
+          </div>
+        </div>
+        ${c.phone ? `<button class="btn-secondary" style="color:#16A34A; border-color:#BBF7D0;" onclick="sendThanks('${esc(c.phone)}', '${esc(c.name || '').replace(/'/g, "\\\\'")}')">💬 رسالة شكر</button>` : ''}
+      </div>`).join('');
+
+  document.getElementById('analyticsBody').innerHTML = `
+    ${filterBar}
+    ${moneyCards}
+    <div class="inv-section-title">🔧 أداء الفنيين — السرعة والمرتجع</div>
+    ${techTable}
+    <div class="inv-section-title">⭐ كبار العملاء (الأكتر تعاملاً في الفترة)</div>
+    ${custList}
+  `;
+}
+
+function sendThanks(phone, name){
+  const msg = `أهلاً ${name || 'يا فندم'} 🌟\nكل الشكر لثقتك المستمرة في I Fix Team — وجودك من أهم عملائنا شرف لينا.\nأي جهاز محتاج صيانة، إحنا دايماً في خدمتك 🙏`;
+  openWa(phone, msg);
 }
 
 // نقطة البداية: التحقق من الدخول والاشتراك قبل تحميل أي بيانات
