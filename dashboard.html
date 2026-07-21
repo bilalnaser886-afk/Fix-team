@@ -413,7 +413,7 @@
       <label class="field"><span>اسم المحل</span><input id="f_shopName" /></label>
       <label class="field"><span>اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
-      <label class="field"><span>رقم التليفون</span><input id="f_customerPhone" /></label>
+      <label class="field"><span>رقم التليفون</span><input id="f_customerPhone" oninput="fixDigitsInput(this)" /></label>
       <div class="row2">
         <label class="field"><span>نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
         <label class="field"><span>الموديل</span><input id="f_model" /></label>
@@ -421,7 +421,7 @@
       <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
       <label class="field"><span>العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
       <label class="field"><span>حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
-      <label class="field"><span>السعر المتوقع (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="number" min="0" step="1" inputmode="numeric" oninput="togglePayTypeVisibility()" /></label>
+      <label class="field"><span>السعر المتوقع (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
         <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
         <div class="pay-choice">
@@ -965,7 +965,7 @@ function renderDetail(){
       <label class="field"><span>اسم العميل</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
       <label class="field"><span>اسم المحل</span><input value="${esc(d.shopName||'')}" placeholder="اسم المحل" onblur="editField('shopName', this.value)" /></label>
     </div>
-    <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="number" min="0" step="1" inputmode="numeric" value="${esc(d.agreedPrice||'')}" onblur="editPrice(this.value)" /></label>
+    <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
     ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع${d.status==='delivered' ? ' (اتحددت عند التسليم)' : ''}</span>
       ${d.status==='delivered'
@@ -1060,10 +1060,6 @@ async function changeStatus(newStatus, paymentChoice){
   }
 
   showError('');
-  // إشعار واتساب تلقائي للعميل مع مراحل: الكشف، الصيانة، تم الصيانة، التسليم
-  if(d.customerPhone && ['diagnosing','repairing','done','delivered'].includes(newStatus)){
-    openWa(d.customerPhone, waStatusMsg(d, newStatus));
-  }
   devices = devices.map(x => x.id === selectedId
     ? {
         ...x, ...extra,
@@ -1075,6 +1071,8 @@ async function changeStatus(newStatus, paymentChoice){
   renderDetail();
   render();
   await persist();
+  const stDev = devices.find(x => x.id === selectedId);
+  if(stDev){ if(!stDev.trackToken){ await ensureTrackToken(stDev.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
 
 async function deleteDevice(){
@@ -1442,6 +1440,14 @@ async function checkSessionStillMine(){
 // ============================================================
 // إشعارات واتساب للعميل + كشف حساب المحل على واتساب
 // ============================================================
+// تحويل الأرقام العربية (٠١٢٣) والفارسية (۰۱۲۳) لإنجليزي
+function enDigits(v){
+  return String(v||'')
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+}
+function fixDigitsInput(el){ const v = enDigits(el.value); if(v !== el.value) el.value = v; }
+
 function waPhone(raw){
   let p = String(raw||'').replace(/[^\d]/g,'');
   if(!p) return '';
@@ -1467,6 +1473,7 @@ async function syncTrack(d){
       deviceType: d.deviceType || '',
       model: d.model || '',
       status: d.status,
+      issue: d.reportedIssue || '',
       price: parseInt(d.agreedPrice) || 0,
       intakeDate: d.intakeDate,
       updatedAt: new Date().toISOString()
@@ -1594,7 +1601,7 @@ async function waShop(shop){
 // السعر بالأرقام الصحيحة + طريقة الدفع (فوري/آجل)
 // ============================================================
 const intPrice = v => {
-  const n = Math.round(Number(String(v||'').replace(/[^\d.]/g,'')));
+  const n = Math.round(Number(enDigits(v).replace(/[^\d.]/g,'')));
   return (isFinite(n) && n > 0) ? String(n) : '';
 };
 
@@ -1642,11 +1649,6 @@ async function editPrice(value){
     }
   }
 
-  // إشعار واتساب بالتكلفة أول ما تتحدد (لو الجهاز لسه عند المحل)
-  const hadPrice = (parseInt(d.agreedPrice) || 0) > 0;
-  if(price && !hadPrice && d.customerPhone && d.status !== 'delivered'){
-    openWa(d.customerPhone, waStatusMsg({...d, agreedPrice: price}, 'price'));
-  }
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
     : x);

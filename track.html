@@ -90,6 +90,21 @@
   .step.done .step-title{color:var(--green);}
   .step-sub{font-size:12.5px; color:#8A8F98; margin-top:2px;}
 
+  /* العطل */
+  .issue-card{
+    display:none; margin-top:16px; background:#EEF2FF;
+    border:1.5px solid #C7D2FE; border-radius:14px; padding:13px 16px;
+  }
+  .issue-card .lbl{font-size:12.5px; color:#4338CA; font-weight:800; margin-bottom:4px;}
+  .issue-card .txt{font-size:14.5px; font-weight:600; line-height:1.7;}
+
+  /* رسالة الاستلام */
+  .pickup{
+    display:none; margin-top:16px; background:linear-gradient(135deg,#F0FDF4,#DCFCE7);
+    border:1.5px solid #86EFAC; border-radius:14px; padding:16px; text-align:center;
+    font-weight:800; font-size:15.5px; color:#166534;
+  }
+
   /* السعر */
   .price-card{
     display:none; margin-top:18px; background:linear-gradient(135deg, #FFF8EC, #FFF3D9);
@@ -129,6 +144,13 @@
       <div class="bar-status" id="statusLine"></div>
 
       <div class="steps" id="steps"></div>
+
+      <div class="issue-card" id="issueCard">
+        <div class="lbl" id="issueLbl"></div>
+        <div class="txt" id="issueTxt"></div>
+      </div>
+
+      <div class="pickup" id="pickupBox">✅ جهازك جاهز — برجاء الاستلام من الفرع 🙏</div>
 
       <div class="price-card" id="priceCard">
         <div class="lbl">تكلفة الصيانة</div>
@@ -214,6 +236,19 @@ function renderTrack(data){
     </div>`;
   }).join('');
 
+  // العطل: قبل الصيانة = المُبلّغ عنه، من الصيانة وبعدها = المكتشف
+  if(data.issue && data.issue.trim()){
+    $('issueCard').style.display = 'block';
+    const discovered = ['repairing','done','delivered'].includes(st);
+    $('issueLbl').textContent = discovered ? '🔎 تم اكتشاف العطل' : '📝 العطل المُبلّغ عنه';
+    $('issueTxt').textContent = data.issue;
+  } else {
+    $('issueCard').style.display = 'none';
+  }
+
+  // رسالة الاستلام من الفرع
+  $('pickupBox').style.display = (st === 'done') ? 'block' : 'none';
+
   if(data.price > 0){
     $('priceCard').style.display = 'block';
     $('priceNum').textContent = data.price.toLocaleString('en-EG') + ' ج.م';
@@ -236,7 +271,9 @@ async function load(){
 }
 
 load();
-setInterval(load, 20000); // تحديث تلقائي كل ٢٠ ثانية
+setInterval(load, 10000); // تحديث تلقائي كل ١٠ ثواني
+// ولو العميل رجع للصفحة بعد ما سابها، تتحدث فوراً
+document.addEventListener('visibilitychange', () => { if(!document.hidden) load(); });
 </script>
 </body>
 </html>
