@@ -1053,13 +1053,20 @@ function matchesSearch(d, q){
     .some(v => v && String(v).includes(q));
 }
 
+function clearSearchBox(id){
+  const el = document.getElementById(id);
+  if(el) el.value = '';
+}
+
 function openColumn(statusKey){
   currentColumn = statusKey;
+  clearSearchBox('columnSearch');   // خانة البحث واحدة لكل الحالات — لازم تتفضى
   renderColumn();
   document.getElementById('columnOverlay').classList.remove('hidden');
 }
 function closeColumn(){
   document.getElementById('columnOverlay').classList.add('hidden');
+  clearSearchBox('columnSearch');
   currentColumn = null;
 }
 function renderColumn(){
@@ -1558,6 +1565,7 @@ document.addEventListener('click', (e) => {
 
 function openSummaries(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  clearSearchBox('invSearch');
   renderSummaries();
   document.getElementById('summariesOverlay').classList.remove('hidden');
 }
@@ -1730,6 +1738,17 @@ function scanCandidates(raw){
 }
 
 function findDeviceByScan(raw){
+  // ===== الطريقة المضمونة: مطابقة بالأرقام فقط =====
+  // الأرقام مبتتأثرش بلغة الكيبورد خالص، وكود الجهاز فيه ١٣ رقم فريدة
+  const digits = enDigits(raw).replace(/[^0-9]/g, '');
+  if(digits.length >= 10){
+    const byDigits = devices.find(d => {
+      const idDigits = String(d.id).replace(/[^0-9]/g, '');
+      return idDigits && (idDigits === digits || idDigits.endsWith(digits) || digits.endsWith(idDigits));
+    });
+    if(byDigits) return byDigits;
+  }
+
   const cands = scanCandidates(raw);
   for(const c of cands){
     const up = c.toUpperCase();
@@ -1752,10 +1771,25 @@ function findDeviceByScan(raw){
 // ============================================================
 let gScanBuf = '', gScanLast = 0;
 
+// بيفتح الجهاز وينضف أي أثر للكود من الخانات
+function openScannedDevice(hit){
+  const el = document.activeElement;
+  if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')){
+    el.value = '';
+    try{ el.dispatchEvent(new Event('input', { bubbles:true })); }catch(err){}
+    el.blur();
+  }
+  ['columnSearch','invSearch','scanInput','accSearch'].forEach(clearSearchBox);
+  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
+    .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
+  gScanBuf = '';
+  openDetail(hit.id);
+}
+
 function initGlobalScanner(){
   document.addEventListener('keydown', (e) => {
     const now = Date.now();
-    if(now - gScanLast > 120) gScanBuf = '';   // فاصل كبير = كتابة بشرية، نبدأ من جديد
+    if(now - gScanLast > 600) gScanBuf = '';   // سكتّة طويلة = بداية كود جديد
     gScanLast = now;
 
     if(e.key === 'Enter'){
@@ -1763,24 +1797,23 @@ function initGlobalScanner(){
       gScanBuf = '';
       if(buf.length < 6) return;
       const hit = findDeviceByScan(buf);
-      if(!hit) return;
-
-      e.preventDefault();
-      // نفضّي الخانة اللي الكود اتكتب فيها بالغلط
-      const el = document.activeElement;
-      if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')){
-        el.value = '';
-        try{ el.dispatchEvent(new Event('input', { bubbles:true })); }catch(err){}
-        el.blur();
-      }
-      // نقفل أي شاشة مفتوحة ونفتح الجهاز
-      ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
-        .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
-      openDetail(hit.id);
+      if(hit){ e.preventDefault(); openScannedDevice(hit); }
       return;
     }
 
-    if(e.key && e.key.length === 1) gScanBuf += e.key;
+    if(!e.key || e.key.length !== 1) return;
+    gScanBuf += e.key;
+    if(gScanBuf.length > 60) gScanBuf = gScanBuf.slice(-60);
+
+    // مفيش انتظار لـ Enter: أول ما الكود يكوّن جهاز حقيقي نفتحه فوراً
+    // (استحالة عملياً إن حد يكتب ID جهاز كامل بالصدفة)
+    if(gScanBuf.length >= 10){
+      const hit = findDeviceByScan(gScanBuf);
+      if(hit){
+        e.preventDefault();
+        setTimeout(() => openScannedDevice(hit), 0);
+      }
+    }
   }, true);
 }
 
@@ -2440,6 +2473,7 @@ async function transferDebit(entryId){
 // ============================================================
 function openAccounts(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  clearSearchBox('accSearch');
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
 }
