@@ -318,6 +318,21 @@
   }
   .acc-mini-btn:hover{background:#F8FAFC;}
 
+  /* ===== زرار إظهار/إخفاء قسم النقاط ===== */
+  .points-toggle{
+    width:100%; display:flex; justify-content:space-between; align-items:center;
+    background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px;
+    padding:11px 14px; font-family:inherit; font-size:13.5px; font-weight:700;
+    color:#475569; cursor:pointer; margin-bottom:8px;
+  }
+  .points-toggle:hover{background:#F1F5F9;}
+
+  /* ===== قسم جملة/قطاعي والنقاط في تفاصيل الجهاز ===== */
+  .points-box{
+    background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px;
+    padding:14px; margin-bottom:16px;
+  }
+
   /* ===== كبار العملاء ===== */
   .cust-item{
     display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
@@ -445,6 +460,13 @@
         <label class="field"><span>الموديل</span><input id="f_model" /></label>
       </div>
       <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
+      <div style="margin-bottom:12px;">
+        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
+        <div class="pay-choice">
+          <button type="button" id="whRetail" class="pay-btn" onclick="setAddWholesale(false)">قطاعي</button>
+          <button type="button" id="whBulk" class="pay-btn" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
+        </div>
+      </div>
       <label class="field"><span>العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
       <label class="field"><span>حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
       <label class="field"><span>السعر المتوقع (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
@@ -648,6 +670,17 @@ function startRealtimeSync(){
         devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
         lastSynced[row.id] = j;
         writeCache(); render();
+      })
+      .subscribe();
+
+    // ردود العميل على الفحص الدقيق وتأكيد السعر — لحظياً
+    sb.channel('track_responses_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'public_track_responses' }, (payload) => {
+        const row = payload.new;
+        const d = devices.find(x => x.id === selectedId);
+        if(!row || !d || row.token !== d.trackToken) return;
+        trackResponses = row;
+        renderDetail();
       })
       .subscribe();
 
@@ -1031,6 +1064,7 @@ function openAddModal(){
     .forEach(id => document.getElementById('f_'+id).value = '');
   document.getElementById('accountantList').innerHTML = accountantOptions();
   setAddPayType('cash');
+  setAddWholesale(false);
   togglePayTypeVisibility();
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
@@ -1100,6 +1134,10 @@ async function submitAdd(){
     conditionNotes: get('conditionNotes'),
     agreedPrice: intPrice(get('agreedPrice')),
     paymentType: addPayType,
+    isWholesale: addIsWholesale,
+    points: '',
+    assistTechnician: '',
+    assistPercent: '',
     technician: '',
     paymentStatus: null,
     status: 'waiting',
@@ -1119,14 +1157,31 @@ async function submitAdd(){
 }
 
 // Detail modal
+let pointsBoxOpen = false;
+function togglePointsBox(){
+  pointsBoxOpen = !pointsBoxOpen;
+  const box = document.getElementById('pointsBox');
+  const arrow = document.getElementById('pointsToggleArrow');
+  if(box) box.style.display = pointsBoxOpen ? '' : 'none';
+  if(arrow) arrow.textContent = pointsBoxOpen ? '▲' : '▼';
+}
+
 function openDetail(id){
   selectedId = id;
+  trackResponses = {};
+  pointsBoxOpen = false;
   renderDetail();
   document.getElementById('detailOverlay').classList.remove('hidden');
+  const d = devices.find(x => x.id === id);
+  if(d && d.trackToken){
+    loadTrackResponses(d.trackToken).then(() => { if(selectedId === id) renderDetail(); });
+  }
 }
 function closeDetail(){
   document.getElementById('detailOverlay').classList.add('hidden');
   selectedId = null;
+  trackResponses = {};
+  pointsBoxOpen = false;
 }
 function technicianOptions(){
   const names = [...new Set(devices.map(d => d.technician).filter(Boolean))];
@@ -1185,6 +1240,17 @@ function renderDetail(){
       <label class="field"><span>اسم المحل</span><input value="${esc(d.shopName||'')}" placeholder="اسم المحل" onblur="editField('shopName', this.value)" /></label>
     </div>
     <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    ${(parseInt(d.agreedPrice)||0) > 0 && d.priceConfirmation && d.priceConfirmation.requested ? `
+      <div class="approval-box">
+        ${!trackResponses.price_response ? `
+          <div class="approval-pending">⏳ في انتظار رد العميل على السعر...</div>
+        ` : trackResponses.price_response === 'accepted' ? `
+          <div class="approval-yes">✅ العميل وافق على السعر</div>
+        ` : `
+          <div class="approval-no">❌ العميل رفض السعر</div>
+        `}
+      </div>
+    ` : ''}
     ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع${d.status==='delivered' ? ' (اتحددت عند التسليم)' : ''}</span>
       ${d.status==='delivered'
@@ -1197,6 +1263,22 @@ function renderDetail(){
     ${d.billedShop ? `<div class="detail-row"><span>متحاسب على حساب محل</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
     <label class="field"><span>العطل / المشكلة</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+
+    <div class="approval-box">
+      ${!d.deepInspection || !d.deepInspection.requested ? `
+        <button class="btn-secondary" style="width:100%; color:#7C3AED; border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 طلب موافقة العميل على فحص دقيق</button>
+      ` : !trackResponses.deep_inspection_response ? `
+        <div class="approval-pending">⏳ في انتظار رد العميل على طلب الفحص الدقيق...
+          <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">إلغاء الطلب</button>
+        </div>
+      ` : trackResponses.deep_inspection_response === 'accepted' ? `
+        <div class="approval-yes">✅ العميل وافق على الفحص الدقيق</div>
+      ` : `
+        <div class="approval-no">❌ العميل رفض الفحص الدقيق
+          <button class="acc-mini-btn" onclick="requestDeepInspection()" style="margin-inline-start:8px;">إعادة الطلب</button>
+        </div>
+      `}
+    </div>
 
     <div style="margin-bottom:14px;">${rows}</div>
 
@@ -1213,6 +1295,34 @@ function renderDetail(){
     <datalist id="technicianList">${technicianOptions()}</datalist>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ لازم تحدد الفني المسؤول قبل ما الجهاز يخرج من "قيد الانتظار"</div>` : ''}
+
+    <button type="button" class="points-toggle" onclick="togglePointsBox()">
+      <span>⭐ إدارة النقاط والفني المساعد</span>
+      <span id="pointsToggleArrow">${pointsBoxOpen ? '▲' : '▼'}</span>
+    </button>
+    <div class="points-box" id="pointsBox" style="${pointsBoxOpen ? '' : 'display:none;'}">
+      <div style="margin-bottom:10px;">
+        <span style="font-size:13px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
+        <div class="pay-choice">
+          <button type="button" style="border-color:#2563EB;${!d.isWholesale?'background:#2563EB;color:#fff;':'background:#fff;color:#2563EB;'}" onclick="setWholesale(false)">قطاعي</button>
+          <button type="button" style="border-color:#7C3AED;${d.isWholesale?'background:#7C3AED;color:#fff;':'background:#fff;color:#7C3AED;'}" onclick="setWholesale(true)">جملة (بدون نقاط)</button>
+        </div>
+      </div>
+      ${!d.isWholesale ? `
+        <label class="field"><span>⭐ نقاط الصيانة (لتقييم الفني في الملخص)</span>
+          <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)" onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
+        </label>
+        ${d.technician ? `
+        <div class="tech-row">
+          <label class="field"><span>🤝 فني مساعد (اختياري)</span>
+            <input list="technicianList" value="${esc(d.assistTechnician||'')}" placeholder="اسم الفني المساعد" onblur="editField('assistTechnician', this.value)" />
+          </label>
+          <label class="field"><span>نسبته من النقاط %</span>
+            <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)" onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
+          </label>
+        </div>` : `<div style="font-size:12px;color:#94A3B8;">حدد الفني الرئيسي الأول عشان تقدر تضيف مساعد</div>`}
+      ` : `<div style="font-size:12px;color:#94A3B8;">الجهاز مسجل جملة — مش بيتحسب عليه نقاط لأي فني</div>`}
+    </div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <span style="font-size:12px;color:#64748B;">تغيير حالة الجهاز</span>
@@ -1236,6 +1346,13 @@ async function editField(key, value){
   await persist();
   const updTrack = devices.find(x => x.id === selectedId);
   if(updTrack){ if(!updTrack.trackToken){ await ensureTrackToken(updTrack.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+}
+
+async function setWholesale(val){
+  devices = devices.map(d => d.id === selectedId ? { ...d, isWholesale: val, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  renderDetail();
+  render();
+  await persist();
 }
 
 async function assignTechnician(value){
@@ -1694,6 +1811,8 @@ async function syncTrack(d){
       status: d.status,
       issue: d.reportedIssue || '',
       price: parseInt(d.agreedPrice) || 0,
+      deepInspectionRequested: !!(d.deepInspection && d.deepInspection.requested),
+      priceConfirmRequested: !!(d.priceConfirmation && d.priceConfirmation.requested),
       intakeDate: d.intakeDate,
       updatedAt: new Date().toISOString()
     });
@@ -1829,6 +1948,15 @@ const intPrice = v => {
 };
 
 let addPayType = 'cash';
+let addIsWholesale = false;
+
+function setAddWholesale(val){
+  addIsWholesale = val;
+  const r = document.getElementById('whRetail'), b = document.getElementById('whBulk');
+  if(!r || !b) return;
+  r.style.cssText = 'border-color:#2563EB;' + (!val ? 'background:#2563EB;color:#fff;' : 'background:#fff;color:#2563EB;');
+  b.style.cssText = 'border-color:#7C3AED;' + (val ? 'background:#7C3AED;color:#fff;' : 'background:#fff;color:#7C3AED;');
+}
 
 // فوري/آجل ميظهروش غير لما يتكتب سعر فعلي — ولو السعر اتمسح يختفوا ويرجعوا فوري
 function togglePayTypeVisibility(){
@@ -1860,6 +1988,12 @@ async function editPrice(value){
   let extra = { agreedPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let histEntry = null;
 
+  // لو السعر اتغيّر فعلياً والجهاز لسه ما اتسلّمش، نطلب تأكيد العميل من جديد
+  if(price && price !== d.agreedPrice && d.status !== 'delivered'){
+    extra.priceConfirmation = { requested: true, requestedAt: new Date().toISOString() };
+    resetTrackResponse(d.trackToken, 'price');
+  }
+
   if(d.status === 'delivered' && d.paymentStatus === 'unpaid' && price){
     extra.paymentStatus = 'paid';
     if(d.paymentType === 'deferred'){
@@ -1878,6 +2012,60 @@ async function editPrice(value){
   renderDetail(); render(); await persist();
   const updT = devices.find(x => x.id === selectedId);
   if(updT){ if(!updT.trackToken){ await ensureTrackToken(updT.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+}
+
+// ============================================================
+// نظام موافقات العميل: الفحص الدقيق + تأكيد السعر
+// ============================================================
+let trackResponses = {};   // آخر رد اتقرا لجهاز مفتوح دلوقتي في التفاصيل
+
+async function loadTrackResponses(token){
+  trackResponses = {};
+  if(!token) return;
+  try{
+    const { data } = await sb.from('public_track_responses').select('*').eq('token', token).maybeSingle();
+    if(data) trackResponses = data;
+  }catch(e){ /* أوفلاين أو خطأ شبكة — نعرض حالة الانتظار الافتراضية */ }
+}
+
+async function resetTrackResponse(token, kind){
+  if(!token) return;
+  try{
+    const patch = kind === 'price'
+      ? { price_response: null, price_responded_at: null }
+      : { deep_inspection_response: null, deep_inspection_responded_at: null };
+    await sb.from('public_track_responses').upsert({ token, ...patch, updated_at: new Date().toISOString() });
+  }catch(e){}
+}
+
+async function requestDeepInspection(){
+  if(!isOnline()){
+    alert('طلب الفحص الدقيق محتاج نت — عشان الطلب يوصل لصفحة العميل فعلاً.');
+    return;
+  }
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  let token = d.trackToken;
+  if(!token){
+    const upd = await ensureTrackToken(d.id);
+    if(!upd || !upd.trackToken) return;
+    token = upd.trackToken;
+  }
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, deepInspection: { requested: true, requestedAt: new Date().toISOString() } }
+    : x);
+  await resetTrackResponse(token, 'deep');
+  renderDetail(); await persist();
+  syncTrack(devices.find(x => x.id === selectedId));
+}
+
+// إلغاء طلب فحص دقيق معلّق (لو اتبعت بالغلط أو العميل رد شفهياً)
+async function cancelDeepInspection(){
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, deepInspection: { requested: false } }
+    : x);
+  renderDetail(); await persist();
+  syncTrack(devices.find(x => x.id === selectedId));
 }
 
 // ============================================================
@@ -2204,6 +2392,7 @@ function stuckDevices(){
 }
 
 function renderSummaries(){
+  expandedTechName = null;   // إعادة الرسم بتقفل أي فني مفتوح — عشان الحالة متتلخبطش مع الفلاتر
   const q = (document.getElementById('summarySearch').value || '').trim();
 
   const chip = (mode, label) =>
@@ -2274,7 +2463,14 @@ function renderSummaries(){
   `;
 }
 
+let expandedTechName = null;
 function expandTech(name){
+  if(expandedTechName === name){
+    expandedTechName = null;
+    document.getElementById('techExpanded').innerHTML = '';
+    return;
+  }
+  expandedTechName = name;
   const list = devices.filter(d => d.technician === name && (ACTIVE_STATUSES.includes(d.status) || (deliveredDateOf(d) && inRange(deliveredDateOf(d)))));
   document.getElementById('techExpanded').innerHTML =
     `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('') || '<div class="empty-col">مفيش أجهزة</div>'}</div>`;
@@ -2379,8 +2575,30 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">إجمالي المتبقي على المحلات (كل الوقت)</div></div>
     </div>`;
 
-  // ===== الفنيين: السرعة والمرتجع =====
-  const techs = [...new Set(devices.map(d => d.technician).filter(Boolean))];
+  // ===== الفنيين: السرعة والمرتجع والنقاط =====
+  const techs = [...new Set([
+    ...devices.map(d => d.technician).filter(Boolean),
+    ...devices.filter(d => !d.isWholesale && d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0).map(d => d.assistTechnician),
+  ])];
+
+  // حساب نقاط كل فني: الرئيسي ياخد الباقي بعد نسبة المساعد، والمساعد ياخد نسبته
+  // (الأجهزة "جملة" مستبعدة تماماً من النقاط)
+  const pointsByTech = {};
+  const addPoints = (name, val) => { if(!name || !val) return; pointsByTech[name] = (pointsByTech[name]||0) + val; };
+  deliveredInRange.forEach(d => {
+    if(d.isWholesale) return;
+    const pts = parseFloat(enDigits(d.points)) || 0;
+    if(!pts || !d.technician) return;
+    const pct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+    if(d.assistTechnician && pct > 0){
+      const assistShare = pts * (pct / 100);
+      addPoints(d.assistTechnician, assistShare);
+      addPoints(d.technician, pts - assistShare);
+    } else {
+      addPoints(d.technician, pts);
+    }
+  });
+
   const techRows = techs.map(t => {
     const done = deliveredInRange.filter(d => d.technician === t);
     const durations = done.map(repairDays).filter(x => x !== null);
@@ -2391,17 +2609,19 @@ function renderAnalytics(){
       return rd && inAnRange(rd);
     }).length;
     const rate = done.length ? Math.round((returns / done.length) * 100) : (returns ? 100 : 0);
-    return { t, count: done.length, avg, returns, rate };
-  }).filter(r => r.count || r.returns)
-    .sort((a,b) => b.count - a.count);
+    const points = Math.round((pointsByTech[t] || 0) * 10) / 10;
+    return { t, count: done.length, avg, returns, rate, points };
+  }).filter(r => r.count || r.returns || r.points)
+    .sort((a,b) => b.points - a.points);
 
   const avgFmt = v => v === null ? '—' : (v < 1 ? 'أقل من يوم' : v.toFixed(1) + ' يوم');
   const techTable = techRows.length === 0
     ? `<div class="empty-col">مفيش تسليمات في الفترة دي</div>`
     : `<table class="inv-table">
-        <tr><th>الفني</th><th>سلّم في الفترة</th><th>متوسط مدة الصيانة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
+        <tr><th>الفني</th><th>⭐ النقاط</th><th>سلّم في الفترة</th><th>متوسط مدة الصيانة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
         ${techRows.map(r => `<tr>
           <td style="font-weight:800;">🔧 ${esc(r.t)}</td>
+          <td style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif;">${r.points || 0}</td>
           <td style="font-weight:800; color:#16A34A;">${r.count}</td>
           <td>${avgFmt(r.avg)}</td>
           <td style="font-weight:800; color:${r.returns ? '#DC2626' : '#64748B'};">${r.returns}</td>

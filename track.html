@@ -105,6 +105,23 @@
     font-weight:800; font-size:15.5px; color:#166534;
   }
 
+  /* موافقات العميل */
+  .approve-card{
+    display:none; margin-top:16px; background:#FEF2F2; border:1.5px solid #FECACA;
+    border-radius:14px; padding:16px;
+  }
+  .approve-msg{font-size:14px; line-height:1.8; margin-bottom:8px;}
+  .approve-btns{display:flex; gap:10px; margin-top:10px;}
+  .approve-btn{
+    flex:1; border:none; border-radius:11px; padding:12px; font-family:'Cairo',sans-serif;
+    font-weight:800; font-size:14.5px; cursor:pointer;
+  }
+  .approve-yes{background:var(--green); color:#fff;}
+  .approve-no{background:#E5E7EB; color:#374151;}
+  .approve-result{display:none; margin-top:10px; text-align:center; font-weight:800; font-size:14px; padding:10px; border-radius:10px;}
+  .approve-result.yes{background:#F0FDF4; color:#166534;}
+  .approve-result.no{background:#F1F5F9; color:#475569;}
+
   /* السعر */
   .price-card{
     display:none; margin-top:18px; background:linear-gradient(135deg, #FFF8EC, #FFF3D9);
@@ -150,11 +167,28 @@
         <div class="txt" id="issueTxt"></div>
       </div>
 
+      <div class="approve-card" id="deepCard">
+        <div class="approve-msg">⚠️ للأسف، عطل جهازك يبدو أكبر من المتوقع.</div>
+        <div class="approve-msg">هل توافق إننا نعمل <b>فحص دقيق</b> للجهاز؟ الفحص ده هياخد وقت أطول شوية، وممكن يزوّد على تكلفة الصيانة النهائية.</div>
+        <div class="approve-btns">
+          <button class="approve-btn approve-yes" onclick="respond('deep','accepted')">موافق</button>
+          <button class="approve-btn approve-no" onclick="respond('deep','declined')">مش موافق</button>
+        </div>
+      </div>
+      <div class="approve-result" id="deepResult"></div>
+
       <div class="pickup" id="pickupBox">✅ جهازك جاهز — برجاء الاستلام من الفرع 🙏</div>
 
       <div class="price-card" id="priceCard">
         <div class="lbl">تكلفة الصيانة</div>
         <div class="num" id="priceNum"></div>
+        <div class="approve-card" id="priceCardApprove" style="margin-top:14px; background:transparent; border:none; padding:0;">
+          <div class="approve-btns">
+            <button class="approve-btn approve-yes" onclick="respond('price','accepted')">موافق على السعر</button>
+            <button class="approve-btn approve-no" onclick="respond('price','declined')">مش موافق</button>
+          </div>
+        </div>
+        <div class="approve-result" id="priceResult"></div>
       </div>
 
       <div class="special" id="specialBox"></div>
@@ -175,6 +209,36 @@ const sb = supabase.createClient(
 
 const $ = id => document.getElementById(id);
 const token = new URLSearchParams(location.search).get('t');
+let lastPayload = null;
+
+async function respond(kind, answer){
+  if(!token) return;
+  try{
+    const { error } = await sb.rpc('submit_track_response', { p_token: token, p_kind: kind, p_answer: answer });
+    if(error) throw error;
+  }catch(e){ alert('حصل خطأ، جرّب تاني'); return; }
+  showApproveResult(kind, answer);
+}
+
+function showApproveResult(kind, answer){
+  const cardId = kind === 'deep' ? 'deepCard' : 'priceCardApprove';
+  const resultId = kind === 'deep' ? 'deepResult' : 'priceResult';
+  $(cardId).style.display = 'none';
+  const r = $(resultId);
+  r.style.display = 'block';
+  r.className = 'approve-result ' + (answer === 'accepted' ? 'yes' : 'no');
+  r.textContent = answer === 'accepted'
+    ? (kind === 'deep' ? '✅ تم إرسال موافقتك على الفحص الدقيق' : '✅ تم إرسال موافقتك على السعر')
+    : '📝 تم إرسال ردك، هيتواصل معاك المحل';
+}
+
+async function loadResponses(){
+  if(!token) return {};
+  try{
+    const { data } = await sb.rpc('get_track_response', { p_token: token });
+    return data || {};
+  }catch(e){ return {}; }
+}
 
 // المراحل اللي العميل بيشوفها (لحد تم الصيانة، والتسليم بيظهر كمكافأة نهائية)
 const STEPS = [
@@ -185,6 +249,7 @@ const STEPS = [
 ];
 const ORDER = ['waiting','diagnosing','repairing','done'];
 
+let responses = {};
 function renderTrack(data){
   $('loading').style.display = 'none';
   $('notfound').style.display = 'none';
@@ -251,9 +316,36 @@ function renderTrack(data){
   // رسالة الاستلام من الفرع
   $('pickupBox').style.display = (st === 'done') ? 'block' : 'none';
 
+  // طلب الفحص الدقيق
+  if(data.deepInspectionRequested && st !== 'delivered'){
+    if(responses.deep_inspection_response){
+      $('deepCard').style.display = 'none';
+      showApproveResult('deep', responses.deep_inspection_response);
+    } else {
+      $('deepCard').style.display = 'block';
+      $('deepResult').style.display = 'none';
+    }
+  } else {
+    $('deepCard').style.display = 'none';
+    $('deepResult').style.display = 'none';
+  }
+
   if(data.price > 0){
     $('priceCard').style.display = 'block';
     $('priceNum').textContent = data.price.toLocaleString('en-EG') + ' ج.م';
+    // طلب تأكيد السعر
+    if(data.priceConfirmRequested && st !== 'delivered'){
+      if(responses.price_response){
+        $('priceCardApprove').style.display = 'none';
+        showApproveResult('price', responses.price_response);
+      } else {
+        $('priceCardApprove').style.display = 'block';
+        $('priceResult').style.display = 'none';
+      }
+    } else {
+      $('priceCardApprove').style.display = 'none';
+      $('priceResult').style.display = 'none';
+    }
   } else {
     $('priceCard').style.display = 'none';
   }
@@ -264,9 +356,10 @@ function renderTrack(data){
 async function load(){
   if(!token){ $('loading').style.display='none'; $('notfound').style.display='block'; return; }
   try{
-    const { data, error } = await sb.from('public_track').select('payload').eq('token', token).maybeSingle();
+    const { data, error } = await sb.rpc('get_tracking', { p_token: token });
     if(error || !data){ $('loading').style.display='none'; $('notfound').style.display='block'; return; }
-    renderTrack(JSON.parse(data.payload));
+    responses = await loadResponses();
+    renderTrack(JSON.parse(data));
   }catch(e){
     $('loading').style.display='none'; $('notfound').style.display='block';
   }
