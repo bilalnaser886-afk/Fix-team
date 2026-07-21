@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -1838,6 +1839,7 @@ function renderLabelInto(containerId, d){
       <div class="label-row">${esc(shortDateTime(d.intakeDate))}</div>
       <div id="qrHolder"></div>
       <div style="font-family:'Cairo',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
+      ${d.conditionNotes ? `<div style="border-top:1px solid #CBD5E1; margin-top:8px; padding-top:6px; font-size:${d.conditionNotes.length > 60 ? 9 : d.conditionNotes.length > 30 ? 10 : 11}px; font-weight:700; line-height:1.5; text-align:right;">${esc(d.conditionNotes)}</div>` : ''}
     </div>
     <div class="label-size-row">
       <label>عرض الليبل (مم)<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
@@ -1846,15 +1848,47 @@ function renderLabelInto(containerId, d){
     <div class="label-hint">اكتب مقاس الليبل الحقيقي بالمليمتر (نفس المقاس المضبوط في إعدادات الطابعة). بيتحفظ تلقائياً للمرات الجاية.</div>
     <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 طباعة الليبل</button>
   `;
-  try{
-    if(window.QRCode){
-      new QRCode(document.getElementById('qrHolder'), { text: d.id, width:110, height:110 });
-    }else{
-      document.getElementById('qrHolder').innerHTML = `<div style="font-size:10px;color:#94A3B8;">الكود مش متاح دلوقتي (محتاج نت أول مرة)</div>`;
+  drawQr(d.id);
+}
+
+// رسم الباركود — بيحمّل المكتبة لو مش موجودة ويحاول تاني
+function drawQr(text, attempt){
+  attempt = attempt || 0;
+  const holder = document.getElementById('qrHolder');
+  if(!holder) return;
+
+  if(window.QRCode){
+    try{
+      holder.innerHTML = '';
+      new QRCode(holder, { text: text, width:110, height:110, correctLevel: QRCode.CorrectLevel.M });
+    }catch(e){
+      holder.innerHTML = `<div style="font-size:11px;color:#DC2626;">حصل خطأ في توليد الكود</div>`;
     }
-  }catch(e){
-    document.getElementById('qrHolder').innerHTML = '';
+    return;
   }
+
+  if(attempt === 0){
+    // محاولة تحميل المكتبة من جديد (ممكن تكون فشلت أول مرة)
+    holder.innerHTML = `<div style="font-size:11px;color:#94A3B8;">⏳ جاري تجهيز الباركود...</div>`;
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    sc.onload = () => drawQr(text, 1);
+    sc.onerror = () => drawQr(text, 3);
+    document.head.appendChild(sc);
+    setTimeout(() => { if(!window.QRCode) drawQr(text, 3); }, 6000);
+    return;
+  }
+
+  if(attempt === 1){
+    // المكتبة اتحمّلت دلوقتي
+    setTimeout(() => drawQr(text, window.QRCode ? 0 : 3), 100);
+    return;
+  }
+
+  holder.innerHTML = `<div style="font-size:11px;color:#DC2626;line-height:1.7;">
+    ❌ الباركود مش متاح — الملف الخارجي بتاعه مش بيوصل<br>
+    <span style="color:#94A3B8;font-size:10.5px;">جرّب Ctrl+Shift+R، ولو المشكلة فضلت يبقى النت بيحجب cdnjs</span>
+  </div>`;
 }
 
 // نجيب صورة الـ QR الجاهزة من المعاينة عشان نحطها في نافذة الطباعة
@@ -1881,12 +1915,25 @@ function printLabel(){
   // المقاسات بتتحسب من ارتفاع الليبل — فأي مقاس يطلع مظبوط
   const pad   = Math.max(0.8, sz.h * 0.045).toFixed(2);
   const qrSz  = Math.min(sz.h * 0.62, sz.w * 0.32).toFixed(2);
-  const fShop = Math.max(2.4, sz.h * 0.148).toFixed(2);   // اسم المحل — الأكبر
-  const fCust = Math.max(2.1, sz.h * 0.122).toFixed(2);   // اسم العميل
-  const fDev  = Math.max(2.1, sz.h * 0.122).toFixed(2);   // نوع الجهاز والموديل
-  const fIssue= Math.max(1.8, sz.h * 0.100).toFixed(2);   // المشكلة
-  const fDate = Math.max(1.6, sz.h * 0.090).toFixed(2);   // تاريخ الدخول
-  const fBrand= Math.max(1.5, sz.h * 0.088).toFixed(2);   // اسم I FIX TEAM تحت الباركود
+  const cond = (d.conditionNotes || '').trim();
+  const k = cond ? 0.90 : 1;   // لو فيه شريط حالة تحت، نصغّر الباقي شوية عشان يوسع
+
+  const fShop = Math.max(2.2, sz.h * 0.148 * k).toFixed(2);   // اسم المحل — الأكبر
+  const fCust = Math.max(1.9, sz.h * 0.122 * k).toFixed(2);   // اسم العميل
+  const fDev  = Math.max(1.9, sz.h * 0.122 * k).toFixed(2);   // نوع الجهاز والموديل
+  const fIssue= Math.max(1.7, sz.h * 0.100 * k).toFixed(2);   // المشكلة
+  const fDate = Math.max(1.5, sz.h * 0.090 * k).toFixed(2);   // تاريخ الدخول
+  const fBrand= Math.max(1.4, sz.h * 0.088 * k).toFixed(2);   // اسم I FIX TEAM تحت الباركود
+
+  // خط حالة الجهاز بيصغّر لوحده كل ما الكلام يكتر عشان يوسع في الشريط
+  const stripW = sz.w - (parseFloat(pad) * 2);          // العرض المتاح
+  const stripH = Math.max(2.6, sz.h * 0.20);            // الارتفاع المسموح للشريط
+  let fCond = 0;
+  if(cond){
+    // تقدير: كل حرف عربي ≈ 0.52 من حجم الخط، وارتفاع السطر 1.25
+    const ideal = Math.sqrt((stripW * stripH) / (cond.length * 0.52 * 1.25));
+    fCond = Math.min(sz.h * 0.078, Math.max(0.95, ideal)).toFixed(2);
+  }
 
   const w = window.open('', '_blank', 'width=420,height=320');
   if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
@@ -1900,7 +1947,14 @@ function printLabel(){
   html, body{ width:${sz.w}mm; height:${sz.h}mm; overflow:hidden; }
   body{
     font-family:'Tajawal', sans-serif; color:#000; background:#fff;
-    padding:${pad}mm; display:flex; align-items:center; gap:${pad}mm;
+    padding:${pad}mm; display:flex; flex-direction:column;
+  }
+  .top{ display:flex; align-items:center; gap:${pad}mm; flex:1; min-height:0; overflow:hidden; }
+  .cond{
+    flex-shrink:0; font-size:${fCond}mm; font-weight:700; line-height:1.25;
+    border-top:0.18mm solid #000; padding-top:${(sz.h*0.012).toFixed(2)}mm;
+    margin-top:${(sz.h*0.012).toFixed(2)}mm; max-height:${stripH.toFixed(2)}mm;
+    overflow:hidden; word-break:break-word;
   }
   .qrbox{
     flex-shrink:0; display:flex; flex-direction:column; align-items:center;
@@ -1935,6 +1989,7 @@ function printLabel(){
     white-space:nowrap; overflow:hidden;
   }
 </style></head><body>
+  <div class="top">
   <div class="qrbox">
     ${qr ? `<div class="qr"><img src="${qr}" alt=""></div>` : ''}
     <div class="brand">I FIX TEAM</div>
@@ -1946,6 +2001,8 @@ function printLabel(){
     ${d.reportedIssue ? `<div class="issue">${esc(d.reportedIssue)}</div>` : ''}
     <div class="date">${esc(shortDateTime(d.intakeDate))}</div>
   </div>
+  </div>
+  ${cond ? `<div class="cond">${esc(cond)}</div>` : ''}
 <script>
   window.onload = function(){
     setTimeout(function(){ window.print(); }, 350);
