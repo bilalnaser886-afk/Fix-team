@@ -1500,16 +1500,26 @@ async function copyTrackLink(id){
   }
 }
 
-// إرسال واتساب: يفتح المحادثة بالرسالة جاهزة والموظف يدوس إرسال
+// إرسال واتساب: على الموبايل يفتح التطبيق مباشرة على شات العميل بالرسالة جاهزة
 function openWa(phone, msg){
   const p = waPhone(phone);
   if(!p) return false;
-  const url = 'https://wa.me/' + p + '?text=' + encodeURIComponent(msg);
-  // على الآيفون/الموبايل المتصفح بيمنع فتح النوافذ بعد العمليات غير المباشرة،
-  // فلو اتمنع بنعرض زرار عائم المستخدم يدوس عليه — الرسالة متضيعش أبداً
+  const text = encodeURIComponent(msg);
+  const webUrl = 'https://wa.me/' + p + '?text=' + text;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if(isMobile){
+    // فتح تطبيق الواتساب مباشرة على المحادثة
+    window.location.href = 'whatsapp://send?phone=' + p + '&text=' + text;
+    // احتياطي: لو التطبيق مفتحش لأي سبب، نظهر الزرار الأخضر بلينك الويب
+    setTimeout(() => { if(!document.hidden) showWaPending(webUrl); }, 1500);
+    return true;
+  }
+
+  // على الكمبيوتر: تاب جديد بـ wa.me
   let w = null;
-  try{ w = window.open(url, '_blank'); }catch(e){}
-  if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(url);
+  try{ w = window.open(webUrl, '_blank'); }catch(e){}
+  if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(webUrl);
   return true;
 }
 
