@@ -199,18 +199,17 @@
   .label-row.mono{font-family:monospace; font-size:11px;}
   .label-id{font-size:10px; color:#94A3B8; margin-top:8px; font-family:monospace;}
   #qrHolder{display:flex; justify-content:center; margin:10px 0;}
-  @media print{
-    @page{ size: 80mm 40mm; margin: 0; }
-    body *{ visibility:hidden; }
-    #printLabel, #printLabel *{ visibility:visible; }
-    #printLabel{
-      position:fixed; top:0; left:0; width:80mm; height:40mm; border:none;
-      padding:3mm; box-sizing:border-box; font-size:11px;
-    }
-    #printLabel .label-row-title{ font-size:14px; }
-    #qrHolder{ margin:2mm 0; }
-    #qrHolder img, #qrHolder canvas{ width:20mm !important; height:20mm !important; }
+  /* الطباعة بقت في نافذة مستقلة (printLabel) — مفيش @media print هنا
+     عشان منطبعش الداشبورد كله بالغلط */
+  .label-size-row{
+    display:flex; gap:8px; align-items:flex-end; margin:10px 0 6px; flex-wrap:wrap;
   }
+  .label-size-row label{flex:1; min-width:90px; font-size:12px; color:#64748B;}
+  .label-size-row input{
+    width:100%; border:1px solid #E2E8F0; border-radius:8px;
+    padding:9px 10px; font-size:15px; font-family:inherit; text-align:center;
+  }
+  .label-hint{font-size:11.5px; color:#94A3B8; line-height:1.6; margin-bottom:8px;}
   .danger-btn{
     width:100%; border:1px solid #FCA5A5; color:#EF4444; background:#fff;
     border-radius:8px; padding:9px; font-size:13px; cursor:pointer; margin-top:8px;
@@ -1722,7 +1721,32 @@ function selectPrintDevice(id){
   renderLabelInto('labelPreviewArea', d);
 }
 
+// ============================================================
+// طباعة الليبل — نافذة مستقلة بمقاس الليبل الحقيقي
+// (الطريقة القديمة كانت بتطبع الداشبورد كله وتطلع صفحات فاضية)
+// ============================================================
+const LABEL_SIZE_KEY = 'ifix_label_size';
+let labelDeviceId = null;
+
+function getLabelSize(){
+  try{
+    const v = JSON.parse(localStorage.getItem(LABEL_SIZE_KEY));
+    if(v && v.w > 0 && v.h > 0) return v;
+  }catch(e){}
+  return { w: 37, h: 25 };   // مقاس ليبل I Fix Team — عدّله من الخانات لو اتغير
+}
+
+function saveLabelSize(){
+  const w = parseFloat(enDigits(document.getElementById('lblW').value)) || 0;
+  const h = parseFloat(enDigits(document.getElementById('lblH').value)) || 0;
+  if(w > 0 && h > 0){
+    try{ localStorage.setItem(LABEL_SIZE_KEY, JSON.stringify({ w, h })); }catch(e){}
+  }
+}
+
 function renderLabelInto(containerId, d){
+  labelDeviceId = d.id;
+  const sz = getLabelSize();
   const container = document.getElementById(containerId);
   container.innerHTML = `
     <div class="print-label" id="printLabel">
@@ -1731,8 +1755,13 @@ function renderLabelInto(containerId, d){
       ${d.shopName ? `<div class="label-row">${esc(d.shopName)}</div>` : ''}
       ${d.serialNumber ? `<div class="label-row mono">SN: ${esc(d.serialNumber)}</div>` : ''}
       <div id="qrHolder"></div>
-      <div class="label-id">${esc(d.id)}</div>
+      <div class="label-id">${devRef(d)}</div>
     </div>
+    <div class="label-size-row">
+      <label>عرض الليبل (مم)<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
+      <label>ارتفاع الليبل (مم)<input id="lblH" type="text" inputmode="decimal" value="${sz.h}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
+    </div>
+    <div class="label-hint">اكتب مقاس الليبل الحقيقي بالمليمتر (نفس المقاس المضبوط في إعدادات الطابعة). بيتحفظ تلقائياً للمرات الجاية.</div>
     <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 طباعة الليبل</button>
   `;
   try{
@@ -1746,8 +1775,86 @@ function renderLabelInto(containerId, d){
   }
 }
 
+// نجيب صورة الـ QR الجاهزة من المعاينة عشان نحطها في نافذة الطباعة
+function grabQrDataUrl(){
+  const holder = document.getElementById('qrHolder');
+  if(!holder) return '';
+  const img = holder.querySelector('img');
+  if(img && img.src && img.src.startsWith('data:')) return img.src;
+  const canvas = holder.querySelector('canvas');
+  if(canvas){
+    try{ return canvas.toDataURL('image/png'); }catch(e){}
+  }
+  return '';
+}
+
 function printLabel(){
-  window.print();
+  saveLabelSize();
+  const d = devices.find(x => x.id === labelDeviceId);
+  if(!d){ alert('حصل خطأ في تجهيز الليبل، اقفل وافتح تاني'); return; }
+
+  const sz = getLabelSize();
+  const qr = grabQrDataUrl();
+
+  // المقاسات بتتحسب من ارتفاع الليبل — فأي مقاس يطلع مظبوط
+  const pad   = Math.max(0.8, sz.h * 0.045).toFixed(2);
+  const qrSz  = Math.min(sz.h * 0.58, sz.w * 0.31).toFixed(2);
+  const fTitle= Math.max(2.2, sz.h * 0.132).toFixed(2);
+  const fRow  = Math.max(1.8, sz.h * 0.094).toFixed(2);
+  const fRef  = Math.max(2.3, sz.h * 0.142).toFixed(2);
+
+  const w = window.open('', '_blank', 'width=420,height=320');
+  if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
+
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<title>ليبل ${esc(devRef(d))}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  @page{ size: ${sz.w}mm ${sz.h}mm; margin: 0; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html, body{ width:${sz.w}mm; height:${sz.h}mm; overflow:hidden; }
+  body{
+    font-family:'Tajawal', sans-serif; color:#000; background:#fff;
+    padding:${pad}mm; display:flex; align-items:center; gap:${pad}mm;
+  }
+  .qr{ width:${qrSz}mm; height:${qrSz}mm; flex-shrink:0; }
+  .qr img{ width:100%; height:100%; display:block; }
+  .info{ flex:1; min-width:0; line-height:1.35; }
+  .t{
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fTitle}mm;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .r{
+    font-size:${fRow}mm; font-weight:700;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .mono{ font-family:'Courier New',monospace; }
+  .ref{
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fRef}mm;
+    letter-spacing:.4px; margin-top:${(sz.h*0.02).toFixed(2)}mm;
+  }
+</style></head><body>
+  ${qr ? `<div class="qr"><img src="${qr}" alt=""></div>` : ''}
+  <div class="info">
+    <div class="t">${esc(d.deviceType)} ${esc(d.model)}</div>
+    <div class="r">${esc(d.customerName)}</div>
+    ${d.customerPhone ? `<div class="r mono">${esc(waPhoneDisplay(d.customerPhone))}</div>` : ''}
+    ${d.shopName ? `<div class="r">${esc(d.shopName)}</div>` : ''}
+    <div class="ref">${esc(devRef(d))}</div>
+  </div>
+<script>
+  window.onload = function(){
+    setTimeout(function(){ window.print(); }, 350);
+    window.onafterprint = function(){ window.close(); };
+  };
+<\/script>
+</body></html>`);
+  w.document.close();
+}
+
+// عرض الرقم بالأرقام الإنجليزية زي ما هو من غير كود دولة
+function waPhoneDisplay(raw){
+  return enDigits(raw).replace(/[^0-9]/g, '');
 }
 
 function toggleDetailLabel(id){
