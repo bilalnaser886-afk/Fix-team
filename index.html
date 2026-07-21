@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="I Fix Team">
+<meta name="theme-color" content="#F2F2F1">
+<link rel="manifest" href="manifest.json">
+<title>I Fix Team — تسجيل الدخول</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --red:#E8321E;        /* أحمر اللوجو */
+    --red-dark:#C22513;
+    --blue:#2B1DE8;       /* أزرق الترس */
+    --gold:#BE8A1C;       /* ذهبي الترس */
+    --ink:#101014;        /* أسود الموبايل */
+    --paper:#F2F2F1;      /* رمادي الخلفية */
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Tajawal','Segoe UI',sans-serif;
+    background:
+      radial-gradient(circle at 1.5px 1.5px, rgba(16,16,20,.055) 1.5px, transparent 1.6px) 0 0/18px 18px,
+      var(--paper);
+    display:flex; align-items:center; justify-content:center; padding:24px 16px;
+    overflow-x:hidden;
+  }
+
+  /* اللوجو فوق والكارت راكب على طرفه السفلي — متداخلين */
+  .stage{width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center;}
+  .logo-hero{
+    width:min(340px, 82vw); height:auto; display:block;
+    margin-bottom:-84px;           /* التداخل مع الكارت */
+    filter:drop-shadow(0 10px 24px rgba(16,16,20,.10));
+    user-select:none; pointer-events:none;
+  }
+  .card{
+    position:relative; width:100%;
+    background:rgba(255,255,255,.72);
+    backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+    border:1px solid rgba(255,255,255,.9);
+    border-radius:18px; padding:88px 26px 26px;   /* مساحة فوق عشان اللوجو الداخل جواها */
+    box-shadow:0 18px 50px rgba(16,16,20,.14);
+  }
+  /* شريط بألوان تروس اللوجو أعلى الكارت */
+  .card::before{
+    content:""; position:absolute; top:0; right:0; left:0; height:5px;
+    border-radius:18px 18px 0 0;
+    background:linear-gradient(to left, var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);
+  }
+
+  h1{
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:22px;
+    margin:0 0 2px; text-align:center; color:var(--ink); letter-spacing:.3px;
+  }
+  .sub{text-align:center; font-size:13px; color:#6B7280; margin:0 0 18px;}
+
+  #loginError{color:var(--red-dark); font-size:13.5px; min-height:20px; text-align:center; font-weight:500;}
+
+  .field{display:block; margin-bottom:12px;}
+  .field span{display:block; font-size:13px; color:#4B5563; margin-bottom:6px; font-weight:500;}
+  input{
+    font-size:16px;
+    width:100%; border:1.5px solid #E3E4E8; border-radius:11px; padding:12px 14px;
+    font-size:15px; font-family:inherit; color:var(--ink); background:#fff;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(43,29,232,.14);}
+
+  button.login{
+    width:100%; margin-top:6px; padding:14px; border:none; border-radius:12px;
+    background:var(--red); color:#fff; font-family:'Cairo',sans-serif;
+    font-weight:800; font-size:16px; cursor:pointer;
+    box-shadow:0 6px 18px rgba(232,50,30,.32);
+    transition:background .15s, transform .1s;
+  }
+  button.login:hover{background:var(--red-dark);}
+  button.login:active{transform:translateY(1px);}
+  button.login:disabled{background:#D2D4DA; box-shadow:none; cursor:wait;}
+  button.login:focus-visible{outline:3px solid rgba(43,29,232,.4); outline-offset:2px;}
+
+  .renew-box{
+    display:none; background:#FFF8EC; border:1px solid #EACb84; border-radius:12px;
+    padding:14px; font-size:13.5px; line-height:1.9; margin-top:14px;
+    direction:ltr; text-align:left;
+  }
+  .renew-box b{color:#9A6A0C;}
+  .wallet{
+    direction:ltr; display:inline-block; background:#fff; border:1.5px dashed #BE8A1C;
+    border-radius:6px; padding:3px 10px; font-weight:bold; font-family:monospace;
+  }
+
+  @media (prefers-reduced-motion:no-preference){
+    .stage{animation:rise .5s ease both;}
+    @keyframes rise{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <img class="logo-hero" src="logo.jpg" alt="I Fix Team — for mobile services">
+  <div class="card">
+    <h1>تسجيل الدخول</h1>
+    <p class="sub">نظام إدارة الصيانة</p>
+    <div id="loginError"></div>
+
+    <label class="field"><span>البريد الإلكتروني</span>
+      <input type="email" id="email" autocomplete="email">
+    </label>
+    <label class="field"><span>كلمة المرور</span>
+      <input type="password" id="password" autocomplete="current-password">
+    </label>
+    <button class="login" id="loginBtn" onclick="login()">دخول</button>
+
+    <!-- تظهر فقط عند انتهاء اشتراك المحل -->
+    <div id="renewBox" class="renew-box">
+      <b>Your subscription has expired.</b><br>
+      Renewal cost: <b>$100 / month</b><br>
+      <span id="egpAmount">&asymp; EGP (calculating today's rate...)</span><br>
+      Payment method: <b>Vodafone Cash</b><br>
+      <span class="wallet">01055946677</span><br>
+      Your system will be reactivated as soon as the payment is confirmed.
+    </div>
+  </div>
+</div>
+
+<script>
+    // ✅ المتغير اسمه sb وليس supabase (تسميته supabase تكسر المكتبة)
+    const sb = supabase.createClient(
+        "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+    );
+
+    const $ = (id) => document.getElementById(id);
+
+    // فحص اشتراك المحل (صف واحد في جدول shop — بيسري على كل الموظفين)
+    async function shopActive() {
+        const { data, error } = await sb
+            .from('shop')
+            .select('paid_until')
+            .eq('id', 1)
+            .single();
+        if (error || !data) return null;
+        return new Date(data.paid_until) > new Date();
+    }
+
+    // ------- حساب مقابل الـ 30 دولار بالجنيه بسعر اليوم -------
+    const PRICE_USD = 100;
+    const FALLBACK_RATE = 50; // سعر احتياطي لو الـ API وقع — عدّله لسعر معقول
+
+    async function showEgpEquivalent() {
+        let rate = null;
+        try {
+            const res = await fetch('https://open.er-api.com/v6/latest/USD');
+            const j = await res.json();
+            if (j && j.result === 'success' && j.rates && j.rates.EGP) rate = j.rates.EGP;
+        } catch (e) { /* هنستخدم السعر الاحتياطي */ }
+        const usedRate = rate || FALLBACK_RATE;
+        const egp = Math.ceil((PRICE_USD * usedRate) / 5) * 5;
+        $('egpAmount').innerHTML =
+            `&asymp; <b>EGP ${egp.toLocaleString('en-EG')}</b> at today's exchange rate` +
+            (rate ? '' : ' (approx.)');
+    }
+
+    function showRenewBox() {
+        $('renewBox').style.display = 'block';
+        showEgpEquivalent();
+    }
+
+    async function login() {
+        const email = $('email').value.trim();
+        const password = $('password').value;
+        const btn = $('loginBtn');
+
+        $('loginError').textContent = '';
+        $('renewBox').style.display = 'none';
+
+        if (!email || !password) {
+            $('loginError').textContent = 'من فضلك أدخل البريد وكلمة المرور';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'جارٍ الدخول...';
+
+        try {
+            const { error } = await sb.auth.signInWithPassword({ email, password });
+            if (error) {
+                if (error.message.includes('Email not confirmed')) {
+                    $('loginError').textContent = 'الحساب غير مؤكد — فعّله من لوحة تحكم Supabase';
+                } else if (error.message.includes('Invalid login credentials')) {
+                    $('loginError').textContent = 'خطأ في البريد أو كلمة المرور';
+                } else {
+                    $('loginError').textContent = 'خطأ: ' + error.message;
+                }
+                return;
+            }
+
+            const active = await shopActive();
+
+            if (active === null) {
+                $('loginError').textContent = 'تعذر التحقق من الاشتراك، حاول مرة أخرى';
+                await sb.auth.signOut();
+                return;
+            }
+
+            if (active) {
+                window.location.href = 'dashboard.html';
+            } else {
+                await sb.auth.signOut();
+                showRenewBox();
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'دخول';
+        }
+    }
+
+    $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('password').focus(); });
+
+    // لو عنده جلسة سارية بالفعل → تخطي صفحة الدخول
+    sb.auth.getSession().then(async ({ data: { session } }) => {
+        if (!session) return;
+        const active = await shopActive();
+        if (active) window.location.href = 'dashboard.html';
+    });
+</script>
+</body>
+</html>

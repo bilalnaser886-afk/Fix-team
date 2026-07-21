@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="I Fix Team">
+<meta name="theme-color" content="#101014">
+<link rel="manifest" href="manifest.json">
+<title>I Fix Team — نظام إدارة الصيانة</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F5F7; --surface:#FFFFFF; --ink:#1A2332; --muted:#64748B;
+    --accent:#0891A8; --accent-dark:#077A8F;
+    --waiting:#B5651D; --waiting-bg:#FBF2E9;
+    --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
+    --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
+    --done:#15803D; --done-bg:#EAF6EE;
+    --delivered:#64748B; --delivered-bg:#EEF1F3;
+    --paid:#15803D; --paid-bg:#EAF6EE;
+    --unpaid:#B45309; --unpaid-bg:#FEF3E2;
+    --rejected:#DC2626; --rejected-bg:#FEF2F2;
+    --returned:#9333EA; --returned-bg:#F5EEFC;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Tajawal', 'Segoe UI', sans-serif;
+  }
+  h1,h2,h3,.display{font-family:'Cairo','Segoe UI',sans-serif;}
+  .topbar{
+    background:var(--ink); color:#fff; padding:14px 54px 14px 22px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:20; box-shadow:0 2px 8px rgba(0,0,0,.15);
+    flex-wrap:wrap; gap:10px;
+  }
+  .menu-btn{
+    position:absolute; top:14px; right:18px; background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.2); color:#fff; width:34px; height:34px;
+    border-radius:8px; font-size:18px; cursor:pointer; line-height:1;
+  }
+  .menu-btn:hover{background:rgba(255,255,255,.2);}
+  .menu-dropdown{
+    position:absolute; top:56px; right:18px; background:#fff; border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18); padding:6px; z-index:41; min-width:170px;
+  }
+  .menu-dropdown button{
+    display:block; width:100%; text-align:right; background:none; border:none;
+    padding:10px 12px; font-size:13px; border-radius:6px; cursor:pointer;
+    font-family:inherit; color:var(--ink);
+  }
+  .menu-dropdown button:hover{background:#F1F5F9;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .logo{
+    width:36px;height:36px;border-radius:10px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:18px;
+  }
+  .brand h1{font-size:16px;font-weight:800;margin:0;}
+  .brand p{font-size:11px;color:#9aa5b1;margin:2px 0 0;}
+  .topbar-actions{display:flex;align-items:center;gap:10px;}
+  #search{
+    background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15);
+    border-radius:8px; color:#fff; padding:8px 12px; font-size:12px; width:220px;
+  }
+  #search::placeholder{color:#9aa5b1;}
+  .btn-primary{
+    background:var(--accent); color:#fff; border:none; border-radius:8px;
+    padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; gap:6px; transition:background .15s;
+  }
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-primary:disabled{background:#CBD5E1;color:#94A3B8;cursor:not-allowed;}
+  .btn-secondary{
+    background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.2);
+    border-radius:8px; padding:9px 12px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .btn-secondary:hover{background:rgba(255,255,255,.18);}
+  .freq-select{
+    background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.2);
+    border-radius:8px; padding:8px 10px; font-size:12px; font-family:inherit; cursor:pointer;
+  }
+  .freq-select option{color:#1A2332;}
+  .stats{display:flex; gap:10px; flex-wrap:wrap; padding:16px 22px 0;}
+  .stat-chip{
+    background:var(--surface); border-radius:10px; padding:8px 12px;
+    display:flex; align-items:center; gap:8px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.05);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .stat-chip b{font-family:'Cairo',sans-serif; font-size:14px;}
+  .board{
+    padding:18px 22px 60px; display:grid; gap:14px;
+    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+    align-items:start;
+  }
+  .column{
+    background:#E9ECEF; border-radius:14px; padding:20px 12px; min-height:110px;
+    border:none; cursor:pointer; text-align:center; transition:transform .12s, box-shadow .12s;
+    font-family:inherit;
+  }
+  .column:hover{transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,.08);}
+  .column-count{font-family:'Cairo',sans-serif; font-weight:800; font-size:34px; line-height:1.1; margin:6px 0 2px;}
+  .column-hint{font-size:11px; color:#94A3B8;}
+  .column-head{display:flex;justify-content:space-between;align-items:center;padding:0 4px 10px;}
+  .column-head span.title{font-family:'Cairo',sans-serif; font-weight:700; font-size:13px;}
+  .column-head span.count{font-size:11px;color:#94A3B8;font-family:monospace;}
+  .empty-col{font-size:11px;color:#94A3B8;text-align:center;padding:24px 0;}
+  .card{
+    background:var(--surface); border-radius:10px; padding:12px 12px 10px;
+    margin-bottom:10px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06);
+    border-top:4px solid transparent; transition:box-shadow .15s; text-align:right;
+  }
+  .card:hover{box-shadow:0 4px 10px rgba(0,0,0,.1);}
+  .card-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .badge{font-size:10px; font-family:monospace; padding:2px 6px; border-radius:5px; letter-spacing:.5px;}
+  .days{font-size:11px; color:#94A3B8;}
+  .card-title{font-family:'Cairo',sans-serif; font-weight:700; font-size:14px; margin-bottom:2px;}
+  .card-sub{font-size:12px; color:#64748B; margin-bottom:6px; line-height:1.6;}
+  .card-shop{font-weight:700; color:#334155;}
+  .card-issue{font-size:12px; color:#475569; background:#F8FAFC; border-radius:6px; padding:6px 8px;}
+  .card-price{margin-top:6px; font-size:12px; font-family:monospace; color:var(--accent); font-weight:700;}
+  .card-tech{font-size:11px; color:#475569; margin-top:6px; display:flex; align-items:center; gap:4px;}
+  .card-tech::before{content:"🔧"; font-size:10px;}
+  .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
+  .tech-row{display:flex; gap:8px; align-items:flex-end; margin-bottom:14px;}
+  .tech-row .field{flex:1; margin-bottom:0;}
+  .tech-warn{font-size:11px; color:#B45309; margin:-8px 0 12px;}
+  .pay-choice{display:flex; gap:8px; margin-top:6px;}
+  .pay-btn{flex:1; border-radius:8px; padding:8px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid;}
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
+    align-items:center; justify-content:center; z-index:30; padding:16px;
+  }
+  .hidden{display:none;}
+  .modal{
+    background:#fff; border-radius:16px; width:75vw; max-width:75vw;
+    max-height:85vh; overflow-y:auto; padding:20px;
+  }
+  /* خانة تسجيل جهاز جديد تفضل بحجمها الأصلي */
+  #addOverlay .modal{ width:100%; max-width:440px; }
+  @media (max-width:700px){ .modal{ width:100%; max-width:100%; } }
+  .modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  .modal-head h2{font-size:16px; margin:0;}
+  .close-btn{background:none;border:none;font-size:20px;color:#94A3B8;cursor:pointer; line-height:1;}
+  label.field{display:block; margin-bottom:12px;}
+  label.field span{font-size:12px; color:#64748B; display:block; margin-bottom:4px;}
+  .field input, .field textarea{
+    width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:9px 11px;
+    font-size:13px; font-family:inherit; color:var(--ink); resize:vertical;
+  }
+  .field input:focus, .field textarea:focus{outline:2px solid rgba(8,145,168,.3); border-color:var(--accent);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .status-pills{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;}
+  .pill{
+    font-size:12px; padding:6px 12px; border-radius:999px; border:1.5px solid #ccc;
+    background:#fff; cursor:pointer; font-family:inherit;
+  }
+  .detail-row{display:flex; justify-content:space-between; border-bottom:1px solid #F1F5F9; padding:6px 0; font-size:13px;}
+  .detail-row span:first-child{color:#94A3B8;}
+  .hist-item{font-size:11px; color:#64748B; margin-bottom:4px;}
+  .timeline-item{
+    border-right:3px solid var(--accent); padding:8px 12px; margin-bottom:10px;
+    background:#F8FAFC; border-radius:0 8px 8px 0;
+  }
+  .timeline-transition{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:3px;}
+  .timeline-duration{font-size:13px; color:var(--accent); font-weight:800; font-family:'Cairo',sans-serif;}
+  .timeline-dates{font-size:11px; color:#94A3B8; margin-top:3px;}
+  .summaries-page{background:#F3F5F7; min-height:100vh; width:100%;}
+  .day-columns{display:flex; gap:14px; overflow-x:auto; padding:16px 2px 30px;}
+  .day-column{background:#E9ECEF; border-radius:14px; padding:12px; min-width:230px; flex:0 0 230px;}
+  .day-column-head{font-family:'Cairo',sans-serif; font-weight:800; font-size:13px; margin-bottom:10px; text-align:center; color:var(--ink);}
+  .day-column-head small{display:block; font-weight:400; color:#94A3B8; font-size:11px; margin-top:2px;}
+  .day-card{background:#fff; border-radius:10px; padding:10px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,.06); cursor:pointer;}
+  .day-card:hover{box-shadow:0 4px 10px rgba(0,0,0,.1);}
+  .day-card-title{font-weight:700; font-size:13px; font-family:'Cairo',sans-serif;}
+  .day-card-sub{font-size:11px; color:#64748B; margin:2px 0 6px;}
+  .status-tag{display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
+  .emp-summary-group{background:#fff; border-radius:12px; padding:14px; margin-bottom:14px;}
+  .emp-status-chip{
+    display:inline-flex; align-items:center; gap:6px; background:#F8FAFC; border-radius:8px;
+    padding:8px 12px; margin:4px 4px 4px 0; cursor:pointer; font-size:12px; font-weight:600;
+  }
+  .emp-status-chip b{font-family:'Cairo',sans-serif;}
+  .print-label{
+    background:#fff; border:2px dashed #CBD5E1; border-radius:10px; padding:16px;
+    width:270px; margin:0 auto 16px; text-align:center;
+  }
+  .label-row-title{font-weight:800; font-family:'Cairo',sans-serif; font-size:15px; margin-bottom:4px;}
+  .label-row{font-size:12px; color:#334155; margin-bottom:2px;}
+  .label-row.mono{font-family:monospace; font-size:11px;}
+  .label-id{font-size:10px; color:#94A3B8; margin-top:8px; font-family:monospace;}
+  #qrHolder{display:flex; justify-content:center; margin:10px 0;}
+  @media print{
+    @page{ size: 80mm 40mm; margin: 0; }
+    body *{ visibility:hidden; }
+    #printLabel, #printLabel *{ visibility:visible; }
+    #printLabel{
+      position:fixed; top:0; left:0; width:80mm; height:40mm; border:none;
+      padding:3mm; box-sizing:border-box; font-size:11px;
+    }
+    #printLabel .label-row-title{ font-size:14px; }
+    #qrHolder{ margin:2mm 0; }
+    #qrHolder img, #qrHolder canvas{ width:20mm !important; height:20mm !important; }
+  }
+  .danger-btn{
+    width:100%; border:1px solid #FCA5A5; color:#EF4444; background:#fff;
+    border-radius:8px; padding:9px; font-size:13px; cursor:pointer; margin-top:8px;
+  }
+  .danger-btn:hover{background:#FEF2F2;}
+  .error-bar{background:#FEF2F2; color:#DC2626; font-size:12px; padding:8px 22px;}
+  .loading{padding:60px 0; text-align:center; color:#94A3B8; font-size:13px;}
+  .save-indicator{font-size:11px; color:#9aa5b1;}
+
+  /* ===== تكبير الخطوط وتوضيحها ===== */
+  .brand h1{font-size:19px;}
+  .brand p{font-size:12.5px;}
+  .menu-dropdown button{font-size:15px; padding:12px 14px;}
+  #search{font-size:14px; padding:10px 14px;}
+  .stat-chip{font-size:14px;}
+  .stat-chip b{font-size:17px;}
+  .column-head span.title{font-size:16px;}
+  .column-count{font-size:44px;}
+  .column-hint{font-size:13px; color:#7C8794;}
+  .empty-col{font-size:13px;}
+  .modal-head h2{font-size:19px;}
+  .field input, .field textarea{font-size:15px; padding:11px 13px;}
+  label.field span{font-size:13.5px;}
+  .detail-row{font-size:15px; padding:8px 0;}
+  .hist-item{font-size:13px; margin-bottom:6px;}
+  .pill{font-size:13.5px; padding:8px 14px;}
+  .timeline-transition{font-size:14.5px;}
+  .timeline-duration{font-size:14.5px;}
+  .timeline-dates{font-size:12.5px;}
+  .btn-secondary{font-size:13.5px;}
+
+  /* ===== زرار إضافة جهاز أكبر وأوضح ===== */
+  .topbar-actions .btn-primary{
+    padding:13px 24px; font-size:16px; font-weight:800; border-radius:10px;
+    box-shadow:0 3px 10px rgba(8,145,168,.35);
+  }
+
+  /* ===== قايمة النسخ الاحتياطي المنسدلة ===== */
+  .backup-menu{
+    position:absolute; top:calc(100% + 8px); left:0; background:#fff; color:var(--ink);
+    border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.22); padding:10px;
+    min-width:230px; z-index:45; text-align:right;
+  }
+  .bm-item{
+    display:block; width:100%; text-align:right; background:none; border:none;
+    padding:11px 12px; font-size:14px; border-radius:8px; cursor:pointer;
+    font-family:inherit; color:var(--ink); font-weight:600;
+  }
+  .bm-item:hover{background:#F1F5F9;}
+  .bm-sep{height:1px; background:#E2E8F0; margin:8px 4px;}
+  .bm-label{font-size:12px; color:#94A3B8; padding:2px 12px 6px;}
+  .bm-select{
+    width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:9px 11px;
+    font-size:14px; font-family:inherit; color:var(--ink); cursor:pointer; background:#fff;
+  }
+
+  /* ===== صفحة الجرد ===== */
+  .inv-filter{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px;}
+  .inv-chip{
+    border:1.5px solid #CBD5E1; background:#fff; color:#475569; border-radius:20px;
+    padding:8px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .inv-chip.active{background:var(--ink); border-color:var(--ink); color:#fff;}
+  .inv-custom{font-size:13px; color:#64748B; display:flex; align-items:center; gap:6px; margin-inline-start:auto;}
+  .inv-custom input{border:1px solid #E2E8F0; border-radius:8px; padding:7px 9px; font-family:inherit; font-size:13px;}
+  .inv-cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-bottom:20px;}
+  .inv-card{background:#fff; border:1px solid #EEF0F3; border-radius:14px; padding:18px; text-align:center; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .inv-card-num{font-family:'Cairo',sans-serif; font-size:40px; font-weight:900; line-height:1;}
+  .inv-card-label{font-size:14px; color:#475569; margin-top:8px; font-weight:600;}
+  .inv-section-title{font-family:'Cairo',sans-serif; font-size:17px; font-weight:800; margin:22px 0 10px;}
+  .inv-table{width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .inv-table th{background:var(--ink); color:#fff; padding:11px 10px; font-size:13.5px;}
+  .inv-table td{padding:11px 10px; border-bottom:1px solid #F1F5F9; text-align:center; font-size:14.5px;}
+  .inv-table tr:hover td{background:#F8FAFC;}
+  .stuck-item{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:#fff; border:1px solid #FEE2E2; border-inline-start:4px solid #DC2626;
+    border-radius:10px; padding:12px 14px; margin-bottom:8px; cursor:pointer;
+  }
+  .stuck-item:hover{background:#FEF2F2;}
+  .stuck-days{font-family:'Cairo',sans-serif; font-size:19px; font-weight:900; color:#DC2626; white-space:nowrap;}
+
+  /* ===== صفحة الحسابات ===== */
+  .acc-payform{background:#fff; border:1px solid #EEF0F3; border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .acc-payform-row{display:grid; grid-template-columns:1.2fr 1fr 1.4fr auto; gap:10px;}
+  .acc-payform-row input{border:1px solid #E2E8F0; border-radius:8px; padding:11px 12px; font-size:14.5px; font-family:inherit;}
+  @media (max-width:800px){ .acc-payform-row{grid-template-columns:1fr;} }
+  .acc-shop{background:#fff; border:1px solid #EEF0F3; border-radius:14px; margin-bottom:12px; overflow:hidden; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .acc-shop-head{
+    width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    background:none; border:none; padding:15px 18px; cursor:pointer; font-family:inherit; text-align:right;
+  }
+  .acc-shop-head:hover{background:#F8FAFC;}
+  .acc-nums{display:flex; gap:16px; align-items:center; font-size:13.5px; color:#475569; flex-wrap:wrap;}
+  .acc-toolbar{display:flex; gap:8px; padding:0 18px 4px; justify-content:flex-end;}
+  .acc-entries{padding:6px 18px 14px;}
+  .acc-entry{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    border:1px solid #F1F5F9; border-radius:10px; padding:11px 13px; margin-bottom:8px; font-size:14px;
+  }
+  .acc-entry-meta{font-size:12px; color:#94A3B8; margin-top:3px;}
+  .acc-mini-btn{
+    border:1px solid #E2E8F0; background:#fff; border-radius:7px; padding:4px 9px;
+    font-size:11.5px; cursor:pointer; font-family:inherit; color:#475569; margin-top:5px;
+  }
+  .acc-mini-btn:hover{background:#F8FAFC;}
+
+  /* ===== الزرار العائم لرسالة الواتساب ===== */
+  .wa-pending{
+    position:fixed; inset-inline:14px; bottom:calc(16px + env(safe-area-inset-bottom));
+    background:#25D366; color:#fff; text-align:center; text-decoration:none;
+    padding:15px; border-radius:14px; font-weight:800; font-size:15px; z-index:200;
+    box-shadow:0 8px 26px rgba(37,211,102,.45); font-family:inherit;
+    animation:waPop .3s ease both;
+  }
+  @keyframes waPop{from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:none;}}
+
+  /* ===== تحسينات الموبايل والآيفون ===== */
+  .topbar{padding-top:calc(12px + env(safe-area-inset-top));}
+  body{padding-bottom:env(safe-area-inset-bottom);}
+  @media (max-width:760px){
+    /* iOS بيعمل zoom تلقائي لو الخط أقل من 16px — نمنعها */
+    input, textarea, select, .bm-select{font-size:16px !important;}
+    .topbar{flex-wrap:wrap; gap:8px;}
+    .topbar-actions{flex-wrap:wrap; gap:8px;}
+    .topbar-actions .btn-primary{flex:1; min-width:140px;}
+    .modal{border-radius:16px 16px 0 0; max-height:92vh;}
+    .inv-cards{grid-template-columns:repeat(2, 1fr);}
+    .inv-custom{margin-inline-start:0; width:100%;}
+    .acc-nums{font-size:12.5px; gap:10px;}
+    .acc-shop-head{padding:13px 14px;}
+    .pill{padding:10px 14px;}   /* أسهل في اللمس */
+    .acc-mini-btn{padding:7px 12px; font-size:12.5px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="logo"><img src="icon-192.png" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;"></div>
+    <div>
+      <h1>I Fix Team</h1>
+      <p>نظام إدارة الصيانة</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span id="saveIndicator" class="save-indicator"></span>
+    <div id="backupWrap" style="position:relative;">
+      <button class="btn-secondary" onclick="toggleBackupMenu(event)">💾 نسخة احتياطية ▾</button>
+      <div id="backupMenu" class="backup-menu hidden">
+        <button class="bm-item" onclick="exportBackup()">⬇ تنزيل نسخة دلوقتي</button>
+        <button class="bm-item" onclick="document.getElementById('importFile').click()">⬆ استيراد نسخة محفوظة</button>
+        <div class="bm-sep"></div>
+        <div class="bm-label">النسخ التلقائي الدوري</div>
+        <select id="backupFreq" class="bm-select" onchange="setBackupFrequency(this.value)">
+          <option value="off">متوقف</option>
+          <option value="daily">يومي</option>
+          <option value="weekly">أسبوعي</option>
+          <option value="monthly">شهري</option>
+        </select>
+      </div>
+    </div>
+    <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importBackup(this.files[0])" />
+    <button class="btn-primary" onclick="openAddModal()">+ جهاز جديد</button>
+  </div>
+  <button class="menu-btn" onclick="toggleMenu()">⋮</button>
+  <div id="menuDropdown" class="menu-dropdown hidden">
+    <button onclick="openSummaries()">📋 الجرد</button>
+    <button onclick="openAccounts()">🧾 الحسابات</button>
+    <button onclick="openPrintPage()">🖨 الطباعة والمسح الضوئي</button>
+    <button onclick="logout()" style="color:#DC2626;">🚪 تسجيل الخروج</button>
+  </div>
+</div>
+
+<div id="errorBar" class="error-bar hidden"></div>
+<div id="board" class="board"><div class="loading">جاري التحميل...</div></div>
+
+<!-- Column list overlay -->
+<div id="columnOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="columnTitle"></h2>
+      <button class="close-btn" onclick="closeColumn()">×</button>
+    </div>
+    <input id="columnSearch" oninput="renderColumn()" placeholder="بحث بالاسم أو المحل أو الرقم التسلسلي..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:9px 11px; font-size:13px; margin-bottom:12px;" />
+    <div id="columnList"></div>
+  </div>
+</div>
+
+<!-- Add device modal -->
+<div id="addOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>تسجيل جهاز جديد</h2>
+      <button class="close-btn" onclick="closeAddModal()">×</button>
+    </div>
+    <div id="addFormWrap">
+      <label class="field"><span>اسم العميل</span><input id="f_customerName" /></label>
+      <label class="field"><span>اسم المحل</span><input id="f_shopName" /></label>
+      <label class="field"><span>اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
+      <datalist id="accountantList"></datalist>
+      <label class="field"><span>رقم التليفون</span><input id="f_customerPhone" /></label>
+      <div class="row2">
+        <label class="field"><span>نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
+        <label class="field"><span>الموديل</span><input id="f_model" /></label>
+      </div>
+      <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
+      <label class="field"><span>العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
+      <label class="field"><span>حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
+      <label class="field"><span>السعر المتوقع (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="number" min="0" step="1" inputmode="numeric" /></label>
+      <div style="margin-bottom:12px;">
+        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
+        <div class="pay-choice">
+          <button type="button" id="ptCash" class="pay-btn" onclick="setAddPayType('cash')">فوري</button>
+          <button type="button" id="ptDeferred" class="pay-btn" onclick="setAddPayType('deferred')">آجل — على حساب المحل</button>
+        </div>
+      </div>
+      <div class="row2">
+        <label class="field"><span>تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
+        <label class="field"><span>وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
+      </div>
+      <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
+    </div>
+    <div id="addSuccessWrap" class="hidden">
+      <div style="text-align:center;font-weight:800;color:var(--done);margin-bottom:12px;">✅ اتسجل الجهاز في "قيد الانتظار"</div>
+      <div id="addLabelArea"></div>
+      <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:#E2E8F0;justify-content:center;display:flex;" onclick="closeAddModal()">تم</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div id="detailOverlay" class="overlay hidden">
+  <div class="modal" id="detailModal"></div>
+</div>
+
+<!-- Timeline (time differences) modal -->
+<div id="timelineOverlay" class="overlay hidden">
+  <div class="modal" id="timelineModal"></div>
+</div>
+
+<!-- Summaries page -->
+<div id="summariesOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>📋 الجرد</h2>
+      <button class="close-btn" onclick="closeSummaries()">×</button>
+    </div>
+    <div style="padding:0 20px;">
+      <input id="summarySearch" oninput="renderSummaries()" placeholder="دور بإسم فني..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; font-size:13px;" />
+    </div>
+    <div id="summariesBody" style="padding:16px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- Accounts (الحسابات) page -->
+<div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>🧾 الحسابات — آجل المحلات</h2>
+      <button class="close-btn" onclick="closeAccounts()">×</button>
+    </div>
+    <div style="padding:0 20px 8px;">
+      <div class="acc-payform">
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px;">تسجيل دفعة من محل</div>
+        <div class="acc-payform-row">
+          <input id="payShop" list="accShopsList" placeholder="اسم المحل" />
+          <input id="payAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="المبلغ بالجنيه" />
+          <input id="payNote" placeholder="ملاحظة (اختياري)" />
+          <button class="btn-primary" style="box-shadow:none;" onclick="recordPayment()">تسجيل الدفعة</button>
+        </div>
+        <datalist id="accShopsList"></datalist>
+      </div>
+      <input id="accSearch" oninput="renderAccounts()" placeholder="دور بإسم محل..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; font-size:14px; margin-top:12px;" />
+    </div>
+    <div id="accountsBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- Print & scan page -->
+<div id="printOverlay" class="overlay hidden no-print" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>🖨 الطباعة والمسح الضوئي</h2>
+      <button class="close-btn" onclick="closePrintPage()">×</button>
+    </div>
+    <div style="padding:0 20px;">
+      <input id="scanInput" autocomplete="off" placeholder="امسح كود جهاز موجود، أو دور بالاسم لطباعة ليبل جديد..."
+        onkeydown="if(event.key==='Enter') handleScanEnter()" oninput="renderPrintList()"
+        style="width:100%; border:2px solid var(--accent); border-radius:8px; padding:12px 14px; font-size:14px; margin-bottom:6px;" />
+      <div style="font-size:11px;color:#94A3B8;margin-bottom:14px;">امسح باركود ملزوق على جهاز عشان يفتحلك تفاصيله على طول، أو اكتب اسم/موديل عشان تطبع ليبل جديد</div>
+    </div>
+    <div id="printListArea" style="padding:0 20px 20px;"></div>
+    <div id="labelPreviewArea" style="padding:0 20px 40px;"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+// ============================================================
+// الاتصال بـ Supabase + حماية الدخول والاشتراك
+// ============================================================
+const sb = supabase.createClient(
+  "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+);
+
+// المستخدم الحالي — عشان نسجل مين عمل إيه
+let currentUser = { name: '', email: '' };
+
+// ممنوع الدخول من غير تسجيل + اشتراك المحل ساري
+async function requireAccess(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){ window.location.href = 'index.html'; return false; }
+  try{
+    currentUser.email = session.user.email || '';
+    const { data: prof } = await sb.from('profiles').select('full_name').eq('id', session.user.id).single();
+    currentUser.name = (prof && prof.full_name && prof.full_name.trim())
+      ? prof.full_name.trim()
+      : (currentUser.email.split('@')[0] || 'مستخدم');
+
+    const { data, error } = await sb.from('shop').select('paid_until').eq('id', 1).single();
+    if(error || !data || new Date(data.paid_until) <= new Date()){
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+      return false;
+    }
+  }catch(e){
+    window.location.href = 'index.html';
+    return false;
+  }
+  return true;
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  window.location.href = 'index.html';
+}
+
+// ============================================================
+// طبقة الحفظ: نفس الواجهة القديمة لكن على Supabase (جدول app_data)
+// ============================================================
+window.storage = {
+  async get(key){
+    const { data, error } = await sb.from('app_data').select('value').eq('key', key).maybeSingle();
+    if(error) throw error;
+    if(!data) return null;
+    return { key, value: data.value };
+  },
+  async set(key, value){
+    const { error } = await sb.from('app_data').upsert({ key: key, value: value, updated_at: new Date().toISOString() });
+    if(error) return null;
+    return { key, value };
+  }
+};
+
+// ============================================================
+// مزامنة لحظية: أي موظف يعدّل، الباقي يشوف التغيير فوراً
+// ============================================================
+function startRealtimeSync(){
+  try{
+    sb.channel('app_data_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, (payload) => {
+        const row = payload.new;
+        if(!row) return;
+        if(row.key === STORAGE_KEY){
+          if(row.value === JSON.stringify(devices)) return; // التغيير أصلاً من عندنا
+          try{ devices = JSON.parse(row.value); render(); }catch(e){}
+        } else if(row.key === LEDGER_KEY){
+          if(row.value === JSON.stringify(ledger)) return;
+          try{
+            ledger = JSON.parse(row.value);
+            if(!document.getElementById('accountsOverlay').classList.contains('hidden')) renderAccounts();
+          }catch(e){}
+        }
+      })
+      .subscribe();
+  }catch(e){ /* المزامنة اللحظية اختيارية — السيستم شغال من غيرها */ }
+}
+
+const STATUSES = [
+  { key: "waiting", label: "قيد الانتظار", varname:"waiting" },
+  { key: "diagnosing", label: "جاري الكشف", varname:"diagnosing" },
+  { key: "repairing", label: "جاري الصيانة", varname:"repairing" },
+  { key: "done", label: "تم الصيانة", varname:"done" },
+  { key: "delivered", label: "تم التسليم", varname:"delivered" },
+  { key: "rejected", label: "تم الرفض", varname:"rejected" },
+  { key: "returned", label: "المرتجعات", varname:"returned" },
+];
+const STORAGE_KEY = "repair-devices";
+let devices = [];
+let selectedId = null;
+let currentColumn = null;
+
+function accent(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key).trim(); }
+function accentBg(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key+'-bg').trim(); }
+function statusInfo(key){ return STATUSES.find(s => s.key === key); }
+function esc(str){ const d=document.createElement('div'); d.innerText = str==null?'':str; return d.innerHTML; }
+function daysSince(dateStr){ return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000); }
+function formatDateTime(iso){
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}   ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function showError(msg){
+  const bar = document.getElementById('errorBar');
+  if(!msg){ bar.classList.add('hidden'); return; }
+  bar.textContent = msg; bar.classList.remove('hidden');
+}
+function setSaving(on){
+  document.getElementById('saveIndicator').textContent = on ? 'جاري الحفظ...' : '';
+}
+
+async function loadDevices(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    devices = res ? JSON.parse(res.value) : [];
+  }catch(e){
+    devices = [];
+  }
+  render();
+}
+
+async function persist(){
+  setSaving(true);
+  showError('');
+  try{
+    const res = await window.storage.set(STORAGE_KEY, JSON.stringify(devices), true);
+    if(!res) throw new Error('save failed');
+  }catch(e){
+    showError('حصل خطأ في الحفظ، حاول تاني');
+  }finally{
+    setSaving(false);
+  }
+}
+
+const BACKUP_SETTINGS_KEY = "backup-settings";
+let backupSettings = { frequency: 'off', lastAutoBackupAt: null };
+
+async function loadBackupSettings(){
+  try{
+    const res = await window.storage.get(BACKUP_SETTINGS_KEY, false);
+    if(res) backupSettings = JSON.parse(res.value);
+  }catch(e){ /* no settings saved yet */ }
+  const sel = document.getElementById('backupFreq');
+  if(sel) sel.value = backupSettings.frequency || 'off';
+}
+
+async function saveBackupSettings(){
+  try{
+    await window.storage.set(BACKUP_SETTINGS_KEY, JSON.stringify(backupSettings), false);
+  }catch(e){ /* ignore */ }
+}
+
+async function setBackupFrequency(freq){
+  backupSettings.frequency = freq;
+  if(freq !== 'off' && !backupSettings.lastAutoBackupAt){
+    backupSettings.lastAutoBackupAt = new Date().toISOString();
+  }
+  await saveBackupSettings();
+  showError('');
+  if(freq !== 'off'){
+    setSaving(false);
+    document.getElementById('saveIndicator').textContent = 'تم ضبط النسخ التلقائي ✓';
+    setTimeout(() => { document.getElementById('saveIndicator').textContent = ''; }, 2500);
+  }
+}
+
+function intervalMsFor(freq){
+  if(freq === 'daily') return 24*3600000;
+  if(freq === 'weekly') return 7*24*3600000;
+  if(freq === 'monthly') return 30*24*3600000;
+  return null;
+}
+
+async function checkAutoBackup(){
+  const ms = intervalMsFor(backupSettings.frequency);
+  if(!ms) return;
+  const last = backupSettings.lastAutoBackupAt ? new Date(backupSettings.lastAutoBackupAt).getTime() : 0;
+  if(Date.now() - last >= ms && devices.length > 0){
+    exportBackup();
+    backupSettings.lastAutoBackupAt = new Date().toISOString();
+    await saveBackupSettings();
+  }
+}
+
+function exportBackup(){
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    devices,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.href = url;
+  a.download = `repair-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importBackup(file){
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const incoming = Array.isArray(parsed) ? parsed : parsed.devices;
+    if(!Array.isArray(incoming)) throw new Error('bad format');
+    const merged = [...devices];
+    const existingIds = new Set(devices.map(d => d.id));
+    incoming.forEach(d => { if(!existingIds.has(d.id)) merged.push(d); });
+    devices = merged;
+    render();
+    await persist();
+    showError('');
+  }catch(e){
+    showError('الملف ده مش نسخة احتياطية صحيحة من النظام');
+  }finally{
+    document.getElementById('importFile').value = '';
+  }
+}
+
+function render(){
+  renderBoard();
+  if(currentColumn) renderColumn();
+}
+
+function renderBoard(){
+  const board = document.getElementById('board');
+  board.innerHTML = STATUSES.map(s => {
+    const count = devices.filter(d => d.status === s.key).length;
+    return `<button class="column" onclick="openColumn('${s.key}')">
+      <div class="column-head">
+        <span class="title" style="color:${accent(s.varname)}">${s.label}</span>
+      </div>
+      <div class="column-count" style="color:${accent(s.varname)}">${count}</div>
+      <div class="column-hint">جهاز — اضغط للعرض</div>
+    </button>`;
+  }).join('');
+}
+
+function matchesSearch(d, q){
+  if(!q) return true;
+  return [d.customerName,d.shopName,d.customerPhone,d.serialNumber,d.deviceType,d.model]
+    .some(v => v && v.includes(q));
+}
+
+function openColumn(statusKey){
+  currentColumn = statusKey;
+  renderColumn();
+  document.getElementById('columnOverlay').classList.remove('hidden');
+}
+function closeColumn(){
+  document.getElementById('columnOverlay').classList.add('hidden');
+  currentColumn = null;
+}
+function renderColumn(){
+  const s = statusInfo(currentColumn);
+  const q = document.getElementById('columnSearch').value.trim();
+  const list = devices.filter(d => d.status === currentColumn && matchesSearch(d, q));
+  document.getElementById('columnTitle').textContent = s.label;
+  document.getElementById('columnTitle').style.color = accent(s.varname);
+  document.getElementById('columnList').innerHTML = list.length === 0
+    ? `<div class="empty-col">لا توجد أجهزة</div>`
+    : list.map(d => cardHtml(d, s)).join('');
+}
+
+function cardHtml(d, s){
+  return `<div class="card" style="border-top-color:${accent(s.varname)}" onclick="openDetail('${d.id}')">
+    <div class="card-top">
+      <span class="badge" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">#${d.id.slice(-5).toUpperCase()}</span>
+      <span class="days">${daysSince(d.intakeDate)} يوم</span>
+    </div>
+    <div class="card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
+    <div class="card-sub">
+      ${d.shopName ? `<div class="card-shop">${esc(d.shopName)}</div>` : ''}
+      <div>${esc(d.customerName)}</div>
+    </div>
+    ${d.reportedIssue ? `<div class="card-issue">${esc(d.reportedIssue)}</div>` : ''}
+    ${d.technician ? `<div class="card-tech">${esc(d.technician)}</div>` : ''}
+    ${d.agreedPrice ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
+    ${d.status === 'delivered' ? paymentBadge(d.paymentStatus) : ''}
+  </div>`;
+}
+
+function paymentBadge(ps){
+  if(ps === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ محاسَب عليه</span>`;
+  if(ps === 'unpaid') return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ لسه مش متسعر</span>`;
+  return '';
+}
+
+// Add device modal
+function openAddModal(){
+  ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
+    .forEach(id => document.getElementById('f_'+id).value = '');
+  document.getElementById('accountantList').innerHTML = accountantOptions();
+  setAddPayType('cash');
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('f_intakeDateOnly').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById('f_intakeTimeOnly').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  document.getElementById('addFormWrap').classList.remove('hidden');
+  document.getElementById('addSuccessWrap').classList.add('hidden');
+  document.getElementById('addLabelArea').innerHTML = '';
+  document.getElementById('addOverlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('f_customerName').focus(), 60);
+}
+function closeAddModal(){ document.getElementById('addOverlay').classList.add('hidden'); }
+
+// قايمة النسخ الاحتياطي المنسدلة
+function toggleBackupMenu(e){
+  e.stopPropagation();
+  document.getElementById('backupMenu').classList.toggle('hidden');
+}
+document.addEventListener('click', (e) => {
+  const w = document.getElementById('backupWrap');
+  if(w && !w.contains(e.target)) document.getElementById('backupMenu').classList.add('hidden');
+});
+
+// التنقل بزرار Enter بين خانات التسجيل — من غير ماوس خالص
+// (Shift+Enter بيعمل سطر جديد في خانات الملاحظات)
+function setupAddFormEnterNav(){
+  const order = ['f_customerName','f_shopName','f_registeredBy','f_customerPhone',
+                 'f_deviceType','f_model','f_serialNumber','f_reportedIssue',
+                 'f_conditionNotes','f_agreedPrice','f_intakeDateOnly','f_intakeTimeOnly'];
+  order.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('keydown', (e) => {
+      if(e.key !== 'Enter' || e.shiftKey) return;
+      e.preventDefault();
+      const next = order[i+1] && document.getElementById(order[i+1]);
+      if(next) next.focus();
+      else submitAdd();   // آخر خانة → Enter بيسجل الجهاز على طول
+    });
+  });
+}
+
+async function submitAdd(){
+  const get = id => document.getElementById('f_'+id).value.trim();
+  const customerName = get('customerName');
+  const deviceType = get('deviceType');
+  if(!customerName || !deviceType) return;
+  const serialNumber = get('serialNumber');
+  if(serialNumber){
+    const dup = devices.find(d => d.serialNumber && d.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase());
+    if(dup && !confirm(`الرقم التسلسلي ده متسجل قبل كده لجهاز "${dup.deviceType} ${dup.model}" — ${dup.customerName}. عايز تكمل التسجيل برضه؟`)) return;
+  }
+  const dateOnly = document.getElementById('f_intakeDateOnly').value;
+  const timeOnly = document.getElementById('f_intakeTimeOnly').value || '00:00';
+  const intakeDateObj = dateOnly ? new Date(`${dateOnly}T${timeOnly}`) : new Date();
+  const intakeDate = isNaN(intakeDateObj.getTime()) ? new Date().toISOString() : intakeDateObj.toISOString();
+  const newDevice = {
+    id: 'dev_' + Date.now(),
+    trackToken: genTrackToken(),
+    customerName, deviceType,
+    shopName: get('shopName'),
+    registeredBy: get('registeredBy'),
+    customerPhone: get('customerPhone'),
+    model: get('model'),
+    serialNumber: get('serialNumber'),
+    reportedIssue: get('reportedIssue'),
+    conditionNotes: get('conditionNotes'),
+    agreedPrice: intPrice(get('agreedPrice')),
+    paymentType: addPayType,
+    technician: '',
+    paymentStatus: null,
+    status: 'waiting',
+    intakeDate,
+    createdBy: currentUser.name,
+    statusHistory: [{ status:'waiting', date: intakeDate, by: currentUser.name }],
+  };
+  devices = [newDevice, ...devices];
+  render();
+  syncTrack(newDevice);
+  // إشعار واتساب تلقائي للعميل بأن الجهاز اتسجل (لو فيه رقم)
+  if(newDevice.customerPhone) openWa(newDevice.customerPhone, waStatusMsg(newDevice, 'waiting'));
+  document.getElementById('addFormWrap').classList.add('hidden');
+  document.getElementById('addSuccessWrap').classList.remove('hidden');
+  renderLabelInto('addLabelArea', newDevice);
+  await persist();
+}
+
+// Detail modal
+function openDetail(id){
+  selectedId = id;
+  renderDetail();
+  document.getElementById('detailOverlay').classList.remove('hidden');
+}
+function closeDetail(){
+  document.getElementById('detailOverlay').classList.add('hidden');
+  selectedId = null;
+}
+function technicianOptions(){
+  const names = [...new Set(devices.map(d => d.technician).filter(Boolean))];
+  return names.map(n => `<option value="${esc(n)}"></option>`).join('');
+}
+function accountantOptions(){
+  const names = [...new Set(devices.map(d => d.registeredBy).filter(Boolean))];
+  return names.map(n => `<option value="${esc(n)}"></option>`).join('');
+}
+
+function renderDetail(){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return closeDetail();
+  const s = statusInfo(d.status);
+  const rows = [
+    ['تاريخ ووقت الدخول', formatDateTime(d.intakeDate)],
+    d.serialNumber ? ['الرقم التسلسلي', d.serialNumber, true] : null,
+    d.conditionNotes ? ['حالة الجهاز عند الاستلام', d.conditionNotes] : null,
+    d.lastModifiedAt ? ['آخر تعديل', formatDateTime(d.lastModifiedAt)] : null,
+  ].filter(Boolean).map(([label,val,mono]) => `<div class="detail-row"><span>${esc(label)}</span><span ${mono?'style="font-family:monospace;color:var(--accent);font-weight:700"':''}>${esc(val)}</span></div>`).join('');
+
+  const pills = STATUSES.map(st => {
+    if(st.key === 'delivered'){
+      const active = d.status==='delivered';
+      const priced = (parseInt(d.agreedPrice)||0) > 0;
+      const hint = priced
+        ? (d.paymentType==='deferred' ? 'تم التسليم — آجل يتضاف على حساب المحل' : 'تم التسليم — محاسَب عليه فوري')
+        : 'تم التسليم — هيفضل "مش متسعر" لحد ما تحدد السعر';
+      return `
+        <button class="pill" style="border-color:${accent('paid')};
+          background:${active?accent('paid'):'#fff'}; color:${active?'#fff':accent('paid')}"
+          title="${hint}" onclick="changeStatus('delivered')">تم التسليم</button>
+      `;
+    }
+    return `
+    <button class="pill" style="border-color:${accent(st.varname)};
+      background:${d.status===st.key?accent(st.varname):'#fff'};
+      color:${d.status===st.key?'#fff':accent(st.varname)}"
+      onclick="changeStatus('${st.key}')">${st.label}</button>
+  `;
+  }).join('');
+
+  const history = (d.statusHistory||[]).map(h =>
+    `<div class="hist-item">‹ ${esc(h.label || statusInfo(h.status)?.label)} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">بواسطة ${esc(h.by)}</b>` : ''}</div>`
+  ).join('');
+
+  document.getElementById('detailModal').innerHTML = `
+    <div class="modal-head">
+      <span class="badge" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">#${d.id.slice(-5).toUpperCase()}</span>
+      <button class="close-btn" onclick="closeDetail()">×</button>
+    </div>
+    <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
+
+    <div class="row2">
+      <label class="field"><span>اسم العميل</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
+      <label class="field"><span>اسم المحل</span><input value="${esc(d.shopName||'')}" placeholder="اسم المحل" onblur="editField('shopName', this.value)" /></label>
+    </div>
+    <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="number" min="0" step="1" inputmode="numeric" value="${esc(d.agreedPrice||'')}" onblur="editPrice(this.value)" /></label>
+    <div style="margin-bottom:12px;">
+      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع${d.status==='delivered' ? ' (اتحددت عند التسليم)' : ''}</span>
+      ${d.status==='delivered'
+        ? `<div style="font-size:14.5px;font-weight:700;">${d.paymentType==='deferred' ? '🕐 آجل — على حساب المحل' : '💵 فوري'}</div>`
+        : `<div class="pay-choice">
+            <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">فوري</button>
+            <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
+          </div>`}
+    </div>
+    ${d.billedShop ? `<div class="detail-row"><span>متحاسب على حساب محل</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
+    ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
+    <label class="field"><span>العطل / المشكلة</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+
+    <div style="margin-bottom:14px;">${rows}</div>
+
+    <div class="tech-row">
+      <label class="field">
+        <span>الفني المسؤول عن الصيانة</span>
+        <input id="techInput" list="technicianList" value="${esc(d.technician||'')}" placeholder="اسم الفني" onblur="assignTechnician(this.value)" />
+      </label>
+      <label class="field">
+        <span>اسم المحاسب اللي سجله</span>
+        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="اسم المحاسب" onblur="editField('registeredBy', this.value)" />
+      </label>
+    </div>
+    <datalist id="technicianList">${technicianOptions()}</datalist>
+    <datalist id="accountantListDetail">${accountantOptions()}</datalist>
+    ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ لازم تحدد الفني المسؤول قبل ما الجهاز يخرج من "قيد الانتظار"</div>` : ''}
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span style="font-size:12px;color:#64748B;">تغيير حالة الجهاز</span>
+      <button class="btn-secondary" style="color:#2563EB;border-color:#BFDBFE;padding:5px 10px;font-size:11px;" onclick="copyTrackLink('${d.id}')">🔗 لينك المتابعة</button>
+      ${d.customerPhone ? `<button class="btn-secondary" style="color:#16A34A;border-color:#BBF7D0;padding:5px 10px;font-size:11px;" onclick="openWa('${esc(d.customerPhone)}', waStatusMsg(devices.find(x=>x.id==='${d.id}'), devices.find(x=>x.id==='${d.id}').status))">💬 واتساب العميل</button>` : ''}
+      <button class="btn-secondary" style="color:var(--ink);border-color:#E2E8F0;padding:5px 10px;font-size:11px;" onclick="toggleDetailLabel('${d.id}')">🖨 طباعة ليبل</button>
+    </div>
+    <div id="detailLabelArea" style="margin-bottom:10px;"></div>
+    <div class="status-pills">${pills}</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">سجل الحالات</div>
+    <div style="margin-bottom:10px;">${history}</div>
+    <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:#E2E8F0;margin-bottom:8px;" onclick="openTimeline()">⏱ فروقات التوقيت بين الخانات</button>
+    <button class="danger-btn" onclick="deleteDevice()">حذف الجهاز</button>
+  `;
+}
+
+async function editField(key, value){
+  devices = devices.map(d => d.id === selectedId ? { ...d, [key]: value.trim(), lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  renderDetail();
+  render();
+  await persist();
+  const updTrack = devices.find(x => x.id === selectedId);
+  if(updTrack){ if(!updTrack.trackToken){ await ensureTrackToken(updTrack.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+}
+
+async function assignTechnician(value){
+  const v = value.trim();
+  devices = devices.map(d => d.id === selectedId ? { ...d, technician:v, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  renderDetail();
+  render();
+  await persist();
+}
+
+async function changeStatus(newStatus, paymentChoice){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+
+  if(d.status === 'waiting' && !['waiting','rejected','returned'].includes(newStatus) && !d.technician){
+    showError('لازم تحدد الفني المسؤول عن الصيانة الأول، قبل ما الجهاز يدخل مراحل الفحص أو الصيانة');
+    renderDetail();
+    return;
+  }
+
+  let historyLabel = statusInfo(newStatus)?.label;
+  let newPaymentStatus = null;
+  let extra = {};
+
+  if(newStatus === 'delivered'){
+    const price = parseInt(d.agreedPrice) || 0;
+    if(price > 0){
+      newPaymentStatus = 'paid';
+      if(d.paymentType === 'deferred'){
+        const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
+        extra.billedShop = shop;
+        historyLabel = `تم التسليم — آجل، اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+        addLedgerDebit({...d, billedShop: shop}, price);
+      } else {
+        historyLabel = 'تم التسليم — محاسَب عليه (فوري)';
+      }
+    } else {
+      newPaymentStatus = 'unpaid';
+      historyLabel = 'تم التسليم — لسه مش متسعر';
+    }
+  }
+
+  showError('');
+  // إشعار واتساب تلقائي للعميل مع مراحل: الكشف، الصيانة، تم الصيانة، التسليم
+  if(d.customerPhone && ['diagnosing','repairing','done','delivered'].includes(newStatus)){
+    openWa(d.customerPhone, waStatusMsg(d, newStatus));
+  }
+  devices = devices.map(x => x.id === selectedId
+    ? {
+        ...x, ...extra,
+        status:newStatus,
+        paymentStatus: newStatus === 'delivered' ? newPaymentStatus : null,
+        statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, date:new Date().toISOString(), by: currentUser.name}]
+      }
+    : x);
+  renderDetail();
+  render();
+  await persist();
+}
+
+async function deleteDevice(){
+  const delDev = devices.find(x => x.id === selectedId);
+  if(delDev && delDev.trackToken){ try{ sb.from('public_track').delete().eq('token', delDev.trackToken); }catch(e){} }
+  const d = devices.find(x => x.id === selectedId);
+  const name = d ? `${d.deviceType} ${d.model} — ${d.customerName}` : 'الجهاز ده';
+  if(!confirm(`متأكد إنك عايز تمسح "${name}"؟ الحذف ده نهائي ومش هينفع ترجّعه.`)) return;
+  devices = devices.filter(d => d.id !== selectedId);
+  closeDetail();
+  render();
+  await persist();
+}
+
+function formatDuration(ms){
+  if(ms <= 0) return '—';
+  const minutes = Math.round(ms/60000);
+  if(minutes < 1) return 'أقل من دقيقة';
+  if(minutes < 60){
+    if(minutes === 15) return 'ربع ساعة';
+    if(minutes === 30) return 'نص ساعة';
+    if(minutes === 45) return 'ثلاثة أرباع الساعة';
+    if(minutes === 1) return 'دقيقة';
+    if(minutes === 2) return 'دقيقتين';
+    return `${minutes} دقيقة`;
+  }
+  const hours = ms/3600000;
+  const days = ms/86400000;
+  if(hours < 24){
+    const wholeHours = Math.floor(hours);
+    const remMinutes = Math.round((hours - wholeHours)*60);
+    let hourStr = wholeHours===1 ? 'ساعة' : wholeHours===2 ? 'ساعتين' : `${wholeHours} ساعة`;
+    if(remMinutes >= 5){
+      if(remMinutes === 15) return `${hourStr} وربع`;
+      if(remMinutes === 30) return `${hourStr} ونص`;
+      if(remMinutes === 45) return `${hourStr} وثلاثة أرباع`;
+      return `${hourStr} و${remMinutes} دقيقة`;
+    }
+    return hourStr;
+  }
+  if(days < 30){
+    const wholeDays = Math.round(days);
+    if(wholeDays === 1) return 'يوم';
+    if(wholeDays === 2) return 'يومين';
+    if(wholeDays <= 10) return `${wholeDays} أيام`;
+    return `${wholeDays} يوم`;
+  }
+  const months = days/30;
+  const wholeMonths = Math.round(months);
+  if(wholeMonths === 1) return 'شهر';
+  if(wholeMonths === 2) return 'شهرين';
+  return `${wholeMonths} أشهر`;
+}
+
+function openTimeline(){
+  renderTimeline();
+  document.getElementById('timelineOverlay').classList.remove('hidden');
+}
+function closeTimeline(){
+  document.getElementById('timelineOverlay').classList.add('hidden');
+}
+function renderTimeline(){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const hist = d.statusHistory || [];
+  let itemsHtml;
+  if(hist.length < 2){
+    itemsHtml = `<div class="empty-col">لسه مفيش انتقالات كفاية بين الخانات</div>`;
+  }else{
+    const items = [];
+    for(let i=1; i<hist.length; i++){
+      const prev = hist[i-1], cur = hist[i];
+      const fromLabel = prev.label || statusInfo(prev.status)?.label;
+      const toLabel = cur.label || statusInfo(cur.status)?.label;
+      const duration = new Date(cur.date) - new Date(prev.date);
+      items.push(`<div class="timeline-item">
+        <div class="timeline-transition">${esc(fromLabel)} ← ${esc(toLabel)}</div>
+        <div class="timeline-duration">${formatDuration(duration)}</div>
+        <div class="timeline-dates">${formatDateTime(prev.date)}   →   ${formatDateTime(cur.date)}</div>
+      </div>`);
+    }
+    const totalDuration = new Date(hist[hist.length-1].date) - new Date(hist[0].date);
+    items.push(`<div class="timeline-item" style="border-right-color:var(--ink);background:#F1F5F9;">
+      <div class="timeline-transition">إجمالي الوقت من التسجيل لحد آخر حالة</div>
+      <div class="timeline-duration">${formatDuration(totalDuration)}</div>
+    </div>`);
+    itemsHtml = items.join('');
+  }
+  document.getElementById('timelineModal').innerHTML = `
+    <div class="modal-head">
+      <h2>فروقات التوقيت — ${esc(d.deviceType)} ${esc(d.model)}</h2>
+      <button class="close-btn" onclick="closeTimeline()">×</button>
+    </div>
+    ${itemsHtml}
+  `;
+}
+
+function toggleMenu(){
+  document.getElementById('menuDropdown').classList.toggle('hidden');
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('menuDropdown');
+  const btn = document.querySelector('.menu-btn');
+  if(!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== btn){
+    menu.classList.add('hidden');
+  }
+});
+
+function openSummaries(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  document.getElementById('summarySearch').value = '';
+  renderSummaries();
+  document.getElementById('summariesOverlay').classList.remove('hidden');
+}
+function closeSummaries(){
+  document.getElementById('summariesOverlay').classList.add('hidden');
+}
+
+function dayKey(dateLike){
+  const d = new Date(dateLike);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fullStatusLabel(d){
+  const s = statusInfo(d.status);
+  if(d.status === 'delivered'){
+    if(d.paymentStatus === 'paid') return 'تم التسليم — محاسَب عليه';
+    if(d.paymentStatus === 'unpaid') return 'تم التسليم — لسه مش متسعر';
+  }
+  return s ? s.label : d.status;
+}
+
+function toNumber(v){
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function renderFinancialSummary(){
+  const delivered = devices.filter(d => d.status === 'delivered');
+  const paid = delivered.filter(d => d.paymentStatus === 'paid');
+  const unpaid = delivered.filter(d => d.paymentStatus === 'unpaid');
+  const paidTotal = paid.reduce((sum,d) => sum + toNumber(d.agreedPrice), 0);
+  const unpaidTotal = unpaid.reduce((sum,d) => sum + toNumber(d.agreedPrice), 0);
+  return `
+    <div class="emp-summary-group" style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div class="stat-chip" style="padding:10px 14px;">
+        <span class="dot" style="background:${accent('paid')}"></span>
+        <span>محاسَب عليه: <b>${paid.length}</b> جهاز — <b>${paidTotal.toLocaleString('ar-EG')}</b> ج.م</span>
+      </div>
+      <div class="stat-chip" style="padding:10px 14px;">
+        <span class="dot" style="background:${accent('unpaid')}"></span>
+        <span>لسه مش متحاسب: <b>${unpaid.length}</b> جهاز — <b>${unpaidTotal.toLocaleString('ar-EG')}</b> ج.م</span>
+      </div>
+      <div class="stat-chip" style="padding:10px 14px;">
+        <span class="dot" style="background:${accent('ink')}"></span>
+        <span>إجمالي المُسلَّم: <b>${delivered.length}</b> جهاز — <b>${(paidTotal+unpaidTotal).toLocaleString('ar-EG')}</b> ج.م</span>
+      </div>
+    </div>`;
+}
+
+/* renderSummaries الجديدة معرفة تحت مع نظام الحسابات */
+
+function renderDayColumns(){
+  if(devices.length === 0) return `<div class="empty-col">لسه مفيش أجهزة متسجلة في النظام</div>`;
+  const groups = {};
+  devices.forEach(d => {
+    const k = dayKey(d.intakeDate);
+    (groups[k] = groups[k] || []).push(d);
+  });
+  const days = Object.keys(groups).sort();
+  return `<div class="day-columns">` + days.map(k => {
+    const list = groups[k].slice().sort((a,b) => new Date(a.intakeDate) - new Date(b.intakeDate));
+    const sample = new Date(list[0].intakeDate);
+    const dateLabel = `${sample.getDate()}/${sample.getMonth()+1}/${sample.getFullYear()}`;
+    return `<div class="day-column">
+      <div class="day-column-head">${dateLabel}<small>${list.length} جهاز</small></div>
+      ${list.map(d => dayCardHtml(d)).join('')}
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+function dayCardHtml(d){
+  const s = statusInfo(d.status);
+  return `<div class="day-card" onclick="closeSummaries(); openDetail('${d.id}')">
+    <div class="day-card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
+    <div class="day-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
+    <span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>
+  </div>`;
+}
+
+function renderEmployeeView(query){
+  const today = dayKey(new Date());
+  const matched = devices.filter(d =>
+    (d.technician && d.technician.includes(query)) || (d.registeredBy && d.registeredBy.includes(query))
+  );
+  if(matched.length === 0){
+    return `<div class="empty-col">مفيش حد بالاسم ده ليه أجهزة متسجلة</div>`;
+  }
+
+  const todayList = matched.filter(d => {
+    const techToday = d.technician && d.technician.includes(query) && (d.statusHistory||[]).some(h => dayKey(h.date) === today);
+    const accToday = d.registeredBy && d.registeredBy.includes(query) && dayKey(d.intakeDate) === today;
+    return techToday || accToday;
+  });
+
+  const byStatus = {};
+  matched.forEach(d => { (byStatus[d.status] = byStatus[d.status] || []).push(d); });
+
+  const todayHtml = todayList.length === 0
+    ? `<div class="empty-col">مفيش نشاط النهاردة</div>`
+    : todayList.map(d => dayCardHtml(d)).join('');
+
+  const statusChips = STATUSES.map(s => {
+    const list = byStatus[s.key] || [];
+    if(list.length === 0) return '';
+    return `<button class="emp-status-chip" style="border:1.5px solid ${accent(s.varname)};color:${accent(s.varname)}"
+      onclick="expandEmpStatus('${s.key}', '${esc(query).replace(/'/g,"\\'")}')">
+      <span>${s.label}</span><b>${list.length}</b>
+    </button>`;
+  }).join('');
+
+  return `
+    <div class="emp-summary-group">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px;">شغل النهاردة (${todayList.length})</div>
+      ${todayHtml}
+    </div>
+    <div class="emp-summary-group">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px;">كل الأجهزة الحالية معاه (${matched.length}) — موزّعة على الخانات</div>
+      <div>${statusChips}</div>
+      <div id="empExpanded"></div>
+    </div>
+  `;
+}
+
+function expandEmpStatus(statusKey, query){
+  const list = devices.filter(d => d.status === statusKey &&
+    ((d.technician && d.technician.includes(query)) || (d.registeredBy && d.registeredBy.includes(query))));
+  document.getElementById('empExpanded').innerHTML =
+    `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('')}</div>`;
+}
+
+function openPrintPage(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  document.getElementById('scanInput').value = '';
+  document.getElementById('printListArea').innerHTML = `<div class="empty-col">اكتب اسم عميل أو موديل، أو امسح كود جهاز موجود</div>`;
+  document.getElementById('labelPreviewArea').innerHTML = '';
+  document.getElementById('printOverlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('scanInput').focus(), 100);
+}
+function closePrintPage(){
+  document.getElementById('printOverlay').classList.add('hidden');
+}
+
+function handleScanEnter(){
+  const val = document.getElementById('scanInput').value.trim();
+  const match = devices.find(d => d.id === val || (d.serialNumber && d.serialNumber === val));
+  if(match){
+    closePrintPage();
+    openDetail(match.id);
+  }
+}
+
+function renderPrintList(){
+  const q = document.getElementById('scanInput').value.trim();
+  const area = document.getElementById('printListArea');
+  document.getElementById('labelPreviewArea').innerHTML = '';
+  if(!q){
+    area.innerHTML = `<div class="empty-col">اكتب اسم عميل أو موديل، أو امسح كود جهاز موجود</div>`;
+    return;
+  }
+  const list = devices.filter(d => matchesSearch(d, q)).slice(0, 20);
+  area.innerHTML = list.length === 0
+    ? `<div class="empty-col">مفيش نتائج</div>`
+    : list.map(d => printCandidateHtml(d)).join('');
+}
+
+function printCandidateHtml(d){
+  const s = statusInfo(d.status);
+  return `<div class="day-card" onclick="selectPrintDevice('${d.id}')">
+    <div class="day-card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
+    <div class="day-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
+    <span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>
+  </div>`;
+}
+
+function selectPrintDevice(id){
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  renderLabelInto('labelPreviewArea', d);
+}
+
+function renderLabelInto(containerId, d){
+  const container = document.getElementById(containerId);
+  container.innerHTML = `
+    <div class="print-label" id="printLabel">
+      <div class="label-row-title">${esc(d.deviceType)} ${esc(d.model)}</div>
+      <div class="label-row">${esc(d.customerName)}${d.customerPhone ? ' — '+esc(d.customerPhone) : ''}</div>
+      ${d.shopName ? `<div class="label-row">${esc(d.shopName)}</div>` : ''}
+      ${d.serialNumber ? `<div class="label-row mono">SN: ${esc(d.serialNumber)}</div>` : ''}
+      <div id="qrHolder"></div>
+      <div class="label-id">${esc(d.id)}</div>
+    </div>
+    <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 طباعة الليبل</button>
+  `;
+  try{
+    if(window.QRCode){
+      new QRCode(document.getElementById('qrHolder'), { text: d.id, width:110, height:110 });
+    }else{
+      document.getElementById('qrHolder').innerHTML = `<div style="font-size:10px;color:#94A3B8;">الكود مش متاح دلوقتي (محتاج نت أول مرة)</div>`;
+    }
+  }catch(e){
+    document.getElementById('qrHolder').innerHTML = '';
+  }
+}
+
+function printLabel(){
+  window.print();
+}
+
+function toggleDetailLabel(id){
+  const area = document.getElementById('detailLabelArea');
+  if(area.innerHTML.trim() !== ''){
+    area.innerHTML = '';
+    return;
+  }
+  const d = devices.find(x => x.id === id);
+  if(d) renderLabelInto('detailLabelArea', d);
+}
+
+// ============================================================
+// جلسة واحدة لكل حساب: آخر جهاز يسجّل دخول هو اللي يفضل شغال
+// ============================================================
+const SESSION_TAG_KEY = 'ifix_session_tag';
+let sessionTag = localStorage.getItem(SESSION_TAG_KEY);
+if(!sessionTag){
+  sessionTag = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  localStorage.setItem(SESSION_TAG_KEY, sessionTag);
+}
+
+async function claimSession(){
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+    await sb.from('active_sessions').upsert({
+      user_id: session.user.id,
+      session_tag: sessionTag,
+      updated_at: new Date().toISOString()
+    });
+  }catch(e){ /* لو الجدول لسه متعملش، السيستم يكمل عادي */ }
+}
+
+async function checkSessionStillMine(){
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+    const { data } = await sb.from('active_sessions').select('session_tag').eq('user_id', session.user.id).maybeSingle();
+    if(data && data.session_tag && data.session_tag !== sessionTag){
+      await sb.auth.signOut();
+      alert('تم تسجيل الدخول بنفس الحساب من جهاز آخر — هيتم تسجيل خروجك من هنا.');
+      window.location.href = 'index.html';
+    }
+  }catch(e){ /* تجاهل أخطاء الشبكة المؤقتة */ }
+}
+
+
+// ============================================================
+// إشعارات واتساب للعميل + كشف حساب المحل على واتساب
+// ============================================================
+function waPhone(raw){
+  let p = String(raw||'').replace(/[^\d]/g,'');
+  if(!p) return '';
+  if(p.startsWith('00')) p = p.slice(2);
+  if(p.startsWith('20')) return p;        // متكتب بكود مصر خلاص
+  if(p.startsWith('0'))  return '2' + p;  // 010xxxxxxxx → 2010xxxxxxxx
+  return p;
+}
+// إرسال واتساب: يفتح المحادثة بالرسالة جاهزة والموظف يدوس إرسال
+function openWa(phone, msg){
+  const p = waPhone(phone);
+  if(!p) return false;
+  const url = 'https://wa.me/' + p + '?text=' + encodeURIComponent(msg);
+  // على الآيفون/الموبايل المتصفح بيمنع فتح النوافذ بعد العمليات غير المباشرة،
+  // فلو اتمنع بنعرض زرار عائم المستخدم يدوس عليه — الرسالة متضيعش أبداً
+  let w = null;
+  try{ w = window.open(url, '_blank'); }catch(e){}
+  if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(url);
+  return true;
+}
+
+// زرار عائم للرسالة اللي اتمنعت
+function showWaPending(url){
+  let b = document.getElementById('waPending');
+  if(!b){
+    b = document.createElement('a');
+    b.id = 'waPending';
+    b.className = 'wa-pending';
+    b.target = '_blank'; b.rel = 'noopener';
+    b.innerHTML = '💬 اضغط لإرسال رسالة الواتساب للعميل';
+    b.onclick = () => setTimeout(() => b.remove(), 400);
+    document.body.appendChild(b);
+  }
+  b.href = url;
+}
+const devRef = d => '#' + d.id.slice(-5).toUpperCase();
+
+function waStatusMsg(d, statusKey){
+  const ref = devRef(d);
+  const dev = `${d.deviceType||''} ${d.model||''}`.trim();
+  const price = parseInt(d.agreedPrice) || 0;
+  const priceLine = price ? `\nتكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*` : '';
+  const M = {
+    waiting:    `أهلاً ${d.customerName} 👋\nتم استلام جهازك *${dev}* بنجاح في I Fix Team ✅\nرقم المتابعة: *${ref}*${priceLine}\nتقدر تتابع حالة جهازك لحظة بلحظة من اللينك ده:\n${trackUrl(d)}\nوهنبعتلك تحديثات أول بأول على الواتساب كمان.`,
+    diagnosing: `تحديث جهازك *${dev}* (${ref}) 🔍\nبدأنا الكشف على الجهاز لتحديد العطل بدقة.\nهنوافيك بالتفاصيل أول ما الكشف يخلص.`,
+    repairing:  `تحديث جهازك *${dev}* (${ref}) 🔧\nتم تحديد العطل وبدأنا الصيانة فعلياً.${priceLine}`,
+    done:       `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
+    delivered:  `تم تسليم جهازك *${dev}* (${ref}) ✅\nشكراً لثقتك في I Fix Team 🌟\nلو حصلت أي ملاحظة بعد الاستلام كلمنا فوراً.`,
+    price:      `تحديث جهازك *${dev}* (${ref}) 💰\nتم تحديد تكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*\nلو عندك أي استفسار كلمنا، ولو موافق هنكمل الصيانة على طول.`,
+  };
+  return M[statusKey] || M.waiting;
+}
+
+// أرقام واتساب المحلات (بتتحفظ أونلاين ومشتركة بين الموظفين)
+const SHOP_PHONES_KEY = 'shop-phones';
+let shopPhones = {};
+async function loadShopPhones(){
+  try{
+    const r = await window.storage.get(SHOP_PHONES_KEY);
+    shopPhones = r ? JSON.parse(r.value) : {};
+  }catch(e){ shopPhones = {}; }
+}
+async function persistShopPhones(){
+  try{ await window.storage.set(SHOP_PHONES_KEY, JSON.stringify(shopPhones)); }catch(e){}
+}
+
+async function setShopPhone(shop){
+  const cur = shopPhones[shop] || '';
+  const ph = (prompt(`رقم واتساب محل "${shop}":`, cur) || '').trim();
+  if(!ph) return null;
+  shopPhones[shop] = ph;
+  await persistShopPhones();
+  return ph;
+}
+
+async function waShop(shop){
+  let ph = shopPhones[shop];
+  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
+  const { debit, credit, balance } = shopStatementRows(shop);
+  const msg =
+    `السلام عليكم 🌹\nده ملخص حسابكم عندنا في *I Fix Team* لغاية ${new Date().toLocaleDateString('ar-EG')}:\n\n` +
+    `إجمالي الأجهزة الآجلة: *${debit.toLocaleString('en-EG')} ج.م*\n` +
+    `إجمالي المدفوع: *${credit.toLocaleString('en-EG')} ج.م*\n` +
+    `المتبقي: *${balance.toLocaleString('en-EG')} ج.م*\n\n` +
+    `ولو حابين كشف الحساب التفصيلي PDF نبعتهولكم في نفس الشات 📄`;
+  openWa(ph, msg);
+}
+
+// ============================================================
+// السعر بالأرقام الصحيحة + طريقة الدفع (فوري/آجل)
+// ============================================================
+const intPrice = v => {
+  const n = Math.round(Number(String(v||'').replace(/[^\d.]/g,'')));
+  return (isFinite(n) && n > 0) ? String(n) : '';
+};
+
+let addPayType = 'cash';
+function setAddPayType(t){
+  addPayType = t;
+  const c = document.getElementById('ptCash'), f = document.getElementById('ptDeferred');
+  if(!c || !f) return;
+  c.style.cssText = 'border-color:#16A34A;' + (t==='cash' ? 'background:#16A34A;color:#fff;' : 'background:#fff;color:#16A34A;');
+  f.style.cssText = 'border-color:#B45309;' + (t==='deferred' ? 'background:#B45309;color:#fff;' : 'background:#fff;color:#B45309;');
+}
+
+async function editPayType(t){
+  devices = devices.map(d => d.id === selectedId ? { ...d, paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  renderDetail(); await persist();
+}
+
+// تعديل السعر: أرقام صحيحة — ولو الجهاز "متسلم بس مش متسعر" واتسعر دلوقتي يتحاسب تلقائياً
+async function editPrice(value){
+  const price = intPrice(value);
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  let extra = { agreedPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let histEntry = null;
+
+  if(d.status === 'delivered' && d.paymentStatus === 'unpaid' && price){
+    extra.paymentStatus = 'paid';
+    if(d.paymentType === 'deferred'){
+      const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
+      extra.billedShop = shop;
+      histEntry = { status:'delivered', label:`اتسعر بعد التسليم — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
+      addLedgerDebit({...d, billedShop: shop}, parseInt(price));
+    } else {
+      histEntry = { status:'delivered', label:'اتسعر بعد التسليم — محاسَب عليه (فوري)', date:new Date().toISOString(), by: currentUser.name };
+    }
+  }
+
+  // إشعار واتساب بالتكلفة أول ما تتحدد (لو الجهاز لسه عند المحل)
+  const hadPrice = (parseInt(d.agreedPrice) || 0) > 0;
+  if(price && !hadPrice && d.customerPhone && d.status !== 'delivered'){
+    openWa(d.customerPhone, waStatusMsg({...d, agreedPrice: price}, 'price'));
+  }
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
+    : x);
+  renderDetail(); render(); await persist();
+  const updT = devices.find(x => x.id === selectedId);
+  if(updT){ if(!updT.trackToken){ await ensureTrackToken(updT.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+}
+
+// ============================================================
+// دفتر الحسابات (آجل المحلات)
+// ============================================================
+const LEDGER_KEY = 'accounts-ledger';
+let ledger = [];
+
+async function loadLedger(){
+  try{
+    const r = await window.storage.get(LEDGER_KEY);
+    ledger = r ? JSON.parse(r.value) : [];
+  }catch(e){ ledger = []; }
+}
+async function persistLedger(){
+  try{ await window.storage.set(LEDGER_KEY, JSON.stringify(ledger)); }catch(e){}
+}
+
+function addLedgerDebit(d, price){
+  ledger = [{
+    id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    type: 'debit',
+    shop: (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل',
+    amount: price,
+    deviceId: d.id,
+    deviceLabel: `${d.deviceType||''} ${d.model||''} — ${d.customerName||''}`.trim(),
+    date: new Date().toISOString(),
+    by: currentUser.name
+  }, ...ledger];
+  persistLedger();
+}
+
+async function recordPayment(){
+  const shop = document.getElementById('payShop').value.trim();
+  const amount = parseInt(document.getElementById('payAmount').value) || 0;
+  const note = document.getElementById('payNote').value.trim();
+  if(!shop){ alert('اكتب اسم المحل الأول'); return; }
+  if(amount <= 0){ alert('اكتب مبلغ صحيح'); return; }
+  ledger = [{
+    id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    type: 'credit', shop, amount, note,
+    date: new Date().toISOString(), by: currentUser.name
+  }, ...ledger];
+  document.getElementById('payShop').value = '';
+  document.getElementById('payAmount').value = '';
+  document.getElementById('payNote').value = '';
+  await persistLedger();
+  renderAccounts();
+}
+
+async function deletePayment(id){
+  const e = ledger.find(x => x.id === id);
+  if(!e || e.type !== 'credit') return;
+  if(!confirm(`متأكد إنك عايز تمسح دفعة ${e.amount.toLocaleString('en-EG')} ج.م من "${e.shop}"؟`)) return;
+  ledger = ledger.filter(x => x.id !== id);
+  await persistLedger();
+  renderAccounts();
+}
+
+// نقل جهاز آجل من حساب محل لحساب محل تاني — مع تسجيل الأصل في تفاصيل الجهاز
+async function transferDebit(entryId){
+  const e = ledger.find(x => x.id === entryId);
+  if(!e || e.type !== 'debit') return;
+  const newShop = (prompt(`الجهاز ده متحاسب حالياً على "${e.shop}".\nاكتب اسم المحل اللي عايز تنقله على حسابه:`) || '').trim();
+  if(!newShop || newShop === e.shop) return;
+  const oldShop = e.shop;
+  e.prevShop = oldShop;
+  e.shop = newShop;
+  e.transferredAt = new Date().toISOString();
+  e.transferredBy = currentUser.name;
+  devices = devices.map(d => d.id === e.deviceId
+    ? { ...d,
+        billedShop: newShop,
+        accountNote: `الجهاز ده كان داخل ومتحاسب على حساب محل "${oldShop}"، واتنقل على حساب "${newShop}" بتاريخ ${new Date().toLocaleDateString('ar-EG')} بواسطة ${currentUser.name}`,
+        lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : d);
+  await persistLedger();
+  await persist();
+  renderAccounts();
+  render();
+}
+
+// ============================================================
+// صفحة الحسابات
+// ============================================================
+function openAccounts(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  document.getElementById('accountsOverlay').classList.remove('hidden');
+  renderAccounts();
+}
+function closeAccounts(){ document.getElementById('accountsOverlay').classList.add('hidden'); }
+let accOpenShop = null;
+
+function shopNamesForDatalist(){
+  const s = new Set();
+  ledger.forEach(e => e.shop && s.add(e.shop));
+  devices.forEach(d => d.shopName && s.add(d.shopName.trim()));
+  return [...s].filter(Boolean).map(n => `<option value="${esc(n)}">`).join('');
+}
+
+function shopStats(){
+  const shops = {};
+  ledger.forEach(e => {
+    const k = e.shop || 'بدون محل';
+    shops[k] = shops[k] || { debit:0, credit:0, entries:[] };
+    shops[k][e.type === 'debit' ? 'debit' : 'credit'] += (e.amount||0);
+    shops[k].entries.push(e);
+  });
+  return shops;
+}
+
+function renderAccounts(){
+  document.getElementById('accShopsList').innerHTML = shopNamesForDatalist();
+  const q = (document.getElementById('accSearch').value || '').trim();
+  const shops = shopStats();
+
+  let names = Object.keys(shops).sort((a,b) => (shops[b].debit - shops[b].credit) - (shops[a].debit - shops[a].credit));
+  if(q) names = names.filter(n => n.includes(q));
+
+  if(names.length === 0){
+    document.getElementById('accountsBody').innerHTML = `<div class="empty-col">${q ? 'مفيش محل بالاسم ده' : 'لسه مفيش حسابات آجلة — أول جهاز آجل يتسلم هيظهر هنا'}</div>`;
+    return;
+  }
+
+  document.getElementById('accountsBody').innerHTML = names.map(n => {
+    const s = shops[n];
+    const balance = s.debit - s.credit;
+    const open = accOpenShop === n;
+    const safe = esc(n).replace(/'/g,"\\'");
+
+    const entriesHtml = !open ? '' : `
+      <div class="acc-toolbar">
+        <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 واتساب المحل</button>
+        <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ رقم المحل</button>
+        <button class="btn-secondary" style="color:#166534;border-color:#BBF7D0;" onclick="exportShopExcel('${safe}')">📊 تصدير Excel</button>
+        <button class="btn-secondary" style="color:#B91C1C;border-color:#FECACA;" onclick="exportShopPdf('${safe}')">📄 تصدير PDF ملون</button>
+      </div>
+      <div class="acc-entries">` + s.entries
+      .slice().sort((a,b) => new Date(b.date) - new Date(a.date))
+      .map(e => e.type === 'debit'
+        ? `<div class="acc-entry">
+             <div>
+               <div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
+               <div class="acc-entry-meta">${new Date(e.date).toLocaleString('ar-EG')} — بواسطة ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div>
+             </div>
+             <div style="text-align:left;">
+               <div style="font-weight:800; color:#B45309;">+ ${(e.amount||0).toLocaleString('en-EG')} ج.م</div>
+               <button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ نقل لمحل تاني</button>
+             </div>
+           </div>`
+        : `<div class="acc-entry" style="background:#F0FDF4;">
+             <div>
+               <div style="font-weight:700; color:#16A34A;">💵 دفعة${e.note ? ` — ${esc(e.note)}` : ''}</div>
+               <div class="acc-entry-meta">${new Date(e.date).toLocaleString('ar-EG')} — بواسطة ${esc(e.by||'')}</div>
+             </div>
+             <div style="text-align:left;">
+               <div style="font-weight:800; color:#16A34A;">− ${(e.amount||0).toLocaleString('en-EG')} ج.م</div>
+               <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button>
+             </div>
+           </div>`
+      ).join('') + `</div>`;
+
+    return `<div class="acc-shop">
+      <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
+        <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}</span>
+        <span class="acc-nums">
+          <span>إجمالي الآجل: <b>${s.debit.toLocaleString('en-EG')}</b></span>
+          <span>المدفوع: <b style="color:#16A34A;">${s.credit.toLocaleString('en-EG')}</b></span>
+          <span>المتبقي عليه: <b style="color:${balance > 0 ? '#DC2626' : '#16A34A'};">${balance.toLocaleString('en-EG')}</b> ج.م</span>
+          <span style="color:#94A3B8;">${open ? '▲' : '▼'}</span>
+        </span>
+      </button>
+      ${entriesHtml}
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// تصدير كشف حساب محل: Excel حقيقي + PDF ملون
+// ============================================================
+function shopStatementRows(shop){
+  const entries = ledger.filter(e => (e.shop||'بدون محل') === shop)
+    .slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+  const debit = entries.filter(e=>e.type==='debit').reduce((t,e)=>t+(e.amount||0),0);
+  const credit = entries.filter(e=>e.type==='credit').reduce((t,e)=>t+(e.amount||0),0);
+  return { entries, debit, credit, balance: debit - credit };
+}
+
+function exportShopExcel(shop){
+  const { entries, debit, credit, balance } = shopStatementRows(shop);
+  const rows = [
+    ['كشف حساب — ' + shop],
+    ['I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG')],
+    [],
+    ['التاريخ','البيان','عليه (آجل)','له (دفعات)','بواسطة'],
+    ...entries.map(e => [
+      new Date(e.date).toLocaleString('ar-EG'),
+      e.type==='debit' ? ('جهاز: ' + (e.deviceLabel||'') + (e.prevShop ? ` (منقول من حساب ${e.prevShop})` : '')) : ('دفعة' + (e.note ? ' — ' + e.note : '')),
+      e.type==='debit' ? (e.amount||0) : '',
+      e.type==='credit' ? (e.amount||0) : '',
+      e.by||''
+    ]),
+    [],
+    ['','إجمالي الآجل', debit, '', ''],
+    ['','إجمالي المدفوع', '', credit, ''],
+    ['','المتبقي على المحل', balance, '', ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:22},{wch:48},{wch:14},{wch:14},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'كشف حساب');
+  XLSX.writeFile(wb, `كشف-حساب-${shop}-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function exportShopPdf(shop){
+  const { entries, debit, credit, balance } = shopStatementRows(shop);
+  const rowsHtml = entries.map((e,i) => `
+    <tr style="background:${i%2 ? '#F8FAFC' : '#fff'};">
+      <td>${new Date(e.date).toLocaleString('ar-EG')}</td>
+      <td style="text-align:right;">${e.type==='debit'
+        ? `📱 ${esc(e.deviceLabel||'جهاز')}${e.prevShop ? `<br><small style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</small>` : ''}`
+        : `💵 دفعة${e.note ? ' — ' + esc(e.note) : ''}`}</td>
+      <td style="color:#B45309; font-weight:800;">${e.type==='debit' ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
+      <td style="color:#16A34A; font-weight:800;">${e.type==='credit' ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
+      <td>${esc(e.by||'')}</td>
+    </tr>`).join('');
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+  <title>كشف حساب — ${esc(shop)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Tajawal',sans-serif; color:#101014; margin:0; padding:28px;}
+    .head{background:linear-gradient(135deg,#E8321E,#C22513); color:#fff; border-radius:14px; padding:22px 26px; display:flex; justify-content:space-between; align-items:center;}
+    .head h1{font-family:'Cairo',sans-serif; font-size:26px; margin:0;}
+    .head .sub{font-size:13px; opacity:.9; margin-top:4px;}
+    .head .brand{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; text-align:left;}
+    .totals{display:flex; gap:14px; margin:18px 0;}
+    .tcard{flex:1; border-radius:12px; padding:14px 18px; color:#fff;}
+    .tcard .lbl{font-size:13px; opacity:.92;}
+    .tcard .num{font-family:'Cairo',sans-serif; font-size:26px; font-weight:900; margin-top:2px;}
+    table{width:100%; border-collapse:collapse; font-size:13.5px;}
+    th{background:#101014; color:#fff; padding:11px 8px; font-size:13px;}
+    td{padding:10px 8px; border-bottom:1px solid #E5E7EB; text-align:center;}
+    .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
+    @media print{ body{padding:12px;} }
+  </style></head><body>
+    <div class="head">
+      <div><h1>كشف حساب: ${esc(shop)}</h1><div class="sub">تاريخ الكشف: ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}</div></div>
+      <div class="brand">I FIX TEAM<br><small style="font-weight:400;font-size:11px;">FOR MOBILE SERVICES</small></div>
+    </div>
+    <div class="totals">
+      <div class="tcard" style="background:#B45309;"><div class="lbl">إجمالي الآجل (عليه)</div><div class="num">${debit.toLocaleString('en-EG')} ج.م</div></div>
+      <div class="tcard" style="background:#16A34A;"><div class="lbl">إجمالي المدفوع (له)</div><div class="num">${credit.toLocaleString('en-EG')} ج.م</div></div>
+      <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
+    </div>
+    <table>
+      <tr><th>التاريخ</th><th style="width:42%;">البيان</th><th>عليه (آجل)</th><th>له (دفعات)</th><th>سُجّل بواسطة</th></tr>
+      ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
+    </table>
+    <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
+    <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ============================================================
+// صفحة الجرد: فلتر فترة + كروت أعداد + أداء الفنيين + الواقف كتير
+// ============================================================
+const STUCK_DAYS = 3;
+let invPeriod = { mode: 'today', from: '', to: '' };
+
+function setInvPeriod(mode){ invPeriod.mode = mode; renderSummaries(); }
+function setInvCustom(){
+  invPeriod.mode = 'custom';
+  invPeriod.from = document.getElementById('invFrom').value;
+  invPeriod.to = document.getElementById('invTo').value;
+  renderSummaries();
+}
+function invRange(){
+  const now = new Date();
+  const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  if(invPeriod.mode === 'today') return [startOfDay(now), null];
+  if(invPeriod.mode === 'week'){ const s = startOfDay(now); s.setDate(s.getDate() - 6); return [s, null]; }
+  if(invPeriod.mode === 'month'){ const s = startOfDay(now); s.setDate(s.getDate() - 29); return [s, null]; }
+  if(invPeriod.mode === 'custom'){
+    const f = invPeriod.from ? startOfDay(new Date(invPeriod.from)) : null;
+    let t = null;
+    if(invPeriod.to){ t = new Date(invPeriod.to); t.setHours(23,59,59,999); }
+    return [f, t];
+  }
+  return [null, null];
+}
+function inRange(iso){
+  if(!iso) return false;
+  const [f, t] = invRange();
+  const d = new Date(iso);
+  if(f && d < f) return false;
+  if(t && d > t) return false;
+  return true;
+}
+function deliveredDateOf(d){
+  const h = (d.statusHistory||[]).filter(x => x.status === 'delivered');
+  return h.length ? h[h.length-1].date : null;
+}
+function lastChangeOf(d){
+  const h = d.statusHistory || [];
+  return h.length ? h[h.length-1].date : d.intakeDate;
+}
+const ACTIVE_STATUSES = ['waiting','diagnosing','repairing','done'];
+
+function stuckDevices(){
+  const now = Date.now();
+  return devices
+    .filter(d => ACTIVE_STATUSES.includes(d.status))
+    .map(d => ({ d, days: Math.floor((now - new Date(lastChangeOf(d)).getTime()) / 86400000) }))
+    .filter(x => x.days >= STUCK_DAYS)
+    .sort((a,b) => b.days - a.days);
+}
+
+function renderSummaries(){
+  const q = (document.getElementById('summarySearch').value || '').trim();
+
+  const chip = (mode, label) =>
+    `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
+  const filterBar = `
+    <div class="inv-filter">
+      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      <span class="inv-custom">
+        من <input type="date" id="invFrom" value="${invPeriod.from}" onchange="setInvCustom()">
+        إلى <input type="date" id="invTo" value="${invPeriod.to}" onchange="setInvCustom()">
+      </span>
+    </div>`;
+
+  const received = devices.filter(d => inRange(d.intakeDate));
+  const delivered = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inRange(dd); });
+  const inProgress = devices.filter(d => ACTIVE_STATUSES.includes(d.status));
+  const stuck = stuckDevices();
+  const cards = `
+    <div class="inv-cards">
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${received.length}</div><div class="inv-card-label">جهاز استُلم في الفترة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${delivered.length}</div><div class="inv-card-label">جهاز اتسلّم في الفترة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${inProgress.length}</div><div class="inv-card-label">جهاز شغال عليه دلوقتي</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#DC2626;">${stuck.length}</div><div class="inv-card-label">جهاز واقف من ${STUCK_DAYS} أيام أو أكتر</div></div>
+    </div>`;
+
+  let techs = [...new Set(devices.map(d => d.technician).filter(Boolean))];
+  if(q) techs = techs.filter(t => t.includes(q));
+  const techRows = techs.map(t => ({
+    t,
+    deliveredCount: delivered.filter(d => d.technician === t).length,
+    receivedCount: received.filter(d => d.technician === t).length,
+    activeCount: inProgress.filter(d => d.technician === t).length,
+  })).sort((a,b) => b.deliveredCount - a.deliveredCount);
+
+  const techTable = techRows.length === 0
+    ? `<div class="empty-col">${q ? 'مفيش فني بالاسم ده' : 'لسه مفيش فنيين متسجلين على أجهزة'}</div>`
+    : `<table class="inv-table">
+        <tr><th>الفني</th><th>سلّم في الفترة</th><th>استلم شغل في الفترة</th><th>شغال عليها دلوقتي</th></tr>
+        ${techRows.map(r => `<tr onclick="expandTech('${esc(r.t).replace(/'/g,"\\'")}')" style="cursor:pointer;">
+          <td style="font-weight:800;">🔧 ${esc(r.t)}</td>
+          <td style="color:#16A34A;font-weight:800;">${r.deliveredCount}</td>
+          <td>${r.receivedCount}</td>
+          <td style="color:#B45309;font-weight:800;">${r.activeCount}</td>
+        </tr>`).join('')}
+      </table>
+      <div id="techExpanded"></div>`;
+
+  const stuckHtml = stuck.length === 0
+    ? `<div class="empty-col">مفيش أجهزة واقفة — كله ماشي 👌</div>`
+    : stuck.map(({d, days}) => {
+        const s = statusInfo(d.status);
+        return `<div class="stuck-item" onclick="closeSummaries(); openDetail('${d.id}')">
+          <div>
+            <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
+            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}واقف في "<b style="color:${accent(s.varname)}">${esc(s.label)}</b>"</div>
+          </div>
+          <div class="stuck-days">${days} يوم</div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('summariesBody').innerHTML = `
+    ${filterBar}
+    ${cards}
+    <div class="inv-section-title">أداء الفنيين</div>
+    ${techTable}
+    <div class="inv-section-title" style="color:#DC2626;">⚠ أجهزة واقفة بقالها كتير</div>
+    ${stuckHtml}
+  `;
+}
+
+function expandTech(name){
+  const list = devices.filter(d => d.technician === name && (ACTIVE_STATUSES.includes(d.status) || (deliveredDateOf(d) && inRange(deliveredDateOf(d)))));
+  document.getElementById('techExpanded').innerHTML =
+    `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('') || '<div class="empty-col">مفيش أجهزة</div>'}</div>`;
+}
+
+// نقطة البداية: التحقق من الدخول والاشتراك قبل تحميل أي بيانات
+requireAccess().then(ok => {
+  if(!ok) return;
+  loadDevices();
+  loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
+  setInterval(checkAutoBackup, 3600000);
+  loadLedger();
+  loadShopPhones();
+  startRealtimeSync();
+  setupAddFormEnterNav();
+  claimSession();
+  setInterval(checkSessionStillMine, 20000); // فحص كل ٢٠ ثانية
+});
+</script>
+</body>
+</html>
