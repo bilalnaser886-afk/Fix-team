@@ -421,8 +421,8 @@
       <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
       <label class="field"><span>العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
       <label class="field"><span>حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
-      <label class="field"><span>السعر المتوقع (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="number" min="0" step="1" inputmode="numeric" /></label>
-      <div style="margin-bottom:12px;">
+      <label class="field"><span>السعر المتوقع (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="number" min="0" step="1" inputmode="numeric" oninput="togglePayTypeVisibility()" /></label>
+      <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
         <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
         <div class="pay-choice">
           <button type="button" id="ptCash" class="pay-btn" onclick="setAddPayType('cash')">فوري</button>
@@ -812,6 +812,7 @@ function openAddModal(){
     .forEach(id => document.getElementById('f_'+id).value = '');
   document.getElementById('accountantList').innerHTML = accountantOptions();
   setAddPayType('cash');
+  togglePayTypeVisibility();
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
   document.getElementById('f_intakeDateOnly').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
@@ -965,7 +966,7 @@ function renderDetail(){
       <label class="field"><span>اسم المحل</span><input value="${esc(d.shopName||'')}" placeholder="اسم المحل" onblur="editField('shopName', this.value)" /></label>
     </div>
     <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="number" min="0" step="1" inputmode="numeric" value="${esc(d.agreedPrice||'')}" onblur="editPrice(this.value)" /></label>
-    <div style="margin-bottom:12px;">
+    ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع${d.status==='delivered' ? ' (اتحددت عند التسليم)' : ''}</span>
       ${d.status==='delivered'
         ? `<div style="font-size:14.5px;font-weight:700;">${d.paymentType==='deferred' ? '🕐 آجل — على حساب المحل' : '💵 فوري'}</div>`
@@ -973,7 +974,7 @@ function renderDetail(){
             <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">فوري</button>
             <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
           </div>`}
-    </div>
+    </div>` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>متحاسب على حساب محل</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
     <label class="field"><span>العطل / المشكلة</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
@@ -1449,6 +1450,56 @@ function waPhone(raw){
   if(p.startsWith('0'))  return '2' + p;  // 010xxxxxxxx → 2010xxxxxxxx
   return p;
 }
+// ============================================================
+// لينك متابعة العميل (صفحة track.html العامة)
+// ============================================================
+const TRACK_BASE = location.origin.startsWith('http') ? location.origin : 'https://iixteam.pages.dev';
+const genTrackToken = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+const trackUrl = d => d.trackToken ? `${TRACK_BASE}/track.html?t=${d.trackToken}` : '';
+
+// نشر بيانات الجهاز الآمنة فقط لصفحة المتابعة (من غير رقم تليفون أو بيانات حساسة)
+async function syncTrack(d){
+  if(!d || !d.trackToken) return;
+  try{
+    const payload = JSON.stringify({
+      ref: devRef(d),
+      customerName: d.customerName || '',
+      deviceType: d.deviceType || '',
+      model: d.model || '',
+      status: d.status,
+      price: parseInt(d.agreedPrice) || 0,
+      intakeDate: d.intakeDate,
+      updatedAt: new Date().toISOString()
+    });
+    await sb.from('public_track').upsert({ token: d.trackToken, payload, updated_at: new Date().toISOString() });
+  }catch(e){ /* المتابعة إضافة اختيارية — أي خطأ فيها ميوقفش السيستم */ }
+}
+
+// يضمن إن الجهاز ليه توكن متابعة (للأجهزة القديمة المتسجلة قبل الميزة)
+async function ensureTrackToken(id){
+  let dev = devices.find(x => x.id === id);
+  if(!dev) return null;
+  if(!dev.trackToken){
+    dev = { ...dev, trackToken: genTrackToken() };
+    devices = devices.map(x => x.id === id ? dev : x);
+    await persist();
+  }
+  return dev;
+}
+
+async function copyTrackLink(id){
+  const dev = await ensureTrackToken(id);
+  if(!dev) return;
+  await syncTrack(dev);
+  const url = trackUrl(dev);
+  try{
+    await navigator.clipboard.writeText(url);
+    alert('تم نسخ لينك المتابعة ✅\n' + url);
+  }catch(e){
+    prompt('انسخ اللينك ده:', url);
+  }
+}
+
 // إرسال واتساب: يفتح المحادثة بالرسالة جاهزة والموظف يدوس إرسال
 function openWa(phone, msg){
   const p = waPhone(phone);
@@ -1538,6 +1589,16 @@ const intPrice = v => {
 };
 
 let addPayType = 'cash';
+
+// فوري/آجل ميظهروش غير لما يتكتب سعر فعلي — ولو السعر اتمسح يختفوا ويرجعوا فوري
+function togglePayTypeVisibility(){
+  const wrap = document.getElementById('payTypeWrap');
+  if(!wrap) return;
+  const has = !!intPrice(document.getElementById('f_agreedPrice').value);
+  wrap.style.display = has ? 'block' : 'none';
+  if(!has) setAddPayType('cash');
+}
+
 function setAddPayType(t){
   addPayType = t;
   const c = document.getElementById('ptCash'), f = document.getElementById('ptDeferred');
