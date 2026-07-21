@@ -333,6 +333,19 @@
     padding:14px; margin-bottom:16px;
   }
 
+  /* ===== تقييم الفنيين ===== */
+  .te-note{
+    background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px;
+    padding:10px 13px; font-size:13px; color:#78350F; margin-bottom:8px; line-height:1.7;
+  }
+  .te-breakdown{padding:10px 14px;}
+  .te-item{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:#fff; border:1px solid #EEF0F3; border-radius:9px;
+    padding:9px 12px; margin-bottom:6px; text-align:right; cursor:pointer;
+  }
+  .te-item:hover{background:#F1F5F9;}
+
   /* ===== كبار العملاء ===== */
   .cust-item{
     display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
@@ -420,6 +433,7 @@
   <button class="menu-btn" onclick="toggleMenu()">⋮</button>
   <div id="menuDropdown" class="menu-dropdown hidden">
     <button onclick="openAnalytics()">📊 الملخص</button>
+    <button onclick="openTechEval()">🏆 تقييم الفنيين</button>
     <button onclick="openSummaries()">📋 الجرد</button>
     <button onclick="openAccounts()">🧾 الحسابات</button>
     <button onclick="openPrintPage()">🖨 الطباعة والمسح الضوئي</button>
@@ -509,7 +523,6 @@
       <button class="close-btn" onclick="closeSummaries()">×</button>
     </div>
     <div style="padding:0 20px;">
-      <input id="summarySearch" oninput="renderSummaries()" placeholder="دور بإسم فني..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; font-size:13px;" />
     </div>
     <div id="summariesBody" style="padding:16px 20px 40px;"></div>
   </div>
@@ -523,6 +536,17 @@
       <button class="close-btn" onclick="closeAnalytics()">×</button>
     </div>
     <div id="analyticsBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- Technician evaluation (تقييم الفنيين) page -->
+<div id="techEvalOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>🏆 تقييم الفنيين</h2>
+      <button class="close-btn" onclick="closeTechEval()">×</button>
+    </div>
+    <div id="techEvalBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -1519,7 +1543,6 @@ document.addEventListener('click', (e) => {
 
 function openSummaries(){
   document.getElementById('menuDropdown').classList.add('hidden');
-  document.getElementById('summarySearch').value = '';
   renderSummaries();
   document.getElementById('summariesOverlay').classList.remove('hidden');
 }
@@ -2392,9 +2415,6 @@ function stuckDevices(){
 }
 
 function renderSummaries(){
-  expandedTechName = null;   // إعادة الرسم بتقفل أي فني مفتوح — عشان الحالة متتلخبطش مع الفلاتر
-  const q = (document.getElementById('summarySearch').value || '').trim();
-
   const chip = (mode, label) =>
     `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
   const filterBar = `
@@ -2418,36 +2438,14 @@ function renderSummaries(){
       <div class="inv-card"><div class="inv-card-num" style="color:#DC2626;">${stuck.length}</div><div class="inv-card-label">جهاز واقف من ${STUCK_DAYS} أيام أو أكتر</div></div>
     </div>`;
 
-  let techs = [...new Set(devices.map(d => d.technician).filter(Boolean))];
-  if(q) techs = techs.filter(t => t.includes(q));
-  const techRows = techs.map(t => ({
-    t,
-    deliveredCount: delivered.filter(d => d.technician === t).length,
-    receivedCount: received.filter(d => d.technician === t).length,
-    activeCount: inProgress.filter(d => d.technician === t).length,
-  })).sort((a,b) => b.deliveredCount - a.deliveredCount);
-
-  const techTable = techRows.length === 0
-    ? `<div class="empty-col">${q ? 'مفيش فني بالاسم ده' : 'لسه مفيش فنيين متسجلين على أجهزة'}</div>`
-    : `<table class="inv-table">
-        <tr><th>الفني</th><th>سلّم في الفترة</th><th>استلم شغل في الفترة</th><th>شغال عليها دلوقتي</th></tr>
-        ${techRows.map(r => `<tr onclick="expandTech('${esc(r.t).replace(/'/g,"\\'")}')" style="cursor:pointer;">
-          <td style="font-weight:800;">🔧 ${esc(r.t)}</td>
-          <td style="color:#16A34A;font-weight:800;">${r.deliveredCount}</td>
-          <td>${r.receivedCount}</td>
-          <td style="color:#B45309;font-weight:800;">${r.activeCount}</td>
-        </tr>`).join('')}
-      </table>
-      <div id="techExpanded"></div>`;
-
   const stuckHtml = stuck.length === 0
     ? `<div class="empty-col">مفيش أجهزة واقفة — كله ماشي 👌</div>`
     : stuck.map(({d, days}) => {
-        const s = statusInfo(d.status);
+        const st = statusInfo(d.status);
         return `<div class="stuck-item" onclick="closeSummaries(); openDetail('${d.id}')">
           <div>
             <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
-            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}واقف في "<b style="color:${accent(s.varname)}">${esc(s.label)}</b>"</div>
+            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}واقف في "<b style="color:${accent(st.varname)}">${esc(st.label)}</b>"</div>
           </div>
           <div class="stuck-days">${days} يوم</div>
         </div>`;
@@ -2456,25 +2454,12 @@ function renderSummaries(){
   document.getElementById('summariesBody').innerHTML = `
     ${filterBar}
     ${cards}
-    <div class="inv-section-title">أداء الفنيين</div>
-    ${techTable}
     <div class="inv-section-title" style="color:#DC2626;">⚠ أجهزة واقفة بقالها كتير</div>
     ${stuckHtml}
   `;
 }
 
-let expandedTechName = null;
-function expandTech(name){
-  if(expandedTechName === name){
-    expandedTechName = null;
-    document.getElementById('techExpanded').innerHTML = '';
-    return;
-  }
-  expandedTechName = name;
-  const list = devices.filter(d => d.technician === name && (ACTIVE_STATUSES.includes(d.status) || (deliveredDateOf(d) && inRange(deliveredDateOf(d)))));
-  document.getElementById('techExpanded').innerHTML =
-    `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('') || '<div class="empty-col">مفيش أجهزة</div>'}</div>`;
-}
+
 
 // ============================================================
 // صفحة الملخص: الفلوس + سرعة الفنيين ونسبة المرتجع + كبار العملاء
@@ -2575,60 +2560,6 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">إجمالي المتبقي على المحلات (كل الوقت)</div></div>
     </div>`;
 
-  // ===== الفنيين: السرعة والمرتجع والنقاط =====
-  const techs = [...new Set([
-    ...devices.map(d => d.technician).filter(Boolean),
-    ...devices.filter(d => !d.isWholesale && d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0).map(d => d.assistTechnician),
-  ])];
-
-  // حساب نقاط كل فني: الرئيسي ياخد الباقي بعد نسبة المساعد، والمساعد ياخد نسبته
-  // (الأجهزة "جملة" مستبعدة تماماً من النقاط)
-  const pointsByTech = {};
-  const addPoints = (name, val) => { if(!name || !val) return; pointsByTech[name] = (pointsByTech[name]||0) + val; };
-  deliveredInRange.forEach(d => {
-    if(d.isWholesale) return;
-    const pts = parseFloat(enDigits(d.points)) || 0;
-    if(!pts || !d.technician) return;
-    const pct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
-    if(d.assistTechnician && pct > 0){
-      const assistShare = pts * (pct / 100);
-      addPoints(d.assistTechnician, assistShare);
-      addPoints(d.technician, pts - assistShare);
-    } else {
-      addPoints(d.technician, pts);
-    }
-  });
-
-  const techRows = techs.map(t => {
-    const done = deliveredInRange.filter(d => d.technician === t);
-    const durations = done.map(repairDays).filter(x => x !== null);
-    const avg = durations.length ? (durations.reduce((a,b) => a+b, 0) / durations.length) : null;
-    const returns = devices.filter(d => {
-      if(d.technician !== t) return false;
-      const rd = returnAfterDeliveryDate(d);
-      return rd && inAnRange(rd);
-    }).length;
-    const rate = done.length ? Math.round((returns / done.length) * 100) : (returns ? 100 : 0);
-    const points = Math.round((pointsByTech[t] || 0) * 10) / 10;
-    return { t, count: done.length, avg, returns, rate, points };
-  }).filter(r => r.count || r.returns || r.points)
-    .sort((a,b) => b.points - a.points);
-
-  const avgFmt = v => v === null ? '—' : (v < 1 ? 'أقل من يوم' : v.toFixed(1) + ' يوم');
-  const techTable = techRows.length === 0
-    ? `<div class="empty-col">مفيش تسليمات في الفترة دي</div>`
-    : `<table class="inv-table">
-        <tr><th>الفني</th><th>⭐ النقاط</th><th>سلّم في الفترة</th><th>متوسط مدة الصيانة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
-        ${techRows.map(r => `<tr>
-          <td style="font-weight:800;">🔧 ${esc(r.t)}</td>
-          <td style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif;">${r.points || 0}</td>
-          <td style="font-weight:800; color:#16A34A;">${r.count}</td>
-          <td>${avgFmt(r.avg)}</td>
-          <td style="font-weight:800; color:${r.returns ? '#DC2626' : '#64748B'};">${r.returns}</td>
-          <td style="font-weight:800; color:${r.rate >= 20 ? '#DC2626' : r.rate > 0 ? '#B45309' : '#16A34A'};">${r.rate}%</td>
-        </tr>`).join('')}
-      </table>`;
-
   // ===== كبار العملاء =====
   const byCustomer = {};
   devices.forEach(d => {
@@ -2660,11 +2591,202 @@ function renderAnalytics(){
   document.getElementById('analyticsBody').innerHTML = `
     ${filterBar}
     ${moneyCards}
-    <div class="inv-section-title">🔧 أداء الفنيين — السرعة والمرتجع</div>
-    ${techTable}
     <div class="inv-section-title">⭐ كبار العملاء (الأكتر تعاملاً في الفترة)</div>
     ${custList}
   `;
+}
+
+// ============================================================
+// صفحة تقييم الفنيين — النقاط والسرعة والمرتجعات
+// النقاط بتتحسب أول ما شغل الجهاز يخلص (تم الصيانة أو التسليم)
+// مش بس عند التسليم — عشان مجهود الفني يظهر فور ما يخلصه
+// ============================================================
+let tePeriod = { mode: 'all', from: '', to: '' };
+let teOpenTech = null;
+let teRows = [];
+
+function openTechEval(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  document.getElementById('techEvalOverlay').classList.remove('hidden');
+  teOpenTech = null;
+  renderTechEval();
+}
+function closeTechEval(){ document.getElementById('techEvalOverlay').classList.add('hidden'); }
+
+function setTePeriod(mode){ tePeriod.mode = mode; teOpenTech = null; renderTechEval(); }
+function setTeCustom(){
+  tePeriod.mode = 'custom';
+  tePeriod.from = document.getElementById('teFrom').value;
+  tePeriod.to = document.getElementById('teTo').value;
+  teOpenTech = null;
+  renderTechEval();
+}
+function inTeRange(iso){
+  if(!iso) return false;
+  const now = new Date();
+  const startOfDay = x => { const y = new Date(x); y.setHours(0,0,0,0); return y; };
+  let f = null, t = null;
+  if(tePeriod.mode === 'today') f = startOfDay(now);
+  else if(tePeriod.mode === 'week'){ f = startOfDay(now); f.setDate(f.getDate() - 6); }
+  else if(tePeriod.mode === 'month'){ f = startOfDay(now); f.setDate(f.getDate() - 29); }
+  else if(tePeriod.mode === 'custom'){
+    if(tePeriod.from) f = startOfDay(new Date(tePeriod.from));
+    if(tePeriod.to){ t = new Date(tePeriod.to); t.setHours(23,59,59,999); }
+  }
+  const d = new Date(iso);
+  if(f && d < f) return false;
+  if(t && d > t) return false;
+  return true;
+}
+
+// تاريخ خلاص شغل الجهاز: التسليم، وإلا أول ما وصل "تم الصيانة"
+function completionDate(d){
+  const dd = deliveredDateOf(d);
+  if(dd) return dd;
+  const h = (d.statusHistory || []).filter(x => x.status === 'done');
+  return h.length ? h[h.length - 1].date : null;
+}
+
+function renderTechEval(){
+  const chip = (mode, label) =>
+    `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
+  const filterBar = `
+    <div class="inv-filter">
+      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      <span class="inv-custom">
+        من <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
+        إلى <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
+      </span>
+    </div>`;
+
+  // ===== حساب مساهمات كل فني =====
+  const contrib = {};                      // اسم الفني → قائمة مساهماته
+  const push = (name, d, share, role) => {
+    if(!name) return;
+    (contrib[name] = contrib[name] || []).push({ d, share, role });
+  };
+
+  let pendingPts = 0, pendingCount = 0;    // نقاط اتكتبت لكن الشغل لسه ما خلصش
+  let wholesaleSkipped = 0;                // أجهزة جملة اتجاهلت
+
+  devices.forEach(d => {
+    const pts = parseFloat(enDigits(d.points)) || 0;
+    if(!pts || !d.technician) return;
+    if(d.isWholesale){ wholesaleSkipped++; return; }
+
+    const cd = completionDate(d);
+    if(!cd){ pendingPts += pts; pendingCount++; return; }
+    if(!inTeRange(cd)) return;
+
+    const pct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+    if(d.assistTechnician && pct > 0){
+      const assistShare = pts * (pct / 100);
+      push(d.assistTechnician, d, assistShare, 'مساعد');
+      push(d.technician, d, pts - assistShare, 'رئيسي');
+    } else {
+      push(d.technician, d, pts, 'رئيسي');
+    }
+  });
+
+  // الأجهزة اللي خلصت في الفترة (بغض النظر عن النقاط)
+  const completedInRange = devices.filter(d => { const cd = completionDate(d); return cd && inTeRange(cd); });
+
+  const names = [...new Set([
+    ...completedInRange.map(d => d.technician).filter(Boolean),
+    ...Object.keys(contrib),
+  ])];
+
+  const round1 = n => Math.round(n * 10) / 10;
+  teRows = names.map(t => {
+    const mine = completedInRange.filter(d => d.technician === t);
+    const durations = mine.map(repairDays).filter(x => x !== null);
+    const avg = durations.length ? durations.reduce((a,b) => a+b, 0) / durations.length : null;
+    const returns = devices.filter(d => {
+      if(d.technician !== t) return false;
+      const rd = returnAfterDeliveryDate(d);
+      return rd && inTeRange(rd);
+    }).length;
+    const items = contrib[t] || [];
+    return {
+      t,
+      points: round1(items.reduce((s, x) => s + x.share, 0)),
+      items,
+      count: mine.length,
+      avg,
+      returns,
+      rate: mine.length ? Math.round((returns / mine.length) * 100) : (returns ? 100 : 0),
+    };
+  }).sort((a,b) => b.points - a.points || b.count - a.count);
+
+  const totalPoints = round1(teRows.reduce((s, r) => s + r.points, 0));
+  const scoredDevices = new Set();
+  Object.values(contrib).forEach(list => list.forEach(x => scoredDevices.add(x.d.id)));
+
+  const cards = `
+    <div class="inv-cards">
+      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">إجمالي النقاط في الفترة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">جهاز اتحسبت عليه نقاط</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">فني له شغل في الفترة</div></div>
+    </div>`;
+
+  // تنبيهات توضح ليه ممكن رقم يبان ناقص
+  let notes = '';
+  if(pendingCount > 0){
+    notes += `<div class="te-note">⏳ فيه <b>${pendingCount}</b> جهاز عليهم <b>${round1(pendingPts)}</b> نقطة لسه الشغل فيهم ما خلصش — هيتحسبوا أول ما يوصلوا "تم الصيانة".</div>`;
+  }
+  if(wholesaleSkipped > 0){
+    notes += `<div class="te-note">📦 اتجاهل <b>${wholesaleSkipped}</b> جهاز مسجل <b>جملة</b> — الجملة مش بتتحسب نقاط زي ما اتفقنا.</div>`;
+  }
+
+  const avgFmt = v => v === null ? '—' : (v < 1 ? 'أقل من يوم' : v.toFixed(1) + ' يوم');
+
+  const table = teRows.length === 0
+    ? `<div class="empty-col">مفيش شغل خلص في الفترة دي</div>`
+    : `<table class="inv-table">
+        <tr><th>الفني</th><th>⭐ النقاط</th><th>أجهزة خلصت</th><th>متوسط المدة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
+        ${teRows.map((r, i) => `
+          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="اضغط لتفاصيل النقاط">
+            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:#94A3B8;font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span></td>
+            <td style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
+            <td style="font-weight:800; color:#16A34A;">${r.count}</td>
+            <td>${avgFmt(r.avg)}</td>
+            <td style="font-weight:800; color:${r.returns ? '#DC2626' : '#64748B'};">${r.returns}</td>
+            <td style="font-weight:800; color:${r.rate >= 20 ? '#DC2626' : r.rate > 0 ? '#B45309' : '#16A34A'};">${r.rate}%</td>
+          </tr>
+          ${teOpenTech === r.t ? `
+          <tr><td colspan="6" style="padding:0; background:#F8FAFC;">
+            <div class="te-breakdown">
+              ${r.items.length === 0
+                ? '<div style="color:#94A3B8; font-size:13px; padding:6px;">مفيش نقاط محسوبة — الأجهزة اللي خلصها مكتبتش عليها نقاط</div>'
+                : r.items.slice().sort((a,b) => b.share - a.share).map(x => `
+                  <div class="te-item" onclick="event.stopPropagation(); closeTechEval(); openDetail('${x.d.id}')">
+                    <div>
+                      <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
+                      <div style="font-size:12px; color:#94A3B8;">
+                        ${x.role === 'مساعد' ? `🤝 مساعد (${esc(x.d.assistPercent)}% من ${esc(x.d.points)})` : `👤 رئيسي${x.d.assistTechnician ? ` (بعد نصيب المساعد من ${esc(x.d.points)})` : ''}`}
+                      </div>
+                    </div>
+                    <div style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif;">${round1(x.share)}</div>
+                  </div>`).join('')}
+            </div>
+          </td></tr>` : ''}
+        `).join('')}
+      </table>`;
+
+  document.getElementById('techEvalBody').innerHTML = `
+    ${filterBar}
+    ${cards}
+    ${notes}
+    <div class="inv-section-title">ترتيب الفنيين بالنقاط</div>
+    ${table}
+  `;
+}
+
+function toggleTeTech(i){
+  const row = teRows[i];
+  if(!row) return;
+  teOpenTech = (teOpenTech === row.t) ? null : row.t;
+  renderTechEval();
 }
 
 function sendThanks(phone, name){
