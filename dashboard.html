@@ -1888,16 +1888,9 @@ function printLabel(){
   const fDate = Math.max(1.6, sz.h * 0.090).toFixed(2);   // تاريخ الدخول
   const fBrand= Math.max(1.5, sz.h * 0.088).toFixed(2);   // اسم I FIX TEAM تحت الباركود
 
-  // إطار مخفي بدل نافذة منفصلة — نافذة طباعة واحدة بس تظهر للمستخدم
-  const old = document.getElementById('labelPrintFrame');
-  if(old) old.remove();
-  const fr = document.createElement('iframe');
-  fr.id = 'labelPrintFrame';
-  fr.style.cssText = 'position:fixed; width:0; height:0; border:0; visibility:hidden;';
-  document.body.appendChild(fr);
-  const w = fr.contentWindow;
+  const w = window.open('', '_blank', 'width=420,height=320');
+  if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
 
-  w.document.open();
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <title>ليبل ${esc(devRef(d))}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
@@ -1953,19 +1946,14 @@ function printLabel(){
     ${d.reportedIssue ? `<div class="issue">${esc(d.reportedIssue)}</div>` : ''}
     <div class="date">${esc(shortDateTime(d.intakeDate))}</div>
   </div>
+<script>
+  window.onload = function(){
+    setTimeout(function(){ window.print(); }, 350);
+    window.onafterprint = function(){ window.close(); };
+  };
+<\/script>
 </body></html>`);
   w.document.close();
-
-  // نستنى الخطوط وصورة الباركود تجهز قبل ما نطبع
-  setTimeout(() => {
-    try{
-      w.focus();
-      w.print();
-    }catch(e){
-      alert('حصل خطأ في الطباعة، جرّب تاني');
-    }
-    setTimeout(() => { const f = document.getElementById('labelPrintFrame'); if(f) f.remove(); }, 2000);
-  }, 450);
 }
 
 // عرض الرقم بالأرقام الإنجليزية زي ما هو من غير كود دولة
