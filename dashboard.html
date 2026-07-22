@@ -687,6 +687,7 @@ function startRealtimeSync(){
     sb.channel('devices_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'devices_data' }, (payload) => {
         if(payload.eventType === 'DELETE'){
+          if(importing) return;   // وقت المسح الجماعي بنتجاهل إشعارات الحذف عشان الصفحة ما تهنجش (كانت بترسم ١٩ ألف مرة)
           const id = payload.old && payload.old.id;
           if(id && lastSynced[id] !== undefined){
             devices = devices.filter(d => d.id !== id);
@@ -776,6 +777,15 @@ const PENDING_KEY = 'ifix_pending_ops';
 let lastSynced = {};          // id → JSON string لآخر نسخة اتحفظت على السيرفر
 let offlineMode = false;
 let importing = false;        // وقت استيراد نسخة كبيرة
+
+// أي عملية Supabase لازم ترجع خلال المهلة دي، وإلا نعتبرها "علقانة" ونوقفها
+// (بدون المهلة دي، طلب اتعلق كان بيفضل مستني للأبد من غير أي رسالة)
+function withTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`"${label}" اتأخر أكتر من ${ms/1000} ثانية من غير رد — على الأرجح مشكلة في وصول السيرفر`)), ms)),
+  ]);
+}
 
 const isOnline = () => (typeof navigator === 'undefined') || navigator.onLine !== false;
 
@@ -1012,40 +1022,81 @@ async function wipeAllData(){
   if(word === null) return;
   if(word.trim() !== 'مسح'){ alert('الكلمة مش مظبوطة — اتلغى المسح، بياناتك زي ما هي.'); return; }
 
-  // نسخة احتياطية تلقائية قبل المسح (أمان إضافي)
-  try{ exportBackup(); }catch(e){}
+  // نسخة احتياطية سريعة قبل المسح — مضغوطة (من غير تنسيق) عشان ما تهنّجش الصفحة على ١٩ ألف جهاز
+  try{
+    const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), devices })], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `repair-backup-before-wipe-${stamp}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }catch(e){}
 
   if(!confirm('آخر تأكيد: نزّلنا نسخة احتياطية أوتوماتيك دلوقتي على جهازك.\n\nنمسح كل البيانات؟')) return;
 
+  if(!isOnline()){ alert('المسح محتاج نت.'); return; }
+
   setSaving(true);
+  importing = true;   // نوقف المزامنة اللحظية أثناء المسح (مهم جداً عشان الصفحة ما تهنجش من إشعارات الحذف)
+
+  // نفضّي الطابور المعلّق فوراً — عشان الـ flushQueue (كل ٣٠ ثانية) ما يرجّعش البيانات بعد المسح
+  try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
+
   try{
-    // مسح من السيرفر — نمسح الجدول كله دفعة واحدة (أضمن من قائمة IDs)
-    if(!isOnline()){ alert('المسح محتاج نت.'); setSaving(false); return; }
-    importing = true;   // نوقف المزامنة اللحظية أثناء المسح
-
-    // نمسح كل الصفوف: شرط دايماً صحيح يشيل الكل
-    const { error: delErr } = await sb.from('devices_data').delete().neq('id', '___never___');
-    if(delErr) throw delErr;
-
-    // نتأكد إن السيرفر فاضي فعلاً
-    const { count } = await sb.from('devices_data').select('*', { count: 'exact', head: true });
-    importing = false;
-
-    if(count && count > 0){
-      throw new Error('لسه فيه ' + count + ' صف على السيرفر — المسح ما اكتملش');
+    // نجيب كل الـ IDs الأول (على صفحات)
+    let ids = [];
+    let from = 0; const PAGE = 1000;
+    while(true){
+      const { data, error } = await withTimeout(
+        sb.from('devices_data').select('id').range(from, from + PAGE - 1), 20000, 'قراءة قائمة الأجهزة');
+      if(error) throw error;
+      if(!data || !data.length) break;
+      ids = ids.concat(data.map(r => r.id));
+      if(data.length < PAGE) break;
+      from += PAGE;
     }
 
-    // مسح محلي + الكاش + الطابور
+    // نمسح على دفعات صغيرة — أسرع وأضمن بكتير من مسحة واحدة كبيرة بتقع في timeout وتفضل شغالة ٥ دقايق
+    const DEL = 500;
+    let removed = 0;
+    showImportProgress(0, ids.length || 1);
+    for(let i = 0; i < ids.length; i += DEL){
+      const chunk = ids.slice(i, i + DEL);
+      let ok = false, lastErr = '';
+      for(let attempt = 0; attempt < 3 && !ok; attempt++){
+        try{
+          const { error } = await withTimeout(
+            sb.from('devices_data').delete().in('id', chunk), 20000, 'مسح دفعة');
+          if(error) throw error;
+          ok = true;
+        }catch(e){
+          lastErr = (e && (e.message || e.hint || e.details)) || String(e);
+          if(attempt < 2) await new Promise(r => setTimeout(r, 700));
+        }
+      }
+      if(!ok) throw new Error('فشل مسح دفعة: ' + lastErr);
+      removed += chunk.length;
+      showImportProgress(removed, ids.length || 1);
+    }
+
+    // نتأكد إن السيرفر فاضي فعلاً
+    const { count } = await withTimeout(
+      sb.from('devices_data').select('*', { count: 'exact', head: true }), 20000, 'التحقق من المسح');
+    if(count && count > 0) throw new Error('لسه فيه ' + count + ' صف على السيرفر — المسح ما اكتملش، جرّب تاني.');
+
+    // مسح محلي + الكاش
     devices = [];
     lastSynced = {};
     writeCache();
-    try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
+    importing = false;
+    hideImportProgress();
     render();
     showError('');
     alert('تم مسح كل البيانات ✅ (السيرفر اتأكد إنه فاضي)\nاعمل ريفريش للتأكيد، وابدأ الاستيراد.');
   }catch(e){
     importing = false;
-    showError('حصل خطأ في المسح: ' + ((e && e.message) || e) + ' — لو استمر امسح جدول devices_data من Supabase مباشرة');
+    hideImportProgress();
+    showError('حصل خطأ في المسح: ' + ((e && e.message) || e) + ' — جرّب تاني، أو امسح جدول devices_data من Supabase مباشرة');
   }finally{
     setSaving(false);
   }
@@ -1082,6 +1133,26 @@ async function importBackup(file){
     return;
   }
 
+  // إصلاح IDs الملف قبل أي حاجة — ده اللي بيمنع تعليق الاستيراد على 0%
+  // الملفات القديمة أحياناً بتيجي بـ id مكرر لأجهزة مختلفة، والسيرفر بيرفض الدفعة كلها.
+  // الـ legacyId هو المفتاح الفريد الحقيقي، فبنبني منه id + trackToken فريدين.
+  {
+    const seen = new Set();
+    for(const d of incoming){
+      if(!d) continue;
+      const hasLegacy = d.legacyId !== undefined && d.legacyId !== null && String(d.legacyId).trim() !== '';
+      if(hasLegacy){
+        const num = 1000000 + parseInt(d.legacyId, 10);
+        if(!Number.isNaN(num)){ d.id = 'old_' + num; d.trackToken = 'old' + num; }
+      }
+      // ضمان تفرّد نهائي مهما كان شكل الملف
+      let base = d.id || 'dev', unique = base, k = 2;
+      while(seen.has(unique)){ unique = base + '_' + k; k++; }
+      if(unique !== d.id){ d.id = unique; if(!d.trackToken) d.trackToken = String(unique).replace(/_/g,''); }
+      seen.add(unique);
+    }
+  }
+
   // دمج مع الموجود (بدون تكرار)
   const existingIds = new Set(devices.map(d => d.id));
   const toAdd = incoming.filter(d => d && d.id && !existingIds.has(d.id));
@@ -1101,10 +1172,12 @@ async function importBackup(file){
   setSaving(true);
   try{
     const test = toAdd[0];
-    const { error: te } = await sb.from('devices_data').upsert(
-      [{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' });
+    const { error: te } = await withTimeout(
+      sb.from('devices_data').upsert([{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' }),
+      12000, 'اختبار الرفع');
     if(te) throw te;
-    const { data: chk, error: ce } = await sb.from('devices_data').select('id').eq('id', test.id).maybeSingle();
+    const { data: chk, error: ce } = await withTimeout(
+      sb.from('devices_data').select('id').eq('id', test.id).maybeSingle(), 12000, 'التحقق من الرفع');
     if(ce) throw ce;
     if(!chk){ throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك'); }
   }catch(e){
@@ -1129,7 +1202,8 @@ async function importBackup(file){
     let ok = false, lastErr = '';
     for(let attempt = 0; attempt < 3 && !ok; attempt++){
       try{
-        const { error } = await sb.from('devices_data').upsert(rows, { onConflict: 'id' });
+        const { error } = await withTimeout(
+          sb.from('devices_data').upsert(rows, { onConflict: 'id' }), 20000, 'رفع دفعة أجهزة');
         if(error) throw error;
         ok = true;
       }catch(e){
