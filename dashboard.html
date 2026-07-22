@@ -429,6 +429,8 @@
         <button class="bm-item" onclick="exportBackup()">⬇ تنزيل نسخة دلوقتي</button>
         <button class="bm-item" onclick="document.getElementById('importFile').click()">⬆ استيراد نسخة محفوظة</button>
         <div class="bm-sep"></div>
+        <button class="bm-item" style="color:#DC2626;" onclick="wipeAllData()">🗑 مسح كل البيانات (للبدء من جديد)</button>
+        <div class="bm-sep"></div>
         <div class="bm-label">النسخ التلقائي الدوري</div>
         <select id="backupFreq" class="bm-select" onchange="setBackupFrequency(this.value)">
           <option value="off">متوقف</option>
@@ -964,6 +966,52 @@ async function checkAutoBackup(){
     exportBackup();
     backupSettings.lastAutoBackupAt = new Date().toISOString();
     await saveBackupSettings();
+  }
+}
+
+// ============================================================
+// مسح كل البيانات — للبدء من جديد قبل الاستيراد النهائي
+// محمي بتأكيدين + كتابة كلمة، وبيعمل نسخة احتياطية تلقائية قبل المسح
+// ============================================================
+async function wipeAllData(){
+  document.getElementById('backupMenu').classList.add('hidden');
+
+  if(devices.length === 0){ alert('مفيش بيانات تتمسح أصلاً.'); return; }
+
+  if(!confirm(`⚠️ تحذير مهم جداً\n\nهتمسح كل الأجهزة المسجلة (${devices.length} جهاز) نهائياً من السيستم ومن السيرفر.\n\nده مناسب بس لما تبدأ شغل فعلي جديد.\n\nتكمل؟`)) return;
+
+  // كتابة كلمة تأكيد — حماية من الضغط بالغلط
+  const word = prompt('للتأكيد النهائي، اكتب كلمة: مسح');
+  if(word === null) return;
+  if(word.trim() !== 'مسح'){ alert('الكلمة مش مظبوطة — اتلغى المسح، بياناتك زي ما هي.'); return; }
+
+  // نسخة احتياطية تلقائية قبل المسح (أمان إضافي)
+  try{ exportBackup(); }catch(e){}
+
+  if(!confirm('آخر تأكيد: نزّلنا نسخة احتياطية أوتوماتيك دلوقتي على جهازك.\n\nنمسح كل البيانات؟')) return;
+
+  setSaving(true);
+  try{
+    // مسح من السيرفر (كل الصفوف)
+    if(isOnline()){
+      const ids = devices.map(d => d.id);
+      for(let i = 0; i < ids.length; i += 100){
+        const chunk = ids.slice(i, i + 100);
+        await sb.from('devices_data').delete().in('id', chunk);
+      }
+    }
+    // مسح محلي + الكاش + الطابور
+    devices = [];
+    lastSynced = {};
+    writeCache();
+    try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
+    render();
+    showError('');
+    alert('تم مسح كل البيانات ✅\nالسيستم جاهز للبدء من جديد. تقدر تستورد النسخة النهائية دلوقتي.');
+  }catch(e){
+    showError('حصل خطأ في المسح — جرّب تاني، ولو استمر امسح جدول devices_data من Supabase مباشرة');
+  }finally{
+    setSaving(false);
   }
 }
 
