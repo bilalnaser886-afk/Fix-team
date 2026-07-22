@@ -372,6 +372,21 @@
   .cust-item:nth-child(2) .cust-rank{background:#94A3B8;}
   .cust-item:nth-child(3) .cust-rank{background:#B45309;}
 
+  /* ===== شريط تقدم الاستيراد ===== */
+  .import-progress{
+    position:fixed; inset:0; z-index:500; background:rgba(16,16,20,.55);
+    display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px);
+  }
+  .ip-inner{
+    background:#fff; border-radius:18px; padding:26px 30px; width:min(88vw, 420px);
+    box-shadow:0 20px 60px rgba(0,0,0,.3); text-align:center;
+  }
+  .ip-title{font-family:'Cairo',sans-serif; font-weight:800; font-size:17px; margin-bottom:16px;}
+  .ip-track{height:14px; background:#EEF0F3; border-radius:20px; overflow:hidden;}
+  .ip-fill{height:100%; background:linear-gradient(90deg,var(--accent),#2563EB); border-radius:20px; transition:width .3s;}
+  .ip-nums{font-family:'Cairo',sans-serif; font-weight:900; font-size:20px; margin-top:14px; color:var(--accent);}
+  .ip-hint{font-size:12.5px; color:#94A3B8; margin-top:8px;}
+
   /* ===== شريط وضع الأوفلاين ===== */
   .offline-bar{
     position:fixed; top:0; inset-inline:0; z-index:300;
@@ -682,6 +697,7 @@ function startRealtimeSync(){
         }
         const row = payload.new;
         if(!row || !row.id) return;
+        if(importing) return;   // وقت الاستيراد بنتجاهل المزامنة اللحظية عشان الأرقام ما ترعشش
         const j = JSON.stringify(row.data);
         if(lastSynced[row.id] === j) return;   // التغيير أصلاً من عندنا
         devices = [row.data, ...devices.filter(d => d.id !== row.id)];
@@ -759,6 +775,7 @@ const DEVICES_CACHE_KEY = 'ifix_devices_cache';
 const PENDING_KEY = 'ifix_pending_ops';
 let lastSynced = {};          // id → JSON string لآخر نسخة اتحفظت على السيرفر
 let offlineMode = false;
+let importing = false;        // وقت استيراد نسخة كبيرة
 
 const isOnline = () => (typeof navigator === 'undefined') || navigator.onLine !== false;
 
@@ -1034,23 +1051,101 @@ function exportBackup(){
 
 async function importBackup(file){
   if(!file) return;
+  let incoming;
   try{
     const text = await file.text();
     const parsed = JSON.parse(text);
-    const incoming = Array.isArray(parsed) ? parsed : parsed.devices;
+    incoming = Array.isArray(parsed) ? parsed : parsed.devices;
     if(!Array.isArray(incoming)) throw new Error('bad format');
-    const merged = [...devices];
-    const existingIds = new Set(devices.map(d => d.id));
-    incoming.forEach(d => { if(!existingIds.has(d.id)) merged.push(d); });
-    devices = merged;
-    render();
-    await persist();
-    showError('');
   }catch(e){
     showError('الملف ده مش نسخة احتياطية صحيحة من النظام');
-  }finally{
     document.getElementById('importFile').value = '';
+    return;
   }
+
+  // دمج مع الموجود (بدون تكرار)
+  const existingIds = new Set(devices.map(d => d.id));
+  const toAdd = incoming.filter(d => d && d.id && !existingIds.has(d.id));
+  document.getElementById('importFile').value = '';
+
+  if(toAdd.length === 0){ alert('كل الأجهزة في الملف موجودة بالفعل — مفيش حاجة جديدة تتضاف.'); return; }
+
+  // الملفات الكبيرة محتاجة نت مستقر — منسمحش بيها أوفلاين
+  if(!isOnline()){
+    alert('استيراد نسخة كبيرة محتاج نت — اتصل بالنت الأول عشان البيانات ترفع كاملة.');
+    return;
+  }
+
+  if(toAdd.length > 300 && !confirm(`هيتضاف ${toAdd.length} جهاز للسيستم.\n\nالعملية دي ممكن تاخد شوية دقايق حسب النت — سيب الصفحة مفتوحة لحد ما تخلص.\n\nنبدأ؟`)) return;
+
+  // نرفع الأول للسيرفر على دفعات، وبعد ما ينجح نحدّث الواجهة
+  setSaving(true);
+  importing = true;
+  const BATCH = 200;
+  let done = 0, failed = 0;
+
+  showImportProgress(0, toAdd.length);
+
+  for(let i = 0; i < toAdd.length; i += BATCH){
+    const chunk = toAdd.slice(i, i + BATCH);
+    const rows = chunk.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }));
+    let ok = false;
+    for(let attempt = 0; attempt < 3 && !ok; attempt++){
+      try{
+        const { error } = await sb.from('devices_data').upsert(rows);
+        if(error) throw error;
+        ok = true;
+      }catch(e){
+        if(attempt === 2){ failed += chunk.length; }
+        else await new Promise(r => setTimeout(r, 800));  // نستنى ونحاول تاني
+      }
+    }
+    if(ok){
+      // نضيف الدفعة للذاكرة المحلية أول بأول
+      chunk.forEach(d => {
+        devices.push(d);
+        lastSynced[d.id] = JSON.stringify(d);
+      });
+      done += chunk.length;
+    }
+    writeCache();
+    showImportProgress(done, toAdd.length);
+    await new Promise(r => setTimeout(r, 120));  // نفس السيرفر يلتقط نفسه
+  }
+
+  importing = false;
+  devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
+  render();
+  setSaving(false);
+  hideImportProgress();
+
+  if(failed > 0){
+    alert(`تم استيراد ${done} جهاز بنجاح.\nفشل ${failed} جهاز (النت اتقطع أو بطأ) — استورد نفس الملف تاني وهيكمّل الناقص بس.`);
+  }else{
+    alert(`تم استيراد ${done} جهاز بنجاح ✅`);
+  }
+}
+
+// شريط تقدم الاستيراد
+function showImportProgress(done, total){
+  let bar = document.getElementById('importProgress');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'importProgress';
+    bar.className = 'import-progress';
+    document.body.appendChild(bar);
+  }
+  const pct = Math.round((done / total) * 100);
+  bar.innerHTML = `<div class="ip-inner">
+    <div class="ip-title">📥 جاري استيراد البيانات القديمة</div>
+    <div class="ip-track"><div class="ip-fill" style="width:${pct}%"></div></div>
+    <div class="ip-nums">${done.toLocaleString('en')} من ${total.toLocaleString('en')} (${pct}%)</div>
+    <div class="ip-hint">سيب الصفحة مفتوحة — متقفلهاش لحد ما تخلص</div>
+  </div>`;
+}
+function hideImportProgress(){
+  const bar = document.getElementById('importProgress');
+  if(bar) setTimeout(() => bar.remove(), 1500);
 }
 
 function render(){
