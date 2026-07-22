@@ -835,11 +835,21 @@ function exitOfflineMode(){
 
 async function loadDevices(){
   try{
-    const { data, error } = await sb.from('devices_data').select('id,data');
-    if(error) throw error;
+    // نجيب كل الصفوف على دفعات (Supabase بيرجع 1000 كحد أقصى للطلب)
+    let allRows = [];
+    let from = 0;
+    const PAGE = 1000;
+    while(true){
+      const { data, error } = await sb.from('devices_data').select('id,data').range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || data.length === 0) break;
+      allRows = allRows.concat(data);
+      if(data.length < PAGE) break;
+      from += PAGE;
+    }
 
-    if(data && data.length){
-      devices = data.map(r => r.data);
+    if(allRows.length){
+      devices = allRows.map(r => r.data);
     } else {
       // الترحيل التلقائي من البنية القديمة (الكتلة الواحدة) — مرة واحدة بس
       let old = null;
@@ -1009,14 +1019,22 @@ async function wipeAllData(){
 
   setSaving(true);
   try{
-    // مسح من السيرفر (كل الصفوف)
-    if(isOnline()){
-      const ids = devices.map(d => d.id);
-      for(let i = 0; i < ids.length; i += 100){
-        const chunk = ids.slice(i, i + 100);
-        await sb.from('devices_data').delete().in('id', chunk);
-      }
+    // مسح من السيرفر — نمسح الجدول كله دفعة واحدة (أضمن من قائمة IDs)
+    if(!isOnline()){ alert('المسح محتاج نت.'); setSaving(false); return; }
+    importing = true;   // نوقف المزامنة اللحظية أثناء المسح
+
+    // نمسح كل الصفوف: شرط دايماً صحيح يشيل الكل
+    const { error: delErr } = await sb.from('devices_data').delete().neq('id', '___never___');
+    if(delErr) throw delErr;
+
+    // نتأكد إن السيرفر فاضي فعلاً
+    const { count } = await sb.from('devices_data').select('*', { count: 'exact', head: true });
+    importing = false;
+
+    if(count && count > 0){
+      throw new Error('لسه فيه ' + count + ' صف على السيرفر — المسح ما اكتملش');
     }
+
     // مسح محلي + الكاش + الطابور
     devices = [];
     lastSynced = {};
@@ -1024,9 +1042,10 @@ async function wipeAllData(){
     try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
     render();
     showError('');
-    alert('تم مسح كل البيانات ✅\nالسيستم جاهز للبدء من جديد. تقدر تستورد النسخة النهائية دلوقتي.');
+    alert('تم مسح كل البيانات ✅ (السيرفر اتأكد إنه فاضي)\nاعمل ريفريش للتأكيد، وابدأ الاستيراد.');
   }catch(e){
-    showError('حصل خطأ في المسح — جرّب تاني، ولو استمر امسح جدول devices_data من Supabase مباشرة');
+    importing = false;
+    showError('حصل خطأ في المسح: ' + ((e && e.message) || e) + ' — لو استمر امسح جدول devices_data من Supabase مباشرة');
   }finally{
     setSaving(false);
   }
@@ -1078,26 +1097,45 @@ async function importBackup(file){
 
   if(toAdd.length > 300 && !confirm(`هيتضاف ${toAdd.length} جهاز للسيستم.\n\nالعملية دي ممكن تاخد شوية دقايق حسب النت — سيب الصفحة مفتوحة لحد ما تخلص.\n\nنبدأ؟`)) return;
 
-  // نرفع الأول للسيرفر على دفعات، وبعد ما ينجح نحدّث الواجهة
+  // اختبار اتصال: نرفع أول جهاز ونتأكد إنه وصل فعلاً قبل ما نكمّل
   setSaving(true);
+  try{
+    const test = toAdd[0];
+    const { error: te } = await sb.from('devices_data').upsert(
+      [{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' });
+    if(te) throw te;
+    const { data: chk, error: ce } = await sb.from('devices_data').select('id').eq('id', test.id).maybeSingle();
+    if(ce) throw ce;
+    if(!chk){ throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك'); }
+  }catch(e){
+    setSaving(false);
+    alert('الاستيراد مش هيشتغل — السبب:\n\n' + ((e && (e.message||e.hint||e.details)) || e) + '\n\nلو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.');
+    return;
+  }
+
+  // نرفع الباقي على دفعات
   importing = true;
-  const BATCH = 200;
-  let done = 0, failed = 0;
+  const BATCH = 150;
+  let done = 1, failed = 0;
+  // نضيف أول جهاز اللي اترفع في الاختبار
+  devices.push(toAdd[0]); lastSynced[toAdd[0].id] = JSON.stringify(toAdd[0]);
+  const rest = toAdd.slice(1);
 
-  showImportProgress(0, toAdd.length);
+  showImportProgress(1, toAdd.length);
 
-  for(let i = 0; i < toAdd.length; i += BATCH){
-    const chunk = toAdd.slice(i, i + BATCH);
+  for(let i = 0; i < rest.length; i += BATCH){
+    const chunk = rest.slice(i, i + BATCH);
     const rows = chunk.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }));
-    let ok = false;
+    let ok = false, lastErr = '';
     for(let attempt = 0; attempt < 3 && !ok; attempt++){
       try{
-        const { error } = await sb.from('devices_data').upsert(rows);
+        const { error } = await sb.from('devices_data').upsert(rows, { onConflict: 'id' });
         if(error) throw error;
         ok = true;
       }catch(e){
-        if(attempt === 2){ failed += chunk.length; }
-        else await new Promise(r => setTimeout(r, 800));  // نستنى ونحاول تاني
+        lastErr = (e && (e.message || e.hint || e.details)) || String(e);
+        if(attempt === 2){ failed += chunk.length; window._importLastError = lastErr; }
+        else await new Promise(r => setTimeout(r, 800));
       }
     }
     if(ok){
@@ -1120,7 +1158,8 @@ async function importBackup(file){
   hideImportProgress();
 
   if(failed > 0){
-    alert(`تم استيراد ${done} جهاز بنجاح.\nفشل ${failed} جهاز (النت اتقطع أو بطأ) — استورد نفس الملف تاني وهيكمّل الناقص بس.`);
+    const reason = window._importLastError ? ('\n\nسبب الفشل: ' + window._importLastError) : '';
+    alert(`تم استيراد ${done} جهاز بنجاح.\nفشل ${failed} جهاز.${reason}\n\nاستورد نفس الملف تاني وهيكمّل الناقص بس.`);
   }else{
     alert(`تم استيراد ${done} جهاز بنجاح ✅`);
   }
