@@ -845,17 +845,27 @@ function exitOfflineMode(){
 
 async function loadDevices(){
   try{
-    // نجيب كل الصفوف على دفعات (Supabase بيرجع 1000 كحد أقصى للطلب)
-    let allRows = [];
-    let from = 0;
+    // نجيب العدد الكلي الأول، وبعدين نجيب كل الصفحات بالتوازي (٨ في نفس الوقت) بدل واحدة ورا التانية.
+    // ده بيقلّل وقت التحميل جداً — من ٢٠ طلب متتالي لكام موجة بس.
     const PAGE = 1000;
-    while(true){
-      const { data, error } = await sb.from('devices_data').select('id,data').range(from, from + PAGE - 1);
-      if(error) throw error;
-      if(!data || data.length === 0) break;
-      allRows = allRows.concat(data);
-      if(data.length < PAGE) break;
-      from += PAGE;
+    let allRows = [];
+    const { count, error: cErr } = await sb.from('devices_data').select('id', { count: 'exact', head: true });
+    if(cErr) throw cErr;
+    const total = count || 0;
+    if(total > 0){
+      const pages = Math.ceil(total / PAGE);
+      const chunks = new Array(pages);
+      let next = 0;
+      const worker = async () => {
+        while(next < pages){
+          const p = next++;
+          const { data, error } = await sb.from('devices_data').select('id,data').range(p*PAGE, p*PAGE + PAGE - 1);
+          if(error) throw error;
+          chunks[p] = data || [];
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(8, pages) }, worker));
+      allRows = chunks.flat();
     }
 
     if(allRows.length){
@@ -1078,6 +1088,11 @@ async function wipeAllData(){
       removed += chunk.length;
       showImportProgress(removed, ids.length || 1);
     }
+
+    // مهم جداً: نمسح كمان النسخة القديمة المخزّنة ككتلة واحدة في app_data —
+    // دي اللي كانت بترجّع الـ ١٩ ألف جهاز تاني بعد الريفريش لأن الترحيل التلقائي بيقرأ منها.
+    try{ await sb.from('app_data').delete().eq('key', STORAGE_KEY); }catch(e){}
+    try{ await window.storage.set(STORAGE_KEY, JSON.stringify([])); }catch(e){}
 
     // نتأكد إن السيرفر فاضي فعلاً
     const { count } = await withTimeout(
