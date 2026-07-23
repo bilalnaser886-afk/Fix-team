@@ -2978,8 +2978,8 @@ function lastChangeOf(d){
   return h.length ? h[h.length-1].date : d.intakeDate;
 }
 const ACTIVE_STATUSES = ['waiting','diagnosing','repairing','done'];
-// كل الأجهزة المفتوحة في المحل (بتشمل المرتجعات) — لكارت "شغال عليه دلوقتي"
-const OPEN_STATUSES = ['waiting','diagnosing','repairing','done','returned'];
+// أجهزة كارت "شغال عليه دلوقتي": اللي بيتشتغل عليها فعلاً — من غير "تم الصيانة" ولا "تم التسليم"، والمرتجع بيفضل
+const OPEN_STATUSES = ['waiting','diagnosing','repairing','returned'];
 // أجهزة الفني النشطة: لسه ماخلصتش ولا اتسلّمت (بتشمل المرتجع، وبتستبعد "تم الصيانة" و"تم التسليم" و"المرفوض")
 const TECH_ACTIVE_STATUSES = ['waiting','diagnosing','repairing','returned'];
 
