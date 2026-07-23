@@ -45,13 +45,15 @@
     flex-wrap:wrap; gap:10px;
   }
   .menu-btn{
-    position:absolute; top:14px; right:18px; background:rgba(255,255,255,.12);
-    border:1px solid rgba(255,255,255,.2); color:#fff; width:34px; height:34px;
-    border-radius:8px; font-size:18px; cursor:pointer; line-height:1;
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); right:18px; background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.2); color:#fff; width:44px; height:44px;
+    border-radius:10px; font-size:20px; cursor:pointer; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
   }
   .menu-btn:hover{background:rgba(255,255,255,.2);}
   .menu-dropdown{
-    position:absolute; top:56px; right:18px; background:#fff; border-radius:10px;
+    position:absolute; top:calc(66px + env(safe-area-inset-top)); right:18px; background:#fff; border-radius:10px;
     box-shadow:0 8px 24px rgba(0,0,0,.18); padding:6px; z-index:41; min-width:170px;
   }
   .menu-dropdown button{
@@ -141,7 +143,16 @@
     position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
     align-items:center; justify-content:center; z-index:30; padding:16px;
   }
-  .hidden{display:none;}
+  .hidden{display:none; pointer-events:none;}
+  /* ===== تحسينات اللمس والآيفون (Phase 1) ===== */
+  body{ -webkit-tap-highlight-color:transparent; }
+  button, a, .card, .column, .inv-card, .inv-chip, .stuck-item, .bm-item, .pay-btn{
+    touch-action:manipulation;
+  }
+  /* قفل تمرير الخلفية وقت فتح أي شاشة منبثقة — يمنع تجمّد السكرول على iOS ويحافظ على مكان القراءة */
+  body.modal-open{ position:fixed; left:0; right:0; width:100%; overflow:hidden; }
+  /* تمرير سلس جوه الشاشات ومنع تسريب التمرير للخلفية */
+  .overlay, .modal{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
   .modal{
     background:#fff; border-radius:16px; width:75vw; max-width:75vw;
     max-height:85vh; overflow-y:auto; padding:20px;
@@ -151,7 +162,11 @@
   @media (max-width:700px){ .modal{ width:100%; max-width:100%; } }
   .modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
   .modal-head h2{font-size:16px; margin:0;}
-  .close-btn{background:none;border:none;font-size:20px;color:#94A3B8;cursor:pointer; line-height:1;}
+  .close-btn{
+    background:none;border:none;font-size:22px;color:#94A3B8;cursor:pointer; line-height:1;
+    min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  }
   label.field{display:block; margin-bottom:12px;}
   label.field span{font-size:12px; color:#64748B; display:block; margin-bottom:4px;}
   .field input, .field textarea{
@@ -3408,6 +3423,32 @@ function sendThanks(phone, name){
   const msg = `أهلاً ${name || 'يا فندم'} 🌟\nكل الشكر لثقتك المستمرة في I Fix Team — وجودك من أهم عملائنا شرف لينا.\nأي جهاز محتاج صيانة، إحنا دايماً في خدمتك 🙏`;
   openWa(phone, msg);
 }
+
+// ===== قفل تمرير الخلفية عند فتح أي شاشة منبثقة (تحسين iOS) =====
+// بيراقب كل الـ overlays، وأول ما أي واحدة تتفتح بيقفل تمرير الصفحة اللي وراها،
+// وأول ما تتقفل بيرجّع المستخدم لنفس مكان السكرول بالظبط.
+(function(){
+  let locked = false, savedY = 0;
+  const overlays = () => Array.from(document.querySelectorAll('.overlay'));
+  const anyOpen = () => overlays().some(o => !o.classList.contains('hidden'));
+  function apply(){
+    const open = anyOpen();
+    if(open && !locked){
+      savedY = window.scrollY || window.pageYOffset || 0;
+      document.body.style.top = '-' + savedY + 'px';
+      document.body.classList.add('modal-open');
+      locked = true;
+    } else if(!open && locked){
+      document.body.classList.remove('modal-open');
+      document.body.style.top = '';
+      window.scrollTo(0, savedY);
+      locked = false;
+    }
+  }
+  const mo = new MutationObserver(apply);
+  overlays().forEach(o => mo.observe(o, { attributes:true, attributeFilter:['class'] }));
+  apply();
+})();
 
 // نقطة البداية: التحقق من الدخول والاشتراك قبل تحميل أي بيانات
 requireAccess().then(ok => {
