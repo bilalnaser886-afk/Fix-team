@@ -153,6 +153,9 @@
   body.modal-open{ position:fixed; left:0; right:0; width:100%; overflow:hidden; }
   /* تمرير سلس جوه الشاشات ومنع تسريب التمرير للخلفية */
   .overlay, .modal{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+  /* التفاصيل لازم تظهر فوق شاشات الجرد/الملخص (اللي z-index بتاعها 30) عشان تفضل الجرد مفتوحة وراها */
+  #detailOverlay{ z-index:50; }
+  #timelineOverlay{ z-index:60; }
   .modal{
     background:#fff; border-radius:16px; width:75vw; max-width:75vw;
     max-height:85vh; overflow-y:auto; padding:20px;
@@ -1294,6 +1297,13 @@ function hideImportProgress(){
 function render(){
   renderBoard();
   if(currentColumn) renderColumn();
+  refreshOpenOverlays();
+}
+
+// يحدّث صفحة الجرد المفتوحة في الخلفية لحظياً (مع الحفاظ على مكان السكرول)
+function refreshOpenOverlays(){
+  const el = document.getElementById('summariesOverlay');
+  if(el && !el.classList.contains('hidden')) renderSummaries();
 }
 
 function renderBoard(){
@@ -1341,9 +1351,12 @@ function renderColumn(){
   const list = devices.filter(d => d.status === currentColumn && matchesSearch(d, q));
   document.getElementById('columnTitle').textContent = s.label;
   document.getElementById('columnTitle').style.color = accent(s.varname);
+  const _colScroller = document.querySelector('#columnOverlay .modal');
+  const _colY = _colScroller ? _colScroller.scrollTop : 0;
   document.getElementById('columnList').innerHTML = list.length === 0
     ? `<div class="empty-col">لا توجد أجهزة</div>`
     : list.map(d => cardHtml(d, s)).join('');
+  if(_colScroller) _colScroller.scrollTop = _colY;
 }
 
 function cardHtml(d, s){
@@ -1494,6 +1507,7 @@ function closeDetail(){
   selectedId = null;
   trackResponses = {};
   pointsBoxOpen = false;
+  refreshOpenOverlays();   // يعكس أي تغيير في الحالة على الجرد المفتوح ورا التفاصيل فوراً
 }
 function technicianOptions(){
   const names = [...new Set(devices.map(d => d.technician).filter(Boolean))];
@@ -1905,10 +1919,15 @@ function renderDayColumns(){
 
 function dayCardHtml(d){
   const s = statusInfo(d.status);
-  return `<div class="day-card" onclick="closeSummaries(); openDetail('${d.id}')">
+  // وسم أحمر واضح للمرتجع (محتاج إعادة فحص)، وباقي الحالات بلون حالتها
+  const badge = d.status === 'returned'
+    ? `<span class="status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 مرتجع — إعادة فحص</span>`
+    : `<span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
+  // بيفتح التفاصيل فوق صفحة الجرد من غير ما يقفلها — عشان لما تقفل التفاصيل تفضل في نفس المكان
+  return `<div class="day-card" onclick="openDetail('${d.id}')">
     <div class="day-card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
     <div class="day-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
-    <span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>
+    ${badge}
   </div>`;
 }
 
@@ -2959,6 +2978,10 @@ function lastChangeOf(d){
   return h.length ? h[h.length-1].date : d.intakeDate;
 }
 const ACTIVE_STATUSES = ['waiting','diagnosing','repairing','done'];
+// كل الأجهزة المفتوحة في المحل (بتشمل المرتجعات) — لكارت "شغال عليه دلوقتي"
+const OPEN_STATUSES = ['waiting','diagnosing','repairing','done','returned'];
+// أجهزة الفني النشطة: لسه ماخلصتش ولا اتسلّمت (بتشمل المرتجع، وبتستبعد "تم الصيانة" و"تم التسليم" و"المرفوض")
+const TECH_ACTIVE_STATUSES = ['waiting','diagnosing','repairing','returned'];
 
 function stuckDevices(){
   const now = Date.now();
@@ -2992,7 +3015,7 @@ function renderSummaries(){
 
   const received = devices.filter(d => inRange(d.intakeDate));
   const delivered = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inRange(dd); });
-  const inProgress = devices.filter(d => ACTIVE_STATUSES.includes(d.status));
+  const inProgress = devices.filter(d => OPEN_STATUSES.includes(d.status));
   const stuck = stuckDevices();
   // الكروت قابلة للضغط — تفتح قائمة الأجهزة اللي جواها
   invLists = {
@@ -3012,7 +3035,7 @@ function renderSummaries(){
       ${card('received', received.length, '#2563EB', 'جهاز استُلم في الفترة')}
       ${card('delivered', delivered.length, '#16A34A', 'جهاز اتسلّم في الفترة')}
       ${card('progress', inProgress.length, '#B45309', 'جهاز شغال عليه دلوقتي')}
-      ${card('stuck', stuck.length, '#DC2626', `جهاز واقف من ${STUCK_DAYS} أيام أو أكتر`)}
+      ${card('stuck', stuck.length, '#DC2626', `⚠️ جهاز تجاوز ${STUCK_DAYS} أيام — محتاج متابعة`)}
     </div>
     ${invOpenCard ? `<div class="inv-open-list">
       ${(invLists[invOpenCard] || []).length === 0
@@ -3049,7 +3072,7 @@ function renderSummaries(){
   const withTech = {};
   devices.forEach(d => {
     if(!d.technician) return;
-    if(!ACTIVE_STATUSES.includes(d.status)) return;   // المتسلّم والمرفوض بيخرجوا
+    if(!TECH_ACTIVE_STATUSES.includes(d.status)) return;   // "تم الصيانة" و"تم التسليم" و"المرفوض" بيخرجوا، والمرتجع بيفضل
     (withTech[d.technician] = withTech[d.technician] || []).push(d);
   });
   invTechLists = withTech;
@@ -3073,15 +3096,17 @@ function renderSummaries(){
         ${withTech[invOpenTech].map(d => dayCardHtml(d)).join('')}
       </div>` : ''}`;
 
+  // نحافظ على مكان السكرول وقت التحديث اللحظي عشان الصفحة ماتنطّش لفوق
+  const _sumScroller = document.getElementById('summariesOverlay');
+  const _sumY = _sumScroller ? _sumScroller.scrollTop : 0;
   document.getElementById('summariesBody').innerHTML = `
     ${filterBar}
     ${searchHtml}
     ${cards}
     <div class="inv-section-title">🔧 الأجهزة مع الفنيين (لسه ما اتسلّمتش)</div>
     ${techCards}
-    <div class="inv-section-title" style="color:#DC2626;">⚠ أجهزة واقفة بقالها كتير</div>
-    ${stuckHtml}
   `;
+  if(_sumScroller) _sumScroller.scrollTop = _sumY;
 }
 
 function toggleInvTech(name){
