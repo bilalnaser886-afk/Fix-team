@@ -163,6 +163,11 @@
     font-family:inherit; box-shadow:0 2px 8px rgba(16,16,20,.04); margin-bottom:10px; }
   .acc-cycle{ text-align:center; font-size:12.5px; font-weight:800; color:#7C3AED;
     background:#F5F3FF; border-radius:8px; padding:5px; margin:8px 0 4px; }
+  /* ===== أوضاع النظام: بانر علوي + لوحة الأدمن ===== */
+  .sys-banner{ text-align:center; padding:8px 14px; font-size:13px; font-weight:700; line-height:1.4; }
+  .admin-sec{ border:1px solid #EEF0F3; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
+  .admin-sec-title{ font-weight:800; font-size:14px; margin-bottom:4px; }
+  .admin-hint{ font-size:12.5px; color:#64748B; margin:0 0 10px; line-height:1.6; }
   .modal{
     background:#fff; border-radius:16px; width:75vw; max-width:75vw;
     max-height:85vh; overflow-y:auto; padding:20px;
@@ -493,8 +498,29 @@
   </div>
 </div>
 
+<div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
 <div id="board" class="board"><div class="loading">جاري التحميل...</div></div>
+
+<!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
+<div id="annOverlay" class="overlay hidden">
+  <div class="modal" style="max-width:420px;">
+    <div style="text-align:center; padding:10px 6px;">
+      <div id="annIcon" style="font-size:46px;">🛠️</div>
+      <h2 id="annTitle" style="margin:12px 0 8px;">مرحباً</h2>
+      <p id="annBody" style="color:#475569; line-height:1.8; font-size:14.5px; margin:0;"></p>
+      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" onclick="closeAnnouncement()">تمام، فهمت 👍</button>
+    </div>
+  </div>
+</div>
+
+<!-- لوحة تحكم الأدمن -->
+<div id="adminOverlay" class="overlay hidden">
+  <div class="modal" style="max-width:470px;">
+    <div class="modal-head"><h2>⚙️ لوحة تحكم الأدمن</h2><button class="close-btn" onclick="closeAdmin()">×</button></div>
+    <div id="adminBody" style="padding:4px 2px 8px;"></div>
+  </div>
+</div>
 
 <!-- Column list overlay -->
 <div id="columnOverlay" class="overlay hidden">
@@ -645,6 +671,170 @@ const sb = supabase.createClient(
 // المستخدم الحالي — عشان نسجل مين عمل إيه
 let currentUser = { name: '', email: '' };
 
+// ============================================================
+// أوضاع النظام (بيتا / فترة مجانية) + لوحة الأدمن
+// ============================================================
+// 🔴🔴 حط هنا إيميل الأدمن الرئيسي (اللي هيتحكم في أوضاع النظام) 🔴🔴
+const ADMIN_EMAIL = 'ADMIN-EMAIL-HERE@example.com';
+
+const SYSTEM_CONFIG_KEY = 'system-config';
+let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
+
+async function loadSystemConfig(){
+  try{
+    const r = await window.storage.get(SYSTEM_CONFIG_KEY);
+    if(r && r.value) systemConfig = Object.assign(systemConfig, JSON.parse(r.value));
+  }catch(e){ /* الافتراضي: وضع عادي */ }
+}
+async function saveSystemConfig(){
+  try{ await window.storage.set(SYSTEM_CONFIG_KEY, JSON.stringify(systemConfig)); }catch(e){}
+}
+function isAdmin(){ return !!currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase(); }
+function trialDaysLeft(){
+  if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
+  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||30)*86400000;
+  return Math.max(0, Math.ceil((end - Date.now())/86400000));
+}
+
+// بانر علوي + نافذة تنبيه حسب الوضع
+function applySystemMode(){
+  const banner = document.getElementById('sysBanner');
+  if(!banner) return;
+  const m = systemConfig.mode;
+  if(m === 'beta'){
+    banner.textContent = '🛠️ فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق';
+    banner.style.background = '#1E293B'; banner.style.color = '#fff';
+    banner.classList.remove('hidden');
+    maybeShowAnnouncement('beta');
+  } else if(m === 'trial'){
+    const left = trialDaysLeft();
+    banner.textContent = `🎁 فترة مجانية — متبقّي ${left} يوماً على الاشتراك`;
+    banner.style.background = '#B45309'; banner.style.color = '#fff';
+    banner.classList.remove('hidden');
+    maybeShowAnnouncement('trial');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+function maybeShowAnnouncement(kind){
+  const id = kind === 'beta' ? systemConfig.betaAnnId : systemConfig.trialAnnId;
+  if(!id) return;
+  const seenKey = 'ifix_seen_ann_' + kind + '_' + id;
+  if(localStorage.getItem(seenKey)) return;   // اتشاف قبل كده = has_seen_*_announcement
+  const o = document.getElementById('annOverlay');
+  if(kind === 'beta'){
+    document.getElementById('annIcon').textContent = '🛠️';
+    document.getElementById('annTitle').textContent = 'مرحباً بك في I Fix Team!';
+    document.getElementById('annBody').textContent = 'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.';
+  } else {
+    const left = trialDaysLeft();
+    document.getElementById('annIcon').textContent = '🎁';
+    document.getElementById('annTitle').textContent = 'بدأت فترتك المجانية';
+    document.getElementById('annBody').textContent = `أنت الآن في الفترة المجانية (${systemConfig.trialDays||30} يوماً). متبقّي ${left} يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.`;
+  }
+  o.setAttribute('data-seen-key', seenKey);
+  o.classList.remove('hidden');
+}
+function closeAnnouncement(){
+  const o = document.getElementById('annOverlay');
+  const k = o.getAttribute('data-seen-key');
+  if(k){ try{ localStorage.setItem(k, '1'); }catch(e){} }
+  o.classList.add('hidden');
+}
+
+// زر لوحة الأدمن في القائمة (للأدمن بس)
+function injectAdminMenu(){
+  if(!isAdmin()) return;
+  const dd = document.getElementById('menuDropdown');
+  if(!dd || document.getElementById('adminMenuBtn')) return;
+  const b = document.createElement('button');
+  b.id = 'adminMenuBtn';
+  b.textContent = '⚙️ لوحة الأدمن';
+  b.style.color = '#7C3AED';
+  b.onclick = openAdmin;
+  const logoutBtn = dd.querySelector('button[onclick="logout()"]');
+  dd.insertBefore(b, logoutBtn);
+}
+
+function openAdmin(){
+  if(!isAdmin()){ alert('الصفحة دي للأدمن الرئيسي بس'); return; }
+  document.getElementById('menuDropdown').classList.add('hidden');
+  document.getElementById('adminOverlay').classList.remove('hidden');
+  renderAdmin();
+}
+function closeAdmin(){ document.getElementById('adminOverlay').classList.add('hidden'); }
+
+function renderAdmin(){
+  const m = systemConfig.mode;
+  const modeLabel = m==='beta' ? '🛠️ وضع البيتا' : (m==='trial' ? '🎁 وضع التجربة المجانية' : '✅ وضع عادي (مدفوع)');
+  const left = trialDaysLeft();
+  document.getElementById('adminBody').innerHTML = `
+    <div style="background:#F1F5F9; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+      <div style="font-size:13px; color:#64748B;">الوضع الحالي للنظام</div>
+      <div style="font-weight:800; font-size:16px; margin-top:2px;">${modeLabel}</div>
+      ${m==='trial' ? `<div style="font-size:13px; color:#B45309; margin-top:4px;">متبقّي ${left} يوماً على الاشتراك</div>` : ''}
+    </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">🛠️ وضع البيتا (قبل الإطلاق)</div>
+      <p class="admin-hint">بيظهر شريط علوي للكل + نافذة ترحيب مرة واحدة لكل مستخدم.</p>
+      <button class="btn-primary" style="box-shadow:none;" onclick="adminSetBeta()">تفعيل تنبيه وضع البيتا</button>
+    </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">🎁 الفترة المجانية والاشتراك</div>
+      <p class="admin-hint">بيبدأ عدّاد ${systemConfig.trialDays||30} يوم من لحظة الضغط، وبعد ما يخلص بيوجّه النظام تلقائياً لصفحة الاشتراك.</p>
+      <button class="btn-primary" style="box-shadow:none; background:#B45309;" onclick="adminSetTrial()">تحويل لوضع التجربة المجانية</button>
+    </div>
+
+    <div class="admin-sec" style="border-color:#FDE68A; background:#FFFBEB;">
+      <div class="admin-sec-title">⏳ مدة الفترة المجانية</div>
+      <p class="admin-hint">عدد الأيام الحالي: <b>${systemConfig.trialDays||30}</b> يوم.</p>
+      <button class="acc-mini-btn" onclick="adminSetTrialDays()">تغيير عدد الأيام</button>
+    </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">✅ الوضع العادي</div>
+      <p class="admin-hint">يوقف كل الشرايط والتنبيهات (النظام في وضعه العادي المدفوع).</p>
+      <button class="btn-secondary" onclick="adminSetNormal()">رجوع للوضع العادي</button>
+    </div>
+  `;
+}
+
+async function adminSetBeta(){
+  if(!confirm('تفعيل وضع البيتا؟ هيظهر شريط علوي للكل ونافذة ترحيب مرة واحدة لكل مستخدم.')) return;
+  systemConfig.mode = 'beta';
+  systemConfig.betaAnnId = Date.now();
+  await saveSystemConfig();
+  applySystemMode(); renderAdmin();
+  alert('تم تفعيل وضع البيتا ✅');
+}
+async function adminSetTrial(){
+  if(!confirm(`تحويل لوضع التجربة المجانية؟ هيبدأ عدّاد ${systemConfig.trialDays||30} يوم من دلوقتي.`)) return;
+  systemConfig.mode = 'trial';
+  systemConfig.trialStart = new Date().toISOString();
+  systemConfig.trialAnnId = Date.now();
+  await saveSystemConfig();
+  applySystemMode(); renderAdmin();
+  alert('تم بدء الفترة المجانية 🎁');
+}
+async function adminSetNormal(){
+  if(!confirm('رجوع للوضع العادي وإيقاف كل التنبيهات؟')) return;
+  systemConfig.mode = 'normal';
+  await saveSystemConfig();
+  applySystemMode(); renderAdmin();
+  alert('رجع للوضع العادي ✅');
+}
+async function adminSetTrialDays(){
+  const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||30));
+  if(v === null) return;
+  const n = parseInt(v)||0;
+  if(n <= 0){ alert('اكتب رقم صحيح'); return; }
+  systemConfig.trialDays = n;
+  await saveSystemConfig();
+  applySystemMode(); renderAdmin();
+}
+
 // ممنوع الدخول من غير تسجيل + اشتراك المحل ساري
 async function requireAccess(){
   // مفيش نت؟ لو فيه كاش وجلسة سابقة → ندخل وضع الأوفلاين
@@ -669,8 +859,17 @@ async function requireAccess(){
       : (currentUser.email.split('@')[0] || 'مستخدم');
     try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
 
+    await loadSystemConfig();
     const { data, error } = await sb.from('shop').select('paid_until').eq('id', 1).single();
-    if(error || !data || new Date(data.paid_until) <= new Date()){
+    const paidActive  = data && data.paid_until && new Date(data.paid_until) > new Date();
+    const betaActive  = systemConfig.mode === 'beta';
+    const trialActive = systemConfig.mode === 'trial' && trialDaysLeft() > 0;
+    if(!(paidActive || betaActive || trialActive)){
+      if(systemConfig.mode === 'trial'){
+        // خلصت الفترة المجانية والاشتراك مش مفعّل → صفحة الاشتراك والدفع
+        window.location.href = 'checkout.html';
+        return false;
+      }
       await sb.auth.signOut();
       window.location.href = 'index.html';
       return false;
@@ -3624,6 +3823,8 @@ function sendThanks(phone, name){
 // نقطة البداية: التحقق من الدخول والاشتراك قبل تحميل أي بيانات
 requireAccess().then(ok => {
   if(!ok) return;
+  applySystemMode();
+  injectAdminMenu();
   loadDevices();
   loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
   setInterval(checkAutoBackup, 3600000);

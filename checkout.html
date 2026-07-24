@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>الاشتراك — I Fix Team</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{ box-sizing:border-box; }
+  body{ font-family:'Tajawal',sans-serif; margin:0; background:#F1F5F9; color:#101014; min-height:100vh;
+    display:flex; align-items:center; justify-content:center; padding:20px; padding-top:max(20px, env(safe-area-inset-top)); }
+  .card{ background:#fff; border-radius:20px; max-width:440px; width:100%; overflow:hidden; box-shadow:0 20px 50px rgba(16,16,20,.12); }
+  .hero{ background:linear-gradient(135deg,#E8321E,#C22513); color:#fff; padding:28px 26px; text-align:center; }
+  .hero .brand{ font-family:'Cairo',sans-serif; font-weight:900; font-size:22px; letter-spacing:.5px; }
+  .hero .sub{ font-size:12px; opacity:.85; margin-top:2px; }
+  .hero h1{ font-family:'Cairo',sans-serif; font-size:20px; margin:16px 0 0; }
+  .body{ padding:24px 26px 28px; }
+  .status{ text-align:center; font-size:13px; margin-bottom:14px; color:#64748B; line-height:1.6; }
+  .plan{ border:2px solid #FEE2E2; background:#FEF2F2; border-radius:14px; padding:18px; text-align:center; margin-bottom:18px; }
+  .plan .price{ font-family:'Cairo',sans-serif; font-size:34px; font-weight:900; color:#DC2626; }
+  .plan .per{ font-size:14px; color:#64748B; }
+  .feat{ font-size:13.5px; color:#334155; line-height:2; margin:14px 0 0; text-align:right; }
+  .btn{ display:block; width:100%; border:none; border-radius:12px; padding:15px; font-family:'Tajawal',sans-serif;
+    font-size:16px; font-weight:800; cursor:pointer; margin-top:12px; }
+  .btn-pay{ background:linear-gradient(135deg,#E8321E,#C22513); color:#fff; }
+  .btn-refresh{ background:#fff; color:#334155; border:1px solid #E2E8F0; }
+  .btn-logout{ background:none; color:#94A3B8; border:none; font-size:13px; margin-top:16px; width:100%; cursor:pointer; }
+  .note{ font-size:12px; color:#94A3B8; text-align:center; margin-top:14px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="hero">
+    <div class="brand">I FIX TEAM</div>
+    <div class="sub">FOR MOBILE SERVICES</div>
+    <h1>🎁 انتهت فترتك المجانية</h1>
+  </div>
+  <div class="body">
+    <div class="status" id="status">جاري التحقق من حسابك...</div>
+    <div class="plan">
+      <div class="price" id="planPrice">—</div>
+      <div class="per">اشتراك شهري لكامل النظام</div>
+      <div class="feat">
+        ✅ إدارة كاملة للأجهزة والصيانة<br>
+        ✅ حسابات المحلات والآجل والخصومات<br>
+        ✅ تقارير وتقييم الفنيين<br>
+        ✅ نسخ احتياطية ومزامنة لحظية
+      </div>
+    </div>
+    <button class="btn btn-pay" onclick="payNow()">💳 اشترك الآن عبر Paymob</button>
+    <button class="btn btn-refresh" onclick="recheck()">🔄 فعّلت الاشتراك؟ ادخل النظام</button>
+    <button class="btn-logout" onclick="doLogout()">تسجيل الخروج</button>
+    <div class="note" id="note"></div>
+  </div>
+</div>
+
+<script>
+const sb = supabase.createClient(
+  "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+);
+
+// ============================================================
+// 🔴 إعدادات الاشتراك و Paymob — املأها 🔴
+// ============================================================
+// رابط الدفع من Paymob (Payment Link من لوحة تحكم Paymob، أو رابط الـ iframe):
+const PAYMOB_PAYMENT_URL = '';     // مثال: 'https://accept.paymob.com/standalone?ref=xxxxxxx'
+// سعر الاشتراك الشهري بالجنيه (رقم فقط):
+const PLAN_PRICE_EGP = 0;
+// ============================================================
+
+document.getElementById('planPrice').textContent =
+  PLAN_PRICE_EGP > 0 ? (PLAN_PRICE_EGP.toLocaleString('en-EG') + ' ج.م / شهر') : 'حسب الباقة';
+
+function payNow(){
+  if(!PAYMOB_PAYMENT_URL){
+    alert('رابط الدفع لسه مش متظبط. كلّم الإدارة لتفعيل الاشتراك.');
+    return;
+  }
+  window.location.href = PAYMOB_PAYMENT_URL;
+}
+
+async function recheck(){
+  document.getElementById('status').textContent = 'جاري التحقق...';
+  try{
+    const { data } = await sb.from('shop').select('paid_until').eq('id', 1).single();
+    if(data && data.paid_until && new Date(data.paid_until) > new Date()){
+      window.location.href = 'dashboard.html';
+      return;
+    }
+    document.getElementById('note').textContent = 'الاشتراك لسه مش مفعّل. لو دفعت للتو استنى دقيقة وجرّب تاني.';
+  }catch(e){
+    document.getElementById('note').textContent = 'حصل خطأ في التحقق. تأكد من النت وجرّب تاني.';
+  }
+}
+
+async function doLogout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  window.location.href = 'index.html';
+}
+
+// لازم يكون مسجّل دخول؛ ولو الاشتراك مفعّل بالفعل يدخل النظام على طول
+sb.auth.getSession().then(({ data:{ session } }) => {
+  if(!session){ window.location.href = 'index.html'; return; }
+  document.getElementById('status').textContent = 'أهلاً ' + (session.user.email || '') + ' — لتفعيل حسابك اشترك من هنا.';
+  sb.from('shop').select('paid_until').eq('id', 1).single().then(({ data }) => {
+    if(data && data.paid_until && new Date(data.paid_until) > new Date()){
+      window.location.href = 'dashboard.html';
+    }
+  });
+});
+</script>
+</body>
+</html>
