@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
@@ -3571,30 +3572,72 @@ function shopStatementRows(shop){
   return { entries, debit, credit, balance: debit - credit };
 }
 
-function exportShopExcel(shop){
+async function exportShopExcel(shop){
   const { entries, debit, credit, balance } = shopStatementRows(shop);
-  const rows = [
-    ['كشف حساب — ' + shop],
-    ['I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG')],
-    [],
-    ['التاريخ','البيان','عليه (آجل)','له (دفعات)','بواسطة'],
-    ...entries.map(e => [
+  const border = {
+    top:{style:'thin',color:{argb:'FFCBD5E1'}}, bottom:{style:'thin',color:{argb:'FFCBD5E1'}},
+    left:{style:'thin',color:{argb:'FFCBD5E1'}}, right:{style:'thin',color:{argb:'FFCBD5E1'}}
+  };
+  const money = '#,##0" ج.م"';
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('كشف حساب', { views:[{ rightToLeft:true }] });
+
+  // العناوين العلوية
+  ws.mergeCells('A1:E1');
+  ws.getCell('A1').value = 'كشف حساب — ' + shop;
+  ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF1F3864'} };
+  ws.getCell('A1').alignment = { horizontal:'center' };
+  ws.mergeCells('A2:E2');
+  ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
+  ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
+  ws.getCell('A2').alignment = { horizontal:'center' };
+
+  // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
+  const head = ws.getRow(4);
+  head.values = ['التاريخ','البيان','عليه (آجل)','له (دفعات)','بواسطة'];
+  head.height = 22;
+  head.eachCell(cell => {
+    cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} };
+    cell.alignment = { horizontal:'center', vertical:'middle' };
+    cell.border = border;
+  });
+
+  // الحركات
+  entries.forEach(e => {
+    const r = ws.addRow([
       new Date(e.date).toLocaleString('ar-EG'),
       stmtDesc(e),
-      isDebitLike(e) ? (e.amount||0) : '',
-      !isDebitLike(e) ? (e.amount||0) : '',
-      e.by||''
-    ]),
-    [],
-    ['','إجمالي الآجل', debit, '', ''],
-    ['','إجمالي المدفوع', '', credit, ''],
-    ['','المتبقي على المحل', balance, '', ''],
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:22},{wch:48},{wch:14},{wch:14},{wch:16}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'كشف حساب');
-  XLSX.writeFile(wb, `كشف-حساب-${shop}-${new Date().toISOString().slice(0,10)}.xlsx`);
+      isDebitLike(e) ? (e.amount||0) : null,
+      !isDebitLike(e) ? (e.amount||0) : null,
+      e.by || ''
+    ]);
+    r.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { vertical:'middle', wrapText:true }; });
+    r.getCell(3).numFmt = money; r.getCell(4).numFmt = money;
+    r.getCell(3).alignment = { horizontal:'center', vertical:'middle' };
+    r.getCell(4).alignment = { horizontal:'center', vertical:'middle' };
+  });
+
+  ws.addRow([]);
+  [['','إجمالي الآجل', debit, null], ['','إجمالي المدفوع/الخصم', null, credit], ['','المتبقي على المحل', balance, null]]
+    .forEach((t, i) => {
+      const r = ws.addRow(t);
+      r.getCell(2).font = { bold:true };
+      r.getCell(3).numFmt = money; r.getCell(4).numFmt = money;
+      r.eachCell({ includeEmpty:true }, cell => {
+        cell.border = border;
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: i===2 ? 'FFFDE68A' : 'FFF1F5F9'} };
+      });
+    });
+
+  [22,50,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `كشف-حساب-${shop}-${new Date().toISOString().slice(0,10)}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
 function exportShopPdf(shop){
@@ -3605,7 +3648,6 @@ function exportShopPdf(shop){
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="color:#B45309; font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
       <td style="color:#16A34A; font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
-      <td>${esc(e.by||'')}</td>
     </tr>`).join('');
 
   const w = window.open('', '_blank');
@@ -3638,8 +3680,8 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th>التاريخ</th><th style="width:42%;">البيان</th><th>عليه (آجل)</th><th>له (دفعات)</th><th>سُجّل بواسطة</th></tr>
-      ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
+      <tr><th style="width:26%;">التاريخ</th><th style="width:48%;">البيان</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      ${rowsHtml || '<tr><td colspan="4">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
     <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
