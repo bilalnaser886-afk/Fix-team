@@ -67,7 +67,7 @@ const sb = supabase.createClient(
 // رابط الدفع من Paymob (Payment Link من لوحة تحكم Paymob، أو رابط الـ iframe):
 const PAYMOB_PAYMENT_URL = '';     // مثال: 'https://accept.paymob.com/standalone?ref=xxxxxxx'
 // سعر الاشتراك الشهري بالجنيه (رقم فقط):
-const PLAN_PRICE_EGP = 0;
+const PLAN_PRICE_EGP = 10000;
 // ============================================================
 
 document.getElementById('planPrice').textContent =
@@ -75,7 +75,7 @@ document.getElementById('planPrice').textContent =
 
 function payNow(){
   if(!PAYMOB_PAYMENT_URL){
-    alert('رابط الدفع لسه مش متظبط. كلّم الإدارة لتفعيل الاشتراك.');
+    alert('.https://paymob.link/LRvb3.');
     return;
   }
   window.location.href = PAYMOB_PAYMENT_URL;
