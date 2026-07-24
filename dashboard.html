@@ -168,6 +168,13 @@
   .admin-sec{ border:1px solid #EEF0F3; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
   .admin-sec-title{ font-weight:800; font-size:14px; margin-bottom:4px; }
   .admin-hint{ font-size:12.5px; color:#64748B; margin:0 0 10px; line-height:1.6; }
+  /* ===== رمز قفل الجهاز ===== */
+  .lock-tabs{ display:flex; gap:6px; margin:2px 0 10px; }
+  .lock-tab{ flex:1; padding:8px 4px; border:1px solid #E2E8F0; background:#fff; border-radius:8px;
+    font-family:inherit; font-size:12.5px; font-weight:700; color:#64748B; cursor:pointer; }
+  .lock-tab.active{ background:#2563EB; color:#fff; border-color:#2563EB; }
+  #patternPad{ position:relative; margin:6px auto 4px; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #patternPad svg{ touch-action:none; }
   .modal{
     background:#fff; border-radius:16px; width:75vw; max-width:75vw;
     max-height:85vh; overflow-y:auto; padding:20px;
@@ -522,6 +529,18 @@
   </div>
 </div>
 
+<!-- إشعار لحظي للمستخدمين -->
+<div id="broadcastOverlay" class="overlay hidden" style="z-index:65;">
+  <div class="modal" style="max-width:420px;">
+    <div style="text-align:center; padding:10px 6px;">
+      <div id="bcIcon" style="font-size:46px;">📢</div>
+      <h2 id="bcTitle" style="margin:12px 0 8px;"></h2>
+      <p id="bcBody" style="color:#475569; line-height:1.8; font-size:14.5px; margin:0; white-space:pre-wrap;"></p>
+      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" onclick="dismissBroadcast()">فهمت 👍</button>
+    </div>
+  </div>
+</div>
+
 <!-- Column list overlay -->
 <div id="columnOverlay" class="overlay hidden">
   <div class="modal">
@@ -531,6 +550,7 @@
     </div>
     <input id="columnSearch" oninput="renderColumn()" placeholder="بحث بالاسم أو المحل أو الرقم التسلسلي..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:9px 11px; font-size:13px; margin-bottom:12px;" />
     <div id="columnList"></div>
+    <div id="colMoreFooter" style="text-align:center; padding:12px; color:#64748B; font-size:13px; display:none;"></div>
   </div>
 </div>
 
@@ -552,6 +572,31 @@
         <label class="field"><span>الموديل</span><input id="f_model" /></label>
       </div>
       <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
+      <div class="field" style="display:block;">
+        <span>🔒 رمز قفل الجهاز (اختياري)</span>
+        <div class="lock-tabs">
+          <button type="button" id="lockTab_text" class="lock-tab active" onclick="setLockTab('text')">🔢 رقم/نص</button>
+          <button type="button" id="lockTab_pattern" class="lock-tab" onclick="setLockTab('pattern')">✏️ نمط</button>
+          <button type="button" id="lockTab_image" class="lock-tab" onclick="setLockTab('image')">🖼️ صورة</button>
+        </div>
+        <div id="lockPane_text">
+          <div style="position:relative;">
+            <input id="f_lockText" type="password" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
+            <button type="button" id="lockEye" onclick="toggleLockText()" style="position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:18px;cursor:pointer;padding:6px;">👁</button>
+          </div>
+        </div>
+        <div id="lockPane_pattern" style="display:none;">
+          <div id="patternPad"></div>
+          <div style="text-align:center;">
+            <div id="patternSeqLabel" style="font-size:12.5px;color:#64748B;margin-bottom:6px;">ارسم النمط بإصبعك</div>
+            <button type="button" class="acc-mini-btn" onclick="initPattern()">🔄 إعادة الرسم</button>
+          </div>
+        </div>
+        <div id="lockPane_image" style="display:none;">
+          <input type="file" accept="image/*" id="f_lockImageInput" onchange="onLockImage(this)" style="font-size:13px;" />
+          <div id="lockImgPreview"></div>
+        </div>
+      </div>
       <div style="margin-bottom:12px;">
         <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
         <div class="pay-choice">
@@ -591,6 +636,11 @@
 <!-- Timeline (time differences) modal -->
 <div id="timelineOverlay" class="overlay hidden">
   <div class="modal" id="timelineModal"></div>
+</div>
+
+<!-- عارض صورة القفل -->
+<div id="imgLightbox" class="overlay hidden" style="z-index:70;" onclick="this.classList.add('hidden')">
+  <img id="imgLightboxImg" style="max-width:92%;max-height:88%;border-radius:12px;" />
 </div>
 
 <!-- Summaries page -->
@@ -756,13 +806,78 @@ function injectAdminMenu(){
   dd.insertBefore(b, logoutBtn);
 }
 
+let adminUnlocked = false;
+function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
+
 function openAdmin(){
   if(!isAdmin()){ alert('الصفحة دي للأدمن الرئيسي بس'); return; }
   document.getElementById('menuDropdown').classList.add('hidden');
+  if(!adminUnlocked){
+    if(!systemConfig.adminPassHash){
+      // أول مرة: اعمل كلمة سر
+      const p1 = prompt('🔑 اعمل كلمة سر للوحة الأدمن (هتتطلب كل مرة تفتح اللوحة):');
+      if(p1===null) return;
+      if(!p1.trim()){ alert('لازم تكتب كلمة سر'); return; }
+      systemConfig.adminPassHash = hashStr(p1.trim());
+      saveSystemConfig();
+      adminUnlocked = true;
+      alert('اتحفظت كلمة السر ✅');
+    } else {
+      const p = prompt('🔒 كلمة سر لوحة الأدمن:');
+      if(p===null) return;
+      if(hashStr((p||'').trim()) !== systemConfig.adminPassHash){ alert('كلمة السر غلط'); return; }
+      adminUnlocked = true;
+    }
+  }
   document.getElementById('adminOverlay').classList.remove('hidden');
   renderAdmin();
 }
 function closeAdmin(){ document.getElementById('adminOverlay').classList.add('hidden'); }
+async function adminChangePass(){
+  const p1 = prompt('كلمة سر جديدة للوحة الأدمن:');
+  if(p1===null) return;
+  if(!p1.trim()){ alert('لازم كلمة سر'); return; }
+  systemConfig.adminPassHash = hashStr(p1.trim());
+  await saveSystemConfig();
+  alert('اتغيرت كلمة سر اللوحة ✅');
+}
+
+// ===== الإشعارات اللحظية للمستخدمين =====
+const BROADCAST_KEY = 'broadcast';
+let currentBroadcast = null;
+async function loadBroadcast(){
+  try{
+    const r = await window.storage.get(BROADCAST_KEY);
+    if(r && r.value){ currentBroadcast = JSON.parse(r.value); showBroadcastIfUnseen(); }
+  }catch(e){}
+}
+function showBroadcastIfUnseen(){
+  if(!currentBroadcast || !currentBroadcast.id) return;
+  if(localStorage.getItem('ifix_seen_bc_' + currentBroadcast.id)) return;
+  const t = currentBroadcast.type;
+  document.getElementById('bcIcon').textContent = t==='warning' ? '⚠️' : (t==='success' ? '✅' : '📢');
+  document.getElementById('bcTitle').textContent = currentBroadcast.title || 'إشعار';
+  document.getElementById('bcBody').textContent = currentBroadcast.body || '';
+  document.getElementById('broadcastOverlay').classList.remove('hidden');
+}
+function dismissBroadcast(){
+  if(currentBroadcast && currentBroadcast.id){ try{ localStorage.setItem('ifix_seen_bc_'+currentBroadcast.id,'1'); }catch(e){} }
+  document.getElementById('broadcastOverlay').classList.add('hidden');
+}
+async function adminSendBroadcast(){
+  const title = (document.getElementById('bcInTitle')?.value || '').trim();
+  const body = (document.getElementById('bcInBody')?.value || '').trim();
+  const type = document.getElementById('bcInType')?.value || 'info';
+  if(!title && !body){ alert('اكتب عنوان أو نص الإشعار الأول'); return; }
+  if(!confirm('تبعت الإشعار ده لكل المستخدمين دلوقتي؟')) return;
+  const bc = { id: Date.now(), title, body, type };
+  try{
+    await window.storage.set(BROADCAST_KEY, JSON.stringify(bc));
+    currentBroadcast = bc;
+    document.getElementById('bcInTitle').value=''; document.getElementById('bcInBody').value='';
+    alert('اتبعت الإشعار للكل ✅');
+  }catch(e){ alert('حصل خطأ في الإرسال — تأكد من النت'); }
+}
 
 function renderAdmin(){
   const m = systemConfig.mode;
@@ -778,13 +893,19 @@ function renderAdmin(){
     <div class="admin-sec">
       <div class="admin-sec-title">🛠️ وضع البيتا (قبل الإطلاق)</div>
       <p class="admin-hint">بيظهر شريط علوي للكل + نافذة ترحيب مرة واحدة لكل مستخدم.</p>
-      <button class="btn-primary" style="box-shadow:none;" onclick="adminSetBeta()">تفعيل تنبيه وضع البيتا</button>
+      ${m==='beta'
+        ? `<div style="font-size:12.5px;color:#16A34A;font-weight:700;margin-bottom:8px;">● مُفعّل حالياً</div>
+           <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;" onclick="adminCancelBeta()">🛑 إلغاء تفعيل وضع البيتا</button>`
+        : `<button class="btn-primary" style="box-shadow:none;" onclick="adminSetBeta()">تفعيل تنبيه وضع البيتا</button>`}
     </div>
 
     <div class="admin-sec">
       <div class="admin-sec-title">🎁 الفترة المجانية والاشتراك</div>
       <p class="admin-hint">بيبدأ عدّاد ${systemConfig.trialDays||30} يوم من لحظة الضغط، وبعد ما يخلص بيوجّه النظام تلقائياً لصفحة الاشتراك.</p>
-      <button class="btn-primary" style="box-shadow:none; background:#B45309;" onclick="adminSetTrial()">تحويل لوضع التجربة المجانية</button>
+      ${m==='trial'
+        ? `<div style="font-size:12.5px;color:#16A34A;font-weight:700;margin-bottom:8px;">● مُفعّل — متبقّي ${left} يوماً</div>
+           <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;" onclick="adminCancelTrial()">🛑 إلغاء الوضع المجاني</button>`
+        : `<button class="btn-primary" style="box-shadow:none; background:#B45309;" onclick="adminSetTrial()">تحويل لوضع التجربة المجانية</button>`}
     </div>
 
     <div class="admin-sec" style="border-color:#FDE68A; background:#FFFBEB;">
@@ -794,9 +915,22 @@ function renderAdmin(){
     </div>
 
     <div class="admin-sec">
-      <div class="admin-sec-title">✅ الوضع العادي</div>
-      <p class="admin-hint">يوقف كل الشرايط والتنبيهات (النظام في وضعه العادي المدفوع).</p>
-      <button class="btn-secondary" onclick="adminSetNormal()">رجوع للوضع العادي</button>
+      <div class="admin-sec-title">📢 إرسال إشعار لحظي للمستخدمين</div>
+      <p class="admin-hint">بيظهر فوراً لكل مستخدم بنافذة فيها زر «فهمت» — مرة واحدة لكل مستخدم.</p>
+      <input id="bcInTitle" placeholder="عنوان الإشعار" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px;" />
+      <textarea id="bcInBody" rows="2" placeholder="نص الإشعار" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px;font-family:inherit;"></textarea>
+      <select id="bcInType" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:10px;">
+        <option value="info">📢 معلومة</option>
+        <option value="warning">⚠️ تنبيه</option>
+        <option value="success">✅ خبر كويس</option>
+      </select>
+      <button class="btn-primary" style="box-shadow:none;" onclick="adminSendBroadcast()">إرسال للكل الآن</button>
+    </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">🔑 أمان اللوحة</div>
+      <p class="admin-hint">كلمة سر فتح لوحة الأدمن (بتتطلب كل مرة تفتح اللوحة).</p>
+      <button class="acc-mini-btn" onclick="adminChangePass()">تغيير كلمة سر اللوحة</button>
     </div>
   `;
 }
@@ -824,6 +958,23 @@ async function adminSetNormal(){
   await saveSystemConfig();
   applySystemMode(); renderAdmin();
   alert('رجع للوضع العادي ✅');
+}
+async function adminCancelBeta(){
+  if(!confirm('إلغاء تفعيل وضع البيتا والرجوع للوضع العادي؟')) return;
+  systemConfig.mode = 'normal';
+  systemConfig.betaAnnId = null;
+  await saveSystemConfig();
+  applySystemMode(); renderAdmin();
+  alert('تم إلغاء وضع البيتا ✅');
+}
+async function adminCancelTrial(){
+  if(!confirm('إلغاء الوضع المجاني والرجوع للوضع العادي؟\nالعدّاد هيتلغي والمستخدمين مش هيتوجّهوا لصفحة الاشتراك.')) return;
+  systemConfig.mode = 'normal';
+  systemConfig.trialStart = null;
+  systemConfig.trialAnnId = null;
+  await saveSystemConfig();
+  applySystemMode(); renderAdmin();
+  alert('تم إلغاء الوضع المجاني ✅');
 }
 async function adminSetTrialDays(){
   const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||30));
@@ -948,7 +1099,12 @@ function startRealtimeSync(){
     sb.channel('app_data_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, (payload) => {
         const row = payload.new;
-        if(!row || row.key !== LEDGER_KEY) return;
+        if(!row) return;
+        if(row.key === BROADCAST_KEY){
+          try{ currentBroadcast = JSON.parse(row.value); showBroadcastIfUnseen(); }catch(e){}
+          return;
+        }
+        if(row.key !== LEDGER_KEY) return;
         if(row.value === JSON.stringify(ledger)) return;
         try{
           ledger = JSON.parse(row.value);
@@ -1503,7 +1659,7 @@ function hideImportProgress(){
 
 function render(){
   renderBoard();
-  if(currentColumn) renderColumn();
+  if(currentColumn) renderColumn(true);
   refreshOpenOverlays();
 }
 
@@ -1544,26 +1700,93 @@ function clearSearchBox(id){
 function openColumn(statusKey){
   currentColumn = statusKey;
   clearSearchBox('columnSearch');   // خانة البحث واحدة لكل الحالات — لازم تتفضى
+  colShown = 0;
   renderColumn();
   document.getElementById('columnOverlay').classList.remove('hidden');
+  attachColScrollOnce();
 }
 function closeColumn(){
   document.getElementById('columnOverlay').classList.add('hidden');
   clearSearchBox('columnSearch');
   currentColumn = null;
 }
-function renderColumn(){
+// ===== الخانة بتحميل تدريجي — عشان الخانات اللي فيها آلاف الأجهزة تفتح فوراً =====
+const COL_PAGE = 50;
+let colFullList = [];
+let colShown = 0;
+let colScrollAttached = false;
+
+function renderColumn(keepPos){
   const s = statusInfo(currentColumn);
   const q = document.getElementById('columnSearch').value.trim();
-  const list = devices.filter(d => d.status === currentColumn && matchesSearch(d, q));
-  document.getElementById('columnTitle').textContent = s.label;
+  colFullList = devices.filter(d => d.status === currentColumn && matchesSearch(d, q));
+  document.getElementById('columnTitle').textContent = `${s.label} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
-  const _colScroller = document.querySelector('#columnOverlay .modal');
-  const _colY = _colScroller ? _colScroller.scrollTop : 0;
-  document.getElementById('columnList').innerHTML = list.length === 0
-    ? `<div class="empty-col">لا توجد أجهزة</div>`
-    : list.map(d => cardHtml(d, s)).join('');
-  if(_colScroller) _colScroller.scrollTop = _colY;
+
+  const scroller = document.querySelector('#columnOverlay .modal');
+  const prevY = scroller ? scroller.scrollTop : 0;
+  const prevShown = colShown;
+  const listEl = document.getElementById('columnList');
+
+  if(colFullList.length === 0){
+    listEl.innerHTML = `<div class="empty-col">لا توجد أجهزة</div>`;
+    colShown = 0; updateColMoreFooter();
+    return;
+  }
+  // عند الفتح/البحث: أول صفحة بس. عند التحديث اللحظي: نفس اللي كان ظاهر (عشان مكان القراءة ما يضيعش)
+  const target = keepPos
+    ? Math.min(colFullList.length, Math.max(COL_PAGE, prevShown))
+    : Math.min(colFullList.length, COL_PAGE);
+  listEl.innerHTML = colFullList.slice(0, target).map(d => cardHtml(d, s)).join('');
+  colShown = target;
+  updateColMoreFooter();
+
+  if(scroller) scroller.scrollTop = keepPos ? prevY : 0;
+
+  // لو الشاشة كبيرة والمحتوى مش مالياها (فمش هينفع ينزل)، نكمّل صفحات لحد ما تبقى قابلة للتمرير
+  requestAnimationFrame(() => {
+    const m = document.querySelector('#columnOverlay .modal');
+    let guard = 0;
+    while(m && colShown < colFullList.length && m.scrollHeight <= m.clientHeight + 40 && guard < 60){
+      appendColumnPage(); guard++;
+    }
+  });
+}
+
+function appendColumnPage(){
+  if(colShown >= colFullList.length) return;
+  const s = statusInfo(currentColumn);
+  const next = colFullList.slice(colShown, colShown + COL_PAGE);
+  document.getElementById('columnList').insertAdjacentHTML('beforeend', next.map(d => cardHtml(d, s)).join(''));
+  colShown += next.length;
+  updateColMoreFooter();
+}
+
+function updateColMoreFooter(){
+  const f = document.getElementById('colMoreFooter');
+  if(!f) return;
+  const remaining = colFullList.length - colShown;
+  if(remaining > 0){
+    f.textContent = `⬇︎ نزّل لتحميل المزيد (${remaining.toLocaleString('en-EG')} متبقّي)`;
+    f.style.display = 'block';
+  } else {
+    f.style.display = 'none';
+  }
+}
+
+function onColScroll(){
+  const m = document.querySelector('#columnOverlay .modal');
+  if(!m || document.getElementById('columnOverlay').classList.contains('hidden')) return;
+  if(colShown < colFullList.length && (m.scrollTop + m.clientHeight >= m.scrollHeight - 350)){
+    appendColumnPage();
+  }
+}
+function attachColScrollOnce(){
+  if(colScrollAttached) return;
+  const m = document.querySelector('#columnOverlay .modal');
+  if(!m) return;
+  m.addEventListener('scroll', onColScroll, { passive:true });
+  colScrollAttached = true;
 }
 
 function cardHtml(d, s){
@@ -1595,6 +1818,7 @@ function openAddModal(){
   ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => document.getElementById('f_'+id).value = '');
   document.getElementById('accountantList').innerHTML = accountantOptions();
+  resetLock();
   setAddPayType('cash');
   setAddWholesale(false);
   togglePayTypeVisibility();
@@ -1609,6 +1833,141 @@ function openAddModal(){
   setTimeout(() => document.getElementById('f_customerName').focus(), 60);
 }
 function closeAddModal(){ document.getElementById('addOverlay').classList.add('hidden'); }
+
+// ============================================================
+// رمز قفل الجهاز: نص / نمط 3x3 / صورة
+// ============================================================
+let lockTab = 'text';
+let patternSeq = [];
+let patternThumb = '';
+let lockImageData = '';
+
+function resetLock(){
+  lockTab = 'text'; patternSeq = []; patternThumb = ''; lockImageData = '';
+  const t = document.getElementById('f_lockText'); if(t){ t.value=''; t.type='password'; }
+  const eye = document.getElementById('lockEye'); if(eye) eye.textContent = '👁';
+  const prev = document.getElementById('lockImgPreview'); if(prev) prev.innerHTML = '';
+  const fi = document.getElementById('f_lockImageInput'); if(fi) fi.value = '';
+  const lbl = document.getElementById('patternSeqLabel'); if(lbl) lbl.textContent = 'ارسم النمط بإصبعك';
+  ['text','pattern','image'].forEach(k=>{
+    const tab = document.getElementById('lockTab_'+k); if(tab) tab.classList.toggle('active', k==='text');
+    const pane = document.getElementById('lockPane_'+k); if(pane) pane.style.display = k==='text' ? 'block':'none';
+  });
+}
+
+function setLockTab(t){
+  lockTab = t;
+  ['text','pattern','image'].forEach(k=>{
+    document.getElementById('lockTab_'+k).classList.toggle('active', k===t);
+    document.getElementById('lockPane_'+k).style.display = k===t ? 'block':'none';
+  });
+  if(t==='pattern') initPattern();
+}
+
+function toggleLockText(){
+  const inp = document.getElementById('f_lockText');
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  document.getElementById('lockEye').textContent = inp.type==='password' ? '👁' : '🙈';
+}
+
+function onLockImage(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 500, scale = Math.min(1, max/Math.max(img.width, img.height));
+      const cvs = document.createElement('canvas');
+      cvs.width = Math.round(img.width*scale); cvs.height = Math.round(img.height*scale);
+      cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height);
+      lockImageData = cvs.toDataURL('image/jpeg', 0.6);
+      document.getElementById('lockImgPreview').innerHTML =
+        `<img src="${lockImageData}" style="max-width:130px;border-radius:8px;margin-top:8px;border:1px solid #E2E8F0;">`;
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// شبكة النمط 3x3 التفاعلية
+function patternPoints(size){
+  const g = size/3, pts = [];
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++) pts.push({ n:r*3+c+1, x:g*c+g/2, y:g*r+g/2 });
+  return pts;
+}
+function initPattern(){
+  const pad = document.getElementById('patternPad');
+  if(!pad) return;
+  const size = 190;
+  const pts = patternPoints(size);
+  patternSeq = []; patternThumb = '';
+  pad.style.width = size+'px'; pad.style.height = size+'px';
+  pad.innerHTML = `<svg width="${size}" height="${size}" style="position:absolute;inset:0;">
+    <polyline id="patLine" fill="none" stroke="#2563EB" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points=""/>
+    ${pts.map(p=>`<circle data-n="${p.n}" cx="${p.x}" cy="${p.y}" r="9" fill="#CBD5E1"/>`).join('')}
+  </svg>`;
+  const lbl = document.getElementById('patternSeqLabel'); if(lbl) lbl.textContent = 'ارسم النمط بإصبعك';
+  const svg = pad.querySelector('svg');
+  const line = pad.querySelector('#patLine');
+  const R = 30;
+  const pos = e => { const r = svg.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+  const hit = (x,y) => { for(const p of pts){ if(Math.hypot(p.x-x,p.y-y) < R && !patternSeq.includes(p.n)) return p; } return null; };
+  function redraw(cur){
+    let str = patternSeq.map(n=>{ const p=pts[n-1]; return p.x+','+p.y; }).join(' ');
+    if(cur) str += ' ' + cur.x + ',' + cur.y;
+    line.setAttribute('points', str);
+    svg.querySelectorAll('circle').forEach(c=>c.setAttribute('fill', patternSeq.includes(+c.dataset.n)?'#2563EB':'#CBD5E1'));
+  }
+  let drawing = false;
+  svg.addEventListener('pointerdown', e=>{ e.preventDefault(); try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+    drawing=true; patternSeq=[]; const {x,y}=pos(e); const h=hit(x,y); if(h) patternSeq.push(h.n); redraw({x,y}); });
+  svg.addEventListener('pointermove', e=>{ if(!drawing) return; e.preventDefault(); const {x,y}=pos(e); const h=hit(x,y); if(h) patternSeq.push(h.n); redraw({x,y}); });
+  const finish = ()=>{ if(!drawing) return; drawing=false; redraw(null); finalizePattern(pts, size); };
+  svg.addEventListener('pointerup', finish);
+  svg.addEventListener('pointercancel', finish);
+}
+function finalizePattern(pts, size){
+  const lbl = document.getElementById('patternSeqLabel');
+  if(patternSeq.length < 2){ patternThumb=''; if(lbl) lbl.textContent='النمط لازم نقطتين على الأقل — أعد الرسم'; return; }
+  if(lbl) lbl.textContent = 'النمط: ' + patternSeq.join('-');
+  const S = 200, cvs = document.createElement('canvas'); cvs.width=S; cvs.height=S;
+  const ctx = cvs.getContext('2d'); const k = S/size;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,S,S);
+  ctx.strokeStyle = '#2563EB'; ctx.lineWidth = 6; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.beginPath();
+  patternSeq.forEach((n,i)=>{ const p=pts[n-1]; i ? ctx.lineTo(p.x*k,p.y*k) : ctx.moveTo(p.x*k,p.y*k); });
+  ctx.stroke();
+  pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x*k,p.y*k, patternSeq.includes(p.n)?9:6, 0, Math.PI*2);
+    ctx.fillStyle = patternSeq.includes(p.n)?'#2563EB':'#CBD5E1'; ctx.fill(); });
+  patternThumb = cvs.toDataURL('image/png');
+}
+
+// يجمع بيانات القفل عند التسجيل
+function collectLock(){
+  const lt = (document.getElementById('f_lockText')?.value || '').trim();
+  if(lockTab==='text' && lt) return { lockType:'text', lockText:lt, lockPattern:'', lockImage:'' };
+  if(lockTab==='pattern' && patternSeq.length>=2) return { lockType:'pattern', lockText:'', lockPattern:patternSeq.join('-'), lockImage:patternThumb };
+  if(lockTab==='image' && lockImageData) return { lockType:'image', lockText:'', lockPattern:'', lockImage:lockImageData };
+  return { lockType:'', lockText:'', lockPattern:'', lockImage:'' };
+}
+
+function viewLockImage(id){
+  const d = devices.find(x=>x.id===id);
+  if(!d || !d.lockImage) return;
+  document.getElementById('imgLightboxImg').src = d.lockImage;
+  document.getElementById('imgLightbox').classList.remove('hidden');
+}
+
+// عرض القفل في تفاصيل الجهاز
+function lockDisplayHtml(d){
+  if(d.lockType==='text' && d.lockText)
+    return `<div class="detail-row"><span>🔒 رمز القفل</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>`;
+  if(d.lockType==='pattern' && d.lockImage)
+    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 نمط القفل${d.lockPattern?` — <span style="font-family:monospace;font-weight:700;">${esc(d.lockPattern)}</span>`:''}</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="width:130px;height:130px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>`;
+  if(d.lockType==='image' && d.lockImage)
+    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 صورة القفل</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>`;
+  return '';
+}
 
 // قايمة النسخ الاحتياطي المنسدلة
 function toggleBackupMenu(e){
@@ -1662,6 +2021,7 @@ async function submitAdd(){
     customerPhone: get('customerPhone'),
     model: get('model'),
     serialNumber: get('serialNumber'),
+    ...collectLock(),
     reportedIssue: get('reportedIssue'),
     conditionNotes: get('conditionNotes'),
     agreedPrice: intPrice(get('agreedPrice')),
@@ -1814,6 +2174,7 @@ function renderDetail(){
     </div>
 
     <div style="margin-bottom:14px;">${rows}</div>
+    ${lockDisplayHtml(d)}
 
     <div class="tech-row">
       <label class="field">
@@ -2130,11 +2491,18 @@ function dayCardHtml(d){
   const badge = d.status === 'returned'
     ? `<span class="status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 مرتجع — إعادة فحص</span>`
     : `<span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
+  // مؤشّر رمز القفل عشان الفني يشوفه على طول
+  const lock = (d.lockType==='text' && d.lockText)
+    ? `<div style="margin-top:6px;font-size:12.5px;">🔒 <span style="font-family:monospace;font-weight:800;">${esc(d.lockText)}</span></div>`
+    : ((d.lockType==='pattern'||d.lockType==='image') && d.lockImage)
+      ? `<div style="margin-top:6px;display:flex;align-items:center;gap:6px;"><span style="font-size:12.5px;">🔒</span><img src="${d.lockImage}" style="width:40px;height:40px;border-radius:6px;border:1px solid #E2E8F0;object-fit:cover;"></div>`
+      : '';
   // بيفتح التفاصيل فوق صفحة الجرد من غير ما يقفلها — عشان لما تقفل التفاصيل تفضل في نفس المكان
   return `<div class="day-card" onclick="openDetail('${d.id}')">
     <div class="day-card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
     <div class="day-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
     ${badge}
+    ${lock}
   </div>`;
 }
 
@@ -3825,6 +4193,7 @@ requireAccess().then(ok => {
   if(!ok) return;
   applySystemMode();
   injectAdminMenu();
+  loadBroadcast();
   loadDevices();
   loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
   setInterval(checkAutoBackup, 3600000);
