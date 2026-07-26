@@ -761,7 +761,14 @@ let currentUser = { name: '', email: '' };
 // أوضاع النظام (بيتا / فترة مجانية) + لوحة الأدمن
 // ============================================================
 // 🔴🔴 حط هنا إيميل الأدمن الرئيسي (اللي هيتحكم في أوضاع النظام) 🔴🔴
-const ADMIN_EMAIL = 'ADMIN-EMAIL-HERE@example.com';
+// 🔴 إيميلات الأدمن الرئيسي — البيئتين متطابقين دلوقتي.
+// (لو احتجت أدمن للتجربة بس، زوّده في سطر staging من غير ما تلمس production)
+const ADMIN_EMAILS_BY_ENV = {
+  production: ['belal0@fix.com'],
+  staging:    ['belal0@fix.com']
+};
+const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
+const ADMIN_EMAIL = ADMIN_EMAILS[0] || '';
 
 const SYSTEM_CONFIG_KEY = 'system-config';
 let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
@@ -775,7 +782,106 @@ async function loadSystemConfig(){
 async function saveSystemConfig(){
   try{ await window.storage.set(SYSTEM_CONFIG_KEY, JSON.stringify(systemConfig)); }catch(e){}
 }
-function isAdmin(){ return !!currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase(); }
+function isAdmin(){ return isSuperAdmin(); }
+
+// ============================================================
+// أدوار المستخدمين: Super Admin مقابل محاسب
+// ============================================================
+// لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
+const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
+const ROLES_KEY = 'user-roles';
+let userRoles = {};   // { "email": "super_admin" }
+
+async function loadUserRoles(){
+  try{
+    const r = await window.storage.get(ROLES_KEY);
+    if(r && r.value) userRoles = JSON.parse(r.value) || {};
+  }catch(e){ userRoles = {}; }
+}
+async function saveUserRoles(){
+  try{ await window.storage.set(ROLES_KEY, JSON.stringify(userRoles)); }catch(e){}
+}
+function isSuperAdmin(){
+  if(!ADMIN_EMAIL_SET) return true;   // وضع آمن: الإعداد لسه ماتعملش
+  const e = (currentUser.email || '').toLowerCase();
+  if(!e) return false;
+  if(ADMIN_EMAILS.includes(e)) return true;
+  return userRoles[e] === 'super_admin';
+}
+function currentRoleLabel(){ return isSuperAdmin() ? 'Super Admin' : 'محاسب'; }
+
+// بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن المحاسب
+function applyRoleVisibility(){
+  const wrap = document.getElementById('backupWrap');
+  if(wrap) wrap.style.display = isSuperAdmin() ? '' : 'none';
+  injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
+}
+
+// ============================================================
+// مفاتيح الميزات (Feature Flags)
+// ============================================================
+const FLAGS_KEY = 'feature-flags';
+// الميزات المعروفة — أي ميزة جديدة تتلف هنا وتتقفل لحد ما الأدمن يفتحها
+const KNOWN_FLAGS = [
+  { key:'gemini_invoice_ocr',  desc:'قراءة فواتير قطع الغيار بالذكاء الاصطناعي (OCR)' },
+  { key:'silent_label_print',  desc:'طباعة الليبل مباشرة من غير نافذة الطباعة' },
+  { key:'device_lock_codes',   desc:'رمز قفل الجهاز (رقم / نمط / صورة)' },
+  { key:'live_broadcasts',     desc:'الإشعارات اللحظية من الأدمن' },
+];
+let featureFlags = {};   // { feature_key: { is_enabled, description, updated_at } }
+
+async function loadFeatureFlags(){
+  try{
+    const r = await window.storage.get(FLAGS_KEY);
+    if(r && r.value) featureFlags = JSON.parse(r.value) || {};
+  }catch(e){ featureFlags = {}; }
+  // نضمن إن كل مفتاح معروف موجود (افتراضياً مقفول)
+  let changed = false;
+  for(const f of KNOWN_FLAGS){
+    if(!featureFlags[f.key]){
+      featureFlags[f.key] = { is_enabled:false, description:f.desc, updated_at:new Date().toISOString() };
+      changed = true;
+    }
+  }
+  if(changed && isSuperAdmin()){ try{ await saveFeatureFlags(); }catch(e){} }
+}
+async function saveFeatureFlags(){
+  try{ await window.storage.set(FLAGS_KEY, JSON.stringify(featureFlags)); }catch(e){}
+}
+// الدالة العامة: أي ميزة جديدة تتلف بيها
+function isFeatureEnabled(key){
+  const f = featureFlags[key];
+  return !!(f && f.is_enabled);
+}
+async function adminToggleFlag(key){
+  if(!isSuperAdmin()) return;
+  const f = featureFlags[key];
+  if(!f) return;
+  f.is_enabled = !f.is_enabled;
+  f.updated_at = new Date().toISOString();
+  await saveFeatureFlags();
+  await addAudit(`${f.is_enabled ? 'فعّل' : 'قفل'} ميزة: ${key}`);
+  renderAdmin();
+}
+
+// ============================================================
+// سجل العمليات الإدارية (Audit Log)
+// ============================================================
+const AUDIT_KEY = 'audit-log';
+let auditLog = [];
+async function loadAudit(){
+  try{
+    const r = await window.storage.get(AUDIT_KEY);
+    if(r && r.value) auditLog = JSON.parse(r.value) || [];
+  }catch(e){ auditLog = []; }
+}
+async function addAudit(action){
+  try{
+    auditLog.unshift({ at:new Date().toISOString(), by:currentUser.name || currentUser.email || '—', email:currentUser.email||'', action });
+    auditLog = auditLog.slice(0, 300);   // نحتفظ بآخر 300 عملية
+    await window.storage.set(AUDIT_KEY, JSON.stringify(auditLog));
+  }catch(e){}
+}
 function trialDaysLeft(){
   if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
   const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||30)*86400000;
@@ -830,7 +936,7 @@ function closeAnnouncement(){
 
 // زر لوحة الأدمن في القائمة (للأدمن بس)
 function injectAdminMenu(){
-  if(!isAdmin()) return;
+  if(!isSuperAdmin()) return;
   const dd = document.getElementById('menuDropdown');
   if(!dd || document.getElementById('adminMenuBtn')) return;
   const b = document.createElement('button');
@@ -911,6 +1017,7 @@ async function adminSendBroadcast(){
     await window.storage.set(BROADCAST_KEY, JSON.stringify(bc));
     currentBroadcast = bc;
     document.getElementById('bcInTitle').value=''; document.getElementById('bcInBody').value='';
+    await addAudit('بعت إشعار: ' + (title || body).slice(0,60));
     alert('اتبعت الإشعار للكل ✅');
   }catch(e){ alert('حصل خطأ في الإرسال — تأكد من النت'); }
 }
@@ -968,7 +1075,69 @@ function renderAdmin(){
       <p class="admin-hint">كلمة سر فتح لوحة الأدمن (بتتطلب كل مرة تفتح اللوحة).</p>
       <button class="acc-mini-btn" onclick="adminChangePass()">تغيير كلمة سر اللوحة</button>
     </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">🎛️ مفاتيح الميزات (Feature Flags)</div>
+      <p class="admin-hint">أي ميزة جديدة بتفضل مقفولة لحد ما تفتحها من هنا — عشان تجرّبها بأمان قبل ما تشتغل للكل.</p>
+      ${KNOWN_FLAGS.map(f => {
+        const on = isFeatureEnabled(f.key);
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
+          <div style="flex:1;">
+            <div style="font-size:13.5px;font-weight:700;">${esc(f.desc)}</div>
+            <div style="font-size:11px;color:#94A3B8;font-family:monospace;">${esc(f.key)}</div>
+          </div>
+          <button class="acc-mini-btn" style="min-width:86px;${on?'background:#DCFCE7;color:#16A34A;border-color:#86EFAC;':''}"
+            onclick="adminToggleFlag('${f.key}')">${on ? '● مفعّلة' : '○ مقفولة'}</button>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">👥 صلاحيات المستخدمين</div>
+      <p class="admin-hint">المحاسب مالوش وصول لأدوات النظام (نسخ احتياطي / استيراد / مسح). الـ Super Admin بس اللي بيشوفها.</p>
+      ${!ADMIN_EMAIL_SET ? `<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:9px 11px;font-size:12.5px;color:#B91C1C;line-height:1.7;margin-bottom:10px;">⚠️ إيميل الأدمن لسه ماتحطش في الكود (<b>ADMIN_EMAIL</b>)، فالصلاحيات مفتوحة للكل مؤقتاً.</div>` : ''}
+      <div style="font-size:12.5px;color:#475569;line-height:1.9;margin-bottom:10px;">
+        أدمن هذه البيئة (${APP_ENV === 'production' ? 'إنتاج' : 'تجريبي'}): <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b><br>
+        ${Object.keys(userRoles).length
+          ? Object.entries(userRoles).map(([em,rl]) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;">
+              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${rl==='super_admin'?'Super Admin':'محاسب'}</span>
+              <button class="acc-mini-btn" style="color:#DC2626;" onclick="adminRemoveRole('${esc(em)}')">حذف</button>
+            </div>`).join('')
+          : '<span style="color:#94A3B8;">مفيش صلاحيات إضافية متسجلة</span>'}
+      </div>
+      <button class="acc-mini-btn" onclick="adminAddSuperAdmin()">➕ إضافة Super Admin بالإيميل</button>
+    </div>
+
+    <div class="admin-sec">
+      <div class="admin-sec-title">📜 سجل العمليات الإدارية</div>
+      <p class="admin-hint">آخر العمليات الحساسة (تغيير أوضاع، مفاتيح ميزات، صلاحيات، مسح بيانات).</p>
+      ${auditLog.length
+        ? `<div style="max-height:190px;overflow:auto;">${auditLog.slice(0,40).map(a =>
+            `<div style="border-bottom:1px solid #F1F5F9;padding:6px 0;font-size:12.5px;line-height:1.6;">
+               ${esc(a.action)}
+               <div style="color:#94A3B8;font-size:11px;">${new Date(a.at).toLocaleString('ar-EG')} — ${esc(a.by)}</div>
+             </div>`).join('')}</div>`
+        : '<div style="color:#94A3B8;font-size:12.5px;">مفيش عمليات متسجلة لسه</div>'}
+    </div>
   `;
+}
+
+async function adminAddSuperAdmin(){
+  const em = prompt('إيميل المستخدم اللي هيبقى Super Admin:');
+  if(em === null) return;
+  const e = (em||'').trim().toLowerCase();
+  if(!e || !e.includes('@')){ alert('اكتب إيميل صحيح'); return; }
+  userRoles[e] = 'super_admin';
+  await saveUserRoles();
+  await addAudit('أضاف Super Admin: ' + e);
+  renderAdmin();
+}
+async function adminRemoveRole(em){
+  if(!confirm(`تشيل صلاحية "${em}"؟`)) return;
+  delete userRoles[(em||'').toLowerCase()];
+  await saveUserRoles();
+  await addAudit('شال صلاحية: ' + em);
+  renderAdmin();
 }
 
 async function adminSetBeta(){
@@ -977,6 +1146,7 @@ async function adminSetBeta(){
   systemConfig.betaAnnId = Date.now();
   await saveSystemConfig();
   applySystemMode(); renderAdmin();
+  await addAudit('فعّل وضع البيتا');
   alert('تم تفعيل وضع البيتا ✅');
 }
 async function adminSetTrial(){
@@ -986,6 +1156,7 @@ async function adminSetTrial(){
   systemConfig.trialAnnId = Date.now();
   await saveSystemConfig();
   applySystemMode(); renderAdmin();
+  await addAudit('بدأ الفترة المجانية');
   alert('تم بدء الفترة المجانية 🎁');
 }
 async function adminSetNormal(){
@@ -1001,6 +1172,7 @@ async function adminCancelBeta(){
   systemConfig.betaAnnId = null;
   await saveSystemConfig();
   applySystemMode(); renderAdmin();
+  await addAudit('ألغى وضع البيتا');
   alert('تم إلغاء وضع البيتا ✅');
 }
 async function adminCancelTrial(){
@@ -1010,6 +1182,7 @@ async function adminCancelTrial(){
   systemConfig.trialAnnId = null;
   await saveSystemConfig();
   applySystemMode(); renderAdmin();
+  await addAudit('ألغى الوضع المجاني');
   alert('تم إلغاء الوضع المجاني ✅');
 }
 async function adminSetTrialDays(){
@@ -1438,6 +1611,7 @@ async function checkAutoBackup(){
 // محمي بتأكيدين + كتابة كلمة، وبيعمل نسخة احتياطية تلقائية قبل المسح
 // ============================================================
 async function wipeAllData(){
+  if(!isSuperAdmin()){ showError('العملية دي للـ Super Admin بس.'); return; }
   document.getElementById('backupMenu').classList.add('hidden');
 
   if(devices.length === 0){ alert('مفيش بيانات تتمسح أصلاً.'); return; }
@@ -2384,6 +2558,7 @@ function onCustomerNameInput(){
 let pendingImportFile = null;
 let pendingImportDevices = null;
 async function onImportFileChosen(file){
+  if(!isSuperAdmin()){ showError('الاستيراد للـ Super Admin بس.'); return; }
   if(!file) return;
   pendingImportDevices = null;
   const _info0 = document.getElementById('importChoiceInfo');
@@ -2435,6 +2610,7 @@ async function doImportMerge(){
   try{ exportBackup(); }catch(e){}
   // مهلة صغيرة: تنزيل الملف على الآيفون ممكن يقطع طلبات الشبكة اللي بعده مباشرة
   await new Promise(r => setTimeout(r, 1500));
+  await addAudit('استورد نسخة (دمج)');
   await importBackup(list);
 }
 async function doImportReplace(){
@@ -2460,6 +2636,7 @@ async function doImportReplace(){
   await new Promise(r => setTimeout(r, 1500));   // مهلة بعد التنزيل عشان الشبكة تستقر
   const ok = await purgeAllData();
   if(!ok){ showError('المسح ما اكتملش — الاستبدال اتوقف والبيانات زي ما هي'); return; }
+  await addAudit('استبدال كامل للبيانات من ملف نسخة احتياطية');
   await importBackup(list);
 }
 // مسح كل البيانات بدون تأكيدات (للاستبدال) — بيرجّع true لو نجح
@@ -4491,6 +4668,7 @@ function sendThanks(phone, name){
 requireAccess().then(ok => {
   if(!ok) return;
   applySystemMode();
+  loadUserRoles().then(loadFeatureFlags).then(loadAudit).then(applyRoleVisibility);
   injectAdminMenu();
   loadBroadcast();
   loadDevices();
