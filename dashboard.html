@@ -1591,21 +1591,36 @@ async function importBackup(incoming){
   }
 
   // اختبار اتصال: نرفع أول جهاز ونتأكد إنه وصل فعلاً قبل ما نكمّل
+  // بنعيد المحاولة كذا مرة — قطعة نت بسيطة كانت بتوقف الاستيراد كله من أول طلب
   setSaving(true);
-  try{
+  {
     const test = toAdd[0];
-    const { error: te } = await withTimeout(
-      sb.from('devices_data').upsert([{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' }),
-      12000, 'اختبار الرفع');
-    if(te) throw te;
-    const { data: chk, error: ce } = await withTimeout(
-      sb.from('devices_data').select('id').eq('id', test.id).maybeSingle(), 12000, 'التحقق من الرفع');
-    if(ce) throw ce;
-    if(!chk){ throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك'); }
-  }catch(e){
-    setSaving(false);
-    showError('الاستيراد مش هيشتغل — السبب: ' + ((e && (e.message||e.hint||e.details)) || e) + ' — لو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.');
-    return;
+    let ok = false, lastErr = null;
+    for(let attempt = 0; attempt < 4 && !ok; attempt++){
+      try{
+        const { error: te } = await withTimeout(
+          sb.from('devices_data').upsert([{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' }),
+          25000, 'اختبار الرفع');
+        if(te) throw te;
+        const { data: chk, error: ce } = await withTimeout(
+          sb.from('devices_data').select('id').eq('id', test.id).maybeSingle(), 25000, 'التحقق من الرفع');
+        if(ce) throw ce;
+        if(!chk) throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك');
+        ok = true;
+      }catch(e){
+        lastErr = e;
+        if(attempt < 3) await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+      }
+    }
+    if(!ok){
+      setSaving(false);
+      const msg = (lastErr && (lastErr.message || lastErr.hint || lastErr.details)) || String(lastErr);
+      const isNetwork = /load failed|failed to fetch|network|timeout|انتهت المهلة/i.test(msg);
+      showError(isNetwork
+        ? `الاتصال بالنت قطع أثناء الرفع (${msg}). البيانات في الملف زي ما هي — اتأكد إن النت ثابت ودوس استيراد بنفس الملف تاني، وهيكمّل الناقص بس.`
+        : `الاستيراد مش هيشتغل — السبب: ${msg} — لو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.`);
+      return;
+    }
   }
 
   // نرفع الباقي على دفعات
@@ -1622,16 +1637,16 @@ async function importBackup(incoming){
     const chunk = rest.slice(i, i + BATCH);
     const rows = chunk.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }));
     let ok = false, lastErr = '';
-    for(let attempt = 0; attempt < 3 && !ok; attempt++){
+    for(let attempt = 0; attempt < 4 && !ok; attempt++){
       try{
         const { error } = await withTimeout(
-          sb.from('devices_data').upsert(rows, { onConflict: 'id' }), 20000, 'رفع دفعة أجهزة');
+          sb.from('devices_data').upsert(rows, { onConflict: 'id' }), 30000, 'رفع دفعة أجهزة');
         if(error) throw error;
         ok = true;
       }catch(e){
         lastErr = (e && (e.message || e.hint || e.details)) || String(e);
-        if(attempt === 2){ failed += chunk.length; window._importLastError = lastErr; }
-        else await new Promise(r => setTimeout(r, 800));
+        if(attempt === 3){ failed += chunk.length; window._importLastError = lastErr; }
+        else await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
     if(ok){
@@ -2418,6 +2433,8 @@ async function doImportMerge(){
   if(!list) return;
   // النسخة الاحتياطية بتتعمل بعد ما الملف اتفكّ خلاص — عشان مايتزاحموش على الذاكرة
   try{ exportBackup(); }catch(e){}
+  // مهلة صغيرة: تنزيل الملف على الآيفون ممكن يقطع طلبات الشبكة اللي بعده مباشرة
+  await new Promise(r => setTimeout(r, 1500));
   await importBackup(list);
 }
 async function doImportReplace(){
@@ -2440,6 +2457,7 @@ async function doImportReplace(){
   }
   document.getElementById('importChoiceOverlay').classList.add('hidden');
   try{ exportBackup(); }catch(e){}
+  await new Promise(r => setTimeout(r, 1500));   // مهلة بعد التنزيل عشان الشبكة تستقر
   const ok = await purgeAllData();
   if(!ok){ showError('المسح ما اكتملش — الاستبدال اتوقف والبيانات زي ما هي'); return; }
   await importBackup(list);
