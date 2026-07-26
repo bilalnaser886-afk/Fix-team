@@ -158,6 +158,13 @@ const PROD_HOSTS = ["fix-team.pages.dev"];
 const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
 const _envCfg = SUPABASE_ENVS[APP_ENV];
 const sb = supabase.createClient(_envCfg.url, _envCfg.key);
+// إيميلات الأدمن — الدخول بيها بيروح لوحة الأدمن مباشرة
+const ADMIN_EMAILS_BY_ENV = {
+  production: ['belal0@fix.com'],
+  staging:    ['belal0@fix.com']
+};
+const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
+const landingFor = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase()) ? 'admin.html' : 'dashboard.html';
 if(APP_ENV === "staging"){
   addEventListener("DOMContentLoaded", function(){
     var b = document.createElement("div");
@@ -241,7 +248,7 @@ if(APP_ENV === "staging"){
             }
 
             if (active) {
-                window.location.href = 'dashboard.html';
+                window.location.href = landingFor(email);
             } else {
                 await sb.auth.signOut();
                 showRenewBox();
@@ -259,7 +266,7 @@ if(APP_ENV === "staging"){
     sb.auth.getSession().then(async ({ data: { session } }) => {
         if (!session) return;
         const active = await shopActive();
-        if (active) window.location.href = 'dashboard.html';
+        if (active) window.location.href = landingFor(session.user.email);
     });
 </script>
 </body>

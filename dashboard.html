@@ -522,13 +522,7 @@
   </div>
 </div>
 
-<!-- لوحة تحكم الأدمن -->
-<div id="adminOverlay" class="overlay hidden">
-  <div class="modal" style="max-width:470px;">
-    <div class="modal-head"><h2>⚙️ لوحة تحكم الأدمن</h2><button class="close-btn" onclick="closeAdmin()">×</button></div>
-    <div id="adminBody" style="padding:4px 2px 8px;"></div>
-  </div>
-</div>
+<!-- لوحة تحكم الأدمن بقت صفحة مستقلة: admin.html -->
 
 <!-- إشعار لحظي للمستخدمين -->
 <div id="broadcastOverlay" class="overlay hidden" style="z-index:65;">
@@ -943,7 +937,7 @@ function injectAdminMenu(){
   b.id = 'adminMenuBtn';
   b.textContent = '⚙️ لوحة الأدمن';
   b.style.color = '#7C3AED';
-  b.onclick = openAdmin;
+  b.onclick = () => { location.href = 'admin.html'; };
   const logoutBtn = dd.querySelector('button[onclick="logout()"]');
   dd.insertBefore(b, logoutBtn);
 }
@@ -952,37 +946,10 @@ let adminUnlocked = false;
 function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
 
 function openAdmin(){
-  if(!isAdmin()){ alert('الصفحة دي للأدمن الرئيسي بس'); return; }
-  document.getElementById('menuDropdown').classList.add('hidden');
-  if(!adminUnlocked){
-    if(!systemConfig.adminPassHash){
-      // أول مرة: اعمل كلمة سر
-      const p1 = prompt('🔑 اعمل كلمة سر للوحة الأدمن (هتتطلب كل مرة تفتح اللوحة):');
-      if(p1===null) return;
-      if(!p1.trim()){ alert('لازم تكتب كلمة سر'); return; }
-      systemConfig.adminPassHash = hashStr(p1.trim());
-      saveSystemConfig();
-      adminUnlocked = true;
-      alert('اتحفظت كلمة السر ✅');
-    } else {
-      const p = prompt('🔒 كلمة سر لوحة الأدمن:');
-      if(p===null) return;
-      if(hashStr((p||'').trim()) !== systemConfig.adminPassHash){ alert('كلمة السر غلط'); return; }
-      adminUnlocked = true;
-    }
-  }
-  document.getElementById('adminOverlay').classList.remove('hidden');
-  renderAdmin();
+  // لوحة الأدمن بقت صفحة مستقلة (admin.html) — من غير باسورد إضافي
+  location.href = 'admin.html';
 }
 function closeAdmin(){ document.getElementById('adminOverlay').classList.add('hidden'); }
-async function adminChangePass(){
-  const p1 = prompt('كلمة سر جديدة للوحة الأدمن:');
-  if(p1===null) return;
-  if(!p1.trim()){ alert('لازم كلمة سر'); return; }
-  systemConfig.adminPassHash = hashStr(p1.trim());
-  await saveSystemConfig();
-  alert('اتغيرت كلمة سر اللوحة ✅');
-}
 
 // ===== الإشعارات اللحظية للمستخدمين =====
 const BROADCAST_KEY = 'broadcast';
@@ -1022,105 +989,7 @@ async function adminSendBroadcast(){
   }catch(e){ alert('حصل خطأ في الإرسال — تأكد من النت'); }
 }
 
-function renderAdmin(){
-  const m = systemConfig.mode;
-  const modeLabel = m==='beta' ? '🛠️ وضع البيتا' : (m==='trial' ? '🎁 وضع التجربة المجانية' : '✅ وضع عادي (مدفوع)');
-  const left = trialDaysLeft();
-  document.getElementById('adminBody').innerHTML = `
-    <div style="background:#F1F5F9; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
-      <div style="font-size:13px; color:#64748B;">الوضع الحالي للنظام</div>
-      <div style="font-weight:800; font-size:16px; margin-top:2px;">${modeLabel}</div>
-      ${m==='trial' ? `<div style="font-size:13px; color:#B45309; margin-top:4px;">متبقّي ${left} يوماً على الاشتراك</div>` : ''}
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🛠️ وضع البيتا (قبل الإطلاق)</div>
-      <p class="admin-hint">بيظهر شريط علوي للكل + نافذة ترحيب مرة واحدة لكل مستخدم.</p>
-      ${m==='beta'
-        ? `<div style="font-size:12.5px;color:#16A34A;font-weight:700;margin-bottom:8px;">● مُفعّل حالياً</div>
-           <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;" onclick="adminCancelBeta()">🛑 إلغاء تفعيل وضع البيتا</button>`
-        : `<button class="btn-primary" style="box-shadow:none;" onclick="adminSetBeta()">تفعيل تنبيه وضع البيتا</button>`}
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🎁 الفترة المجانية والاشتراك</div>
-      <p class="admin-hint">بيبدأ عدّاد ${systemConfig.trialDays||30} يوم من لحظة الضغط، وبعد ما يخلص بيوجّه النظام تلقائياً لصفحة الاشتراك.</p>
-      ${m==='trial'
-        ? `<div style="font-size:12.5px;color:#16A34A;font-weight:700;margin-bottom:8px;">● مُفعّل — متبقّي ${left} يوماً</div>
-           <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;" onclick="adminCancelTrial()">🛑 إلغاء الوضع المجاني</button>`
-        : `<button class="btn-primary" style="box-shadow:none; background:#B45309;" onclick="adminSetTrial()">تحويل لوضع التجربة المجانية</button>`}
-    </div>
-
-    <div class="admin-sec" style="border-color:#FDE68A; background:#FFFBEB;">
-      <div class="admin-sec-title">⏳ مدة الفترة المجانية</div>
-      <p class="admin-hint">عدد الأيام الحالي: <b>${systemConfig.trialDays||30}</b> يوم.</p>
-      <button class="acc-mini-btn" onclick="adminSetTrialDays()">تغيير عدد الأيام</button>
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">📢 إرسال إشعار لحظي للمستخدمين</div>
-      <p class="admin-hint">بيظهر فوراً لكل مستخدم بنافذة فيها زر «فهمت» — مرة واحدة لكل مستخدم.</p>
-      <input id="bcInTitle" placeholder="عنوان الإشعار" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px;" />
-      <textarea id="bcInBody" rows="2" placeholder="نص الإشعار" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px;font-family:inherit;"></textarea>
-      <select id="bcInType" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:10px;">
-        <option value="info">📢 معلومة</option>
-        <option value="warning">⚠️ تنبيه</option>
-        <option value="success">✅ خبر كويس</option>
-      </select>
-      <button class="btn-primary" style="box-shadow:none;" onclick="adminSendBroadcast()">إرسال للكل الآن</button>
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🔑 أمان اللوحة</div>
-      <p class="admin-hint">كلمة سر فتح لوحة الأدمن (بتتطلب كل مرة تفتح اللوحة).</p>
-      <button class="acc-mini-btn" onclick="adminChangePass()">تغيير كلمة سر اللوحة</button>
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🎛️ مفاتيح الميزات (Feature Flags)</div>
-      <p class="admin-hint">أي ميزة جديدة بتفضل مقفولة لحد ما تفتحها من هنا — عشان تجرّبها بأمان قبل ما تشتغل للكل.</p>
-      ${KNOWN_FLAGS.map(f => {
-        const on = isFeatureEnabled(f.key);
-        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
-          <div style="flex:1;">
-            <div style="font-size:13.5px;font-weight:700;">${esc(f.desc)}</div>
-            <div style="font-size:11px;color:#94A3B8;font-family:monospace;">${esc(f.key)}</div>
-          </div>
-          <button class="acc-mini-btn" style="min-width:86px;${on?'background:#DCFCE7;color:#16A34A;border-color:#86EFAC;':''}"
-            onclick="adminToggleFlag('${f.key}')">${on ? '● مفعّلة' : '○ مقفولة'}</button>
-        </div>`;
-      }).join('')}
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">👥 صلاحيات المستخدمين</div>
-      <p class="admin-hint">المحاسب مالوش وصول لأدوات النظام (نسخ احتياطي / استيراد / مسح). الـ Super Admin بس اللي بيشوفها.</p>
-      ${!ADMIN_EMAIL_SET ? `<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:9px 11px;font-size:12.5px;color:#B91C1C;line-height:1.7;margin-bottom:10px;">⚠️ إيميل الأدمن لسه ماتحطش في الكود (<b>ADMIN_EMAIL</b>)، فالصلاحيات مفتوحة للكل مؤقتاً.</div>` : ''}
-      <div style="font-size:12.5px;color:#475569;line-height:1.9;margin-bottom:10px;">
-        أدمن هذه البيئة (${APP_ENV === 'production' ? 'إنتاج' : 'تجريبي'}): <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b><br>
-        ${Object.keys(userRoles).length
-          ? Object.entries(userRoles).map(([em,rl]) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;">
-              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${rl==='super_admin'?'Super Admin':'محاسب'}</span>
-              <button class="acc-mini-btn" style="color:#DC2626;" onclick="adminRemoveRole('${esc(em)}')">حذف</button>
-            </div>`).join('')
-          : '<span style="color:#94A3B8;">مفيش صلاحيات إضافية متسجلة</span>'}
-      </div>
-      <button class="acc-mini-btn" onclick="adminAddSuperAdmin()">➕ إضافة Super Admin بالإيميل</button>
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">📜 سجل العمليات الإدارية</div>
-      <p class="admin-hint">آخر العمليات الحساسة (تغيير أوضاع، مفاتيح ميزات، صلاحيات، مسح بيانات).</p>
-      ${auditLog.length
-        ? `<div style="max-height:190px;overflow:auto;">${auditLog.slice(0,40).map(a =>
-            `<div style="border-bottom:1px solid #F1F5F9;padding:6px 0;font-size:12.5px;line-height:1.6;">
-               ${esc(a.action)}
-               <div style="color:#94A3B8;font-size:11px;">${new Date(a.at).toLocaleString('ar-EG')} — ${esc(a.by)}</div>
-             </div>`).join('')}</div>`
-        : '<div style="color:#94A3B8;font-size:12.5px;">مفيش عمليات متسجلة لسه</div>'}
-    </div>
-  `;
-}
+function renderAdmin(){ /* اللوحة اتنقلت لـ admin.html */ }
 
 async function adminAddSuperAdmin(){
   const em = prompt('إيميل المستخدم اللي هيبقى Super Admin:');

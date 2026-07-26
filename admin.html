@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>لوحة الأدمن — I Fix Team</title>
+<link rel="icon" href="favicon32.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;}
+  :root{ --ink:#101014; --muted:#64748B; --line:#EEF0F3; }
+  body{ font-family:'Tajawal',sans-serif; margin:0; background:#F1F5F9; color:var(--ink);
+    padding-bottom:60px; -webkit-tap-highlight-color:transparent; }
+  .topbar{ background:#0F172A; color:#fff; padding:calc(14px + env(safe-area-inset-top)) 18px 14px; }
+  .topbar h1{ font-family:'Cairo',sans-serif; font-size:19px; margin:0; }
+  .topbar .sub{ font-size:12px; opacity:.7; margin-top:2px; }
+  .topbar .who{ font-size:12px; opacity:.85; margin-top:8px; }
+  .wrap{ max-width:640px; margin:0 auto; padding:16px; }
+  .sec{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;
+    box-shadow:0 2px 10px rgba(16,16,20,.04); }
+  .sec-title{ font-weight:800; font-size:15px; margin-bottom:4px; }
+  .hint{ font-size:12.5px; color:var(--muted); margin:0 0 12px; line-height:1.7; }
+  button{ font-family:inherit; cursor:pointer; touch-action:manipulation; }
+  .btn{ width:100%; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:800; color:#fff;
+    background:#2563EB; }
+  .btn.warn{ background:#B45309; }
+  .btn.danger{ background:#fff; color:#DC2626; border:1px solid #FCA5A5; }
+  .btn.ghost{ background:#fff; color:#334155; border:1px solid #E2E8F0; }
+  .mini{ background:#fff; border:1px solid #E2E8F0; border-radius:8px; padding:8px 12px; font-size:13px;
+    font-weight:700; color:#334155; min-height:40px; }
+  .mini.on{ background:#DCFCE7; color:#16A34A; border-color:#86EFAC; }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 0; border-bottom:1px solid #F8FAFC; }
+  .badge{ display:inline-block; border-radius:8px; padding:4px 10px; font-size:12.5px; font-weight:800; }
+  input, textarea, select{ width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px;
+    font-size:14px; font-family:inherit; margin-bottom:9px; }
+  .mode-box{ background:#F1F5F9; border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+  .log{ max-height:230px; overflow:auto; }
+  .log-item{ border-bottom:1px solid #F1F5F9; padding:7px 0; font-size:12.5px; line-height:1.6; }
+  .log-meta{ color:#94A3B8; font-size:11px; }
+  .loading{ text-align:center; padding:50px 20px; color:var(--muted); }
+  .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:#fff; text-align:center;
+    font-weight:800; font-size:14px; padding:13px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⚙️ لوحة تحكم الأدمن</h1>
+  <div class="sub">I Fix Team — إدارة النظام</div>
+  <div class="who" id="whoBox">جاري التحقق…</div>
+</div>
+
+<div class="wrap" id="wrap"><div class="loading">جاري التحميل…</div></div>
+
+<script>
+// ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
+const SUPABASE_ENVS = {
+  production: {
+    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+  },
+  staging: {
+    url: "https://farfaazxogpvxmujnedu.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
+  }
+};
+const PROD_HOSTS = ["fix-team.pages.dev"];
+const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
+const _envCfg = SUPABASE_ENVS[APP_ENV];
+const sb = supabase.createClient(_envCfg.url, _envCfg.key);
+if(APP_ENV === "staging"){
+  addEventListener("DOMContentLoaded", function(){
+    var b = document.createElement("div");
+    b.textContent = "🧪 بيئة تجريبية — STAGING";
+    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
+    document.body.appendChild(b);
+  });
+}
+
+// إيميلات الأدمن — حسب البيئة
+const ADMIN_EMAILS_BY_ENV = {
+  production: ['belal0@fix.com'],
+  staging:    ['belal0@fix.com']
+};
+const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
+
+let currentUser = { name:'', email:'' };
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ===== التخزين على app_data =====
+const storage = {
+  async get(key){
+    const { data, error } = await sb.from('app_data').select('value').eq('key', key).maybeSingle();
+    if(error) throw error;
+    return data ? { key, value:data.value } : null;
+  },
+  async set(key, value){
+    const { error } = await sb.from('app_data').upsert({ key, value, updated_at:new Date().toISOString() });
+    if(error) throw error;
+    return { key, value };
+  }
+};
+
+// ===== الحالة =====
+const SYSTEM_CONFIG_KEY='system-config', ROLES_KEY='user-roles', FLAGS_KEY='feature-flags',
+      AUDIT_KEY='audit-log', BROADCAST_KEY='broadcast';
+let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
+let userRoles = {}, featureFlags = {}, auditLog = [];
+
+const KNOWN_FLAGS = [
+  { key:'gemini_invoice_ocr', desc:'قراءة فواتير قطع الغيار بالذكاء الاصطناعي (OCR)' },
+  { key:'silent_label_print', desc:'طباعة الليبل مباشرة من غير نافذة الطباعة' },
+  { key:'device_lock_codes',  desc:'رمز قفل الجهاز (رقم / نمط / صورة)' },
+  { key:'live_broadcasts',    desc:'الإشعارات اللحظية من الأدمن' },
+];
+
+function trialDaysLeft(){
+  if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
+  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||30)*86400000;
+  return Math.max(0, Math.ceil((end - Date.now())/86400000));
+}
+function isFeatureEnabled(key){ const f = featureFlags[key]; return !!(f && f.is_enabled); }
+
+function toast(msg, ok){
+  const t = document.createElement('div');
+  t.className = 'toast'; t.style.background = ok===false ? '#DC2626' : '#16A34A';
+  t.textContent = msg; t.onclick = () => t.remove();
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+async function saveConfig(){ await storage.set(SYSTEM_CONFIG_KEY, JSON.stringify(systemConfig)); }
+async function saveRoles(){ await storage.set(ROLES_KEY, JSON.stringify(userRoles)); }
+async function saveFlags(){ await storage.set(FLAGS_KEY, JSON.stringify(featureFlags)); }
+async function addAudit(action){
+  try{
+    auditLog.unshift({ at:new Date().toISOString(), by:currentUser.name||currentUser.email, email:currentUser.email, action });
+    auditLog = auditLog.slice(0,300);
+    await storage.set(AUDIT_KEY, JSON.stringify(auditLog));
+  }catch(e){}
+}
+
+// ===== تحميل كل الإعدادات =====
+async function loadAll(){
+  try{ const r = await storage.get(SYSTEM_CONFIG_KEY); if(r&&r.value) systemConfig = Object.assign(systemConfig, JSON.parse(r.value)); }catch(e){}
+  try{ const r = await storage.get(ROLES_KEY); if(r&&r.value) userRoles = JSON.parse(r.value)||{}; }catch(e){}
+  try{ const r = await storage.get(FLAGS_KEY); if(r&&r.value) featureFlags = JSON.parse(r.value)||{}; }catch(e){}
+  try{ const r = await storage.get(AUDIT_KEY); if(r&&r.value) auditLog = JSON.parse(r.value)||[]; }catch(e){}
+  let changed = false;
+  for(const f of KNOWN_FLAGS){
+    if(!featureFlags[f.key]){ featureFlags[f.key] = { is_enabled:false, description:f.desc, updated_at:new Date().toISOString() }; changed = true; }
+  }
+  if(changed){ try{ await saveFlags(); }catch(e){} }
+}
+
+// ===== الواجهة =====
+function render(){
+  const m = systemConfig.mode;
+  const modeLabel = m==='beta' ? '🛠️ وضع البيتا' : (m==='trial' ? '🎁 وضع التجربة المجانية' : '✅ وضع عادي (مدفوع)');
+  const left = trialDaysLeft();
+
+  document.getElementById('wrap').innerHTML = `
+    <div class="sec">
+      <div class="mode-box">
+        <div style="font-size:13px;color:var(--muted);">الوضع الحالي للنظام</div>
+        <div style="font-weight:800;font-size:17px;margin-top:2px;">${modeLabel}</div>
+        ${m==='trial' ? `<div style="font-size:13px;color:#B45309;margin-top:4px;">متبقّي ${left} يوماً على الاشتراك</div>` : ''}
+      </div>
+      <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ فتح شاشة الصيانة (المحاسب)</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">🛠️ وضع البيتا (قبل الإطلاق)</div>
+      <p class="hint">شريط علوي للكل + نافذة ترحيب مرة واحدة لكل مستخدم.</p>
+      ${m==='beta'
+        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● مُفعّل حالياً</div>
+           <button class="btn danger" onclick="setMode('cancelBeta')">🛑 إلغاء وضع البيتا</button>`
+        : `<button class="btn" onclick="setMode('beta')">تفعيل تنبيه وضع البيتا</button>`}
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">🎁 الفترة المجانية والاشتراك</div>
+      <p class="hint">عدّاد ${systemConfig.trialDays||30} يوم من لحظة التفعيل، وبعدها توجيه تلقائي لصفحة الاشتراك.</p>
+      ${m==='trial'
+        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● مُفعّل — متبقّي ${left} يوماً</div>
+           <button class="btn danger" onclick="setMode('cancelTrial')">🛑 إلغاء الوضع المجاني</button>`
+        : `<button class="btn warn" onclick="setMode('trial')">تحويل لوضع التجربة المجانية</button>`}
+      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ تغيير عدد الأيام (${systemConfig.trialDays||30})</button></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">📢 إرسال إشعار لحظي</div>
+      <p class="hint">بيظهر فوراً لكل مستخدم بنافذة فيها زر «فهمت» — مرة واحدة لكل مستخدم.</p>
+      <input id="bcTitle" placeholder="عنوان الإشعار" />
+      <textarea id="bcBody" rows="2" placeholder="نص الإشعار"></textarea>
+      <select id="bcType">
+        <option value="info">📢 معلومة</option>
+        <option value="warning">⚠️ تنبيه</option>
+        <option value="success">✅ خبر كويس</option>
+      </select>
+      <button class="btn" onclick="sendBroadcast()">إرسال للكل الآن</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">🎛️ مفاتيح الميزات (Feature Flags)</div>
+      <p class="hint">أي ميزة جديدة بتفضل مقفولة لحد ما تفتحها من هنا.</p>
+      ${KNOWN_FLAGS.map(f => {
+        const on = isFeatureEnabled(f.key);
+        return `<div class="row">
+          <div style="flex:1;">
+            <div style="font-size:13.5px;font-weight:700;">${esc(f.desc)}</div>
+            <div style="font-size:11px;color:#94A3B8;font-family:monospace;">${esc(f.key)}</div>
+          </div>
+          <button class="mini ${on?'on':''}" style="min-width:92px;" onclick="toggleFlag('${f.key}')">${on?'● مفعّلة':'○ مقفولة'}</button>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">👥 صلاحيات المستخدمين</div>
+      <p class="hint">المحاسب مالوش وصول لأدوات النظام (نسخ احتياطي / استيراد / مسح) ولا للوحة دي.</p>
+      <div style="font-size:12.5px;color:#475569;line-height:1.9;margin-bottom:10px;">
+        أدمن هذه البيئة (${APP_ENV==='production'?'إنتاج':'تجريبي'}):
+        <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b>
+        ${Object.keys(userRoles).length
+          ? Object.entries(userRoles).map(([em,rl]) => `<div class="row">
+              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${rl==='super_admin'?'Super Admin':'محاسب'}</span>
+              <button class="mini" style="color:#DC2626;" onclick="removeRole('${esc(em)}')">حذف</button>
+            </div>`).join('')
+          : '<div style="color:#94A3B8;margin-top:6px;">مفيش صلاحيات إضافية متسجلة</div>'}
+      </div>
+      <button class="mini" onclick="addSuperAdmin()">➕ إضافة Super Admin بالإيميل</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">📜 سجل العمليات الإدارية</div>
+      <p class="hint">آخر العمليات الحساسة على النظام.</p>
+      ${auditLog.length
+        ? `<div class="log">${auditLog.slice(0,50).map(a => `<div class="log-item">${esc(a.action)}
+             <div class="log-meta">${new Date(a.at).toLocaleString('ar-EG')} — ${esc(a.by)}</div></div>`).join('')}</div>`
+        : '<div style="color:#94A3B8;font-size:12.5px;">مفيش عمليات متسجلة لسه</div>'}
+    </div>
+
+    <div class="sec">
+      <button class="btn ghost" onclick="doLogout()">تسجيل الخروج</button>
+    </div>
+  `;
+}
+
+// ===== العمليات =====
+async function setMode(kind){
+  const texts = {
+    beta:'تفعيل وضع البيتا؟', trial:`تحويل لوضع التجربة المجانية (${systemConfig.trialDays||30} يوم)؟`,
+    cancelBeta:'إلغاء وضع البيتا والرجوع للوضع العادي؟', cancelTrial:'إلغاء الوضع المجاني والرجوع للوضع العادي؟'
+  };
+  if(!confirm(texts[kind])) return;
+  try{
+    if(kind==='beta'){ systemConfig.mode='beta'; systemConfig.betaAnnId=Date.now(); }
+    if(kind==='trial'){ systemConfig.mode='trial'; systemConfig.trialStart=new Date().toISOString(); systemConfig.trialAnnId=Date.now(); }
+    if(kind==='cancelBeta'){ systemConfig.mode='normal'; systemConfig.betaAnnId=null; }
+    if(kind==='cancelTrial'){ systemConfig.mode='normal'; systemConfig.trialStart=null; systemConfig.trialAnnId=null; }
+    await saveConfig();
+    await addAudit({beta:'فعّل وضع البيتا', trial:'بدأ الفترة المجانية', cancelBeta:'ألغى وضع البيتا', cancelTrial:'ألغى الوضع المجاني'}[kind]);
+    render(); toast('تم الحفظ ✅');
+  }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
+}
+async function changeTrialDays(){
+  const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||30));
+  if(v===null) return;
+  const n = parseInt(v)||0;
+  if(n<=0){ toast('اكتب رقم صحيح', false); return; }
+  try{ systemConfig.trialDays = n; await saveConfig(); await addAudit('غيّر مدة الفترة المجانية لـ ' + n + ' يوم'); render(); toast('تم ✅'); }
+  catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
+}
+async function toggleFlag(key){
+  const f = featureFlags[key]; if(!f) return;
+  try{
+    f.is_enabled = !f.is_enabled; f.updated_at = new Date().toISOString();
+    await saveFlags(); await addAudit(`${f.is_enabled?'فعّل':'قفل'} ميزة: ${key}`);
+    render(); toast(f.is_enabled ? 'الميزة اتفعّلت ✅' : 'الميزة اتقفلت');
+  }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
+}
+async function addSuperAdmin(){
+  const em = prompt('إيميل المستخدم اللي هيبقى Super Admin:');
+  if(em===null) return;
+  const e = (em||'').trim().toLowerCase();
+  if(!e || !e.includes('@')){ toast('اكتب إيميل صحيح', false); return; }
+  try{ userRoles[e]='super_admin'; await saveRoles(); await addAudit('أضاف Super Admin: '+e); render(); toast('تمت الإضافة ✅'); }
+  catch(err){ toast('فشل الحفظ: ' + (err.message||err), false); }
+}
+async function removeRole(em){
+  if(!confirm(`تشيل صلاحية "${em}"؟`)) return;
+  try{ delete userRoles[(em||'').toLowerCase()]; await saveRoles(); await addAudit('شال صلاحية: '+em); render(); toast('تم الحذف'); }
+  catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
+}
+async function sendBroadcast(){
+  const title = (document.getElementById('bcTitle').value||'').trim();
+  const body  = (document.getElementById('bcBody').value||'').trim();
+  const type  = document.getElementById('bcType').value || 'info';
+  if(!title && !body){ toast('اكتب عنوان أو نص الإشعار', false); return; }
+  if(!confirm('تبعت الإشعار ده لكل المستخدمين دلوقتي؟')) return;
+  try{
+    await storage.set(BROADCAST_KEY, JSON.stringify({ id:Date.now(), title, body, type }));
+    await addAudit('بعت إشعار: ' + (title||body).slice(0,60));
+    document.getElementById('bcTitle').value=''; document.getElementById('bcBody').value='';
+    toast('اتبعت للكل ✅');
+  }catch(e){ toast('فشل الإرسال: ' + (e.message||e), false); }
+}
+async function doLogout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.href = 'index.html';
+}
+
+// ===== حارس الدخول: لازم جلسة + إيميل أدمن =====
+(async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.href = 'index.html'; return; }
+  currentUser.email = (session.user.email||'').toLowerCase();
+  try{
+    const { data:prof } = await sb.from('profiles').select('full_name').eq('id', session.user.id).single();
+    currentUser.name = (prof && prof.full_name) ? prof.full_name : currentUser.email;
+  }catch(e){ currentUser.name = currentUser.email; }
+
+  if(!ADMIN_EMAILS.includes(currentUser.email)){
+    // مش أدمن → يروح شاشة المحاسب
+    location.href = 'dashboard.html';
+    return;
+  }
+  document.getElementById('whoBox').textContent = `${currentUser.name} — Super Admin`;
+  await loadAll();
+  render();
+})();
+</script>
+</body>
+</html>
