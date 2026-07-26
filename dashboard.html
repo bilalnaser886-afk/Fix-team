@@ -180,15 +180,16 @@
   #patternPad{ position:relative; margin:6px auto 4px; touch-action:none; user-select:none; -webkit-user-select:none; }
   #patternPad svg{ touch-action:none; }
   /* ===== خانات البحث جوه النوافذ تفضل ثابتة فوق أثناء التمرير ===== */
+  /* بتثبت تحت رأس النافذة مباشرة — المسافة بتتحسب تلقائياً في JS (--head-h) */
   .modal-search{
-    position:sticky; top:0; z-index:100; background:#fff;
+    position:sticky; top:var(--head-h, 0px); z-index:100; background:#fff;
     padding:8px 0 10px; margin-bottom:2px;
   }
   .modal-search input{
     width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; font-size:13px;
   }
   /* رأس النافذة يفضل ثابت كمان عشان زرار الإغلاق ومقبض السحب يبقوا في المتناول */
-  .modal-head{ position:sticky; top:0; z-index:101; background:#fff; padding-top:4px; }
+  .modal-head{ position:sticky; top:0; z-index:101; background:#fff; padding-top:6px; padding-bottom:6px; margin-bottom:8px; }
   /* مقبض السحب للأسفل (موبايل) */
   .modal-grab{
     display:none; width:44px; height:5px; border-radius:3px; background:#CBD5E1;
@@ -4728,9 +4729,24 @@ function sendThanks(phone, name){
     });
   }
 
+  // ---- خانة البحث تثبت تحت رأس النافذة بالظبط (بنقيس ارتفاع الرأس فعلياً) ----
+  // بنحط المتغيّر على الـ overlay نفسه عشان يورّث لجوه، سواء النافذة .modal أو صفحة كاملة .summaries-page
+  function fixStickyOffsets(){
+    document.querySelectorAll('.overlay:not(.hidden)').forEach(o => {
+      if(!o.querySelector('.modal-search')) return;
+      const head = o.querySelector('.modal-head');
+      const h = head ? Math.round(head.getBoundingClientRect().height) : 0;
+      o.style.setProperty('--head-h', h + 'px');
+    });
+  }
+  addEventListener('resize', fixStickyOffsets);
+  addEventListener('orientationchange', () => setTimeout(fixStickyOffsets, 250));
+
   function refresh(){
     overlaysList().forEach(o => { if(isOpen(o)) attachGrab(o); });
     syncHistory();
+    fixStickyOffsets();
+    requestAnimationFrame(fixStickyOffsets);   // بعد ما التخطيط يستقر
   }
   const mo = new MutationObserver(refresh);
   overlaysList().forEach(o => mo.observe(o, { attributes:true, attributeFilter:['class'] }));
