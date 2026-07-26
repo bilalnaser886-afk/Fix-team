@@ -547,6 +547,7 @@
   <div class="modal" style="max-width:430px;">
     <div class="modal-head"><h2>استيراد نسخة احتياطية</h2><button class="close-btn" onclick="closeImportChoice()">×</button></div>
     <p style="color:#475569;font-size:13.5px;line-height:1.7;margin:2px 0 14px;">هننزّل نسخة أمان تلقائية من بياناتك الحالية الأول، وبعدها اختار:</p>
+    <div id="importChoiceInfo"></div>
     <button class="btn-primary" style="box-shadow:none;margin-bottom:10px;line-height:1.5;" onclick="doImportMerge()">🔀 دمج البيانات<br><span style="font-weight:400;font-size:12px;opacity:.9;">يضيف الأجهزة الجديدة بس، من غير ما يمسح الموجود</span></button>
     <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;line-height:1.5;" onclick="doImportReplace()">♻️ استبدال كامل<br><span style="font-weight:400;font-size:12px;">يمسح كل البيانات الحالية ويحط اللي في الملف بدالها</span></button>
   </div>
@@ -1552,40 +1553,42 @@ function exportBackup(){
 
 // يتقري ويتفحص فور الاختيار (قبل أي مودال) — عشان أي مشكلة في الملف تبان فوراً وبوضوح،
 // وعشان مايتأجّلش قراءة الملف على iOS لحد بعد فتح نافذة الاختيار.
-async function importBackup(incoming){
-  // إصلاح IDs الملف قبل أي حاجة — ده اللي بيمنع تعليق الاستيراد على 0%
-  // الملفات القديمة أحياناً بتيجي بـ id مكرر لأجهزة مختلفة، والسيرفر بيرفض الدفعة كلها.
-  // الـ legacyId هو المفتاح الفريد الحقيقي، فبنبني منه id + trackToken فريدين.
-  {
-    const seen = new Set();
-    for(const d of incoming){
-      if(!d) continue;
-      const hasLegacy = d.legacyId !== undefined && d.legacyId !== null && String(d.legacyId).trim() !== '';
-      if(hasLegacy){
-        const num = 1000000 + parseInt(d.legacyId, 10);
-        if(!Number.isNaN(num)){ d.id = 'old_' + num; d.trackToken = 'old' + num; }
-      }
-      // ضمان تفرّد نهائي مهما كان شكل الملف
-      let base = d.id || 'dev', unique = base, k = 2;
-      while(seen.has(unique)){ unique = base + '_' + k; k++; }
-      if(unique !== d.id){ d.id = unique; if(!d.trackToken) d.trackToken = String(unique).replace(/_/g,''); }
-      seen.add(unique);
+// توحيد الـ IDs: بيمنع تعليق الاستيراد بسبب id مكرر (الـ legacyId هو المفتاح الفريد الحقيقي)
+function normalizeImportIds(incoming){
+  const seen = new Set();
+  for(const d of incoming){
+    if(!d) continue;
+    const hasLegacy = d.legacyId !== undefined && d.legacyId !== null && String(d.legacyId).trim() !== '';
+    if(hasLegacy){
+      const num = 1000000 + parseInt(d.legacyId, 10);
+      if(!Number.isNaN(num)){ d.id = 'old_' + num; d.trackToken = 'old' + num; }
     }
+    let base = d.id || 'dev', unique = base, k = 2;
+    while(seen.has(unique)){ unique = base + '_' + k; k++; }
+    if(unique !== d.id){ d.id = unique; if(!d.trackToken) d.trackToken = String(unique).replace(/_/g,''); }
+    seen.add(unique);
   }
+  return incoming;
+}
+
+async function importBackup(incoming){
+  normalizeImportIds(incoming);
 
   // دمج مع الموجود (بدون تكرار)
   const existingIds = new Set(devices.map(d => d.id));
   const toAdd = incoming.filter(d => d && d.id && !existingIds.has(d.id));
 
-  if(toAdd.length === 0){ alert('كل الأجهزة في الملف موجودة بالفعل — مفيش حاجة جديدة تتضاف.'); return; }
-
-  // الملفات الكبيرة محتاجة نت مستقر — منسمحش بيها أوفلاين
-  if(!isOnline()){
-    alert('استيراد نسخة كبيرة محتاج نت — اتصل بالنت الأول عشان البيانات ترفع كاملة.');
+  // ملاحظة: مفيش alert/confirm هنا خالص — النوافذ دي بتتبلع على الآيفون بعد تنزيل نسخة الأمان،
+  // فالاستيراد كان بيقف من غير ما يبان أي حاجة. كل الرسايل بقت تبان جوه الصفحة.
+  if(toAdd.length === 0){
+    showError('كل الأجهزة اللي في الملف موجودة عندك بالفعل — مفيش حاجة جديدة تتضاف.');
     return;
   }
 
-  if(toAdd.length > 300 && !confirm(`هيتضاف ${toAdd.length} جهاز للسيستم.\n\nالعملية دي ممكن تاخد شوية دقايق حسب النت — سيب الصفحة مفتوحة لحد ما تخلص.\n\nنبدأ؟`)) return;
+  if(!isOnline()){
+    showError('الاستيراد محتاج نت — اتصل بالنت وجرّب تاني عشان البيانات ترفع كاملة.');
+    return;
+  }
 
   // اختبار اتصال: نرفع أول جهاز ونتأكد إنه وصل فعلاً قبل ما نكمّل
   setSaving(true);
@@ -1601,7 +1604,7 @@ async function importBackup(incoming){
     if(!chk){ throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك'); }
   }catch(e){
     setSaving(false);
-    alert('الاستيراد مش هيشتغل — السبب:\n\n' + ((e && (e.message||e.hint||e.details)) || e) + '\n\nلو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.');
+    showError('الاستيراد مش هيشتغل — السبب: ' + ((e && (e.message||e.hint||e.details)) || e) + ' — لو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.');
     return;
   }
 
@@ -1651,11 +1654,26 @@ async function importBackup(incoming){
   hideImportProgress();
 
   if(failed > 0){
-    const reason = window._importLastError ? ('\n\nسبب الفشل: ' + window._importLastError) : '';
-    alert(`تم استيراد ${done} جهاز بنجاح.\nفشل ${failed} جهاز.${reason}\n\nاستورد نفس الملف تاني وهيكمّل الناقص بس.`);
+    const reason = window._importLastError ? (' — سبب الفشل: ' + window._importLastError) : '';
+    showError(`تم استيراد ${done.toLocaleString('en-EG')} جهاز، وفشل ${failed.toLocaleString('en-EG')}${reason}. استورد نفس الملف تاني وهيكمّل الناقص بس.`);
   }else{
-    alert(`تم استيراد ${done} جهاز بنجاح ✅`);
+    showImportDone(`✅ تم استيراد ${done.toLocaleString('en-EG')} جهاز بنجاح`);
   }
+}
+
+// رسالة نجاح خضرا جوه الصفحة (بدل alert اللي بيتبلع على الآيفون بعد التنزيل)
+function showImportDone(msg){
+  let el = document.getElementById('importDoneBar');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'importDoneBar';
+    el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;background:#16A34A;color:#fff;'
+      + 'text-align:center;font:800 14px/1.7 inherit;padding:12px 14px;';
+    el.onclick = () => el.remove();
+    document.body.appendChild(el);
+  }
+  el.textContent = msg + ' — (اضغط للإخفاء)';
+  setTimeout(() => { const e = document.getElementById('importDoneBar'); if(e) e.remove(); }, 12000);
 }
 
 // شريط تقدم الاستيراد
@@ -2353,6 +2371,8 @@ let pendingImportDevices = null;
 async function onImportFileChosen(file){
   if(!file) return;
   pendingImportDevices = null;
+  const _info0 = document.getElementById('importChoiceInfo');
+  if(_info0) delete _info0.dataset.confirmReplace;
   // بنقرا الملف ونفكّه فوراً — قبل ما نفضّي الـ input وقبل أي نسخة أمان أو نافذة،
   // عشان الذاكرة تكون فاضية وقت الفك (ده كان بيفشل في الدمج على الموبايل مع الملفات الكبيرة).
   let incoming = null, failReason = '';
@@ -2369,13 +2389,27 @@ async function onImportFileChosen(file){
     showError(`ما قدرتش أقرا الملف "${file.name}" — السبب: ${failReason}. لو الملف كبير، اقفل أي تابات تانية وجرّب تاني، أو استخدم الاستبدال الكامل.`);
     return;
   }
-  pendingImportDevices = incoming;
+  pendingImportDevices = normalizeImportIds(incoming);
   pendingImportFile = file;
+  // نوري المستخدم الملف فيه إيه وكام جهاز جديد فعلاً — جوه الصفحة، من غير نوافذ متصفح
+  const have = new Set(devices.map(d => d.id));
+  const newCount = pendingImportDevices.filter(d => d && d.id && !have.has(d.id)).length;
+  const info = document.getElementById('importChoiceInfo');
+  if(info){
+    info.innerHTML = `<div style="background:#F1F5F9;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.9;margin-bottom:12px;">
+      📄 <b>${esc(file.name)}</b><br>
+      الملف فيه <b>${pendingImportDevices.length.toLocaleString('en-EG')}</b> جهاز —
+      منهم <b style="color:${newCount ? '#16A34A' : '#DC2626'};">${newCount.toLocaleString('en-EG')}</b> جديد مش موجود عندك.
+      ${newCount === 0 ? '<br><span style="color:#DC2626;">الدمج مش هيضيف حاجة — كلهم موجودين بالفعل.</span>' : ''}
+    </div>`;
+  }
   document.getElementById('backupMenu').classList.add('hidden');
   document.getElementById('importChoiceOverlay').classList.remove('hidden');
 }
 function closeImportChoice(){
   document.getElementById('importChoiceOverlay').classList.add('hidden');
+  const info = document.getElementById('importChoiceInfo');
+  if(info) delete info.dataset.confirmReplace;
   pendingImportFile = null; pendingImportDevices = null;
 }
 async function doImportMerge(){
@@ -2387,11 +2421,24 @@ async function doImportMerge(){
   await importBackup(list);
 }
 async function doImportReplace(){
-  document.getElementById('importChoiceOverlay').classList.add('hidden');
   const list = pendingImportDevices; pendingImportFile = null; pendingImportDevices = null;
   if(!list) return;
-  if(!confirm('الاستبدال الكامل هيمسح كل البيانات الحالية ويحط اللي في الملف بدالها.\nمتأكد؟')) return;
-  if(!isOnline()){ alert('الاستبدال محتاج نت.'); return; }
+  if(!isOnline()){
+    document.getElementById('importChoiceOverlay').classList.add('hidden');
+    showError('الاستبدال محتاج نت — اتصل بالنت وجرّب تاني.');
+    return;
+  }
+  // تأكيد جوه الصفحة (مش confirm بتاع المتصفح — ده بيتبلع على الآيفون بعد التنزيل)
+  const info = document.getElementById('importChoiceInfo');
+  if(info && !info.dataset.confirmReplace){
+    info.dataset.confirmReplace = '1';
+    info.insertAdjacentHTML('beforeend', `<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.8;color:#B91C1C;">
+      ⚠️ الاستبدال الكامل هيمسح <b>كل</b> بياناتك الحالية ويحط اللي في الملف بدالها.<br>
+      دوس «استبدال كامل» تاني للتأكيد.</div>`);
+    pendingImportDevices = list; pendingImportFile = null;   // نستنى الضغطة التانية
+    return;
+  }
+  document.getElementById('importChoiceOverlay').classList.add('hidden');
   try{ exportBackup(); }catch(e){}
   const ok = await purgeAllData();
   if(!ok){ showError('المسح ما اكتملش — الاستبدال اتوقف والبيانات زي ما هي'); return; }
