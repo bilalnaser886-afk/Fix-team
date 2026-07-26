@@ -1550,20 +1550,9 @@ function exportBackup(){
   URL.revokeObjectURL(url);
 }
 
-async function importBackup(file){
-  if(!file) return;
-  let incoming;
-  try{
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    incoming = Array.isArray(parsed) ? parsed : parsed.devices;
-    if(!Array.isArray(incoming)) throw new Error('bad format');
-  }catch(e){
-    showError('الملف ده مش نسخة احتياطية صحيحة من النظام');
-    document.getElementById('importFile').value = '';
-    return;
-  }
-
+// يتقري ويتفحص فور الاختيار (قبل أي مودال) — عشان أي مشكلة في الملف تبان فوراً وبوضوح،
+// وعشان مايتأجّلش قراءة الملف على iOS لحد بعد فتح نافذة الاختيار.
+async function importBackup(incoming){
   // إصلاح IDs الملف قبل أي حاجة — ده اللي بيمنع تعليق الاستيراد على 0%
   // الملفات القديمة أحياناً بتيجي بـ id مكرر لأجهزة مختلفة، والسيرفر بيرفض الدفعة كلها.
   // الـ legacyId هو المفتاح الفريد الحقيقي، فبنبني منه id + trackToken فريدين.
@@ -1587,7 +1576,6 @@ async function importBackup(file){
   // دمج مع الموجود (بدون تكرار)
   const existingIds = new Set(devices.map(d => d.id));
   const toAdd = incoming.filter(d => d && d.id && !existingIds.has(d.id));
-  document.getElementById('importFile').value = '';
 
   if(toAdd.length === 0){ alert('كل الأجهزة في الملف موجودة بالفعل — مفيش حاجة جديدة تتضاف.'); return; }
 
@@ -2361,34 +2349,53 @@ function onCustomerNameInput(){
 
 // ===== استيراد بخيار دمج / استبدال كامل + نسخة أمان تلقائية قبل =====
 let pendingImportFile = null;
-function onImportFileChosen(file){
+let pendingImportDevices = null;
+async function onImportFileChosen(file){
   if(!file) return;
-  pendingImportFile = file;
+  pendingImportDevices = null;
+  // بنقرا الملف ونفكّه فوراً — قبل ما نفضّي الـ input وقبل أي نسخة أمان أو نافذة،
+  // عشان الذاكرة تكون فاضية وقت الفك (ده كان بيفشل في الدمج على الموبايل مع الملفات الكبيرة).
+  let incoming = null, failReason = '';
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    incoming = Array.isArray(parsed) ? parsed : parsed.devices;
+    if(!Array.isArray(incoming) || incoming.length === 0){ incoming = null; failReason = 'الملف مافيهوش قايمة أجهزة'; }
+  }catch(e){
+    failReason = (e && e.message) ? e.message : String(e);
+  }
   document.getElementById('importFile').value = '';
+  if(!incoming){
+    showError(`ما قدرتش أقرا الملف "${file.name}" — السبب: ${failReason}. لو الملف كبير، اقفل أي تابات تانية وجرّب تاني، أو استخدم الاستبدال الكامل.`);
+    return;
+  }
+  pendingImportDevices = incoming;
+  pendingImportFile = file;
   document.getElementById('backupMenu').classList.add('hidden');
   document.getElementById('importChoiceOverlay').classList.remove('hidden');
 }
 function closeImportChoice(){
   document.getElementById('importChoiceOverlay').classList.add('hidden');
-  pendingImportFile = null;
+  pendingImportFile = null; pendingImportDevices = null;
 }
 async function doImportMerge(){
   document.getElementById('importChoiceOverlay').classList.add('hidden');
-  const file = pendingImportFile; pendingImportFile = null;
-  if(!file) return;
+  const list = pendingImportDevices; pendingImportFile = null; pendingImportDevices = null;
+  if(!list) return;
+  // النسخة الاحتياطية بتتعمل بعد ما الملف اتفكّ خلاص — عشان مايتزاحموش على الذاكرة
   try{ exportBackup(); }catch(e){}
-  await importBackup(file);
+  await importBackup(list);
 }
 async function doImportReplace(){
   document.getElementById('importChoiceOverlay').classList.add('hidden');
-  const file = pendingImportFile; pendingImportFile = null;
-  if(!file) return;
+  const list = pendingImportDevices; pendingImportFile = null; pendingImportDevices = null;
+  if(!list) return;
   if(!confirm('الاستبدال الكامل هيمسح كل البيانات الحالية ويحط اللي في الملف بدالها.\nمتأكد؟')) return;
   if(!isOnline()){ alert('الاستبدال محتاج نت.'); return; }
   try{ exportBackup(); }catch(e){}
   const ok = await purgeAllData();
   if(!ok){ showError('المسح ما اكتملش — الاستبدال اتوقف والبيانات زي ما هي'); return; }
-  await importBackup(file);
+  await importBackup(list);
 }
 // مسح كل البيانات بدون تأكيدات (للاستبدال) — بيرجّع true لو نجح
 async function purgeAllData(){
