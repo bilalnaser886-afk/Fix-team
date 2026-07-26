@@ -56,10 +56,33 @@
 </div>
 
 <script>
-const sb = supabase.createClient(
-  "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-);
+// ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
+// نطاق الإنتاج بس بيستخدم قاعدة الإنتاج. أي نطاق تاني (تجريبي/معاينة/لوكال) بيستخدم Staging تلقائياً
+// عشان مستحيل نشر تجريبي يلمس بيانات الإنتاج بالغلط.
+const SUPABASE_ENVS = {
+  production: {
+    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+  },
+  staging: {
+    // 🔴 بعد ما تعمل مشروع Supabase تجريبي، حط رابطه ومفتاح anon بتاعه هنا:
+    url: "https://farfaazxogpvxmujnedu.supabase.co/rest/v1/",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
+  }
+};
+// نطاقات الإنتاج (زوّد الدومين المخصص لما تجيبه، زي ifixteam.com):
+const PROD_HOSTS = ["fix-team.pages.dev"];
+const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
+const _envCfg = SUPABASE_ENVS[APP_ENV];
+const sb = supabase.createClient(_envCfg.url, _envCfg.key);
+if(APP_ENV === "staging"){
+  addEventListener("DOMContentLoaded", function(){
+    var b = document.createElement("div");
+    b.textContent = "🧪 بيئة تجريبية — STAGING";
+    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
+    document.body.appendChild(b);
+  });
+}
 
 // ============================================================
 // 🔴 إعدادات الاشتراك و Paymob — املأها 🔴
@@ -67,7 +90,7 @@ const sb = supabase.createClient(
 // رابط الدفع من Paymob (Payment Link من لوحة تحكم Paymob، أو رابط الـ iframe):
 const PAYMOB_PAYMENT_URL = '';     // مثال: 'https://accept.paymob.com/standalone?ref=xxxxxxx'
 // سعر الاشتراك الشهري بالجنيه (رقم فقط):
-const PLAN_PRICE_EGP = 10000;
+const PLAN_PRICE_EGP = 0;
 // ============================================================
 
 document.getElementById('planPrice').textContent =
@@ -75,7 +98,7 @@ document.getElementById('planPrice').textContent =
 
 function payNow(){
   if(!PAYMOB_PAYMENT_URL){
-    alert('.https://paymob.link/LRvb3.');
+    alert('رابط الدفع لسه مش متظبط. كلّم الإدارة لتفعيل الاشتراك.');
     return;
   }
   window.location.href = PAYMOB_PAYMENT_URL;
