@@ -17,6 +17,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -199,6 +200,18 @@
   }
   @media (max-width:760px){ .modal-grab{ display:block; } }
   .modal.dragging{ transition:none; }
+  /* ===== دعم الإنجليزية / LTR ===== */
+  html.lang-en body, html.lang-en input, html.lang-en textarea,
+  html.lang-en select, html.lang-en button{
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  html.lang-en .brand h1{ letter-spacing:.2px; }
+  .lang-toggle{
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:#fff;
+    border-radius:10px; min-height:40px; padding:0 12px; font-size:13px; font-weight:700;
+    font-family:inherit; cursor:pointer; white-space:nowrap;
+  }
+  .lang-toggle:hover{ background:rgba(255,255,255,.2); }
   .modal{
     background:#fff; border-radius:16px; width:75vw; max-width:75vw;
     max-height:85vh; overflow-y:auto; padding:20px;
@@ -493,46 +506,46 @@
     <div class="logo"><img src="icon-192.png" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;"></div>
     <div>
       <h1>I Fix Team</h1>
-      <p>نظام إدارة الصيانة</p>
+      <p data-i18n="app.subtitle">نظام إدارة الصيانة</p>
     </div>
   </div>
   <div class="topbar-actions">
     <span id="saveIndicator" class="save-indicator"></span>
     <div id="backupWrap" style="position:relative;">
-      <button class="btn-secondary" onclick="toggleBackupMenu(event)">💾 نسخة احتياطية ▾</button>
+      <button class="btn-secondary" data-i18n="btn.backup" onclick="toggleBackupMenu(event)">نسخة احتياطية ▾</button>
       <div id="backupMenu" class="backup-menu hidden">
-        <button class="bm-item" onclick="exportBackup()">⬇ تنزيل نسخة دلوقتي</button>
-        <button class="bm-item" onclick="document.getElementById('importFile').click()">⬆ استيراد نسخة محفوظة</button>
+        <button class="bm-item" data-i18n="backup.download" onclick="exportBackup()">تنزيل نسخة احتياطية</button>
+        <button class="bm-item" data-i18n="backup.import" onclick="document.getElementById('importFile').click()">استيراد نسخة محفوظة</button>
         <div class="bm-sep"></div>
-        <button class="bm-item" style="color:#DC2626;" onclick="wipeAllData()">🗑 مسح كل البيانات (للبدء من جديد)</button>
+        <button class="bm-item" data-i18n="backup.wipe" style="color:#DC2626;" onclick="wipeAllData()">حذف جميع البيانات</button>
         <div class="bm-sep"></div>
-        <div class="bm-label">النسخ التلقائي الدوري</div>
+        <div class="bm-label" data-i18n="backup.autoLabel">النسخ التلقائي الدوري</div>
         <select id="backupFreq" class="bm-select" onchange="setBackupFrequency(this.value)">
-          <option value="off">متوقف</option>
-          <option value="daily">يومي</option>
-          <option value="weekly">أسبوعي</option>
-          <option value="monthly">شهري</option>
+          <option value="off" data-i18n="backup.freq.off">متوقف</option>
+          <option value="daily" data-i18n="backup.freq.daily">يومي</option>
+          <option value="weekly" data-i18n="backup.freq.weekly">أسبوعي</option>
+          <option value="monthly" data-i18n="backup.freq.monthly">شهري</option>
         </select>
       </div>
     </div>
     <input id="importFile" type="file" accept="application/json" style="display:none" onchange="onImportFileChosen(this.files[0])" />
-    <button class="btn-primary" onclick="openAddModal()">+ جهاز جديد</button>
+    <button class="btn-primary" data-i18n="btn.newDevice" onclick="openAddModal()">+ جهاز جديد</button>
   </div>
   <div class="menu-wrap">
     <button class="menu-btn" onclick="toggleMenu()">⋮</button>
     <div id="menuDropdown" class="menu-dropdown hidden">
-    <button onclick="openAnalytics()">📊 الملخص</button>
-    <button onclick="openTechEval()">🏆 تقييم الفنيين</button>
-    <button onclick="openSummaries()">📋 الجرد</button>
-    <button onclick="openAccounts()">🧾 الحسابات</button>
-    <button onclick="logout()" style="color:#DC2626;">🚪 تسجيل الخروج</button>
+    <button data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
+    <button data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
+    <button data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
+    <button data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
     </div>
   </div>
 </div>
 
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
-<div id="board" class="board"><div class="loading">جاري التحميل...</div></div>
+<div id="board" class="board"><div class="loading" data-i18n="app.loading">جارٍ التحميل...</div></div>
 
 <!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
 <div id="annOverlay" class="overlay hidden">
@@ -578,7 +591,7 @@
       <h2 id="columnTitle"></h2>
       <button class="close-btn" onclick="closeColumn()">×</button>
     </div>
-    <div class="modal-search"><input id="columnSearch" oninput="renderColumn()" placeholder="بحث بالاسم أو المحل أو الرقم التسلسلي..." /></div>
+    <div class="modal-search"><input id="columnSearch" oninput="renderColumn()" data-i18n-ph="search.column.ph" placeholder="ابحث بالاسم أو المحل أو الرقم التسلسلي..." /></div>
     <div id="columnList"></div>
     <div id="colMoreFooter" style="text-align:center; padding:12px; color:#64748B; font-size:13px; display:none;"></div>
   </div>
@@ -740,7 +753,7 @@
         <datalist id="accShopsList"></datalist>
         <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
       </div>
-      <div class="modal-search" style="margin-top:10px;"><input id="accSearch" oninput="renderAccounts()" placeholder="دور بإسم محل..." /></div>
+      <div class="modal-search" style="margin-top:10px;"><input id="accSearch" oninput="renderAccounts()" data-i18n-ph="search.accounts.ph" placeholder="ابحث باسم المحل..." /></div>
     </div>
     <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
@@ -1230,24 +1243,26 @@ function startRealtimeSync(){
 
 // حالات العرض/الفلترة — "تم التسليم" اتقسمت لحالتين حسب حالة الدفع
 const STATUSES = [
-  { key: "waiting", label: "قيد الانتظار", varname:"waiting" },
-  { key: "diagnosing", label: "جاري الكشف", varname:"diagnosing" },
-  { key: "repairing", label: "جاري الصيانة", varname:"repairing" },
-  { key: "done", label: "تم الصيانة", varname:"done" },
-  { key: "delivered_paid", label: "تم التسليم والدفع", varname:"delivered_paid" },
-  { key: "delivered_unpaid", label: "تم التسليم - بانتظار الدفع", varname:"delivered_unpaid" },
-  { key: "rejected", label: "تم الرفض", varname:"rejected" },
-  { key: "returned", label: "المرتجعات", varname:"returned" },
+  { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
+  { key: "diagnosing", label: "قيد الفحص", labelKey:"status.diagnosing", varname:"diagnosing" },
+  { key: "repairing", label: "قيد الإصلاح", labelKey:"status.repairing", varname:"repairing" },
+  { key: "done", label: "تم الإصلاح بنجاح", labelKey:"status.done", varname:"done" },
+  { key: "delivered_paid", label: "تم التسليم والدفع", labelKey:"status.delivered_paid", varname:"delivered_paid" },
+  { key: "delivered_unpaid", label: "تم التسليم - بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
+  { key: "rejected", label: "مرفوض", labelKey:"status.rejected", varname:"rejected" },
+  { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
 ];
+// اسم الحالة حسب اللغة الحالية
+function stLabel(s){ return s ? (typeof t === 'function' && s.labelKey ? t(s.labelKey) : s.label) : ''; }
 // حالات الأزرار (الإجراءات) — التسليم زرار واحد، والنظام بيحدد الخانة حسب الدفع
 const ACTION_STATUSES = [
-  { key: "waiting", label: "قيد الانتظار", varname:"waiting" },
-  { key: "diagnosing", label: "جاري الكشف", varname:"diagnosing" },
-  { key: "repairing", label: "جاري الصيانة", varname:"repairing" },
-  { key: "done", label: "تم الصيانة", varname:"done" },
-  { key: "delivered", label: "تم التسليم", varname:"delivered" },
-  { key: "rejected", label: "تم الرفض", varname:"rejected" },
-  { key: "returned", label: "المرتجعات", varname:"returned" },
+  { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
+  { key: "diagnosing", label: "قيد الفحص", labelKey:"status.diagnosing", varname:"diagnosing" },
+  { key: "repairing", label: "قيد الإصلاح", labelKey:"status.repairing", varname:"repairing" },
+  { key: "done", label: "تم الإصلاح بنجاح", labelKey:"status.done", varname:"done" },
+  { key: "delivered", label: "تم التسليم", labelKey:"status.delivered", varname:"delivered" },
+  { key: "rejected", label: "مرفوض", labelKey:"status.rejected", varname:"rejected" },
+  { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
 ];
 
 // هل الجهاز محاسَب عليه فعلاً؟
@@ -1829,10 +1844,10 @@ function renderBoard(){
     const count = devices.filter(d => effStatus(d) === s.key).length;
     return `<button class="column" onclick="openColumn('${s.key}')">
       <div class="column-head">
-        <span class="title" style="color:${accent(s.varname)}">${s.label}</span>
+        <span class="title" style="color:${accent(s.varname)}">${stLabel(s)}</span>
       </div>
       <div class="column-count" style="color:${accent(s.varname)}">${count}</div>
-      <div class="column-hint">جهاز — اضغط للعرض</div>
+      <div class="column-hint">${t('board.deviceCountHint')}</div>
     </button>`;
   }).join('');
 }
@@ -1874,7 +1889,7 @@ function renderColumn(keepPos){
   const s = statusInfo(currentColumn);
   const q = document.getElementById('columnSearch').value.trim();
   colFullList = devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q));
-  document.getElementById('columnTitle').textContent = `${s.label} (${colFullList.length.toLocaleString('en-EG')})`;
+  document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
 
   const scroller = document.querySelector('#columnOverlay .modal');
@@ -1883,7 +1898,7 @@ function renderColumn(keepPos){
   const listEl = document.getElementById('columnList');
 
   if(colFullList.length === 0){
-    listEl.innerHTML = `<div class="empty-col">لا توجد أجهزة</div>`;
+    listEl.innerHTML = `<div class="empty-col">${t('board.empty')}</div>`;
     colShown = 0; updateColMoreFooter();
     return;
   }
@@ -2377,7 +2392,7 @@ function renderDetail(){
     <button class="pill" style="border-color:${accent(st.varname)};
       background:${d.status===st.key?accent(st.varname):'#fff'};
       color:${d.status===st.key?'#fff':accent(st.varname)}"
-      onclick="changeStatus('${st.key}')">${st.label}</button>
+      onclick="changeStatus('${st.key}')">${stLabel(st)}</button>
   `;
   }).join('');
 
@@ -2879,7 +2894,7 @@ function dayKey(dateLike){
 }
 function fullStatusLabel(d){
   const s = statusInfo(effStatus(d));
-  return s ? s.label : d.status;
+  return s ? stLabel(s) : d.status;
 }
 
 function toNumber(v){
@@ -2981,7 +2996,7 @@ function renderEmployeeView(query){
     if(list.length === 0) return '';
     return `<button class="emp-status-chip" style="border:1.5px solid ${accent(s.varname)};color:${accent(s.varname)}"
       onclick="expandEmpStatus('${s.key}', '${esc(query).replace(/'/g,"\\'")}')">
-      <span>${s.label}</span><b>${list.length}</b>
+      <span>${stLabel(s)}</span><b>${list.length}</b>
     </button>`;
   }).join('');
 
@@ -4832,6 +4847,11 @@ function sendThanks(phone, name){
 requireAccess().then(ok => {
   if(!ok) return;
   applySystemMode();
+  // تعدد اللغات: نضبط الاتجاه ونركّب زر تبديل اللغة
+  try{
+    I18N.applyI18n(document);
+    I18N.mountLangToggle(document.querySelector('.topbar-actions'));
+  }catch(e){}
   loadUserRoles().then(loadFeatureFlags).then(loadAudit).then(applyRoleVisibility);
   injectAdminMenu();
   loadBroadcast();

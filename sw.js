@@ -1,12 +1,15 @@
 // I Fix Team — Service Worker
 // الوظيفة: تخزين ملفات النظام على الجهاز عشان يفتح ويشتغل من غير نت
-const CACHE_NAME = 'ifixteam-v1';
+const CACHE_NAME = 'ifixteam-v2';
 
 const APP_SHELL = [
   './',
   'index.html',
   'dashboard.html',
   'track.html',
+  'admin.html',
+  'checkout.html',
+  'i18n.js',
   'manifest.json',
   'logo.jpg',
   'favicon.ico',
@@ -55,6 +58,20 @@ self.addEventListener('fetch', (event) => {
         .catch(() =>
           caches.match(req).then(hit => hit || caches.match('dashboard.html').then(d => d || caches.match('index.html')))
         )
+    );
+    return;
+  }
+
+  // ملفات JS بتاعتنا (زي i18n.js): النت الأول عشان تحديثات الترجمة والكود توصل فوراً
+  if(url.origin === self.location.origin && url.pathname.endsWith('.js')){
+    event.respondWith(
+      fetch(req)
+        .then(res => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(req, copy));
+          return res;
+        })
+        .catch(() => caches.match(req))
     );
     return;
   }
