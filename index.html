@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="i18n.js"></script>
 <style>
   :root{
     --red:#E8321E;        /* أحمر اللوجو */
@@ -111,17 +112,17 @@
 <div class="stage">
   <img class="logo-hero" src="logo.jpg" alt="I Fix Team — for mobile services">
   <div class="card">
-    <h1>تسجيل الدخول</h1>
-    <p class="sub">نظام إدارة الصيانة</p>
+    <h1 data-i18n="login.title">تسجيل الدخول</h1>
+    <p class="sub" data-i18n="app.subtitle">نظام إدارة الصيانة</p>
     <div id="loginError"></div>
 
-    <label class="field"><span>البريد الإلكتروني</span>
+    <label class="field"><span data-i18n="login.email">البريد الإلكتروني</span>
       <input type="email" id="email" autocomplete="email">
     </label>
-    <label class="field"><span>كلمة المرور</span>
+    <label class="field"><span data-i18n="login.password">كلمة المرور</span>
       <input type="password" id="password" autocomplete="current-password">
     </label>
-    <button class="login" id="loginBtn" onclick="login()">دخول</button>
+    <button class="login" id="loginBtn" data-i18n="login.submit" onclick="login()">دخول</button>
 
     <!-- تظهر فقط عند انتهاء اشتراك المحل -->
     <div id="renewBox" class="renew-box">
@@ -139,10 +140,40 @@
     // ✅ المتغير اسمه sb وليس supabase (تسميته supabase تكسر المكتبة)
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(() => {}); }
 
-const sb = supabase.createClient(
-        "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-    );
+// ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
+// نطاق الإنتاج بس بيستخدم قاعدة الإنتاج. أي نطاق تاني (تجريبي/معاينة/لوكال) بيستخدم Staging تلقائياً
+// عشان مستحيل نشر تجريبي يلمس بيانات الإنتاج بالغلط.
+const SUPABASE_ENVS = {
+  production: {
+    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+  },
+  staging: {
+    // 🔴 بعد ما تعمل مشروع Supabase تجريبي، حط رابطه ومفتاح anon بتاعه هنا:
+    url: "https://farfaazxogpvxmujnedu.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
+  }
+};
+// نطاقات الإنتاج (زوّد الدومين المخصص لما تجيبه، زي ifixteam.com):
+const PROD_HOSTS = ["fix-team.pages.dev"];
+const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
+const _envCfg = SUPABASE_ENVS[APP_ENV];
+const sb = supabase.createClient(_envCfg.url, _envCfg.key);
+// إيميلات الأدمن — الدخول بيها بيروح لوحة الأدمن مباشرة
+const ADMIN_EMAILS_BY_ENV = {
+  production: ['belal0@fix.com'],
+  staging:    ['belal0@fix.com']
+};
+const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
+const landingFor = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase()) ? 'admin.html' : 'dashboard.html';
+if(APP_ENV === "staging"){
+  addEventListener("DOMContentLoaded", function(){
+    var b = document.createElement("div");
+    b.textContent = "🧪 بيئة تجريبية — STAGING";
+    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
+    document.body.appendChild(b);
+  });
+}
 
     const $ = (id) => document.getElementById(id);
 
@@ -202,7 +233,7 @@ const sb = supabase.createClient(
                 if (error.message.includes('Email not confirmed')) {
                     $('loginError').textContent = 'الحساب غير مؤكد — فعّله من لوحة تحكم Supabase';
                 } else if (error.message.includes('Invalid login credentials')) {
-                    $('loginError').textContent = 'خطأ في البريد أو كلمة المرور';
+                    $('loginError').textContent = t('login.badCreds');
                 } else {
                     $('loginError').textContent = 'خطأ: ' + error.message;
                 }
@@ -218,7 +249,7 @@ const sb = supabase.createClient(
             }
 
             if (active) {
-                window.location.href = 'dashboard.html';
+                window.location.href = landingFor(email);
             } else {
                 await sb.auth.signOut();
                 showRenewBox();
@@ -236,7 +267,7 @@ const sb = supabase.createClient(
     sb.auth.getSession().then(async ({ data: { session } }) => {
         if (!session) return;
         const active = await shopActive();
-        if (active) window.location.href = 'dashboard.html';
+        if (active) window.location.href = landingFor(session.user.email);
     });
 </script>
 </body>

@@ -17,6 +17,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -28,6 +29,8 @@
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
     --delivered:#64748B; --delivered-bg:#EEF1F3;
+    --delivered_paid:#16A34A; --delivered_paid-bg:#DCFCE7;
+    --delivered_unpaid:#D97706; --delivered_unpaid-bg:#FEF3C7;
     --paid:#15803D; --paid-bg:#EAF6EE;
     --unpaid:#B45309; --unpaid-bg:#FEF3E2;
     --rejected:#DC2626; --rejected-bg:#FEF2F2;
@@ -40,13 +43,15 @@
   }
   h1,h2,h3,.display{font-family:'Cairo','Segoe UI',sans-serif;}
   .topbar{
-    background:var(--ink); color:#fff; padding:14px 54px 14px 22px;
+    background:var(--ink); color:#fff; padding:14px 18px;
     display:flex; align-items:center; justify-content:space-between;
     position:sticky; top:0; z-index:20; box-shadow:0 2px 8px rgba(0,0,0,.15);
-    flex-wrap:wrap; gap:10px;
+    flex-wrap:nowrap; gap:1rem;
   }
+  /* زر القائمة بقى داخل تدفّق الفليكس — مستحيل يركب على اللوجو أو الأزرار */
+  .menu-wrap{ position:relative; flex:0 0 auto; }
   .menu-btn{
-    position:absolute; top:calc(14px + env(safe-area-inset-top)); right:18px; background:rgba(255,255,255,.12);
+    background:rgba(255,255,255,.12);
     border:1px solid rgba(255,255,255,.2); color:#fff; width:44px; height:44px;
     border-radius:10px; font-size:20px; cursor:pointer; line-height:1;
     display:flex; align-items:center; justify-content:center;
@@ -54,7 +59,7 @@
   }
   .menu-btn:hover{background:rgba(255,255,255,.2);}
   .menu-dropdown{
-    position:absolute; top:calc(66px + env(safe-area-inset-top)); right:18px; background:#fff; border-radius:10px;
+    position:absolute; top:calc(100% + 8px); inset-inline-end:0; background:#fff; border-radius:10px;
     box-shadow:0 8px 24px rgba(0,0,0,.18); padding:6px; z-index:41; min-width:170px;
   }
   .menu-dropdown button{
@@ -63,14 +68,15 @@
     font-family:inherit; color:var(--ink);
   }
   .menu-dropdown button:hover{background:#F1F5F9;}
-  .brand{display:flex; align-items:center; gap:10px;}
+  .brand{display:flex; align-items:center; gap:10px; min-width:0; flex:0 1 auto;}
   .brand .logo{
-    width:36px;height:36px;border-radius:10px;background:var(--accent);
-    display:flex;align-items:center;justify-content:center;font-size:18px;
+    width:36px;height:36px;aspect-ratio:1/1;flex:0 0 36px;border-radius:10px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden;
   }
-  .brand h1{font-size:16px;font-weight:800;margin:0;}
-  .brand p{font-size:11px;color:#9aa5b1;margin:2px 0 0;}
-  .topbar-actions{display:flex;align-items:center;gap:10px;}
+  .brand > div:last-child{ min-width:0; }
+  .brand h1{font-size:16px;font-weight:800;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brand p{font-size:11px;color:#9aa5b1;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
   #search{
     background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15);
     border-radius:8px; color:#fff; padding:8px 12px; font-size:12px; width:220px;
@@ -176,6 +182,36 @@
   .lock-tab.active{ background:#2563EB; color:#fff; border-color:#2563EB; }
   #patternPad{ position:relative; margin:6px auto 4px; touch-action:none; user-select:none; -webkit-user-select:none; }
   #patternPad svg{ touch-action:none; }
+  /* ===== خانات البحث جوه النوافذ تفضل ثابتة فوق أثناء التمرير ===== */
+  /* بتثبت تحت رأس النافذة مباشرة — المسافة بتتحسب تلقائياً في JS (--head-h) */
+  .modal-search{
+    position:sticky; top:var(--head-h, 0px); z-index:100; background:#fff;
+    padding:8px 0 10px; margin-bottom:2px;
+  }
+  .modal-search input{
+    width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; font-size:13px;
+  }
+  /* رأس النافذة يفضل ثابت كمان عشان زرار الإغلاق ومقبض السحب يبقوا في المتناول */
+  .modal-head{ position:sticky; top:0; z-index:101; background:#fff; padding-top:6px; padding-bottom:6px; margin-bottom:8px; }
+  /* مقبض السحب للأسفل (موبايل) */
+  .modal-grab{
+    display:none; width:44px; height:5px; border-radius:3px; background:#CBD5E1;
+    margin:-8px auto 8px; flex:0 0 auto;
+  }
+  @media (max-width:760px){ .modal-grab{ display:block; } }
+  .modal.dragging{ transition:none; }
+  /* ===== دعم الإنجليزية / LTR ===== */
+  html.lang-en body, html.lang-en input, html.lang-en textarea,
+  html.lang-en select, html.lang-en button{
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  html.lang-en .brand h1{ letter-spacing:.2px; }
+  .lang-toggle{
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:#fff;
+    border-radius:10px; min-height:40px; padding:0 12px; font-size:13px; font-weight:700;
+    font-family:inherit; cursor:pointer; white-space:nowrap;
+  }
+  .lang-toggle:hover{ background:rgba(255,255,255,.2); }
   .modal{
     background:#fff; border-radius:16px; width:75vw; max-width:75vw;
     max-height:85vh; overflow-y:auto; padding:20px;
@@ -183,8 +219,7 @@
   /* خانة تسجيل جهاز جديد تفضل بحجمها الأصلي */
   #addOverlay .modal{ width:100%; max-width:440px; }
   @media (max-width:700px){ .modal{ width:100%; max-width:100%; } }
-  .modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
-  .modal-head h2{font-size:16px; margin:0;}
+  .modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}  .modal-head h2{font-size:16px; margin:0;}
   .close-btn{
     background:none;border:none;font-size:22px;color:#94A3B8;cursor:pointer; line-height:1;
     min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center;
@@ -451,9 +486,14 @@
   @media (max-width:760px){
     /* iOS بيعمل zoom تلقائي لو الخط أقل من 16px — نمنعها */
     input, textarea, select, .bm-select{font-size:16px !important;}
-    .topbar{flex-wrap:wrap; gap:8px;}
-    .topbar-actions{flex-wrap:wrap; gap:8px;}
+    /* الهيدر على الموبايل: صف أول فيه الاسم وزر القائمة، وصف تاني فيه الأزرار */
+    .topbar{flex-wrap:wrap; gap:10px 8px;}
+    .brand{order:1; flex:0 1 auto;}
+    .menu-wrap{order:2; margin-inline-start:auto;}
+    .topbar-actions{order:3; flex:1 0 100%; justify-content:flex-start; flex-wrap:wrap; gap:8px;}
     .topbar-actions .btn-primary{flex:1; min-width:140px;}
+    /* القائمة المنسدلة تفضل جوه الشاشة مهما كان مكان الزر */
+    .menu-dropdown{ max-width:calc(100vw - 24px); }
     .modal{border-radius:16px 16px 0 0; max-height:92vh;}
     .inv-cards{grid-template-columns:repeat(2, 1fr);}
     .inv-custom{margin-inline-start:0; width:100%;}
@@ -471,44 +511,46 @@
     <div class="logo"><img src="icon-192.png" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;"></div>
     <div>
       <h1>I Fix Team</h1>
-      <p>نظام إدارة الصيانة</p>
+      <p data-i18n="app.subtitle">نظام إدارة الصيانة</p>
     </div>
   </div>
   <div class="topbar-actions">
     <span id="saveIndicator" class="save-indicator"></span>
     <div id="backupWrap" style="position:relative;">
-      <button class="btn-secondary" onclick="toggleBackupMenu(event)">💾 نسخة احتياطية ▾</button>
+      <button class="btn-secondary" data-i18n="btn.backup" onclick="toggleBackupMenu(event)">نسخة احتياطية ▾</button>
       <div id="backupMenu" class="backup-menu hidden">
-        <button class="bm-item" onclick="exportBackup()">⬇ تنزيل نسخة دلوقتي</button>
-        <button class="bm-item" onclick="document.getElementById('importFile').click()">⬆ استيراد نسخة محفوظة</button>
+        <button class="bm-item" data-i18n="backup.download" onclick="exportBackup()">تنزيل نسخة احتياطية</button>
+        <button class="bm-item" data-i18n="backup.import" onclick="document.getElementById('importFile').click()">استيراد نسخة محفوظة</button>
         <div class="bm-sep"></div>
-        <button class="bm-item" style="color:#DC2626;" onclick="wipeAllData()">🗑 مسح كل البيانات (للبدء من جديد)</button>
+        <button class="bm-item" data-i18n="backup.wipe" style="color:#DC2626;" onclick="wipeAllData()">حذف جميع البيانات</button>
         <div class="bm-sep"></div>
-        <div class="bm-label">النسخ التلقائي الدوري</div>
+        <div class="bm-label" data-i18n="backup.autoLabel">النسخ التلقائي الدوري</div>
         <select id="backupFreq" class="bm-select" onchange="setBackupFrequency(this.value)">
-          <option value="off">متوقف</option>
-          <option value="daily">يومي</option>
-          <option value="weekly">أسبوعي</option>
-          <option value="monthly">شهري</option>
+          <option value="off" data-i18n="backup.freq.off">متوقف</option>
+          <option value="daily" data-i18n="backup.freq.daily">يومي</option>
+          <option value="weekly" data-i18n="backup.freq.weekly">أسبوعي</option>
+          <option value="monthly" data-i18n="backup.freq.monthly">شهري</option>
         </select>
       </div>
     </div>
     <input id="importFile" type="file" accept="application/json" style="display:none" onchange="onImportFileChosen(this.files[0])" />
-    <button class="btn-primary" onclick="openAddModal()">+ جهاز جديد</button>
+    <button class="btn-primary" data-i18n="btn.newDevice" onclick="openAddModal()">+ جهاز جديد</button>
   </div>
-  <button class="menu-btn" onclick="toggleMenu()">⋮</button>
-  <div id="menuDropdown" class="menu-dropdown hidden">
-    <button onclick="openAnalytics()">📊 الملخص</button>
-    <button onclick="openTechEval()">🏆 تقييم الفنيين</button>
-    <button onclick="openSummaries()">📋 الجرد</button>
-    <button onclick="openAccounts()">🧾 الحسابات</button>
-    <button onclick="logout()" style="color:#DC2626;">🚪 تسجيل الخروج</button>
+  <div class="menu-wrap">
+    <button class="menu-btn" onclick="toggleMenu()">⋮</button>
+    <div id="menuDropdown" class="menu-dropdown hidden">
+    <button data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
+    <button data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
+    <button data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
+    <button data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
+    </div>
   </div>
 </div>
 
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
-<div id="board" class="board"><div class="loading">جاري التحميل...</div></div>
+<div id="board" class="board"><div class="loading" data-i18n="app.loading">جارٍ التحميل...</div></div>
 
 <!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
 <div id="annOverlay" class="overlay hidden">
@@ -517,18 +559,12 @@
       <div id="annIcon" style="font-size:46px;">🛠️</div>
       <h2 id="annTitle" style="margin:12px 0 8px;">مرحباً</h2>
       <p id="annBody" style="color:#475569; line-height:1.8; font-size:14.5px; margin:0;"></p>
-      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" onclick="closeAnnouncement()">تمام، فهمت 👍</button>
+      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" data-i18n="btn.understood" onclick="closeAnnouncement()">تمام، فهمت 👍</button>
     </div>
   </div>
 </div>
 
-<!-- لوحة تحكم الأدمن -->
-<div id="adminOverlay" class="overlay hidden">
-  <div class="modal" style="max-width:470px;">
-    <div class="modal-head"><h2>⚙️ لوحة تحكم الأدمن</h2><button class="close-btn" onclick="closeAdmin()">×</button></div>
-    <div id="adminBody" style="padding:4px 2px 8px;"></div>
-  </div>
-</div>
+<!-- لوحة تحكم الأدمن بقت صفحة مستقلة: admin.html -->
 
 <!-- إشعار لحظي للمستخدمين -->
 <div id="broadcastOverlay" class="overlay hidden" style="z-index:65;">
@@ -537,7 +573,7 @@
       <div id="bcIcon" style="font-size:46px;">📢</div>
       <h2 id="bcTitle" style="margin:12px 0 8px;"></h2>
       <p id="bcBody" style="color:#475569; line-height:1.8; font-size:14.5px; margin:0; white-space:pre-wrap;"></p>
-      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" onclick="dismissBroadcast()">فهمت 👍</button>
+      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" data-i18n="btn.understood" onclick="dismissBroadcast()">فهمت 👍</button>
     </div>
   </div>
 </div>
@@ -547,6 +583,7 @@
   <div class="modal" style="max-width:430px;">
     <div class="modal-head"><h2>استيراد نسخة احتياطية</h2><button class="close-btn" onclick="closeImportChoice()">×</button></div>
     <p style="color:#475569;font-size:13.5px;line-height:1.7;margin:2px 0 14px;">هننزّل نسخة أمان تلقائية من بياناتك الحالية الأول، وبعدها اختار:</p>
+    <div id="importChoiceInfo"></div>
     <button class="btn-primary" style="box-shadow:none;margin-bottom:10px;line-height:1.5;" onclick="doImportMerge()">🔀 دمج البيانات<br><span style="font-weight:400;font-size:12px;opacity:.9;">يضيف الأجهزة الجديدة بس، من غير ما يمسح الموجود</span></button>
     <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;line-height:1.5;" onclick="doImportReplace()">♻️ استبدال كامل<br><span style="font-weight:400;font-size:12px;">يمسح كل البيانات الحالية ويحط اللي في الملف بدالها</span></button>
   </div>
@@ -559,7 +596,7 @@
       <h2 id="columnTitle"></h2>
       <button class="close-btn" onclick="closeColumn()">×</button>
     </div>
-    <input id="columnSearch" oninput="renderColumn()" placeholder="بحث بالاسم أو المحل أو الرقم التسلسلي..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:9px 11px; font-size:13px; margin-bottom:12px;" />
+    <div class="modal-search"><input id="columnSearch" oninput="renderColumn()" data-i18n-ph="search.column.ph" placeholder="ابحث بالاسم أو المحل أو الرقم التسلسلي..." /></div>
     <div id="columnList"></div>
     <div id="colMoreFooter" style="text-align:center; padding:12px; color:#64748B; font-size:13px; display:none;"></div>
   </div>
@@ -569,39 +606,40 @@
 <div id="addOverlay" class="overlay hidden">
   <div class="modal">
     <div class="modal-head">
-      <h2>تسجيل جهاز جديد</h2>
+      <h2 data-i18n="add.title">تسجيل جهاز جديد</h2>
       <button class="close-btn" onclick="closeAddModal()">×</button>
     </div>
     <div id="addFormWrap">
-      <label class="field"><span>اسم العميل</span><input id="f_customerName" oninput="onCustomerNameInput()" /></label>
-      <label class="field"><span>اسم المحل</span><input id="f_shopName" /></label>
-      <label class="field"><span>اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
+      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" oninput="onCustomerNameInput()" /></label>
+      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" /></label>
+      <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
-      <label class="field"><span>رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" oninput="fixDigitsInput(this)" /></label>
+      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" oninput="fixDigitsInput(this)" /></label>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
-        <label class="field"><span>نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
-        <label class="field"><span>الموديل</span><input id="f_model" /></label>
+        <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
+        <label class="field"><span data-i18n="add.model">الموديل</span><input id="f_model" /></label>
       </div>
-      <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
-      <div class="field" style="display:block;">
-        <span>🔒 رمز قفل الجهاز (اختياري)</span>
+      <label class="field"><span data-i18n="add.serial">الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
+      <div id="lockHostAdd"></div>
+      <div class="field" id="lockSection" style="display:block;">
+        <span data-i18n="lock.title">🔒 رمز قفل الجهاز (اختياري)</span>
         <div class="lock-tabs">
-          <button type="button" id="lockTab_text" class="lock-tab active" onclick="setLockTab('text')">🔢 رقم/نص</button>
-          <button type="button" id="lockTab_pattern" class="lock-tab" onclick="setLockTab('pattern')">✏️ نمط</button>
-          <button type="button" id="lockTab_image" class="lock-tab" onclick="setLockTab('image')">🖼️ صورة</button>
+          <button type="button" id="lockTab_text" class="lock-tab active" data-i18n="lock.tabText" onclick="setLockTab('text')">رقم/نص</button>
+          <button type="button" id="lockTab_pattern" class="lock-tab" data-i18n="lock.tabPattern" onclick="setLockTab('pattern')">نمط</button>
+          <button type="button" id="lockTab_image" class="lock-tab" data-i18n="lock.tabImage" onclick="setLockTab('image')">صورة</button>
         </div>
         <div id="lockPane_text">
           <div style="position:relative;">
-            <input id="f_lockText" type="password" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
+            <input id="f_lockText" type="password" data-i18n-ph="lock.textPh" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
             <button type="button" id="lockEye" onclick="toggleLockText()" style="position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:18px;cursor:pointer;padding:6px;">👁</button>
           </div>
         </div>
         <div id="lockPane_pattern" style="display:none;">
           <div id="patternPad"></div>
           <div style="text-align:center;">
-            <div id="patternSeqLabel" style="font-size:12.5px;color:#64748B;margin-bottom:6px;">ارسم النمط بإصبعك</div>
-            <button type="button" class="acc-mini-btn" onclick="initPattern()">🔄 إعادة الرسم</button>
+            <div id="patternSeqLabel" style="font-size:12.5px;color:#64748B;margin-bottom:6px;" data-i18n="lock.drawHint">ارسم النمط بإصبعك</div>
+            <button type="button" class="acc-mini-btn" data-i18n="lock.redraw" onclick="initPattern()">إعادة الرسم</button>
           </div>
         </div>
         <div id="lockPane_image" style="display:none;">
@@ -610,27 +648,27 @@
         </div>
       </div>
       <div style="margin-bottom:12px;">
-        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
+        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;" data-i18n="add.dealType">نوع التعامل</span>
         <div class="pay-choice">
-          <button type="button" id="whRetail" class="pay-btn" onclick="setAddWholesale(false)">قطاعي</button>
-          <button type="button" id="whBulk" class="pay-btn" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
+          <button type="button" id="whRetail" class="pay-btn" data-i18n="add.retail" onclick="setAddWholesale(false)">قطاعي</button>
+          <button type="button" id="whBulk" class="pay-btn" data-i18n="add.wholesale" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
         </div>
       </div>
-      <label class="field"><span>العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
-      <label class="field"><span>حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
-      <label class="field"><span>السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
+      <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
+      <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
+      <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
-        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
+        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;" data-i18n="add.payType">طريقة الدفع</span>
         <div class="pay-choice">
-          <button type="button" id="ptCash" class="pay-btn" onclick="setAddPayType('cash')">فوري</button>
-          <button type="button" id="ptDeferred" class="pay-btn" onclick="setAddPayType('deferred')">آجل — على حساب المحل</button>
+          <button type="button" id="ptCash" class="pay-btn" data-i18n="add.payCash" onclick="setAddPayType('cash')">فوري</button>
+          <button type="button" id="ptDeferred" class="pay-btn" data-i18n="add.payDeferred" onclick="setAddPayType('deferred')">آجل — على حساب المحل</button>
         </div>
       </div>
       <div class="row2">
-        <label class="field"><span>تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
-        <label class="field"><span>وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
+        <label class="field"><span data-i18n="add.intakeDate">تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
+        <label class="field"><span data-i18n="add.intakeTime">وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
       </div>
-      <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
+      <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" data-i18n="add.submit" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
     </div>
     <div id="addSuccessWrap" class="hidden">
       <div style="text-align:center;font-weight:800;color:var(--done);margin-bottom:12px;">✅ اتسجل الجهاز في "قيد الانتظار"</div>
@@ -650,6 +688,15 @@
   <div class="modal" id="timelineModal"></div>
 </div>
 
+<!-- تعديل رمز قفل الجهاز (في أي مرحلة) -->
+<div id="editLockOverlay" class="overlay hidden" style="z-index:58;">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head"><h2 data-i18n="lock.edit">تعديل رمز قفل الجهاز</h2><button class="close-btn" onclick="closeEditLock()">×</button></div>
+    <div id="editLockHost"></div>
+    <button class="btn-primary" style="box-shadow:none;margin-top:8px;" data-i18n="lock.save" onclick="saveEditedLock()">حفظ رمز القفل</button>
+  </div>
+</div>
+
 <!-- عارض صورة القفل -->
 <div id="imgLightbox" class="overlay hidden" style="z-index:70;" onclick="this.classList.add('hidden')">
   <img id="imgLightboxImg" style="max-width:92%;max-height:88%;border-radius:12px;" />
@@ -659,12 +706,12 @@
 <div id="summariesOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>📋 الجرد</h2>
+      <h2 data-i18n="inv.title">📋 الجرد</h2>
       <button class="close-btn" onclick="closeSummaries()">×</button>
     </div>
-    <div style="padding:0 20px 4px;">
-      <input id="invSearch" oninput="renderSummaries()" placeholder="🔍 دور بإسم عميل، محل، فني، موديل، رقم تليفون، أو امسح الباركود..."
-             style="width:100%; border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
+    <div class="modal-search" style="padding:0 20px 8px;">
+      <input id="invSearch" oninput="renderSummaries()" data-i18n-ph="search.inventory.ph" placeholder="🔍 دور بإسم عميل، محل، فني، موديل، رقم تليفون، أو امسح الباركود..."
+             style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
     </div>
     <div id="summariesBody" style="padding:16px 20px 40px;"></div>
   </div>
@@ -674,7 +721,7 @@
 <div id="analyticsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>📊 الملخص</h2>
+      <h2 data-i18n="an.title">📊 الملخص</h2>
       <button class="close-btn" onclick="closeAnalytics()">×</button>
     </div>
     <div id="analyticsBody" style="padding:12px 20px 40px;"></div>
@@ -685,7 +732,7 @@
 <div id="techEvalOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>🏆 تقييم الفنيين</h2>
+      <h2 data-i18n="te.title">🏆 تقييم الفنيين</h2>
       <button class="close-btn" onclick="closeTechEval()">×</button>
     </div>
     <div id="techEvalBody" style="padding:12px 20px 40px;"></div>
@@ -696,22 +743,22 @@
 <div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>🧾 الحسابات — آجل المحلات</h2>
+      <h2 data-i18n="acc.title">🧾 الحسابات — آجل المحلات</h2>
       <button class="close-btn" onclick="closeAccounts()">×</button>
     </div>
     <div style="padding:0 20px 8px;">
       <div class="acc-payform">
-        <div style="font-size:14px;font-weight:800;margin-bottom:10px;">تسجيل دفعة من محل</div>
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px;" data-i18n="acc.recordPayment">تسجيل دفعة من محل</div>
         <div class="acc-payform-row">
-          <input id="payShop" list="accShopsList" placeholder="اسم المحل" />
-          <input id="payAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="المبلغ بالجنيه" />
-          <input id="payNote" placeholder="ملاحظة (اختياري)" />
-          <button class="btn-primary" style="box-shadow:none;" onclick="recordPayment()">تسجيل الدفعة</button>
+          <input id="payShop" list="accShopsList" data-i18n-ph="acc.shopNamePh" placeholder="اسم المحل" />
+          <input id="payAmount" type="number" min="1" step="1" inputmode="numeric" data-i18n-ph="acc.amountPh" placeholder="المبلغ بالجنيه" />
+          <input id="payNote" data-i18n-ph="acc.notePh" placeholder="ملاحظة (اختياري)" />
+          <button class="btn-primary" style="box-shadow:none;" data-i18n="acc.submitPayment" onclick="recordPayment()">تسجيل الدفعة</button>
         </div>
         <datalist id="accShopsList"></datalist>
-        <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
+        <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" data-i18n="acc.openingBalance" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
       </div>
-      <input id="accSearch" oninput="renderAccounts()" placeholder="دور بإسم محل..." style="width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; font-size:14px; margin-top:12px;" />
+      <div class="modal-search" style="margin-top:10px;"><input id="accSearch" oninput="renderAccounts()" data-i18n-ph="search.accounts.ph" placeholder="ابحث باسم المحل..." /></div>
     </div>
     <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
@@ -735,8 +782,8 @@ const SUPABASE_ENVS = {
   },
   staging: {
     // 🔴 بعد ما تعمل مشروع Supabase تجريبي، حط رابطه ومفتاح anon بتاعه هنا:
-    url: "STAGING_SUPABASE_URL",
-    key: "STAGING_SUPABASE_ANON_KEY"
+    url: "https://farfaazxogpvxmujnedu.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
   }
 };
 // نطاقات الإنتاج (زوّد الدومين المخصص لما تجيبه، زي ifixteam.com):
@@ -760,7 +807,14 @@ let currentUser = { name: '', email: '' };
 // أوضاع النظام (بيتا / فترة مجانية) + لوحة الأدمن
 // ============================================================
 // 🔴🔴 حط هنا إيميل الأدمن الرئيسي (اللي هيتحكم في أوضاع النظام) 🔴🔴
-const ADMIN_EMAIL = 'ADMIN-EMAIL-HERE@example.com';
+// 🔴 إيميلات الأدمن الرئيسي — البيئتين متطابقين دلوقتي.
+// (لو احتجت أدمن للتجربة بس، زوّده في سطر staging من غير ما تلمس production)
+const ADMIN_EMAILS_BY_ENV = {
+  production: ['belal0@fix.com'],
+  staging:    ['belal0@fix.com']
+};
+const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
+const ADMIN_EMAIL = ADMIN_EMAILS[0] || '';
 
 const SYSTEM_CONFIG_KEY = 'system-config';
 let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
@@ -774,7 +828,95 @@ async function loadSystemConfig(){
 async function saveSystemConfig(){
   try{ await window.storage.set(SYSTEM_CONFIG_KEY, JSON.stringify(systemConfig)); }catch(e){}
 }
-function isAdmin(){ return !!currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase(); }
+function isAdmin(){ return isSuperAdmin(); }
+
+// ============================================================
+// أدوار المستخدمين: Super Admin مقابل محاسب
+// ============================================================
+// لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
+const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
+const ROLES_KEY = 'user-roles';
+let userRoles = {};   // { "email": "super_admin" }
+
+async function loadUserRoles(){
+  try{
+    const r = await window.storage.get(ROLES_KEY);
+    if(r && r.value) userRoles = JSON.parse(r.value) || {};
+  }catch(e){ userRoles = {}; }
+}
+async function saveUserRoles(){
+  try{ await window.storage.set(ROLES_KEY, JSON.stringify(userRoles)); }catch(e){}
+}
+function isSuperAdmin(){
+  if(!ADMIN_EMAIL_SET) return true;   // وضع آمن: الإعداد لسه ماتعملش
+  const e = (currentUser.email || '').toLowerCase();
+  if(!e) return false;
+  if(ADMIN_EMAILS.includes(e)) return true;
+  return userRoles[e] === 'super_admin';
+}
+function currentRoleLabel(){ return isSuperAdmin() ? 'Super Admin' : 'محاسب'; }
+
+// بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن المحاسب
+function applyRoleVisibility(){
+  const wrap = document.getElementById('backupWrap');
+  if(wrap) wrap.style.display = isSuperAdmin() ? '' : 'none';
+  injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
+}
+
+// ============================================================
+// مفاتيح الميزات (Feature Flags)
+// ============================================================
+const FLAGS_KEY = 'feature-flags';
+// الميزات المعروفة — أي ميزة جديدة تتلف هنا وتتقفل لحد ما الأدمن يفتحها
+const KNOWN_FLAGS = [
+  { key:'gemini_invoice_ocr',  desc:'قراءة فواتير قطع الغيار بالذكاء الاصطناعي (OCR)' },
+  { key:'silent_label_print',  desc:'طباعة الليبل مباشرة من غير نافذة الطباعة' },
+  { key:'device_lock_codes',   desc:'رمز قفل الجهاز (رقم / نمط / صورة)' },
+  { key:'live_broadcasts',     desc:'الإشعارات اللحظية من الأدمن' },
+];
+let featureFlags = {};   // { feature_key: { is_enabled, description, updated_at } }
+
+async function loadFeatureFlags(){
+  try{
+    const r = await window.storage.get(FLAGS_KEY);
+    if(r && r.value) featureFlags = JSON.parse(r.value) || {};
+  }catch(e){ featureFlags = {}; }
+  // نضمن إن كل مفتاح معروف موجود (افتراضياً مقفول)
+  let changed = false;
+  for(const f of KNOWN_FLAGS){
+    if(!featureFlags[f.key]){
+      featureFlags[f.key] = { is_enabled:false, description:f.desc, updated_at:new Date().toISOString() };
+      changed = true;
+    }
+  }
+  if(changed && isSuperAdmin()){ try{ await saveFeatureFlags(); }catch(e){} }
+}
+async function saveFeatureFlags(){
+  try{ await window.storage.set(FLAGS_KEY, JSON.stringify(featureFlags)); }catch(e){}
+}
+// الدالة العامة: أي ميزة جديدة تتلف بيها
+function isFeatureEnabled(key){
+  const f = featureFlags[key];
+  return !!(f && f.is_enabled);
+}
+// ============================================================
+// سجل العمليات الإدارية (Audit Log)
+// ============================================================
+const AUDIT_KEY = 'audit-log';
+let auditLog = [];
+async function loadAudit(){
+  try{
+    const r = await window.storage.get(AUDIT_KEY);
+    if(r && r.value) auditLog = JSON.parse(r.value) || [];
+  }catch(e){ auditLog = []; }
+}
+async function addAudit(action){
+  try{
+    auditLog.unshift({ at:new Date().toISOString(), by:currentUser.name || currentUser.email || '—', email:currentUser.email||'', action });
+    auditLog = auditLog.slice(0, 300);   // نحتفظ بآخر 300 عملية
+    await window.storage.set(AUDIT_KEY, JSON.stringify(auditLog));
+  }catch(e){}
+}
 function trialDaysLeft(){
   if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
   const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||30)*86400000;
@@ -787,13 +929,13 @@ function applySystemMode(){
   if(!banner) return;
   const m = systemConfig.mode;
   if(m === 'beta'){
-    banner.textContent = '🛠️ فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق';
+    banner.textContent = '🛠️ ' + t('sys.betaBanner');
     banner.style.background = '#1E293B'; banner.style.color = '#fff';
     banner.classList.remove('hidden');
     maybeShowAnnouncement('beta');
   } else if(m === 'trial'){
     const left = trialDaysLeft();
-    banner.textContent = `🎁 فترة مجانية — متبقّي ${left} يوماً على الاشتراك`;
+    banner.textContent = '🎁 ' + t('sys.trialBanner',{n:left});
     banner.style.background = '#B45309'; banner.style.color = '#fff';
     banner.classList.remove('hidden');
     maybeShowAnnouncement('trial');
@@ -809,13 +951,13 @@ function maybeShowAnnouncement(kind){
   const o = document.getElementById('annOverlay');
   if(kind === 'beta'){
     document.getElementById('annIcon').textContent = '🛠️';
-    document.getElementById('annTitle').textContent = 'مرحباً بك في I Fix Team!';
-    document.getElementById('annBody').textContent = 'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.';
+    document.getElementById('annTitle').textContent = t('sys.betaTitle');
+    document.getElementById('annBody').textContent = t('sys.betaBody');
   } else {
     const left = trialDaysLeft();
     document.getElementById('annIcon').textContent = '🎁';
-    document.getElementById('annTitle').textContent = 'بدأت فترتك المجانية';
-    document.getElementById('annBody').textContent = `أنت الآن في الفترة المجانية (${systemConfig.trialDays||30} يوماً). متبقّي ${left} يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.`;
+    document.getElementById('annTitle').textContent = t('sys.trialTitle');
+    document.getElementById('annBody').textContent = t('sys.trialBody',{d:(systemConfig.trialDays||30), n:left});
   }
   o.setAttribute('data-seen-key', seenKey);
   o.classList.remove('hidden');
@@ -829,54 +971,23 @@ function closeAnnouncement(){
 
 // زر لوحة الأدمن في القائمة (للأدمن بس)
 function injectAdminMenu(){
-  if(!isAdmin()) return;
+  if(!isSuperAdmin()) return;
   const dd = document.getElementById('menuDropdown');
   if(!dd || document.getElementById('adminMenuBtn')) return;
   const b = document.createElement('button');
   b.id = 'adminMenuBtn';
-  b.textContent = '⚙️ لوحة الأدمن';
+  b.textContent = '⚙️ ' + t('menu.admin');
   b.style.color = '#7C3AED';
-  b.onclick = openAdmin;
+  b.onclick = () => { location.href = 'admin.html'; };
   const logoutBtn = dd.querySelector('button[onclick="logout()"]');
   dd.insertBefore(b, logoutBtn);
 }
 
-let adminUnlocked = false;
-function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
 
 function openAdmin(){
-  if(!isAdmin()){ alert('الصفحة دي للأدمن الرئيسي بس'); return; }
-  document.getElementById('menuDropdown').classList.add('hidden');
-  if(!adminUnlocked){
-    if(!systemConfig.adminPassHash){
-      // أول مرة: اعمل كلمة سر
-      const p1 = prompt('🔑 اعمل كلمة سر للوحة الأدمن (هتتطلب كل مرة تفتح اللوحة):');
-      if(p1===null) return;
-      if(!p1.trim()){ alert('لازم تكتب كلمة سر'); return; }
-      systemConfig.adminPassHash = hashStr(p1.trim());
-      saveSystemConfig();
-      adminUnlocked = true;
-      alert('اتحفظت كلمة السر ✅');
-    } else {
-      const p = prompt('🔒 كلمة سر لوحة الأدمن:');
-      if(p===null) return;
-      if(hashStr((p||'').trim()) !== systemConfig.adminPassHash){ alert('كلمة السر غلط'); return; }
-      adminUnlocked = true;
-    }
-  }
-  document.getElementById('adminOverlay').classList.remove('hidden');
-  renderAdmin();
+  // لوحة الأدمن بقت صفحة مستقلة (admin.html) — من غير باسورد إضافي
+  location.href = 'admin.html';
 }
-function closeAdmin(){ document.getElementById('adminOverlay').classList.add('hidden'); }
-async function adminChangePass(){
-  const p1 = prompt('كلمة سر جديدة للوحة الأدمن:');
-  if(p1===null) return;
-  if(!p1.trim()){ alert('لازم كلمة سر'); return; }
-  systemConfig.adminPassHash = hashStr(p1.trim());
-  await saveSystemConfig();
-  alert('اتغيرت كلمة سر اللوحة ✅');
-}
-
 // ===== الإشعارات اللحظية للمستخدمين =====
 const BROADCAST_KEY = 'broadcast';
 let currentBroadcast = null;
@@ -891,135 +1002,18 @@ function showBroadcastIfUnseen(){
   if(localStorage.getItem('ifix_seen_bc_' + currentBroadcast.id)) return;
   const t = currentBroadcast.type;
   document.getElementById('bcIcon').textContent = t==='warning' ? '⚠️' : (t==='success' ? '✅' : '📢');
-  document.getElementById('bcTitle').textContent = currentBroadcast.title || 'إشعار';
-  document.getElementById('bcBody').textContent = currentBroadcast.body || '';
+  // لو الأدمن كتب نسخة إنجليزية، بنعرضها للمستخدم اللي مختار إنجليزي
+  const lang = (typeof I18N !== 'undefined') ? I18N.getLang() : 'ar';
+  const pick = (base) => (lang === 'en' && currentBroadcast[base + '_en']) ? currentBroadcast[base + '_en'] : (currentBroadcast[base] || '');
+  document.getElementById('bcTitle').textContent = pick('title') || t('bc.default');
+  document.getElementById('bcBody').textContent = pick('body');
   document.getElementById('broadcastOverlay').classList.remove('hidden');
 }
 function dismissBroadcast(){
   if(currentBroadcast && currentBroadcast.id){ try{ localStorage.setItem('ifix_seen_bc_'+currentBroadcast.id,'1'); }catch(e){} }
   document.getElementById('broadcastOverlay').classList.add('hidden');
 }
-async function adminSendBroadcast(){
-  const title = (document.getElementById('bcInTitle')?.value || '').trim();
-  const body = (document.getElementById('bcInBody')?.value || '').trim();
-  const type = document.getElementById('bcInType')?.value || 'info';
-  if(!title && !body){ alert('اكتب عنوان أو نص الإشعار الأول'); return; }
-  if(!confirm('تبعت الإشعار ده لكل المستخدمين دلوقتي؟')) return;
-  const bc = { id: Date.now(), title, body, type };
-  try{
-    await window.storage.set(BROADCAST_KEY, JSON.stringify(bc));
-    currentBroadcast = bc;
-    document.getElementById('bcInTitle').value=''; document.getElementById('bcInBody').value='';
-    alert('اتبعت الإشعار للكل ✅');
-  }catch(e){ alert('حصل خطأ في الإرسال — تأكد من النت'); }
-}
-
-function renderAdmin(){
-  const m = systemConfig.mode;
-  const modeLabel = m==='beta' ? '🛠️ وضع البيتا' : (m==='trial' ? '🎁 وضع التجربة المجانية' : '✅ وضع عادي (مدفوع)');
-  const left = trialDaysLeft();
-  document.getElementById('adminBody').innerHTML = `
-    <div style="background:#F1F5F9; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
-      <div style="font-size:13px; color:#64748B;">الوضع الحالي للنظام</div>
-      <div style="font-weight:800; font-size:16px; margin-top:2px;">${modeLabel}</div>
-      ${m==='trial' ? `<div style="font-size:13px; color:#B45309; margin-top:4px;">متبقّي ${left} يوماً على الاشتراك</div>` : ''}
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🛠️ وضع البيتا (قبل الإطلاق)</div>
-      <p class="admin-hint">بيظهر شريط علوي للكل + نافذة ترحيب مرة واحدة لكل مستخدم.</p>
-      ${m==='beta'
-        ? `<div style="font-size:12.5px;color:#16A34A;font-weight:700;margin-bottom:8px;">● مُفعّل حالياً</div>
-           <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;" onclick="adminCancelBeta()">🛑 إلغاء تفعيل وضع البيتا</button>`
-        : `<button class="btn-primary" style="box-shadow:none;" onclick="adminSetBeta()">تفعيل تنبيه وضع البيتا</button>`}
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🎁 الفترة المجانية والاشتراك</div>
-      <p class="admin-hint">بيبدأ عدّاد ${systemConfig.trialDays||30} يوم من لحظة الضغط، وبعد ما يخلص بيوجّه النظام تلقائياً لصفحة الاشتراك.</p>
-      ${m==='trial'
-        ? `<div style="font-size:12.5px;color:#16A34A;font-weight:700;margin-bottom:8px;">● مُفعّل — متبقّي ${left} يوماً</div>
-           <button class="btn-secondary" style="color:#DC2626;border-color:#FCA5A5;" onclick="adminCancelTrial()">🛑 إلغاء الوضع المجاني</button>`
-        : `<button class="btn-primary" style="box-shadow:none; background:#B45309;" onclick="adminSetTrial()">تحويل لوضع التجربة المجانية</button>`}
-    </div>
-
-    <div class="admin-sec" style="border-color:#FDE68A; background:#FFFBEB;">
-      <div class="admin-sec-title">⏳ مدة الفترة المجانية</div>
-      <p class="admin-hint">عدد الأيام الحالي: <b>${systemConfig.trialDays||30}</b> يوم.</p>
-      <button class="acc-mini-btn" onclick="adminSetTrialDays()">تغيير عدد الأيام</button>
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">📢 إرسال إشعار لحظي للمستخدمين</div>
-      <p class="admin-hint">بيظهر فوراً لكل مستخدم بنافذة فيها زر «فهمت» — مرة واحدة لكل مستخدم.</p>
-      <input id="bcInTitle" placeholder="عنوان الإشعار" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px;" />
-      <textarea id="bcInBody" rows="2" placeholder="نص الإشعار" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px;font-family:inherit;"></textarea>
-      <select id="bcInType" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:10px;">
-        <option value="info">📢 معلومة</option>
-        <option value="warning">⚠️ تنبيه</option>
-        <option value="success">✅ خبر كويس</option>
-      </select>
-      <button class="btn-primary" style="box-shadow:none;" onclick="adminSendBroadcast()">إرسال للكل الآن</button>
-    </div>
-
-    <div class="admin-sec">
-      <div class="admin-sec-title">🔑 أمان اللوحة</div>
-      <p class="admin-hint">كلمة سر فتح لوحة الأدمن (بتتطلب كل مرة تفتح اللوحة).</p>
-      <button class="acc-mini-btn" onclick="adminChangePass()">تغيير كلمة سر اللوحة</button>
-    </div>
-  `;
-}
-
-async function adminSetBeta(){
-  if(!confirm('تفعيل وضع البيتا؟ هيظهر شريط علوي للكل ونافذة ترحيب مرة واحدة لكل مستخدم.')) return;
-  systemConfig.mode = 'beta';
-  systemConfig.betaAnnId = Date.now();
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  alert('تم تفعيل وضع البيتا ✅');
-}
-async function adminSetTrial(){
-  if(!confirm(`تحويل لوضع التجربة المجانية؟ هيبدأ عدّاد ${systemConfig.trialDays||30} يوم من دلوقتي.`)) return;
-  systemConfig.mode = 'trial';
-  systemConfig.trialStart = new Date().toISOString();
-  systemConfig.trialAnnId = Date.now();
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  alert('تم بدء الفترة المجانية 🎁');
-}
-async function adminSetNormal(){
-  if(!confirm('رجوع للوضع العادي وإيقاف كل التنبيهات؟')) return;
-  systemConfig.mode = 'normal';
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  alert('رجع للوضع العادي ✅');
-}
-async function adminCancelBeta(){
-  if(!confirm('إلغاء تفعيل وضع البيتا والرجوع للوضع العادي؟')) return;
-  systemConfig.mode = 'normal';
-  systemConfig.betaAnnId = null;
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  alert('تم إلغاء وضع البيتا ✅');
-}
-async function adminCancelTrial(){
-  if(!confirm('إلغاء الوضع المجاني والرجوع للوضع العادي؟\nالعدّاد هيتلغي والمستخدمين مش هيتوجّهوا لصفحة الاشتراك.')) return;
-  systemConfig.mode = 'normal';
-  systemConfig.trialStart = null;
-  systemConfig.trialAnnId = null;
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  alert('تم إلغاء الوضع المجاني ✅');
-}
-async function adminSetTrialDays(){
-  const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||30));
-  if(v === null) return;
-  const n = parseInt(v)||0;
-  if(n <= 0){ alert('اكتب رقم صحيح'); return; }
-  systemConfig.trialDays = n;
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-}
+function renderAdmin(){ /* اللوحة اتنقلت لـ admin.html */ }
 
 // ممنوع الدخول من غير تسجيل + اشتراك المحل ساري
 async function requireAccess(){
@@ -1039,6 +1033,7 @@ async function requireAccess(){
   if(!session){ window.location.href = 'index.html'; return false; }
   try{
     currentUser.email = session.user.email || '';
+    try{ I18N.setUser(currentUser.email); }catch(e){}   // كل محاسب بلغته
     const { data: prof } = await sb.from('profiles').select('full_name').eq('id', session.user.id).single();
     currentUser.name = (prof && prof.full_name && prof.full_name.trim())
       ? prof.full_name.trim()
@@ -1151,15 +1146,53 @@ function startRealtimeSync(){
   }catch(e){ /* المزامنة اللحظية اختيارية — السيستم شغال من غيرها */ }
 }
 
+// حالات العرض/الفلترة — "تم التسليم" اتقسمت لحالتين حسب حالة الدفع
 const STATUSES = [
-  { key: "waiting", label: "قيد الانتظار", varname:"waiting" },
-  { key: "diagnosing", label: "جاري الكشف", varname:"diagnosing" },
-  { key: "repairing", label: "جاري الصيانة", varname:"repairing" },
-  { key: "done", label: "تم الصيانة", varname:"done" },
-  { key: "delivered", label: "تم التسليم", varname:"delivered" },
-  { key: "rejected", label: "تم الرفض", varname:"rejected" },
-  { key: "returned", label: "المرتجعات", varname:"returned" },
+  { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
+  { key: "diagnosing", label: "جاري الكشف", labelKey:"status.diagnosing", varname:"diagnosing" },
+  { key: "repairing", label: "جاري الصيانة", labelKey:"status.repairing", varname:"repairing" },
+  { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
+  { key: "delivered_paid", label: "تم التسليم والدفع", labelKey:"status.delivered_paid", varname:"delivered_paid" },
+  { key: "delivered_unpaid", label: "تم التسليم بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
+  { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
+  { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
 ];
+// اسم الحالة حسب اللغة الحالية
+function stLabel(s){ return s ? (typeof t === 'function' && s.labelKey ? t(s.labelKey) : s.label) : ''; }
+
+// اسم الحالة في السجل: بيفضّل المفتاح المخزّن (الجديد)، وبيترجم النصوص العربية القديمة كمان
+const _AR_STATUS_BACKMAP = null;   // بيتبني عند أول استخدام
+function histLabel(hEntry){
+  if(!hEntry) return '';
+  if(hEntry.labelKey) return t(hEntry.labelKey, hEntry.labelVars || {});
+  if(hEntry.label){
+    // سجلات قديمة اتخزنت بالعربي: لو النص اسم حالة معروف، نرجّعه مترجم
+    const hit = STATUSES.concat(ACTION_STATUSES).find(s => s.label === hEntry.label);
+    if(hit) return stLabel(hit);
+    return hEntry.label;   // نص مركّب قديم — بيفضل زي ما اتخزن
+  }
+  return stLabel(statusInfo(hEntry.status));
+}
+// حالات الأزرار (الإجراءات) — التسليم زرار واحد، والنظام بيحدد الخانة حسب الدفع
+const ACTION_STATUSES = [
+  { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
+  { key: "diagnosing", label: "جاري الكشف", labelKey:"status.diagnosing", varname:"diagnosing" },
+  { key: "repairing", label: "جاري الصيانة", labelKey:"status.repairing", varname:"repairing" },
+  { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
+  { key: "delivered", label: "تم التسليم", labelKey:"status.delivered", varname:"delivered" },
+  { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
+  { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
+];
+
+// هل الجهاز محاسَب عليه فعلاً؟
+function getLocale(){ return (typeof I18N!=='undefined' && I18N.getLang()==='en') ? 'en-GB' : 'ar-EG'; }
+function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
+// الحالة الفعلية للعرض: بتقسم "تم التسليم" لمدفوع / بانتظار الدفع
+function effStatus(d){
+  if(!d) return '';
+  if(d.status === 'delivered') return isPaidDevice(d) ? 'delivered_paid' : 'delivered_unpaid';
+  return d.status;
+}
 const STORAGE_KEY = "repair-devices";
 let devices = [];
 let selectedId = null;
@@ -1167,7 +1200,7 @@ let currentColumn = null;
 
 function accent(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key).trim(); }
 function accentBg(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key+'-bg').trim(); }
-function statusInfo(key){ return STATUSES.find(s => s.key === key); }
+function statusInfo(key){ return STATUSES.find(s => s.key === key) || ACTION_STATUSES.find(s => s.key === key); }
 function esc(str){ const d=document.createElement('div'); d.innerText = str==null?'':str; return d.innerHTML; }
 function daysSince(dateStr){ return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000); }
 function formatDateTime(iso){
@@ -1437,16 +1470,17 @@ async function checkAutoBackup(){
 // محمي بتأكيدين + كتابة كلمة، وبيعمل نسخة احتياطية تلقائية قبل المسح
 // ============================================================
 async function wipeAllData(){
+  if(!isSuperAdmin()){ showError(t('msg.superAdminOnly')); return; }
   document.getElementById('backupMenu').classList.add('hidden');
 
-  if(devices.length === 0){ alert('مفيش بيانات تتمسح أصلاً.'); return; }
+  if(devices.length === 0){ alert(t('msg.nothingToWipe')); return; }
 
   if(!confirm(`⚠️ تحذير مهم جداً\n\nهتمسح كل الأجهزة المسجلة (${devices.length} جهاز) نهائياً من السيستم ومن السيرفر.\n\nده مناسب بس لما تبدأ شغل فعلي جديد.\n\nتكمل؟`)) return;
 
   // كتابة كلمة تأكيد — حماية من الضغط بالغلط
   const word = prompt('للتأكيد النهائي، اكتب كلمة: مسح');
   if(word === null) return;
-  if(word.trim() !== 'مسح'){ alert('الكلمة مش مظبوطة — اتلغى المسح، بياناتك زي ما هي.'); return; }
+  if(word.trim() !== 'مسح'){ alert(t('msg.wipeWordWrong')); return; }
 
   // نسخة احتياطية سريعة قبل المسح — مضغوطة (من غير تنسيق) عشان ما تهنّجش الصفحة على ١٩ ألف جهاز
   try{
@@ -1458,9 +1492,9 @@ async function wipeAllData(){
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }catch(e){}
 
-  if(!confirm('آخر تأكيد: نزّلنا نسخة احتياطية أوتوماتيك دلوقتي على جهازك.\n\nنمسح كل البيانات؟')) return;
+  if(!confirm(t('msg.wipeFinal'))) return;
 
-  if(!isOnline()){ alert('المسح محتاج نت.'); return; }
+  if(!isOnline()){ alert(t('msg.wipeNeedNet')); return; }
 
   setSaving(true);
   importing = true;   // نوقف المزامنة اللحظية أثناء المسح (مهم جداً عشان الصفحة ما تهنجش من إشعارات الحذف)
@@ -1523,11 +1557,11 @@ async function wipeAllData(){
     hideImportProgress();
     render();
     showError('');
-    alert('تم مسح كل البيانات ✅ (السيرفر اتأكد إنه فاضي)\nاعمل ريفريش للتأكيد، وابدأ الاستيراد.');
+    alert(t('msg.wipeDone'));
   }catch(e){
     importing = false;
     hideImportProgress();
-    showError('حصل خطأ في المسح: ' + ((e && e.message) || e) + ' — جرّب تاني، أو امسح جدول devices_data من Supabase مباشرة');
+    showError(t('msg.wipeError') + ((e && e.message) || e) + ' — جرّب تاني، أو امسح جدول devices_data من Supabase مباشرة');
   }finally{
     setSaving(false);
   }
@@ -1550,71 +1584,76 @@ function exportBackup(){
   URL.revokeObjectURL(url);
 }
 
-async function importBackup(file){
-  if(!file) return;
-  let incoming;
-  try{
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    incoming = Array.isArray(parsed) ? parsed : parsed.devices;
-    if(!Array.isArray(incoming)) throw new Error('bad format');
-  }catch(e){
-    showError('الملف ده مش نسخة احتياطية صحيحة من النظام');
-    document.getElementById('importFile').value = '';
-    return;
-  }
-
-  // إصلاح IDs الملف قبل أي حاجة — ده اللي بيمنع تعليق الاستيراد على 0%
-  // الملفات القديمة أحياناً بتيجي بـ id مكرر لأجهزة مختلفة، والسيرفر بيرفض الدفعة كلها.
-  // الـ legacyId هو المفتاح الفريد الحقيقي، فبنبني منه id + trackToken فريدين.
-  {
-    const seen = new Set();
-    for(const d of incoming){
-      if(!d) continue;
-      const hasLegacy = d.legacyId !== undefined && d.legacyId !== null && String(d.legacyId).trim() !== '';
-      if(hasLegacy){
-        const num = 1000000 + parseInt(d.legacyId, 10);
-        if(!Number.isNaN(num)){ d.id = 'old_' + num; d.trackToken = 'old' + num; }
-      }
-      // ضمان تفرّد نهائي مهما كان شكل الملف
-      let base = d.id || 'dev', unique = base, k = 2;
-      while(seen.has(unique)){ unique = base + '_' + k; k++; }
-      if(unique !== d.id){ d.id = unique; if(!d.trackToken) d.trackToken = String(unique).replace(/_/g,''); }
-      seen.add(unique);
+// يتقري ويتفحص فور الاختيار (قبل أي مودال) — عشان أي مشكلة في الملف تبان فوراً وبوضوح،
+// وعشان مايتأجّلش قراءة الملف على iOS لحد بعد فتح نافذة الاختيار.
+// توحيد الـ IDs: بيمنع تعليق الاستيراد بسبب id مكرر (الـ legacyId هو المفتاح الفريد الحقيقي)
+function normalizeImportIds(incoming){
+  const seen = new Set();
+  for(const d of incoming){
+    if(!d) continue;
+    const hasLegacy = d.legacyId !== undefined && d.legacyId !== null && String(d.legacyId).trim() !== '';
+    if(hasLegacy){
+      const num = 1000000 + parseInt(d.legacyId, 10);
+      if(!Number.isNaN(num)){ d.id = 'old_' + num; d.trackToken = 'old' + num; }
     }
+    let base = d.id || 'dev', unique = base, k = 2;
+    while(seen.has(unique)){ unique = base + '_' + k; k++; }
+    if(unique !== d.id){ d.id = unique; if(!d.trackToken) d.trackToken = String(unique).replace(/_/g,''); }
+    seen.add(unique);
   }
+  return incoming;
+}
+
+async function importBackup(incoming){
+  normalizeImportIds(incoming);
 
   // دمج مع الموجود (بدون تكرار)
   const existingIds = new Set(devices.map(d => d.id));
   const toAdd = incoming.filter(d => d && d.id && !existingIds.has(d.id));
-  document.getElementById('importFile').value = '';
 
-  if(toAdd.length === 0){ alert('كل الأجهزة في الملف موجودة بالفعل — مفيش حاجة جديدة تتضاف.'); return; }
-
-  // الملفات الكبيرة محتاجة نت مستقر — منسمحش بيها أوفلاين
-  if(!isOnline()){
-    alert('استيراد نسخة كبيرة محتاج نت — اتصل بالنت الأول عشان البيانات ترفع كاملة.');
+  // ملاحظة: مفيش alert/confirm هنا خالص — النوافذ دي بتتبلع على الآيفون بعد تنزيل نسخة الأمان،
+  // فالاستيراد كان بيقف من غير ما يبان أي حاجة. كل الرسايل بقت تبان جوه الصفحة.
+  if(toAdd.length === 0){
+    showError(t('msg.importAllExist'));
     return;
   }
 
-  if(toAdd.length > 300 && !confirm(`هيتضاف ${toAdd.length} جهاز للسيستم.\n\nالعملية دي ممكن تاخد شوية دقايق حسب النت — سيب الصفحة مفتوحة لحد ما تخلص.\n\nنبدأ؟`)) return;
+  if(!isOnline()){
+    showError(t('msg.importNeedNet'));
+    return;
+  }
 
   // اختبار اتصال: نرفع أول جهاز ونتأكد إنه وصل فعلاً قبل ما نكمّل
+  // بنعيد المحاولة كذا مرة — قطعة نت بسيطة كانت بتوقف الاستيراد كله من أول طلب
   setSaving(true);
-  try{
+  {
     const test = toAdd[0];
-    const { error: te } = await withTimeout(
-      sb.from('devices_data').upsert([{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' }),
-      12000, 'اختبار الرفع');
-    if(te) throw te;
-    const { data: chk, error: ce } = await withTimeout(
-      sb.from('devices_data').select('id').eq('id', test.id).maybeSingle(), 12000, 'التحقق من الرفع');
-    if(ce) throw ce;
-    if(!chk){ throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك'); }
-  }catch(e){
-    setSaving(false);
-    alert('الاستيراد مش هيشتغل — السبب:\n\n' + ((e && (e.message||e.hint||e.details)) || e) + '\n\nلو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.');
-    return;
+    let ok = false, lastErr = null;
+    for(let attempt = 0; attempt < 4 && !ok; attempt++){
+      try{
+        const { error: te } = await withTimeout(
+          sb.from('devices_data').upsert([{ id: test.id, data: test, updated_at: new Date().toISOString() }], { onConflict: 'id' }),
+          25000, 'اختبار الرفع');
+        if(te) throw te;
+        const { data: chk, error: ce } = await withTimeout(
+          sb.from('devices_data').select('id').eq('id', test.id).maybeSingle(), 25000, 'التحقق من الرفع');
+        if(ce) throw ce;
+        if(!chk) throw new Error('الصف اترفع بس مش موجود على السيرفر — غالباً مشكلة صلاحيات أو الاشتراك');
+        ok = true;
+      }catch(e){
+        lastErr = e;
+        if(attempt < 3) await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+      }
+    }
+    if(!ok){
+      setSaving(false);
+      const msg = (lastErr && (lastErr.message || lastErr.hint || lastErr.details)) || String(lastErr);
+      const isNetwork = /load failed|failed to fetch|network|timeout|انتهت المهلة/i.test(msg);
+      showError(isNetwork
+        ? `الاتصال بالنت قطع أثناء الرفع (${msg}). البيانات في الملف زي ما هي — اتأكد إن النت ثابت ودوس استيراد بنفس الملف تاني، وهيكمّل الناقص بس.`
+        : `الاستيراد مش هيشتغل — السبب: ${msg} — لو مكتوب "row-level security" أو "subscription": الاشتراك محتاج يتجدد من Supabase.`);
+      return;
+    }
   }
 
   // نرفع الباقي على دفعات
@@ -1631,16 +1670,16 @@ async function importBackup(file){
     const chunk = rest.slice(i, i + BATCH);
     const rows = chunk.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }));
     let ok = false, lastErr = '';
-    for(let attempt = 0; attempt < 3 && !ok; attempt++){
+    for(let attempt = 0; attempt < 4 && !ok; attempt++){
       try{
         const { error } = await withTimeout(
-          sb.from('devices_data').upsert(rows, { onConflict: 'id' }), 20000, 'رفع دفعة أجهزة');
+          sb.from('devices_data').upsert(rows, { onConflict: 'id' }), 30000, 'رفع دفعة أجهزة');
         if(error) throw error;
         ok = true;
       }catch(e){
         lastErr = (e && (e.message || e.hint || e.details)) || String(e);
-        if(attempt === 2){ failed += chunk.length; window._importLastError = lastErr; }
-        else await new Promise(r => setTimeout(r, 800));
+        if(attempt === 3){ failed += chunk.length; window._importLastError = lastErr; }
+        else await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
     if(ok){
@@ -1663,11 +1702,26 @@ async function importBackup(file){
   hideImportProgress();
 
   if(failed > 0){
-    const reason = window._importLastError ? ('\n\nسبب الفشل: ' + window._importLastError) : '';
-    alert(`تم استيراد ${done} جهاز بنجاح.\nفشل ${failed} جهاز.${reason}\n\nاستورد نفس الملف تاني وهيكمّل الناقص بس.`);
+    const reason = window._importLastError ? (' — سبب الفشل: ' + window._importLastError) : '';
+    showError(`تم استيراد ${done.toLocaleString('en-EG')} جهاز، وفشل ${failed.toLocaleString('en-EG')}${reason}. استورد نفس الملف تاني وهيكمّل الناقص بس.`);
   }else{
-    alert(`تم استيراد ${done} جهاز بنجاح ✅`);
+    showImportDone(`✅ تم استيراد ${done.toLocaleString('en-EG')} جهاز بنجاح`);
   }
+}
+
+// رسالة نجاح خضرا جوه الصفحة (بدل alert اللي بيتبلع على الآيفون بعد التنزيل)
+function showImportDone(msg){
+  let el = document.getElementById('importDoneBar');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'importDoneBar';
+    el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;background:#16A34A;color:#fff;'
+      + 'text-align:center;font:800 14px/1.7 inherit;padding:12px 14px;';
+    el.onclick = () => el.remove();
+    document.body.appendChild(el);
+  }
+  el.textContent = msg + ' — (اضغط للإخفاء)';
+  setTimeout(() => { const e = document.getElementById('importDoneBar'); if(e) e.remove(); }, 12000);
 }
 
 // شريط تقدم الاستيراد
@@ -1681,10 +1735,10 @@ function showImportProgress(done, total){
   }
   const pct = Math.round((done / total) * 100);
   bar.innerHTML = `<div class="ip-inner">
-    <div class="ip-title">📥 جاري استيراد البيانات القديمة</div>
+    <div class="ip-title">📥 ${t('ui.importing')}</div>
     <div class="ip-track"><div class="ip-fill" style="width:${pct}%"></div></div>
     <div class="ip-nums">${done.toLocaleString('en')} من ${total.toLocaleString('en')} (${pct}%)</div>
-    <div class="ip-hint">سيب الصفحة مفتوحة — متقفلهاش لحد ما تخلص</div>
+    <div class="ip-hint">${t('ui.keepOpen')}</div>
   </div>`;
 }
 function hideImportProgress(){
@@ -1707,13 +1761,13 @@ function refreshOpenOverlays(){
 function renderBoard(){
   const board = document.getElementById('board');
   board.innerHTML = STATUSES.map(s => {
-    const count = devices.filter(d => d.status === s.key).length;
+    const count = devices.filter(d => effStatus(d) === s.key).length;
     return `<button class="column" onclick="openColumn('${s.key}')">
       <div class="column-head">
-        <span class="title" style="color:${accent(s.varname)}">${s.label}</span>
+        <span class="title" style="color:${accent(s.varname)}">${stLabel(s)}</span>
       </div>
       <div class="column-count" style="color:${accent(s.varname)}">${count}</div>
-      <div class="column-hint">جهاز — اضغط للعرض</div>
+      <div class="column-hint">${t('board.deviceCountHint')}</div>
     </button>`;
   }).join('');
 }
@@ -1754,8 +1808,8 @@ let colScrollAttached = false;
 function renderColumn(keepPos){
   const s = statusInfo(currentColumn);
   const q = document.getElementById('columnSearch').value.trim();
-  colFullList = devices.filter(d => d.status === currentColumn && matchesSearch(d, q));
-  document.getElementById('columnTitle').textContent = `${s.label} (${colFullList.length.toLocaleString('en-EG')})`;
+  colFullList = devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q));
+  document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
 
   const scroller = document.querySelector('#columnOverlay .modal');
@@ -1764,7 +1818,7 @@ function renderColumn(keepPos){
   const listEl = document.getElementById('columnList');
 
   if(colFullList.length === 0){
-    listEl.innerHTML = `<div class="empty-col">لا توجد أجهزة</div>`;
+    listEl.innerHTML = `<div class="empty-col">${t('board.empty')}</div>`;
     colShown = 0; updateColMoreFooter();
     return;
   }
@@ -1843,37 +1897,23 @@ function cardHtml(d, s){
 }
 
 function paymentBadge(d){
-  if(d.paymentStatus === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ محاسَب عليه</span>`;
+  if(d.paymentStatus === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ ${t('ui.settled')}</span>`;
   const price = parseInt(d.agreedPrice) || 0;
-  if(price > 0) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ لسه ماتحصّلش</span>`;
-  return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ لسه مش متسعّر</span>`;
+  if(price > 0) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notCollected')}</span>`;
+  return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notPriced')}</span>`;
 }
 
 // بلوك الدفع في التفاصيل + زرار "تم الدفع" للكاش
-function paymentDetailHtml(d){
-  if(d.status !== 'delivered') return '';
-  const price = parseInt(d.agreedPrice) || 0;
-  if(d.paymentStatus === 'paid'){
-    const how = d.paymentType === 'deferred' ? 'آجل على حساب المحل' : 'كاش';
-    return `<div style="background:var(--paid-bg);color:var(--paid);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-weight:700;">✓ محاسَب عليه (${how})${price?` — ${price.toLocaleString('en-EG')} ج.م`:''}</div>`;
-  }
-  if(price > 0 && d.paymentType !== 'deferred'){
-    return `<div style="background:var(--unpaid-bg);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-      <div style="color:var(--unpaid);font-weight:700;margin-bottom:8px;">⏳ كاش — لسه ماتحصّلش (${price.toLocaleString('en-EG')} ج.م)</div>
-      <button class="btn-primary" style="box-shadow:none;background:var(--paid);" onclick="markPaid()">💵 تم الدفع</button>
-    </div>`;
-  }
-  return `<div style="background:var(--unpaid-bg);color:var(--unpaid);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-weight:700;">⏳ لسه مش متسعّر — اكتب السعر</div>`;
-}
-
+// (اتشالت — بلوك الدفع الموحّد فوق بقى بيغطيها)
 async function markPaid(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const price = parseInt(d.agreedPrice) || 0;
-  if(price <= 0){ alert('لازم تكتب السعر الأول قبل ما تأكّد الدفع'); return; }
+  if(price <= 0){ alert(t('msg.needPriceFirst')); return; }
+  const labelKey = d.status === 'delivered' ? 'hist.paidDelivered' : 'hist.paidCash';
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
-        statusHistory:[...(x.statusHistory||[]), {status:'delivered', label:'تم الدفع (كاش) — محاسَب عليه', date:new Date().toISOString(), by:currentUser.name}] }
+        statusHistory:[...(x.statusHistory||[]), {status:x.status, labelKey, date:new Date().toISOString(), by:currentUser.name}] }
     : x);
   renderDetail(); render(); await persist();
   const t = devices.find(x=>x.id===selectedId);
@@ -1885,6 +1925,8 @@ function openAddModal(){
   ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => document.getElementById('f_'+id).value = '');
   document.getElementById('accountantList').innerHTML = accountantOptions();
+  const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
+  if(_sec && _back && _sec.parentElement !== _back) _back.appendChild(_sec);   // نضمن رجوعه لمكانه
   resetLock();
   buildCustPhoneMap();
   setAddPayType('cash');
@@ -2028,13 +2070,98 @@ function viewLockImage(id){
 
 // عرض القفل في تفاصيل الجهاز
 function lockDisplayHtml(d){
+  const editBtn = `<button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin:8px 0 10px;" onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
-    return `<div class="detail-row"><span>🔒 رمز القفل</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>`;
+    return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
-    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 نمط القفل${d.lockPattern?` — <span style="font-family:monospace;font-weight:700;">${esc(d.lockPattern)}</span>`:''}</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="width:130px;height:130px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>`;
+    return `<div style="margin:10px 0;">
+      <div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 نمط القفل${d.lockPattern?` — <span style="font-family:monospace;font-weight:700;">${esc(d.lockPattern)}</span>`:''}</div>
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <img id="lockPatImg" src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="width:130px;height:130px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;">
+        <div id="patReplayBox" style="display:none;"></div>
+      </div>
+      ${d.lockPattern ? `<button class="acc-mini-btn" style="margin-top:8px;" onclick="replayPattern('${esc(d.lockPattern)}')">▶️ ${t('lock.replay')}</button>` : ''}
+    </div>${editBtn}`;
   if(d.lockType==='image' && d.lockImage)
-    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 صورة القفل</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>`;
-  return '';
+    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 ${t('ui.lockImage')}</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>${editBtn}`;
+  return `<div style="font-size:13px;color:#94A3B8;margin:8px 0 0;">🔓 ${t('lock.none')}</div>${editBtn}`;
+}
+
+// تشغيل النمط خطوة بخطوة (حوالي 300ms لكل نقطة)
+function replayPattern(seqStr){
+  const seq = String(seqStr||'').split('-').map(n => parseInt(n)).filter(n => n>=1 && n<=9);
+  if(seq.length < 2) return;
+  const box = document.getElementById('patReplayBox');
+  const img = document.getElementById('lockPatImg');
+  if(!box) return;
+  box.style.display = 'block';
+  if(img) img.style.display = 'none';
+
+  const S = 130, g = S/3;
+  const pts = [];
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++) pts.push({ n:r*3+c+1, x:g*c+g/2, y:g*r+g/2 });
+
+  box.innerHTML = `<svg id="patReplaySvg" width="${S}" height="${S}" style="border:1px solid #E2E8F0;border-radius:12px;background:#fff;">
+    <polyline id="patReplayLine" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points=""/>
+    ${pts.map(p=>`<circle id="rp${p.n}" cx="${p.x}" cy="${p.y}" r="6" fill="#CBD5E1"/>`).join('')}
+  </svg>
+  <div id="patReplayStep" style="text-align:center;font-size:12px;color:#64748B;margin-top:4px;"></div>`;
+
+  const line = document.getElementById('patReplayLine');
+  const stepLbl = document.getElementById('patReplayStep');
+  let i = 0;
+  const timer = setInterval(() => {
+    if(i >= seq.length){
+      clearInterval(timer);
+      setTimeout(() => {   // نرجّع الصورة بعد ما يخلص
+        if(img) img.style.display = '';
+        box.style.display = 'none';
+      }, 1200);
+      return;
+    }
+    const p = pts[seq[i]-1];
+    const dot = document.getElementById('rp'+seq[i]);
+    if(dot){ dot.setAttribute('fill','#2563EB'); dot.setAttribute('r','9'); }
+    const cur = line.getAttribute('points');
+    line.setAttribute('points', (cur ? cur + ' ' : '') + p.x + ',' + p.y);
+    if(stepLbl) stepLbl.textContent = `خطوة ${i+1} من ${seq.length} — نقطة ${seq[i]}`;
+    i++;
+  }, 300);
+}
+
+// تعديل رمز القفل في أي مرحلة من عمر الجهاز
+function openEditLock(){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  // بننقل قسم القفل نفسه (مش نسخة) عشان مايبقاش فيه IDs مكررة
+  const sec = document.getElementById('lockSection');
+  const host = document.getElementById('editLockHost');
+  if(sec && host) host.appendChild(sec);
+  resetLock();
+  document.getElementById('editLockOverlay').classList.remove('hidden');
+}
+function closeEditLock(){
+  document.getElementById('editLockOverlay').classList.add('hidden');
+  // نرجّعه مكانه في شاشة تسجيل جهاز جديد
+  const sec = document.getElementById('lockSection');
+  const back = document.getElementById('lockHostAdd');
+  if(sec && back) back.appendChild(sec);
+}
+
+async function saveEditedLock(){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const lock = collectLock();
+  if(!lock.lockType){ alert(t('msg.needLock')); return; }
+  const label = lock.lockType==='text' ? 'رمز رقمي/نصي' : (lock.lockType==='pattern' ? 'نمط مرسوم' : 'صورة');
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...lock, lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
+        activityNotes:[...(x.activityNotes||[]), { text:'تم تحديث رمز قفل الجهاز (' + label + ')',
+          at:new Date().toISOString(), by:currentUser.name, role:isSuperAdmin()?'أدمن':'موظف' }] }
+    : x);
+  closeEditLock();
+  renderDetail(); render();
+  await persist();
 }
 
 // قايمة النسخ الاحتياطي المنسدلة
@@ -2158,35 +2285,37 @@ function renderDetail(){
   if(!d) return closeDetail();
   const s = statusInfo(d.status);
   const rows = [
-    ['تاريخ ووقت الدخول', formatDateTime(d.intakeDate)],
-    d.serialNumber ? ['الرقم التسلسلي', d.serialNumber, true] : null,
-    d.conditionNotes ? ['حالة الجهاز عند الاستلام', d.conditionNotes] : null,
-    d.lastModifiedAt ? ['آخر تعديل', formatDateTime(d.lastModifiedAt)] : null,
+    [t('det.intakeAt'), formatDateTime(d.intakeDate)],
+    d.serialNumber ? [t('det.serial'), d.serialNumber, true] : null,
+    d.conditionNotes ? [t('det.condition'), d.conditionNotes] : null,
+    d.lastModifiedAt ? [t('det.lastEdit'), formatDateTime(d.lastModifiedAt)] : null,
   ].filter(Boolean).map(([label,val,mono]) => `<div class="detail-row"><span>${esc(label)}</span><span ${mono?'style="font-family:monospace;color:var(--accent);font-weight:700"':''}>${esc(val)}</span></div>`).join('');
 
-  const pills = STATUSES.map(st => {
+  const pills = ACTION_STATUSES.map(st => {
     if(st.key === 'delivered'){
       const active = d.status==='delivered';
       const priced = (parseInt(d.agreedPrice)||0) > 0;
-      const hint = priced
-        ? (d.paymentType==='deferred' ? 'تم التسليم — آجل يتضاف على حساب المحل' : 'تم التسليم — محاسَب عليه فوري')
-        : 'تم التسليم — هيفضل "مش متسعر" لحد ما تحدد السعر';
+      const hint = !priced
+        ? 'تم التسليم — هيفضل "بانتظار الدفع" لحد ما تحدد السعر'
+        : (d.paymentType==='deferred'
+            ? 'تم التسليم والدفع — المبلغ بيتضاف على حساب المحل'
+            : 'تم التسليم - بانتظار الدفع — لحد ما تدوس "تأكيد الدفع"');
       return `
         <button class="pill" style="border-color:${accent('paid')};
           background:${active?accent('paid'):'#fff'}; color:${active?'#fff':accent('paid')}"
-          title="${hint}" onclick="changeStatus('delivered')">تم التسليم</button>
+          title="${hint}" onclick="changeStatus('delivered')">${t('status.delivered')}</button>
       `;
     }
     return `
     <button class="pill" style="border-color:${accent(st.varname)};
       background:${d.status===st.key?accent(st.varname):'#fff'};
       color:${d.status===st.key?'#fff':accent(st.varname)}"
-      onclick="changeStatus('${st.key}')">${st.label}</button>
+      onclick="changeStatus('${st.key}')">${stLabel(st)}</button>
   `;
   }).join('');
 
   const history = (d.statusHistory||[]).map(h =>
-    `<div class="hist-item">‹ ${esc(h.label || statusInfo(h.status)?.label)} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">بواسطة ${esc(h.by)}</b>` : ''}</div>`
+    `<div class="hist-item">‹ ${esc(histLabel(h))} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">${t('det.by')} ${esc(h.by)}</b>` : ''}</div>`
   ).join('');
 
   document.getElementById('detailModal').innerHTML = `
@@ -2197,46 +2326,55 @@ function renderDetail(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
 
     <div class="row2">
-      <label class="field"><span>اسم العميل</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>اسم المحل</span><input value="${esc(d.shopName||'')}" placeholder="اسم المحل" onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}" onblur="editField('shopName', this.value)" /></label>
     </div>
-    <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
     ${(parseInt(d.agreedPrice)||0) > 0 && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
-          <div class="approval-pending">⏳ في انتظار رد العميل على السعر...</div>
+          <div class="approval-pending">${t('det.priceWaiting')}</div>
         ` : trackResponses.price_response === 'accepted' ? `
-          <div class="approval-yes">✅ العميل وافق على السعر</div>
+          <div class="approval-yes">${t('det.priceYes')}</div>
         ` : `
-          <div class="approval-no">❌ العميل رفض السعر</div>
+          <div class="approval-no">${t('det.priceNo')}</div>
         `}
       </div>
     ` : ''}
     ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
-      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع${d.status==='delivered' ? ' (اتحددت عند التسليم)' : ''}</span>
-      ${d.status==='delivered'
-        ? `<div style="font-size:14.5px;font-weight:700;">${d.paymentType==='deferred' ? '🕐 آجل — على حساب المحل' : '💵 فوري'}</div>`
-        : `<div class="pay-choice">
-            <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">فوري</button>
-            <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
-          </div>`}
+      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
+      </div>
+      ${d.paymentType === 'deferred'
+        ? (isPaidDevice(d)
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
+                 ✓ ${t('det.paidViaAccount')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.settled')}
+               </div>`
+            : `<div style="background:#FEF3C7;color:#B45309;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
+                 🕐 ${t('det.deferredPending')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.deferredPendingHint')}
+               </div>`)
+        : (isPaidDevice(d)
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
-    ${d.billedShop ? `<div class="detail-row"><span>متحاسب على حساب محل</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
+    ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
-    <label class="field"><span>العطل / المشكلة</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+    <label class="field"><span>${t('det.issue')}</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
 
     <div class="approval-box">
       ${!d.deepInspection || !d.deepInspection.requested ? `
-        <button class="btn-secondary" style="width:100%; color:#7C3AED; border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 طلب موافقة العميل على فحص دقيق</button>
+        <button class="btn-secondary" style="width:100%; color:#7C3AED; border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 ${t('det.deepReq')}</button>
       ` : !trackResponses.deep_inspection_response ? `
-        <div class="approval-pending">⏳ في انتظار رد العميل على طلب الفحص الدقيق...
-          <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">إلغاء الطلب</button>
+        <div class="approval-pending">⏳ ${t('det.deepWaiting')}
+          <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">${t('det.deepCancel')}</button>
         </div>
       ` : trackResponses.deep_inspection_response === 'accepted' ? `
-        <div class="approval-yes">✅ العميل وافق على الفحص الدقيق</div>
+        <div class="approval-yes">${t('det.deepYes')}</div>
       ` : `
-        <div class="approval-no">❌ العميل رفض الفحص الدقيق
-          <button class="acc-mini-btn" onclick="requestDeepInspection()" style="margin-inline-start:8px;">إعادة الطلب</button>
+        <div class="approval-no">❌ ${t('det.deepNo')}
+          <button class="acc-mini-btn" onclick="requestDeepInspection()" style="margin-inline-start:8px;">${t('det.deepRetry')}</button>
         </div>
       `}
     </div>
@@ -2246,68 +2384,67 @@ function renderDetail(){
 
     <div class="tech-row">
       <label class="field">
-        <span>الفني المسؤول عن الصيانة</span>
-        <input id="techInput" list="technicianList" value="${esc(d.technician||'')}" placeholder="اسم الفني" onblur="assignTechnician(this.value)" />
+        <span>${t('det.technician')}</span>
+        <input id="techInput" list="technicianList" value="${esc(d.technician||'')}" placeholder="${t('det.technicianPh')}" onblur="assignTechnician(this.value)" />
       </label>
       <label class="field">
-        <span>اسم المحاسب اللي سجله</span>
-        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="اسم المحاسب" onblur="editField('registeredBy', this.value)" />
+        <span>${t('det.accountant')}</span>
+        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}" onblur="editField('registeredBy', this.value)" />
       </label>
     </div>
     <datalist id="technicianList">${technicianOptions()}</datalist>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
-    ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ لازم تحدد الفني المسؤول قبل ما الجهاز يخرج من "قيد الانتظار"</div>` : ''}
+    ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
-      <span>⭐ إدارة النقاط والفني المساعد</span>
+      <span>⭐ ${t('det.pointsToggle')}</span>
       <span id="pointsToggleArrow">${pointsBoxOpen ? '▲' : '▼'}</span>
     </button>
     <div class="points-box" id="pointsBox" style="${pointsBoxOpen ? '' : 'display:none;'}">
       <div style="margin-bottom:10px;">
-        <span style="font-size:13px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
+        <span style="font-size:13px; color:#64748B; display:block; margin-bottom:6px;">${t('det.dealType')}</span>
         <div class="pay-choice">
-          <button type="button" style="border-color:#2563EB;${!d.isWholesale?'background:#2563EB;color:#fff;':'background:#fff;color:#2563EB;'}" onclick="setWholesale(false)">قطاعي</button>
-          <button type="button" style="border-color:#7C3AED;${d.isWholesale?'background:#7C3AED;color:#fff;':'background:#fff;color:#7C3AED;'}" onclick="setWholesale(true)">جملة (بدون نقاط)</button>
+          <button type="button" style="border-color:#2563EB;${!d.isWholesale?'background:#2563EB;color:#fff;':'background:#fff;color:#2563EB;'}" onclick="setWholesale(false)">${t('det.retail')}</button>
+          <button type="button" style="border-color:#7C3AED;${d.isWholesale?'background:#7C3AED;color:#fff;':'background:#fff;color:#7C3AED;'}" onclick="setWholesale(true)">${t('det.wholesale')}</button>
         </div>
       </div>
       ${!d.isWholesale ? `
-        <label class="field"><span>⭐ نقاط الصيانة (لتقييم الفني في الملخص)</span>
+        <label class="field"><span>⭐ ${t('det.points')}</span>
           <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)" onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
         </label>
         ${d.technician ? `
         <div class="tech-row">
-          <label class="field"><span>🤝 فني مساعد (اختياري)</span>
-            <input list="technicianList" value="${esc(d.assistTechnician||'')}" placeholder="اسم الفني المساعد" onblur="editField('assistTechnician', this.value)" />
+          <label class="field"><span>🤝 ${t('det.assistTech')}</span>
+            <input list="technicianList" value="${esc(d.assistTechnician||'')}" placeholder="${t('det.assistTechPh')}" onblur="editField('assistTechnician', this.value)" />
           </label>
-          <label class="field"><span>نسبته من النقاط %</span>
+          <label class="field"><span>${t('det.assistPercent')}</span>
             <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)" onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
           </label>
-        </div>` : `<div style="font-size:12px;color:#94A3B8;">حدد الفني الرئيسي الأول عشان تقدر تضيف مساعد</div>`}
-      ` : `<div style="font-size:12px;color:#94A3B8;">الجهاز مسجل جملة — مش بيتحسب عليه نقاط لأي فني</div>`}
+        </div>` : `<div style="font-size:12px;color:#94A3B8;">${t('det.assistNeedMain')}</div>`}
+      ` : `<div style="font-size:12px;color:#94A3B8;">${t('det.wholesaleNote')}</div>`}
     </div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <span style="font-size:12px;color:#64748B;">تغيير حالة الجهاز</span>
-      <button class="btn-secondary" style="color:#2563EB;border-color:#BFDBFE;padding:5px 10px;font-size:11px;" onclick="copyTrackLink('${d.id}')">🔗 لينك المتابعة</button>
-      ${d.customerPhone ? `<button class="btn-secondary" style="color:#16A34A;border-color:#BBF7D0;padding:5px 10px;font-size:11px;" onclick="openWa('${esc(d.customerPhone)}', waStatusMsg(devices.find(x=>x.id==='${d.id}'), devices.find(x=>x.id==='${d.id}').status))">💬 واتساب العميل</button>` : ''}
-      <button class="btn-secondary" style="color:var(--ink);border-color:#E2E8F0;padding:5px 10px;font-size:11px;" onclick="toggleDetailLabel('${d.id}')">🖨 طباعة ليبل</button>
+      <span style="font-size:12px;color:#64748B;">${t('det.changeStatus')}</span>
+      <button class="btn-secondary" style="color:#2563EB;border-color:#BFDBFE;padding:5px 10px;font-size:11px;" onclick="copyTrackLink('${d.id}')">🔗 ${t('det.trackLink')}</button>
+      ${d.customerPhone ? `<button class="btn-secondary" style="color:#16A34A;border-color:#BBF7D0;padding:5px 10px;font-size:11px;" onclick="openWa('${esc(d.customerPhone)}', waStatusMsg(devices.find(x=>x.id==='${d.id}'), devices.find(x=>x.id==='${d.id}').status))">💬 ${t('det.waCustomer')}</button>` : ''}
+      <button class="btn-secondary" style="color:var(--ink);border-color:#E2E8F0;padding:5px 10px;font-size:11px;" onclick="toggleDetailLabel('${d.id}')">🖨 ${t('det.printLabel')}</button>
     </div>
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
-    ${paymentDetailHtml(d)}
     <div class="status-pills">${pills}</div>
-    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">سجل الحالات</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${t('det.statusLog')}</div>
     <div style="margin-bottom:10px;">${history}</div>
-    <div style="font-size:12px;color:#64748B;margin:14px 0 8px;">📝 ملاحظات إضافية (سجل بيتزاد وميتعدّلش)</div>
+    <div style="font-size:12px;color:#64748B;margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
     <div style="margin-bottom:8px;">${(d.activityNotes||[]).length
       ? (d.activityNotes||[]).map(n => `<div style="background:#F8FAFC;border:1px solid #EEF0F3;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
           <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(n.text)}</div>
           <div style="font-size:11px;color:#94A3B8;margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by||'')}${n.role?` (${esc(n.role)})`:''}</div>
         </div>`).join('')
-      : '<div style="color:#94A3B8;font-size:12px;">مفيش ملاحظات إضافية لسه</div>'}</div>
-    <textarea id="newActivityNote" rows="2" placeholder="اكتب ملاحظة جديدة تتسجّل باسمك ووقتها..." style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
-    <button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin-bottom:10px;" onclick="addActivityNote()">➕ إضافة ملاحظة</button>
-    <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:#E2E8F0;margin-bottom:8px;" onclick="openTimeline()">⏱ فروقات التوقيت بين الخانات</button>
-    <button class="danger-btn" onclick="deleteDevice()">حذف الجهاز</button>
+      : `<div style="color:#94A3B8;font-size:12px;">${t('det.noNotes')}</div>`}</div>
+    <textarea id="newActivityNote" rows="2" placeholder="${t('det.newNotePh')}" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
+    <button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin-bottom:10px;" onclick="addActivityNote()">➕ ${t('det.addNote')}</button>
+    <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:#E2E8F0;margin-bottom:8px;" onclick="openTimeline()">⏱ ${t('det.timeline')}</button>
+    <button class="danger-btn" onclick="deleteDevice()">${t('det.delete')}</button>
   `;
 }
 
@@ -2361,34 +2498,88 @@ function onCustomerNameInput(){
 
 // ===== استيراد بخيار دمج / استبدال كامل + نسخة أمان تلقائية قبل =====
 let pendingImportFile = null;
-function onImportFileChosen(file){
+let pendingImportDevices = null;
+async function onImportFileChosen(file){
+  if(!isSuperAdmin()){ showError(t('msg.importSuperOnly')); return; }
   if(!file) return;
-  pendingImportFile = file;
+  pendingImportDevices = null;
+  const _info0 = document.getElementById('importChoiceInfo');
+  if(_info0) delete _info0.dataset.confirmReplace;
+  // بنقرا الملف ونفكّه فوراً — قبل ما نفضّي الـ input وقبل أي نسخة أمان أو نافذة،
+  // عشان الذاكرة تكون فاضية وقت الفك (ده كان بيفشل في الدمج على الموبايل مع الملفات الكبيرة).
+  let incoming = null, failReason = '';
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    incoming = Array.isArray(parsed) ? parsed : parsed.devices;
+    if(!Array.isArray(incoming) || incoming.length === 0){ incoming = null; failReason = 'الملف مافيهوش قايمة أجهزة'; }
+  }catch(e){
+    failReason = (e && e.message) ? e.message : String(e);
+  }
   document.getElementById('importFile').value = '';
+  if(!incoming){
+    showError(`ما قدرتش أقرا الملف "${file.name}" — السبب: ${failReason}. لو الملف كبير، اقفل أي تابات تانية وجرّب تاني، أو استخدم الاستبدال الكامل.`);
+    return;
+  }
+  pendingImportDevices = normalizeImportIds(incoming);
+  pendingImportFile = file;
+  // نوري المستخدم ${t('ui.importFileHas')} إيه وكام جهاز جديد فعلاً — جوه الصفحة، من غير نوافذ متصفح
+  const have = new Set(devices.map(d => d.id));
+  const newCount = pendingImportDevices.filter(d => d && d.id && !have.has(d.id)).length;
+  const info = document.getElementById('importChoiceInfo');
+  if(info){
+    info.innerHTML = `<div style="background:#F1F5F9;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.9;margin-bottom:12px;">
+      📄 <b>${esc(file.name)}</b><br>
+      ${t('ui.importFileHas')} <b>${pendingImportDevices.length.toLocaleString('en-EG')}</b> جهاز —
+      منهم <b style="color:${newCount ? '#16A34A' : '#DC2626'};">${newCount.toLocaleString('en-EG')}</b> جديد مش موجود عندك.
+      ${newCount === 0 ? `<br><span style="color:#DC2626;">${t('ui.mergeNothing')}</span>` : ''}
+    </div>`;
+  }
   document.getElementById('backupMenu').classList.add('hidden');
   document.getElementById('importChoiceOverlay').classList.remove('hidden');
 }
 function closeImportChoice(){
   document.getElementById('importChoiceOverlay').classList.add('hidden');
-  pendingImportFile = null;
+  const info = document.getElementById('importChoiceInfo');
+  if(info) delete info.dataset.confirmReplace;
+  pendingImportFile = null; pendingImportDevices = null;
 }
 async function doImportMerge(){
   document.getElementById('importChoiceOverlay').classList.add('hidden');
-  const file = pendingImportFile; pendingImportFile = null;
-  if(!file) return;
+  const list = pendingImportDevices; pendingImportFile = null; pendingImportDevices = null;
+  if(!list) return;
+  // النسخة الاحتياطية بتتعمل بعد ما الملف اتفكّ خلاص — عشان مايتزاحموش على الذاكرة
   try{ exportBackup(); }catch(e){}
-  await importBackup(file);
+  // مهلة صغيرة: تنزيل الملف على الآيفون ممكن يقطع طلبات الشبكة اللي بعده مباشرة
+  await new Promise(r => setTimeout(r, 1500));
+  await addAudit('استورد نسخة (دمج)');
+  await importBackup(list);
 }
 async function doImportReplace(){
+  const list = pendingImportDevices; pendingImportFile = null; pendingImportDevices = null;
+  if(!list) return;
+  if(!isOnline()){
+    document.getElementById('importChoiceOverlay').classList.add('hidden');
+    showError(t('msg.replaceNeedNet'));
+    return;
+  }
+  // تأكيد جوه الصفحة (مش confirm بتاع المتصفح — ده بيتبلع على الآيفون بعد التنزيل)
+  const info = document.getElementById('importChoiceInfo');
+  if(info && !info.dataset.confirmReplace){
+    info.dataset.confirmReplace = '1';
+    info.insertAdjacentHTML('beforeend', `<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.8;color:#B91C1C;">
+      ⚠️ ${t('ui.replaceWarn')} <b>كل</b> ${t('ui.replaceWarn2')}<br>
+      ${t('ui.replaceAgain')}</div>`);
+    pendingImportDevices = list; pendingImportFile = null;   // نستنى الضغطة التانية
+    return;
+  }
   document.getElementById('importChoiceOverlay').classList.add('hidden');
-  const file = pendingImportFile; pendingImportFile = null;
-  if(!file) return;
-  if(!confirm('الاستبدال الكامل هيمسح كل البيانات الحالية ويحط اللي في الملف بدالها.\nمتأكد؟')) return;
-  if(!isOnline()){ alert('الاستبدال محتاج نت.'); return; }
   try{ exportBackup(); }catch(e){}
+  await new Promise(r => setTimeout(r, 1500));   // مهلة بعد التنزيل عشان الشبكة تستقر
   const ok = await purgeAllData();
-  if(!ok){ showError('المسح ما اكتملش — الاستبدال اتوقف والبيانات زي ما هي'); return; }
-  await importBackup(file);
+  if(!ok){ showError(t('msg.replaceAborted')); return; }
+  await addAudit('استبدال كامل للبيانات من ملف نسخة احتياطية');
+  await importBackup(list);
 }
 // مسح كل البيانات بدون تأكيدات (للاستبدال) — بيرجّع true لو نجح
 async function purgeAllData(){
@@ -2447,31 +2638,35 @@ async function changeStatus(newStatus, paymentChoice){
   if(!d) return;
 
   if(d.status === 'waiting' && !['waiting','rejected','returned'].includes(newStatus) && !d.technician){
-    showError('لازم تحدد الفني المسؤول عن الصيانة الأول، قبل ما الجهاز يدخل مراحل الفحص أو الصيانة');
+    showError(t('msg.needTech'));
     renderDetail();
     return;
   }
 
-  let historyLabel = statusInfo(newStatus)?.label;
+  let historyLabel = null; let historyKey = null; let historyVars = null;
   let newPaymentStatus = null;
   let extra = {};
 
   if(newStatus === 'delivered'){
     const price = parseInt(d.agreedPrice) || 0;
     if(price > 0 && d.paymentType === 'deferred'){
-      // آجل: يتضاف على حساب المحل + يتسجّل "تم الدفع" تلقائياً (مفيش زرار)
+      // آجل: يتقيّد على حساب المحل (لو ماتقيّدش قبل كده) ويعتبر متسوّى
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      historyLabel = `تم التسليم — آجل، اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
-      addLedgerDebit({...d, billedShop: shop}, price);
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+        addLedgerDebit({...d, billedShop: shop}, price);
+        historyKey = 'hist.deliveredDeferred'; historyVars = { amount: price.toLocaleString('en-EG'), shop };
+      } else {
+        historyKey = 'hist.deliveredDeferredPrev'; historyVars = { shop };
+      }
     } else if(price > 0){
-      // كاش: ما يتحسبش مدفوع تلقائياً — مستني زرار "تم الدفع"
-      newPaymentStatus = 'unpaid';
-      historyLabel = 'تم التسليم — كاش، لسه ماتحصّلش';
+      // فوري: مستني "تأكيد الدفع"
+      newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
+      historyKey = isPaidDevice(d) ? 'hist.deliveredPaidCash' : 'hist.deliveredPending';
     } else {
       newPaymentStatus = 'unpaid';
-      historyLabel = 'تم التسليم — لسه مش متسعّر';
+      historyKey = 'hist.deliveredNoPrice';
     }
   }
 
@@ -2481,7 +2676,7 @@ async function changeStatus(newStatus, paymentChoice){
         ...x, ...extra,
         status:newStatus,
         paymentStatus: newStatus === 'delivered' ? newPaymentStatus : null,
-        statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, date:new Date().toISOString(), by: currentUser.name}]
+        statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, labelKey:historyKey, labelVars:historyVars, date:new Date().toISOString(), by: currentUser.name}]
       }
     : x);
   renderDetail();
@@ -2496,7 +2691,7 @@ async function deleteDevice(){
   if(delDev && delDev.trackToken){ try{ sb.from('public_track').delete().eq('token', delDev.trackToken); }catch(e){} }
   const d = devices.find(x => x.id === selectedId);
   const name = d ? `${d.deviceType} ${d.model} — ${d.customerName}` : 'الجهاز ده';
-  if(!confirm(`متأكد إنك عايز تمسح "${name}"؟ الحذف ده نهائي ومش هينفع ترجّعه.`)) return;
+  if(!confirm(t('msg.deleteDevice',{name:name}))) return;
   devices = devices.filter(d => d.id !== selectedId);
   closeDetail();
   render();
@@ -2506,7 +2701,16 @@ async function deleteDevice(){
 function formatDuration(ms){
   if(ms <= 0) return '—';
   const minutes = Math.round(ms/60000);
-  if(minutes < 1) return 'أقل من دقيقة';
+  // في الإنجليزي بنستخدم صيغة رقمية بسيطة؛ العربي بيحتفظ بصيغه الطبيعية
+  if(typeof I18N !== 'undefined' && I18N.getLang() === 'en'){
+    if(minutes < 1) return t('dur.lessMin');
+    if(minutes < 60) return minutes === 1 ? t('dur.min1') : t('dur.minN',{n:minutes});
+    const hrs = ms/3600000, dys = ms/86400000;
+    if(hrs < 24){ const wh = Math.round(hrs); return wh === 1 ? t('dur.hour1') : t('dur.hourN',{n:wh}); }
+    const wd = Math.round(dys);
+    return wd === 1 ? t('dur.day1') : t('dur.dayN',{n:wd});
+  }
+  if(minutes < 1) return t('dur.lessMin');
   if(minutes < 60){
     if(minutes === 15) return 'ربع ساعة';
     if(minutes === 30) return 'نص ساعة';
@@ -2556,13 +2760,13 @@ function renderTimeline(){
   const hist = d.statusHistory || [];
   let itemsHtml;
   if(hist.length < 2){
-    itemsHtml = `<div class="empty-col">لسه مفيش انتقالات كفاية بين الخانات</div>`;
+    itemsHtml = `<div class="empty-col">${t('tl.notEnough')}</div>`;
   }else{
     const items = [];
     for(let i=1; i<hist.length; i++){
       const prev = hist[i-1], cur = hist[i];
-      const fromLabel = prev.label || statusInfo(prev.status)?.label;
-      const toLabel = cur.label || statusInfo(cur.status)?.label;
+      const fromLabel = histLabel(prev);
+      const toLabel = histLabel(cur);
       const duration = new Date(cur.date) - new Date(prev.date);
       items.push(`<div class="timeline-item">
         <div class="timeline-transition">${esc(fromLabel)} ← ${esc(toLabel)}</div>
@@ -2572,14 +2776,14 @@ function renderTimeline(){
     }
     const totalDuration = new Date(hist[hist.length-1].date) - new Date(hist[0].date);
     items.push(`<div class="timeline-item" style="border-right-color:var(--ink);background:#F1F5F9;">
-      <div class="timeline-transition">إجمالي الوقت من التسجيل لحد آخر حالة</div>
+      <div class="timeline-transition">${t('tl.total')}</div>
       <div class="timeline-duration">${formatDuration(totalDuration)}</div>
     </div>`);
     itemsHtml = items.join('');
   }
   document.getElementById('timelineModal').innerHTML = `
     <div class="modal-head">
-      <h2>فروقات التوقيت — ${esc(d.deviceType)} ${esc(d.model)}</h2>
+      <h2>${t('tl.title')} — ${esc(d.deviceType)} ${esc(d.model)}</h2>
       <button class="close-btn" onclick="closeTimeline()">×</button>
     </div>
     ${itemsHtml}
@@ -2588,6 +2792,15 @@ function renderTimeline(){
 
 function toggleMenu(){
   document.getElementById('menuDropdown').classList.toggle('hidden');
+}
+// بعد اختيار عنصر من القائمة، الضغطة ممكن "تعدّي" للكارت اللي تحتها وتفتح خانة غلط.
+// الدرع ده بيبلع أي ضغطة تايهة لجزء من الثانية — تحت النوافذ فمش بيعطّل حاجة.
+function shieldGhostClick(ms){
+  const s = document.createElement('div');
+  s.id = 'ghostShield';
+  s.style.cssText = 'position:fixed;inset:0;z-index:25;background:transparent;';
+  document.body.appendChild(s);
+  setTimeout(() => { const el = document.getElementById('ghostShield'); if(el) el.remove(); }, ms || 450);
 }
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('menuDropdown');
@@ -2599,6 +2812,7 @@ document.addEventListener('click', (e) => {
 
 function openSummaries(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   clearSearchBox('invSearch');
   renderSummaries();
   document.getElementById('summariesOverlay').classList.remove('hidden');
@@ -2614,12 +2828,8 @@ function dayKey(dateLike){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function fullStatusLabel(d){
-  const s = statusInfo(d.status);
-  if(d.status === 'delivered'){
-    if(d.paymentStatus === 'paid') return 'تم التسليم — محاسَب عليه';
-    if(d.paymentStatus === 'unpaid') return 'تم التسليم — لسه مش متسعر';
-  }
-  return s ? s.label : d.status;
+  const s = statusInfo(effStatus(d));
+  return s ? stLabel(s) : d.status;
 }
 
 function toNumber(v){
@@ -2629,6 +2839,8 @@ function toNumber(v){
 
 function renderFinancialSummary(){
   const delivered = devices.filter(d => d.status === 'delivered');
+  const deliveredPaid = delivered.filter(d => isPaidDevice(d));
+  const deliveredUnpaid = delivered.filter(d => !isPaidDevice(d));
   const paid = delivered.filter(d => d.paymentStatus === 'paid');
   const unpaid = delivered.filter(d => d.paymentStatus === 'unpaid');
   const paidTotal = paid.reduce((sum,d) => sum + toNumber(d.agreedPrice), 0);
@@ -2653,7 +2865,7 @@ function renderFinancialSummary(){
 /* renderSummaries الجديدة معرفة تحت مع نظام الحسابات */
 
 function renderDayColumns(){
-  if(devices.length === 0) return `<div class="empty-col">لسه مفيش أجهزة متسجلة في النظام</div>`;
+  if(devices.length === 0) return `<div class="empty-col">${t('ui.noDevices')}</div>`;
   const groups = {};
   devices.forEach(d => {
     const k = dayKey(d.intakeDate);
@@ -2675,7 +2887,7 @@ function dayCardHtml(d){
   const s = statusInfo(d.status);
   // وسم أحمر واضح للمرتجع (محتاج إعادة فحص)، وباقي الحالات بلون حالتها
   const badge = d.status === 'returned'
-    ? `<span class="status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 مرتجع — إعادة فحص</span>`
+    ? `<span class="status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 ${t('ui.returnedBadge')}</span>`
     : `<span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
   // مؤشّر رمز القفل عشان الفني يشوفه على طول
   const lock = (d.lockType==='text' && d.lockText)
@@ -2698,7 +2910,7 @@ function renderEmployeeView(query){
     (d.technician && d.technician.includes(query)) || (d.registeredBy && d.registeredBy.includes(query))
   );
   if(matched.length === 0){
-    return `<div class="empty-col">مفيش حد بالاسم ده ليه أجهزة متسجلة</div>`;
+    return `<div class="empty-col">${t('ui.noOneNamed')}</div>`;
   }
 
   const todayList = matched.filter(d => {
@@ -2708,10 +2920,10 @@ function renderEmployeeView(query){
   });
 
   const byStatus = {};
-  matched.forEach(d => { (byStatus[d.status] = byStatus[d.status] || []).push(d); });
+  matched.forEach(d => { const k = effStatus(d); (byStatus[k] = byStatus[k] || []).push(d); });
 
   const todayHtml = todayList.length === 0
-    ? `<div class="empty-col">مفيش نشاط النهاردة</div>`
+    ? `<div class="empty-col">${t('ui.noActivityToday')}</div>`
     : todayList.map(d => dayCardHtml(d)).join('');
 
   const statusChips = STATUSES.map(s => {
@@ -2719,7 +2931,7 @@ function renderEmployeeView(query){
     if(list.length === 0) return '';
     return `<button class="emp-status-chip" style="border:1.5px solid ${accent(s.varname)};color:${accent(s.varname)}"
       onclick="expandEmpStatus('${s.key}', '${esc(query).replace(/'/g,"\\'")}')">
-      <span>${s.label}</span><b>${list.length}</b>
+      <span>${stLabel(s)}</span><b>${list.length}</b>
     </button>`;
   }).join('');
 
@@ -2737,7 +2949,7 @@ function renderEmployeeView(query){
 }
 
 function expandEmpStatus(statusKey, query){
-  const list = devices.filter(d => d.status === statusKey &&
+  const list = devices.filter(d => effStatus(d) === statusKey &&
     ((d.technician && d.technician.includes(query)) || (d.registeredBy && d.registeredBy.includes(query))));
   document.getElementById('empExpanded').innerHTML =
     `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('')}</div>`;
@@ -2908,11 +3120,11 @@ function renderLabelInto(containerId, d){
       ${d.conditionNotes ? `<div style="border-top:1px solid #CBD5E1; margin-top:8px; padding-top:6px; font-size:${d.conditionNotes.length > 60 ? 9 : d.conditionNotes.length > 30 ? 10 : 11}px; font-weight:700; line-height:1.5; text-align:right;">${esc(d.conditionNotes)}</div>` : ''}
     </div>
     <div class="label-size-row">
-      <label>عرض الليبل (مم)<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
-      <label>ارتفاع الليبل (مم)<input id="lblH" type="text" inputmode="decimal" value="${sz.h}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
+      <label>${t('ui.labelW')}<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
+      <label>${t('ui.labelH')}<input id="lblH" type="text" inputmode="decimal" value="${sz.h}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
     </div>
-    <div class="label-hint">اكتب مقاس الليبل الحقيقي بالمليمتر (نفس المقاس المضبوط في إعدادات الطابعة). بيتحفظ تلقائياً للمرات الجاية.</div>
-    <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 طباعة الليبل</button>
+    <div class="label-hint">${t('ui.labelHint')}</div>
+    <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 ${t('ui.printingLabel')}</button>
   `;
   drawQr(d.id);
 }
@@ -2928,14 +3140,14 @@ function drawQr(text, attempt){
       holder.innerHTML = '';
       new QRCode(holder, { text: text, width:110, height:110, correctLevel: QRCode.CorrectLevel.M });
     }catch(e){
-      holder.innerHTML = `<div style="font-size:11px;color:#DC2626;">حصل خطأ في توليد الكود</div>`;
+      holder.innerHTML = `<div style="font-size:11px;color:#DC2626;">${t('ui.barcodeError')}</div>`;
     }
     return;
   }
 
   if(attempt === 0){
     // محاولة تحميل المكتبة من جديد (ممكن تكون فشلت أول مرة)
-    holder.innerHTML = `<div style="font-size:11px;color:#94A3B8;">⏳ جاري تجهيز الباركود...</div>`;
+    holder.innerHTML = `<div style="font-size:11px;color:#94A3B8;">⏳ ${t('ui.barcodePrep')}</div>`;
     const sc = document.createElement('script');
     sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
     sc.onload = () => drawQr(text, 1);
@@ -2952,8 +3164,8 @@ function drawQr(text, attempt){
   }
 
   holder.innerHTML = `<div style="font-size:11px;color:#DC2626;line-height:1.7;">
-    ❌ الباركود مش متاح — الملف الخارجي بتاعه مش بيوصل<br>
-    <span style="color:#94A3B8;font-size:10.5px;">جرّب Ctrl+Shift+R، ولو المشكلة فضلت يبقى النت بيحجب cdnjs</span>
+    ❌ ${t('ui.barcodeFail')}<br>
+    <span style="color:#94A3B8;font-size:10.5px;">${t('ui.cdnHint')}</span>
   </div>`;
 }
 
@@ -2973,7 +3185,7 @@ function grabQrDataUrl(){
 function printLabel(){
   saveLabelSize();
   const d = devices.find(x => x.id === labelDeviceId);
-  if(!d){ alert('حصل خطأ في تجهيز الليبل، اقفل وافتح تاني'); return; }
+  if(!d){ alert(t('msg.labelError')); return; }
 
   const sz = getLabelSize();
   const qr = grabQrDataUrl();
@@ -3002,7 +3214,7 @@ function printLabel(){
   }
 
   const w = window.open('', '_blank', 'width=420,height=320');
-  if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
+  if(!w){ alert(t('msg.printBlocked')); return; }
 
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <title>ليبل ${esc(devRef(d))}</title>
@@ -3123,7 +3335,7 @@ async function checkSessionStillMine(){
     const { data } = await sb.from('active_sessions').select('session_tag').eq('user_id', session.user.id).maybeSingle();
     if(data && data.session_tag && data.session_tag !== sessionTag){
       await sb.auth.signOut();
-      alert('تم تسجيل الدخول بنفس الحساب من جهاز آخر — هيتم تسجيل خروجك من هنا.');
+      alert(t('msg.sessionTaken'));
       window.location.href = 'index.html';
     }
   }catch(e){ /* تجاهل أخطاء الشبكة المؤقتة */ }
@@ -3332,9 +3544,51 @@ function setAddPayType(t){
   f.style.cssText = 'border-color:#B45309;' + (t==='deferred' ? 'background:#B45309;color:#fff;' : 'background:#fff;color:#B45309;');
 }
 
+// تغيير طريقة الدفع في أي مرحلة — بيقيّد على حساب المحل أو يرجّع القيد
 async function editPayType(t){
-  devices = devices.map(d => d.id === selectedId ? { ...d, paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
-  renderDetail(); await persist();
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const price = parseInt(d.agreedPrice) || 0;
+  if(t === d.paymentType && (t !== 'deferred' || isPaidDevice(d))) return;   // مفيش تغيير
+
+  let extra = { paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let note = null; let noteKey = null; let noteVars = null;
+
+  if(t === 'deferred'){
+    if(price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    const shop = (d.billedShop || d.shopName || '').trim();
+    if(!shop){ alert(t('msg.needShopForCredit')); return; }
+    extra.billedShop = shop;
+    if(d.status === 'delivered'){
+      // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+        addLedgerDebit({ ...d, billedShop: shop }, price);
+      }
+      extra.paymentStatus = 'paid';
+      note = null; noteKey = 'hist.toDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
+    } else {
+      // لسه في المحل → مجرد تحديد طريقة الدفع، والقيد بيتعمل أول ما يتسلّم
+      extra.paymentStatus = 'unpaid';
+      note = null; noteKey = 'hist.toDeferredPending'; noteVars = { shop };
+    }
+  } else {
+    // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
+    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id);
+    if(had){
+      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id));
+      await persistLedger();
+    }
+    extra.paymentStatus = 'unpaid';   // مستني "تأكيد الدفع"
+    note = null; noteKey = had ? 'hist.toCashRemoved' : 'hist.toCash';
+  }
+
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory:[...(x.statusHistory||[]),
+        { status:x.status, label:note, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
+  const t2 = devices.find(x => x.id === selectedId);
+  if(t2) syncTrack(t2);
 }
 
 // تعديل السعر: أرقام صحيحة — ولو الجهاز "متسلم بس مش متسعر" واتسعر دلوقتي يتحاسب تلقائياً
@@ -3351,17 +3605,20 @@ async function editPrice(value){
     resetTrackResponse(d.trackToken, 'price');
   }
 
-  if(d.status === 'delivered' && d.paymentStatus !== 'paid' && price){
-    if(d.paymentType === 'deferred'){
-      // آجل: يتضاف على الحساب + يتسجّل "تم الدفع" تلقائياً
+  // تسعير جهاز متسلّم بالفعل ومحدد عليه آجل → يتقيّد على حساب المحل فوراً
+  // (لو لسه في المحل، القيد بيستنى لحد التسليم)
+  if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
+    const shop = (d.billedShop || d.shopName || '').trim();
+    if(shop){
       extra.paymentStatus = 'paid';
-      const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      histEntry = { status:'delivered', label:`اتسعر بعد التسليم — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
-      addLedgerDebit({...d, billedShop: shop}, parseInt(price));
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+        addLedgerDebit({...d, billedShop: shop}, parseInt(price));
+      }
+      histEntry = { status:d.status, labelKey:'hist.pricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
     }
-    // كاش: بنحدّث السعر بس، وبيفضل "لسه ماتحصّلش" لحد ما يتدوس زرار "تم الدفع"
   }
+  // فوري: بنحدّث السعر بس، وبيفضل "بانتظار الدفع" لحد ما يتدوس "تأكيد الدفع"
 
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
@@ -3397,7 +3654,7 @@ async function resetTrackResponse(token, kind){
 
 async function requestDeepInspection(){
   if(!isOnline()){
-    alert('طلب الفحص الدقيق محتاج نت — عشان الطلب يوصل لصفحة العميل فعلاً.');
+    alert(t('msg.deepNeedNet'));
     return;
   }
   const d = devices.find(x => x.id === selectedId);
@@ -3460,12 +3717,12 @@ function addLedgerDebit(d, price){
 }
 
 async function recordPayment(){
-  if(!isOnline()){ alert('تسجيل الدفعات محتاج نت — استنى النت يرجع الأول عشان الفلوس متتسجلش مرتين بالغلط.'); return; }
+  if(!isOnline()){ alert(t('msg.payNeedNet')); return; }
   const shop = document.getElementById('payShop').value.trim();
   const amount = parseInt(document.getElementById('payAmount').value) || 0;
   const note = document.getElementById('payNote').value.trim();
-  if(!shop){ alert('اكتب اسم المحل الأول'); return; }
-  if(amount <= 0){ alert('اكتب مبلغ صحيح'); return; }
+  if(!shop){ alert(t('msg.needShopName')); return; }
+  if(amount <= 0){ alert(t('msg.badAmount')); return; }
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'credit', shop, amount, note,
@@ -3516,6 +3773,7 @@ async function transferDebit(entryId){
 // ============================================================
 function openAccounts(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   clearSearchBox('accSearch');
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
@@ -3566,34 +3824,34 @@ function cycleStartIds(entries){
 // رسم حركة واحدة في كشف المحل حسب نوعها
 function accEntryHtml(e){
   const amt = (e.amount||0).toLocaleString('en-EG');
-  const meta = `<div class="acc-entry-meta">${new Date(e.date).toLocaleString('ar-EG')} — بواسطة ${esc(e.by||'')}</div>`;
+  const meta = `<div class="acc-entry-meta">${new Date(e.date).toLocaleString(getLocale())} — ${t('acc.by')} ${esc(e.by||'')}</div>`;
   if(e.type === 'credit'){
     return `<div class="acc-entry" style="background:#F0FDF4;">
-      <div><div style="font-weight:700; color:#16A34A;">💵 دفعة${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
+      <div><div style="font-weight:700; color:#16A34A;">💵 ${t('acc.entryPayment')}${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:#16A34A;">− ${amt} ج.م</div>
-        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button></div>
+        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button></div>
     </div>`;
   }
   if(e.type === 'discount'){
     return `<div class="acc-entry" style="background:#EFF6FF;">
-      <div><div style="font-weight:700; color:#2563EB;">🏷️ خصم${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
+      <div><div style="font-weight:700; color:#2563EB;">🏷️ ${t('acc.entryDiscount')}${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:#2563EB;">− ${amt} ج.م</div>
-        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button></div>
+        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button></div>
     </div>`;
   }
   if(e.type === 'opening'){
     return `<div class="acc-entry" style="background:#FFFBEB;">
-      <div><div style="font-weight:700; color:#B45309;">🧾 رصيد افتتاحي سابق</div>${meta}</div>
+      <div><div style="font-weight:700; color:#B45309;">🧾 ${t('acc.entryOpening')}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:#B45309;">+ ${amt} ج.م</div>
-        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button></div>
+        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button></div>
     </div>`;
   }
   // debit (جهاز آجل)
   return `<div class="acc-entry">
     <div><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
-      <div class="acc-entry-meta">${new Date(e.date).toLocaleString('ar-EG')} — بواسطة ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
+      <div class="acc-entry-meta">${new Date(e.date).toLocaleString(getLocale())} — ${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
     <div style="text-align:left;"><div style="font-weight:800; color:#B45309;">+ ${amt} ج.م</div>
-      <button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ نقل لمحل تاني</button></div>
+      <button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ ${t('acc.moveShop')}</button></div>
   </div>`;
 }
 
@@ -3604,15 +3862,15 @@ function accShopBlockHtml(n, s){
   const safe = esc(n).replace(/'/g,"\\'");
   const starts = cycleStartIds(s.entries);
   const sortedDesc = s.entries.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
-  const cycleDivider = (e) => `<div style="text-align:center; margin:8px 0; color:#0891A8; font-size:12.5px; font-weight:800; border-top:1px dashed #CBD5E1; padding-top:8px;">🔄 بداية دورة حسابية جديدة — ${new Date(e.date).toLocaleDateString('ar-EG')}</div>`;
+  const cycleDivider = (e) => `<div style="text-align:center; margin:8px 0; color:#0891A8; font-size:12.5px; font-weight:800; border-top:1px dashed #CBD5E1; padding-top:8px;">🔄 ${t('acc.newCycle')} — ${new Date(e.date).toLocaleDateString('ar-EG')}</div>`;
   const entriesHtml = !open ? '' : `
     <div class="acc-toolbar">
-      <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 واتساب</button>
-      <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ رقم</button>
-      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#2563EB;border-color:#BFDBFE;" onclick="addDiscount('${safe}')">🏷️ خصم</button>
+      <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 ${t('acc.wa')}</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ ${t('acc.phone')}</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#2563EB;border-color:#BFDBFE;" onclick="addDiscount('${safe}')">🏷️ ${t('acc.discount')}</button>
       <button class="btn-secondary" style="color:#166534;border-color:#BBF7D0;" onclick="exportShopExcel('${safe}')">📊 Excel</button>
       <button class="btn-secondary" style="color:#B91C1C;border-color:#FECACA;" onclick="exportShopPdf('${safe}')">📄 PDF</button>
-      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#DC2626;border-color:#FCA5A5;" onclick="deleteAccount('${safe}')">🗑 حذف الحساب</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#DC2626;border-color:#FCA5A5;" onclick="deleteAccount('${safe}')">🗑 ${t('acc.deleteAccount')}</button>
     </div>
     <div class="acc-entries">${sortedDesc.map(e => accEntryHtml(e) + (starts.has(e.id) ? cycleDivider(e) : '')).join('')}</div>`;
 
@@ -3620,9 +3878,9 @@ function accShopBlockHtml(n, s){
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
       <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}</span>
       <span class="acc-nums">
-        <span>عليه: <b>${s.owed.toLocaleString('en-EG')}</b></span>
-        <span>مدفوع/خصم: <b style="color:#16A34A;">${s.paid.toLocaleString('en-EG')}</b></span>
-        <span>المتبقي: <b style="color:${balance > 0 ? '#DC2626' : '#16A34A'};">${balance.toLocaleString('en-EG')}</b> ج.م</span>
+        <span>${t('acc.owed')}: <b>${s.owed.toLocaleString('en-EG')}</b></span>
+        <span>${t('acc.paidDisc')}: <b style="color:#16A34A;">${s.paid.toLocaleString('en-EG')}</b></span>
+        <span>${t('acc.remaining')}: <b style="color:${balance > 0 ? '#DC2626' : '#16A34A'};">${balance.toLocaleString('en-EG')}</b> ${t('acc.egp')}</span>
         <span style="color:#94A3B8;">${open ? '▲' : '▼'}</span>
       </span>
     </button>
@@ -3641,7 +3899,7 @@ function renderAccounts(){
   if(q) names = names.filter(n => n.includes(q));
 
   if(names.length === 0){
-    document.getElementById('accountsBody').innerHTML = `<div class="empty-col">${q ? 'مفيش محل بالاسم ده' : 'لسه مفيش حسابات آجلة — أول جهاز آجل يتسلم هيظهر هنا'}</div>`;
+    document.getElementById('accountsBody').innerHTML = `<div class="empty-col">${q ? t('acc.noMatch') : t('acc.empty')}</div>`;
     return;
   }
 
@@ -3658,16 +3916,16 @@ function renderAccounts(){
       <button onclick="toggleAccGroup('${key}')" style="width:100%; display:flex; justify-content:space-between; align-items:center; background:${bg}; color:${fg}; border:none; border-radius:12px; padding:14px 16px; font-family:inherit; font-weight:800; font-size:15px; cursor:pointer;">
         <span>${title} (${list.length})</span><span>${accGroupOpen[key] ? '▲' : '▼'}</span>
       </button>
-      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? list.map(n => accShopBlockHtml(n, shops[n])).join('') : '<div class="empty-col">مفيش</div>'}</div>` : ''}
+      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? list.map(n => accShopBlockHtml(n, shops[n])).join('') : `<div class="empty-col">${t('acc.none')}</div>`}</div>` : ''}
     </div>`;
 
   document.getElementById('accountsBody').innerHTML = `
     <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:12px; padding:12px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-      <span style="font-weight:800; color:#991B1B;">إجمالي الديون المفتوحة على المحلات</span>
-      <span style="font-weight:900; font-size:18px; color:#DC2626;">${totalOpen.toLocaleString('en-EG')} ج.م</span>
+      <span style="font-weight:800; color:#991B1B;">${t('acc.totalOpen')}</span>
+      <span style="font-weight:900; font-size:18px; color:#DC2626;">${totalOpen.toLocaleString('en-EG')} ${t('acc.egp')}</span>
     </div>
-    ${groupHtml('📂 الحسابات المفتوحة', '#FEF2F2', '#991B1B', 'open', openNames)}
-    ${groupHtml('✅ الحسابات المدفوعة', '#F0FDF4', '#166534', 'paid', paidNames)}
+    ${groupHtml('📂 ' + t('acc.groupOpen'), '#FEF2F2', '#991B1B', 'open', openNames)}
+    ${groupHtml('✅ ' + t('acc.groupPaid'), '#F0FDF4', '#166534', 'paid', paidNames)}
   `;
   if(_scroller) _scroller.scrollTop = _y;
 }
@@ -3677,7 +3935,7 @@ async function addDiscount(shop){
   const raw = prompt(`إضافة خصم لحساب "${shop}".\nاكتب قيمة الخصم بالجنيه:`);
   if(raw === null) return;
   const amount = parseInt(raw) || 0;
-  if(amount <= 0){ alert('اكتب قيمة خصم صحيحة'); return; }
+  if(amount <= 0){ alert(t('msg.badDiscount')); return; }
   const note = (prompt('سبب الخصم (اختياري):') || '').trim();
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
@@ -3695,7 +3953,7 @@ async function addOpeningBalance(){
   const raw = prompt(`الرصيد الافتتاحي السابق لمحل "${shop}" بالجنيه\n(المديونية القديمة قبل استخدام السيستم):`);
   if(raw === null) return;
   const amount = parseInt(raw) || 0;
-  if(amount <= 0){ alert('اكتب رصيد افتتاحي صحيح'); return; }
+  if(amount <= 0){ alert(t('msg.badOpening')); return; }
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'opening', shop, amount, note: 'رصيد افتتاحي سابق (قبل السيستم)',
@@ -3946,53 +4204,58 @@ function renderSummaries(){
     `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
-        من <input type="date" id="invFrom" value="${invPeriod.from}" onchange="setInvCustom()">
-        إلى <input type="date" id="invTo" value="${invPeriod.to}" onchange="setInvCustom()">
+        ${t('inv.from')} <input type="date" id="invFrom" value="${invPeriod.from}" onchange="setInvCustom()">
+        ${t('inv.to')} <input type="date" id="invTo" value="${invPeriod.to}" onchange="setInvCustom()">
       </span>
     </div>`;
 
   const received = devices.filter(d => inRange(d.intakeDate));
   const delivered = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inRange(dd); });
+  const deliveredPaid = delivered.filter(d => isPaidDevice(d));
+  const deliveredUnpaid = delivered.filter(d => !isPaidDevice(d));
   const inProgress = devices.filter(d => OPEN_STATUSES.includes(d.status));
   const stuck = stuckDevices();
   // الكروت قابلة للضغط — تفتح قائمة الأجهزة اللي جواها
   invLists = {
     received: received,
     delivered: delivered,
+    delivered_paid: deliveredPaid,
+    delivered_unpaid: deliveredUnpaid,
     progress: inProgress,
     stuck: stuck.map(x => x.d),
   };
   const card = (key, num, color, label) => `
-    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="اضغط لعرض الأجهزة">
+    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="${t('inv.tapToView')}">
       <div class="inv-card-num" style="color:${color};">${num}</div>
       <div class="inv-card-label">${label}</div>
-      <div class="inv-card-more">${invOpenCard===key ? 'إخفاء ▲' : 'عرض الأجهزة ▼'}</div>
+      <div class="inv-card-more">${invOpenCard===key ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
     </div>`;
   const cards = `
     <div class="inv-cards">
-      ${card('received', received.length, '#2563EB', 'جهاز استُلم في الفترة')}
-      ${card('delivered', delivered.length, '#16A34A', 'جهاز اتسلّم في الفترة')}
-      ${card('progress', inProgress.length, '#B45309', 'جهاز شغال عليه دلوقتي')}
-      ${card('stuck', stuck.length, '#DC2626', `⚠️ جهاز تجاوز ${STUCK_DAYS} أيام — محتاج متابعة`)}
+      ${card('received', received.length, '#2563EB', t('inv.received'))}
+      ${card('delivered_paid', deliveredPaid.length, '#16A34A', t('inv.deliveredPaid'))}
+      ${card('delivered_unpaid', deliveredUnpaid.length, '#D97706', t('inv.deliveredUnpaid'))}
+      ${card('progress', inProgress.length, '#B45309', t('inv.inProgress'))}
+      ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
     </div>
     ${invOpenCard ? `<div class="inv-open-list">
       ${(invLists[invOpenCard] || []).length === 0
-        ? '<div class="empty-col">مفيش أجهزة في الخانة دي</div>'
+        ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
         : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
     </div>` : ''}`;
 
   const stuckHtml = stuck.length === 0
-    ? `<div class="empty-col">مفيش أجهزة واقفة — كله ماشي 👌</div>`
+    ? `<div class="empty-col">${t('inv.noStuck')}</div>`
     : stuck.map(({d, days}) => {
         const st = statusInfo(d.status);
         return `<div class="stuck-item" onclick="closeSummaries(); openDetail('${d.id}')">
           <div>
             <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
-            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}واقف في "<b style="color:${accent(st.varname)}">${esc(st.label)}</b>"</div>
+            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}${t('inv.stuckIn')} "<b style="color:${accent(st.varname)}">${esc(stLabel(st))}</b>"</div>
           </div>
-          <div class="stuck-days">${days} يوم</div>
+          <div class="stuck-days">${days} ${t('inv.days')}</div>
         </div>`;
       }).join('');
 
@@ -4002,9 +4265,9 @@ function renderSummaries(){
   if(q){
     const found = devices.filter(d => matchesSearch(d, q));
     searchHtml = `
-      <div class="inv-section-title">🔍 نتائج البحث عن "${esc(q)}" — ${found.length}</div>
+      <div class="inv-section-title">🔍 ${t('inv.searchResults')} "${esc(q)}" — ${found.length}</div>
       <div class="inv-open-list">
-        ${found.length === 0 ? '<div class="empty-col">مفيش نتائج</div>' : found.map(d => dayCardHtml(d)).join('')}
+        ${found.length === 0 ? `<div class="empty-col">${t('inv.noResults')}</div>` : found.map(d => dayCardHtml(d)).join('')}
       </div>`;
   }
 
@@ -4019,16 +4282,16 @@ function renderSummaries(){
   const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
 
   const techCards = techNames.length === 0
-    ? `<div class="empty-col">مفيش أجهزة مع فنيين دلوقتي</div>`
+    ? `<div class="empty-col">${t('inv.noTechDevices')}</div>`
     : `<div class="inv-cards">
-        ${techNames.map(t => {
-          const late = withTech[t].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
-          const safe = esc(t).replace(/'/g, "\\'");
-          return `<div class="inv-card ${invOpenTech===t ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="اضغط لعرض أجهزته">
-            <div class="inv-card-num" style="color:#0891A8;">${withTech[t].length}</div>
-            <div class="inv-card-label">🔧 ${esc(t)}</div>
-            ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} واقف بقاله كتير</div>` : ''}
-            <div class="inv-card-more">${invOpenTech===t ? 'إخفاء ▲' : 'عرض الأجهزة ▼'}</div>
+        ${techNames.map(techName => {
+          const late = withTech[techName].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
+          const safe = esc(techName).replace(/'/g, "\\'");
+          return `<div class="inv-card ${invOpenTech===techName ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
+            <div class="inv-card-num" style="color:#0891A8;">${withTech[techName].length}</div>
+            <div class="inv-card-label">🔧 ${esc(techName)}</div>
+            ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
+            <div class="inv-card-more">${invOpenTech===techName ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
           </div>`;
         }).join('')}
       </div>
@@ -4043,7 +4306,7 @@ function renderSummaries(){
     ${filterBar}
     ${searchHtml}
     ${cards}
-    <div class="inv-section-title">🔧 الأجهزة مع الفنيين (لسه ما اتسلّمتش)</div>
+    <div class="inv-section-title">🔧 ${t('inv.techSection')}</div>
     ${techCards}
   `;
   if(_sumScroller) _sumScroller.scrollTop = _sumY;
@@ -4063,6 +4326,7 @@ let anPeriod = { mode: 'month', from: '', to: '' };
 
 function openAnalytics(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
   renderAnalytics();
 }
@@ -4123,10 +4387,10 @@ function renderAnalytics(){
     `<button class="inv-chip ${anPeriod.mode===mode?'active':''}" onclick="setAnPeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
-        من <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
-        إلى <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
+        ${t('inv.from')} <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
+        ${t('inv.to')} <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
       </span>
     </div>`;
 
@@ -4146,13 +4410,13 @@ function renderAnalytics(){
 
   const fmt = n => n.toLocaleString('en-EG');
   const moneyCards = `
-    <div class="inv-section-title">💰 الفلوس</div>
+    <div class="inv-section-title">💰 ${t('an.money')}</div>
     <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${fmt(totalCashIn)}</div><div class="inv-card-label">إجمالي الكاش المحصّل في الفترة (ج.م)</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${fmt(cashCollected)}</div><div class="inv-card-label">منها فوري من التسليمات</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">ومنها دفعات من المحلات</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${fmt(deferredAdded)}</div><div class="inv-card-label">آجل اتسجل في الفترة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">إجمالي المتبقي على المحلات (كل الوقت)</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${fmt(totalCashIn)}</div><div class="inv-card-label">${t('an.totalCash')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${fmt(cashCollected)}</div><div class="inv-card-label">${t('an.fromDeliveries')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">${t('an.fromShops')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${fmt(deferredAdded)}</div><div class="inv-card-label">${t('an.deferredAdded')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${t('an.outstanding')}</div></div>
     </div>`;
 
   // ===== كبار العملاء =====
@@ -4170,23 +4434,23 @@ function renderAnalytics(){
   const topCustomers = Object.values(byCustomer).sort((a,b) => b.count - a.count).slice(0, 10);
 
   const custList = topCustomers.length === 0
-    ? `<div class="empty-col">مفيش عملاء في الفترة دي</div>`
+    ? `<div class="empty-col">${t('an.noCustomers')}</div>`
     : topCustomers.map((c, i) => `
       <div class="cust-item">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="cust-rank">${i + 1}</div>
           <div>
-            <div style="font-weight:800;">${esc(c.name || 'بدون اسم')}${c.shop ? ` <span style="color:#94A3B8; font-weight:500; font-size:13px;">— ${esc(c.shop)}</span>` : ''}</div>
-            <div style="font-size:13px; color:#64748B;">${c.count} جهاز في الفترة${c.paid ? ` — دفع فوري ${fmt(c.paid)} ج.م` : ''}</div>
+            <div style="font-weight:800;">${esc(c.name || t('an.noName'))}${c.shop ? ` <span style="color:#94A3B8; font-weight:500; font-size:13px;">— ${esc(c.shop)}</span>` : ''}</div>
+            <div style="font-size:13px; color:#64748B;">${c.count} ${t('an.devicesInPeriod')}${c.paid ? ` — ${t('an.paidCash')} ${fmt(c.paid)} ${t('acc.egp')}` : ''}</div>
           </div>
         </div>
-        ${c.phone ? `<button class="btn-secondary" style="color:#16A34A; border-color:#BBF7D0;" onclick="sendThanks('${esc(c.phone)}', '${esc(c.name || '').replace(/'/g, "\\\\'")}')">💬 رسالة شكر</button>` : ''}
+        ${c.phone ? `<button class="btn-secondary" style="color:#16A34A; border-color:#BBF7D0;" onclick="sendThanks('${esc(c.phone)}', '${esc(c.name || '').replace(/'/g, "\\\\'")}')">💬 ${t('an.thanksMsg')}</button>` : ''}
       </div>`).join('');
 
   document.getElementById('analyticsBody').innerHTML = `
     ${filterBar}
     ${moneyCards}
-    <div class="inv-section-title">⭐ كبار العملاء (الأكتر تعاملاً في الفترة)</div>
+    <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
     ${custList}
   `;
 }
@@ -4202,6 +4466,7 @@ let teRows = [];
 
 function openTechEval(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   document.getElementById('techEvalOverlay').classList.remove('hidden');
   teOpenTech = null;
   renderTechEval();
@@ -4247,10 +4512,10 @@ function renderTechEval(){
     `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
-        من <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
-        إلى <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
+        ${t('inv.from')} <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
+        ${t('inv.to')} <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
       </span>
     </div>`;
 
@@ -4292,16 +4557,17 @@ function renderTechEval(){
   ])];
 
   const round1 = n => Math.round(n * 10) / 10;
-  teRows = names.map(t => {
-    const mine = completedInRange.filter(d => d.technician === t);
+  teRows = names.map(techName => {
+    const t = techName;   // ملاحظة: بنسمّيه techName عشان مايحجبش دالة الترجمة t()
+    const mine = completedInRange.filter(d => d.technician === techName);
     const durations = mine.map(repairDays).filter(x => x !== null);
     const avg = durations.length ? durations.reduce((a,b) => a+b, 0) / durations.length : null;
     const returns = devices.filter(d => {
-      if(d.technician !== t) return false;
+      if(d.technician !== techName) return false;
       const rd = returnAfterDeliveryDate(d);
       return rd && inTeRange(rd);
     }).length;
-    const items = contrib[t] || [];
+    const items = contrib[techName] || [];
     return {
       t,
       points: round1(items.reduce((s, x) => s + x.share, 0)),
@@ -4319,28 +4585,28 @@ function renderTechEval(){
 
   const cards = `
     <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">إجمالي النقاط في الفترة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">جهاز اتحسبت عليه نقاط</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">فني له شغل في الفترة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">${t('te.totalPoints')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">${t('te.scoredDevices')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">${t('te.techsActive')}</div></div>
     </div>`;
 
   // تنبيهات توضح ليه ممكن رقم يبان ناقص
   let notes = '';
   if(pendingCount > 0){
-    notes += `<div class="te-note">⏳ فيه <b>${pendingCount}</b> جهاز عليهم <b>${round1(pendingPts)}</b> نقطة لسه الشغل فيهم ما خلصش — هيتحسبوا أول ما يوصلوا "تم الصيانة".</div>`;
+    notes += `<div class="te-note">⏳ ${t('te.pendingNote',{n:pendingCount,p:round1(pendingPts)})}</div>`;
   }
   if(wholesaleSkipped > 0){
-    notes += `<div class="te-note">📦 اتجاهل <b>${wholesaleSkipped}</b> جهاز مسجل <b>جملة</b> — الجملة مش بتتحسب نقاط زي ما اتفقنا.</div>`;
+    notes += `<div class="te-note">📦 ${t('te.wholesaleNote',{n:wholesaleSkipped})}</div>`;
   }
 
-  const avgFmt = v => v === null ? '—' : (v < 1 ? 'أقل من يوم' : v.toFixed(1) + ' يوم');
+  const avgFmt = v => v === null ? '—' : (v < 1 ? t('te.lessThanDay') : v.toFixed(1) + ' ' + t('te.day'));
 
   const table = teRows.length === 0
-    ? `<div class="empty-col">مفيش شغل خلص في الفترة دي</div>`
+    ? `<div class="empty-col">${t('te.noWork')}</div>`
     : `<table class="inv-table">
-        <tr><th>الفني</th><th>⭐ النقاط</th><th>أجهزة خلصت</th><th>متوسط المدة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
+        <tr><th>${t('te.colTech')}</th><th>⭐ ${t('te.colPoints')}</th><th>${t('te.colDone')}</th><th>${t('te.colAvg')}</th><th>${t('te.colReturns')}</th><th>${t('te.colRate')}</th></tr>
         ${teRows.map((r, i) => `
-          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="اضغط لتفاصيل النقاط">
+          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="${t('te.tapForDetails')}">
             <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:#94A3B8;font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span></td>
             <td style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
             <td style="font-weight:800; color:#16A34A;">${r.count}</td>
@@ -4352,13 +4618,13 @@ function renderTechEval(){
           <tr><td colspan="6" style="padding:0; background:#F8FAFC;">
             <div class="te-breakdown">
               ${r.items.length === 0
-                ? '<div style="color:#94A3B8; font-size:13px; padding:6px;">مفيش نقاط محسوبة — الأجهزة اللي خلصها مكتبتش عليها نقاط</div>'
+                ? `<div style="color:#94A3B8; font-size:13px; padding:6px;">${t('te.noPoints')}</div>`
                 : r.items.slice().sort((a,b) => b.share - a.share).map(x => `
                   <div class="te-item" onclick="event.stopPropagation(); closeTechEval(); openDetail('${x.d.id}')">
                     <div>
                       <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
                       <div style="font-size:12px; color:#94A3B8;">
-                        ${x.role === 'مساعد' ? `🤝 مساعد (${esc(x.d.assistPercent)}% من ${esc(x.d.points)})` : `👤 رئيسي${x.d.assistTechnician ? ` (بعد نصيب المساعد من ${esc(x.d.points)})` : ''}`}
+                        ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
                       </div>
                     </div>
                     <div style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif;">${round1(x.share)}</div>
@@ -4372,7 +4638,7 @@ function renderTechEval(){
     ${filterBar}
     ${cards}
     ${notes}
-    <div class="inv-section-title">ترتيب الفنيين بالنقاط</div>
+    <div class="inv-section-title">⭐ ${t('ui.techRanking')}</div>
     ${table}
   `;
 }
@@ -4415,10 +4681,118 @@ function sendThanks(phone, name){
   apply();
 })();
 
+// ===== تجربة الموبايل: السحب لأسفل لإغلاق النافذة + زر الرجوع =====
+// بيشتغل تلقائياً على كل النوافذ الموجودة والجديدة، من غير ما نلمس دوال الفتح/القفل
+(function(){
+  const overlaysList = () => Array.from(document.querySelectorAll('.overlay'));
+  const isOpen = o => o && !o.classList.contains('hidden');
+  const topOpenOverlay = () => {
+    const open = overlaysList().filter(isOpen);
+    if(!open.length) return null;
+    // الأعلى في ترتيب الطبقات هو اللي يتقفل الأول
+    return open.sort((a,b) => (parseInt(getComputedStyle(b).zIndex)||0) - (parseInt(getComputedStyle(a).zIndex)||0))[0];
+  };
+  // بنقفل النافذة بنفس زرار الإغلاق بتاعها عشان أي تنظيف خاص بيها يتنفّذ
+  function closeOverlay(o){
+    if(!o) return false;
+    const btn = o.querySelector('.close-btn, [data-close]');
+    if(btn){ btn.click(); return true; }
+    o.classList.add('hidden');
+    return true;
+  }
+
+  // ---- زر الرجوع في الموبايل يقفل النافذة بدل ما يخرج من التطبيق ----
+  let stackDepth = 0;
+  function syncHistory(){
+    const openCount = overlaysList().filter(isOpen).length;
+    while(stackDepth < openCount){ history.pushState({ ifixModal:true }, ''); stackDepth++; }
+    if(openCount === 0) stackDepth = 0;
+  }
+  addEventListener('popstate', function(){
+    const top = topOpenOverlay();
+    if(top){
+      if(stackDepth > 0) stackDepth--;
+      closeOverlay(top);
+    }
+  });
+
+  // ---- مقبض السحب لأسفل ----
+  function attachGrab(o){
+    const modal = o.querySelector('.modal');
+    if(!modal || modal.dataset.grabReady) return;
+    modal.dataset.grabReady = '1';
+    const grab = document.createElement('div');
+    grab.className = 'modal-grab';
+    modal.insertBefore(grab, modal.firstChild);
+
+    let startY = 0, curY = 0, dragging = false;
+    const head = modal.querySelector('.modal-head');
+    const handles = [grab, head].filter(Boolean);
+
+    handles.forEach(hEl => {
+      hEl.addEventListener('touchstart', e => {
+        if(modal.scrollTop > 0) return;           // بنسحب بس لو فوق خالص
+        dragging = true; startY = e.touches[0].clientY; curY = startY;
+        modal.classList.add('dragging');
+      }, { passive:true });
+
+      hEl.addEventListener('touchmove', e => {
+        if(!dragging) return;
+        curY = e.touches[0].clientY;
+        const dy = Math.max(0, curY - startY);
+        modal.style.transform = 'translateY(' + dy + 'px)';
+        modal.style.opacity = String(Math.max(.4, 1 - dy/400));
+      }, { passive:true });
+
+      hEl.addEventListener('touchend', () => {
+        if(!dragging) return;
+        dragging = false;
+        modal.classList.remove('dragging');
+        const dy = curY - startY;
+        modal.style.transform = ''; modal.style.opacity = '';
+        if(dy > 110){                              // سحبة كافية → اقفل
+          if(stackDepth > 0){ stackDepth--; history.back(); }
+          else closeOverlay(o);
+        }
+      });
+    });
+  }
+
+  // ---- خانة البحث تثبت تحت رأس النافذة بالظبط (بنقيس ارتفاع الرأس فعلياً) ----
+  // بنحط المتغيّر على الـ overlay نفسه عشان يورّث لجوه، سواء النافذة .modal أو صفحة كاملة .summaries-page
+  function fixStickyOffsets(){
+    document.querySelectorAll('.overlay:not(.hidden)').forEach(o => {
+      if(!o.querySelector('.modal-search')) return;
+      const head = o.querySelector('.modal-head');
+      const h = head ? Math.round(head.getBoundingClientRect().height) : 0;
+      o.style.setProperty('--head-h', h + 'px');
+    });
+  }
+  addEventListener('resize', fixStickyOffsets);
+  addEventListener('orientationchange', () => setTimeout(fixStickyOffsets, 250));
+
+  function refresh(){
+    overlaysList().forEach(o => { if(isOpen(o)) attachGrab(o); });
+    syncHistory();
+    fixStickyOffsets();
+    requestAnimationFrame(fixStickyOffsets);   // بعد ما التخطيط يستقر
+  }
+  const mo = new MutationObserver(refresh);
+  overlaysList().forEach(o => mo.observe(o, { attributes:true, attributeFilter:['class'] }));
+  addEventListener('DOMContentLoaded', refresh);
+  refresh();
+})();
+
 // نقطة البداية: التحقق من الدخول والاشتراك قبل تحميل أي بيانات
 requireAccess().then(ok => {
   if(!ok) return;
   applySystemMode();
+  // تعدد اللغات: نضبط الاتجاه ونركّب زر تبديل اللغة
+  try{
+    I18N.applyI18n(document);
+    I18N.mountLangToggle(document.querySelector('.topbar-actions'));
+  }catch(e){}
+  loadUserRoles().then(loadFeatureFlags).then(loadAudit).then(applyRoleVisibility);
   injectAdminMenu();
   loadBroadcast();
   loadDevices();
