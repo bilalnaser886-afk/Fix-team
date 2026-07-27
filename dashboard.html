@@ -706,11 +706,11 @@
 <div id="summariesOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>📋 الجرد</h2>
+      <h2 data-i18n="inv.title">📋 الجرد</h2>
       <button class="close-btn" onclick="closeSummaries()">×</button>
     </div>
     <div class="modal-search" style="padding:0 20px 8px;">
-      <input id="invSearch" oninput="renderSummaries()" placeholder="🔍 دور بإسم عميل، محل، فني، موديل، رقم تليفون، أو امسح الباركود..."
+      <input id="invSearch" oninput="renderSummaries()" data-i18n-ph="search.inventory.ph" placeholder="🔍 دور بإسم عميل، محل، فني، موديل، رقم تليفون، أو امسح الباركود..."
              style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
     </div>
     <div id="summariesBody" style="padding:16px 20px 40px;"></div>
@@ -4274,10 +4274,10 @@ function renderSummaries(){
     `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
-        من <input type="date" id="invFrom" value="${invPeriod.from}" onchange="setInvCustom()">
-        إلى <input type="date" id="invTo" value="${invPeriod.to}" onchange="setInvCustom()">
+        ${t('inv.from')} <input type="date" id="invFrom" value="${invPeriod.from}" onchange="setInvCustom()">
+        ${t('inv.to')} <input type="date" id="invTo" value="${invPeriod.to}" onchange="setInvCustom()">
       </span>
     </div>`;
 
@@ -4295,35 +4295,35 @@ function renderSummaries(){
     stuck: stuck.map(x => x.d),
   };
   const card = (key, num, color, label) => `
-    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="اضغط لعرض الأجهزة">
+    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="${t('inv.tapToView')}">
       <div class="inv-card-num" style="color:${color};">${num}</div>
       <div class="inv-card-label">${label}</div>
-      <div class="inv-card-more">${invOpenCard===key ? 'إخفاء ▲' : 'عرض الأجهزة ▼'}</div>
+      <div class="inv-card-more">${invOpenCard===key ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
     </div>`;
   const cards = `
     <div class="inv-cards">
-      ${card('received', received.length, '#2563EB', 'جهاز استُلم في الفترة')}
-      ${card('delivered_paid', deliveredPaid.length, '#16A34A', 'تم التسليم والدفع')}
-      ${card('delivered_unpaid', deliveredUnpaid.length, '#D97706', 'تم التسليم - بانتظار الدفع')}
-      ${card('progress', inProgress.length, '#B45309', 'جهاز شغال عليه دلوقتي')}
-      ${card('stuck', stuck.length, '#DC2626', `⚠️ جهاز تجاوز ${STUCK_DAYS} أيام — محتاج متابعة`)}
+      ${card('received', received.length, '#2563EB', t('inv.received'))}
+      ${card('delivered_paid', deliveredPaid.length, '#16A34A', t('inv.deliveredPaid'))}
+      ${card('delivered_unpaid', deliveredUnpaid.length, '#D97706', t('inv.deliveredUnpaid'))}
+      ${card('progress', inProgress.length, '#B45309', t('inv.inProgress'))}
+      ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
     </div>
     ${invOpenCard ? `<div class="inv-open-list">
       ${(invLists[invOpenCard] || []).length === 0
-        ? '<div class="empty-col">مفيش أجهزة في الخانة دي</div>'
+        ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
         : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
     </div>` : ''}`;
 
   const stuckHtml = stuck.length === 0
-    ? `<div class="empty-col">مفيش أجهزة واقفة — كله ماشي 👌</div>`
+    ? `<div class="empty-col">${t('inv.noStuck')}</div>`
     : stuck.map(({d, days}) => {
         const st = statusInfo(d.status);
         return `<div class="stuck-item" onclick="closeSummaries(); openDetail('${d.id}')">
           <div>
             <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
-            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}واقف في "<b style="color:${accent(st.varname)}">${esc(st.label)}</b>"</div>
+            <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}${t('inv.stuckIn')} "<b style="color:${accent(st.varname)}">${esc(stLabel(st))}</b>"</div>
           </div>
-          <div class="stuck-days">${days} يوم</div>
+          <div class="stuck-days">${days} ${t('inv.days')}</div>
         </div>`;
       }).join('');
 
@@ -4333,9 +4333,9 @@ function renderSummaries(){
   if(q){
     const found = devices.filter(d => matchesSearch(d, q));
     searchHtml = `
-      <div class="inv-section-title">🔍 نتائج البحث عن "${esc(q)}" — ${found.length}</div>
+      <div class="inv-section-title">🔍 ${t('inv.searchResults')} "${esc(q)}" — ${found.length}</div>
       <div class="inv-open-list">
-        ${found.length === 0 ? '<div class="empty-col">مفيش نتائج</div>' : found.map(d => dayCardHtml(d)).join('')}
+        ${found.length === 0 ? `<div class="empty-col">${t('inv.noResults')}</div>` : found.map(d => dayCardHtml(d)).join('')}
       </div>`;
   }
 
@@ -4350,16 +4350,16 @@ function renderSummaries(){
   const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
 
   const techCards = techNames.length === 0
-    ? `<div class="empty-col">مفيش أجهزة مع فنيين دلوقتي</div>`
+    ? `<div class="empty-col">${t('inv.noTechDevices')}</div>`
     : `<div class="inv-cards">
         ${techNames.map(t => {
           const late = withTech[t].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
           const safe = esc(t).replace(/'/g, "\\'");
-          return `<div class="inv-card ${invOpenTech===t ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="اضغط لعرض أجهزته">
+          return `<div class="inv-card ${invOpenTech===t ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
             <div class="inv-card-num" style="color:#0891A8;">${withTech[t].length}</div>
             <div class="inv-card-label">🔧 ${esc(t)}</div>
-            ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} واقف بقاله كتير</div>` : ''}
-            <div class="inv-card-more">${invOpenTech===t ? 'إخفاء ▲' : 'عرض الأجهزة ▼'}</div>
+            ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
+            <div class="inv-card-more">${invOpenTech===t ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
           </div>`;
         }).join('')}
       </div>
@@ -4374,7 +4374,7 @@ function renderSummaries(){
     ${filterBar}
     ${searchHtml}
     ${cards}
-    <div class="inv-section-title">🔧 الأجهزة مع الفنيين (لسه ما اتسلّمتش)</div>
+    <div class="inv-section-title">🔧 ${t('inv.techSection')}</div>
     ${techCards}
   `;
   if(_sumScroller) _sumScroller.scrollTop = _sumY;
@@ -4454,7 +4454,7 @@ function renderAnalytics(){
     `<button class="inv-chip ${anPeriod.mode===mode?'active':''}" onclick="setAnPeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
         من <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
         إلى <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
@@ -4578,7 +4578,7 @@ function renderTechEval(){
     `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today','النهارده')}${chip('week','آخر ٧ أيام')}${chip('month','آخر ٣٠ يوم')}${chip('all','الكل')}
+      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
         من <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
         إلى <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
