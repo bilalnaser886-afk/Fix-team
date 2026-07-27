@@ -2415,9 +2415,13 @@ function renderDetail(){
         <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
       </div>
       ${d.paymentType === 'deferred'
-        ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
-             ✓ اتضاف على حساب المحل${d.billedShop?` "${esc(d.billedShop)}"`:''} — محاسَب عليه
-           </div>`
+        ? (isPaidDevice(d)
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
+                 ✓ اتضاف على حساب المحل${d.billedShop?` "${esc(d.billedShop)}"`:''} — محاسَب عليه
+               </div>`
+            : `<div style="background:#FEF3C7;color:#B45309;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
+                 🕐 آجل على حساب المحل${d.billedShop?` "${esc(d.billedShop)}"`:''} — هيتضاف على الحساب أول ما الجهاز يتسلّم
+               </div>`)
         : (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ تم الدفع (فوري)</div>`
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 تأكيد الدفع</button>`)}
@@ -3604,13 +3608,19 @@ async function editPayType(t){
     if(price <= 0){ alert('اكتب السعر الأول عشان يتحاسب على حساب المحل'); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
     if(!shop){ alert('الجهاز ده مش متسجل عليه اسم محل — اكتب اسم المحل الأول عشان يتحاسب آجل.'); return; }
-    // لو مفيش قيد قديم للجهاز، نضيفه دلوقتي
-    if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
-      addLedgerDebit({ ...d, billedShop: shop }, price);
-    }
     extra.billedShop = shop;
-    extra.paymentStatus = 'paid';   // اتسوّى عن طريق حساب المحل
-    note = `اتحوّل لآجل — اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+    if(d.status === 'delivered'){
+      // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+        addLedgerDebit({ ...d, billedShop: shop }, price);
+      }
+      extra.paymentStatus = 'paid';
+      note = `آجل — اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+    } else {
+      // لسه في المحل → مجرد تحديد طريقة الدفع، والقيد بيتعمل أول ما يتسلّم
+      extra.paymentStatus = 'unpaid';
+      note = `اتحدد آجل على حساب "${shop}" — هيتقيّد أول ما الجهاز يتسلّم`;
+    }
   } else {
     // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
     const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id);
@@ -3646,8 +3656,9 @@ async function editPrice(value){
     resetTrackResponse(d.trackToken, 'price');
   }
 
-  // تسعير في أي مرحلة: لو آجل يتقيّد على حساب المحل فوراً ويعتبر متسوّى
-  if(price && d.paymentType === 'deferred' && !isPaidDevice(d)){
+  // تسعير جهاز متسلّم بالفعل ومحدد عليه آجل → يتقيّد على حساب المحل فوراً
+  // (لو لسه في المحل، القيد بيستنى لحد التسليم)
+  if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
     const shop = (d.billedShop || d.shopName || '').trim();
     if(shop){
       extra.paymentStatus = 'paid';
@@ -3655,7 +3666,7 @@ async function editPrice(value){
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
         addLedgerDebit({...d, billedShop: shop}, parseInt(price));
       }
-      histEntry = { status:d.status, label:`اتسعّر — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
+      histEntry = { status:d.status, label:`اتسعّر بعد التسليم — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
     }
   }
   // فوري: بنحدّث السعر بس، وبيفضل "بانتظار الدفع" لحد ما يتدوس "تأكيد الدفع"
