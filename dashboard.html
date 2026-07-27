@@ -486,9 +486,14 @@
   @media (max-width:760px){
     /* iOS بيعمل zoom تلقائي لو الخط أقل من 16px — نمنعها */
     input, textarea, select, .bm-select{font-size:16px !important;}
-    .topbar{flex-wrap:wrap; gap:8px;}
-    .topbar-actions{flex-wrap:wrap; gap:8px;}
+    /* الهيدر على الموبايل: صف أول فيه الاسم وزر القائمة، وصف تاني فيه الأزرار */
+    .topbar{flex-wrap:wrap; gap:10px 8px;}
+    .brand{order:1; flex:0 1 auto;}
+    .menu-wrap{order:2; margin-inline-start:auto;}
+    .topbar-actions{order:3; flex:1 0 100%; justify-content:flex-start; flex-wrap:wrap; gap:8px;}
     .topbar-actions .btn-primary{flex:1; min-width:140px;}
+    /* القائمة المنسدلة تفضل جوه الشاشة مهما كان مكان الزر */
+    .menu-dropdown{ max-width:calc(100vw - 24px); }
     .modal{border-radius:16px 16px 0 0; max-height:92vh;}
     .inv-cards{grid-template-columns:repeat(2, 1fr);}
     .inv-custom{margin-inline-start:0; width:100%;}
@@ -601,40 +606,40 @@
 <div id="addOverlay" class="overlay hidden">
   <div class="modal">
     <div class="modal-head">
-      <h2>تسجيل جهاز جديد</h2>
+      <h2 data-i18n="add.title">تسجيل جهاز جديد</h2>
       <button class="close-btn" onclick="closeAddModal()">×</button>
     </div>
     <div id="addFormWrap">
-      <label class="field"><span>اسم العميل</span><input id="f_customerName" oninput="onCustomerNameInput()" /></label>
-      <label class="field"><span>اسم المحل</span><input id="f_shopName" /></label>
-      <label class="field"><span>اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
+      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" oninput="onCustomerNameInput()" /></label>
+      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" /></label>
+      <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
-      <label class="field"><span>رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" oninput="fixDigitsInput(this)" /></label>
+      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" oninput="fixDigitsInput(this)" /></label>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
-        <label class="field"><span>نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
-        <label class="field"><span>الموديل</span><input id="f_model" /></label>
+        <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
+        <label class="field"><span data-i18n="add.model">الموديل</span><input id="f_model" /></label>
       </div>
-      <label class="field"><span>الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
+      <label class="field"><span data-i18n="add.serial">الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
       <div id="lockHostAdd"></div>
       <div class="field" id="lockSection" style="display:block;">
-        <span>🔒 رمز قفل الجهاز (اختياري)</span>
+        <span data-i18n="lock.title">🔒 رمز قفل الجهاز (اختياري)</span>
         <div class="lock-tabs">
-          <button type="button" id="lockTab_text" class="lock-tab active" onclick="setLockTab('text')">🔢 رقم/نص</button>
-          <button type="button" id="lockTab_pattern" class="lock-tab" onclick="setLockTab('pattern')">✏️ نمط</button>
-          <button type="button" id="lockTab_image" class="lock-tab" onclick="setLockTab('image')">🖼️ صورة</button>
+          <button type="button" id="lockTab_text" class="lock-tab active" data-i18n="lock.tabText" onclick="setLockTab('text')">رقم/نص</button>
+          <button type="button" id="lockTab_pattern" class="lock-tab" data-i18n="lock.tabPattern" onclick="setLockTab('pattern')">نمط</button>
+          <button type="button" id="lockTab_image" class="lock-tab" data-i18n="lock.tabImage" onclick="setLockTab('image')">صورة</button>
         </div>
         <div id="lockPane_text">
           <div style="position:relative;">
-            <input id="f_lockText" type="password" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
+            <input id="f_lockText" type="password" data-i18n-ph="lock.textPh" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
             <button type="button" id="lockEye" onclick="toggleLockText()" style="position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:18px;cursor:pointer;padding:6px;">👁</button>
           </div>
         </div>
         <div id="lockPane_pattern" style="display:none;">
           <div id="patternPad"></div>
           <div style="text-align:center;">
-            <div id="patternSeqLabel" style="font-size:12.5px;color:#64748B;margin-bottom:6px;">ارسم النمط بإصبعك</div>
-            <button type="button" class="acc-mini-btn" onclick="initPattern()">🔄 إعادة الرسم</button>
+            <div id="patternSeqLabel" style="font-size:12.5px;color:#64748B;margin-bottom:6px;" data-i18n="lock.drawHint">ارسم النمط بإصبعك</div>
+            <button type="button" class="acc-mini-btn" data-i18n="lock.redraw" onclick="initPattern()">إعادة الرسم</button>
           </div>
         </div>
         <div id="lockPane_image" style="display:none;">
@@ -643,27 +648,27 @@
         </div>
       </div>
       <div style="margin-bottom:12px;">
-        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
+        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;" data-i18n="add.dealType">نوع التعامل</span>
         <div class="pay-choice">
-          <button type="button" id="whRetail" class="pay-btn" onclick="setAddWholesale(false)">قطاعي</button>
-          <button type="button" id="whBulk" class="pay-btn" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
+          <button type="button" id="whRetail" class="pay-btn" data-i18n="add.retail" onclick="setAddWholesale(false)">قطاعي</button>
+          <button type="button" id="whBulk" class="pay-btn" data-i18n="add.wholesale" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
         </div>
       </div>
-      <label class="field"><span>العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
-      <label class="field"><span>حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
-      <label class="field"><span>السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
+      <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
+      <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
+      <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
-        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
+        <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;" data-i18n="add.payType">طريقة الدفع</span>
         <div class="pay-choice">
-          <button type="button" id="ptCash" class="pay-btn" onclick="setAddPayType('cash')">فوري</button>
-          <button type="button" id="ptDeferred" class="pay-btn" onclick="setAddPayType('deferred')">آجل — على حساب المحل</button>
+          <button type="button" id="ptCash" class="pay-btn" data-i18n="add.payCash" onclick="setAddPayType('cash')">فوري</button>
+          <button type="button" id="ptDeferred" class="pay-btn" data-i18n="add.payDeferred" onclick="setAddPayType('deferred')">آجل — على حساب المحل</button>
         </div>
       </div>
       <div class="row2">
-        <label class="field"><span>تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
-        <label class="field"><span>وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
+        <label class="field"><span data-i18n="add.intakeDate">تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
+        <label class="field"><span data-i18n="add.intakeTime">وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
       </div>
-      <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
+      <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" data-i18n="add.submit" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
     </div>
     <div id="addSuccessWrap" class="hidden">
       <div style="text-align:center;font-weight:800;color:var(--done);margin-bottom:12px;">✅ اتسجل الجهاز في "قيد الانتظار"</div>
@@ -686,9 +691,9 @@
 <!-- تعديل رمز قفل الجهاز (في أي مرحلة) -->
 <div id="editLockOverlay" class="overlay hidden" style="z-index:58;">
   <div class="modal" style="max-width:420px;">
-    <div class="modal-head"><h2>🔐 تعديل رمز قفل الجهاز</h2><button class="close-btn" onclick="closeEditLock()">×</button></div>
+    <div class="modal-head"><h2 data-i18n="lock.edit">تعديل رمز قفل الجهاز</h2><button class="close-btn" onclick="closeEditLock()">×</button></div>
     <div id="editLockHost"></div>
-    <button class="btn-primary" style="box-shadow:none;margin-top:8px;" onclick="saveEditedLock()">💾 حفظ رمز القفل</button>
+    <button class="btn-primary" style="box-shadow:none;margin-top:8px;" data-i18n="lock.save" onclick="saveEditedLock()">حفظ رمز القفل</button>
   </div>
 </div>
 
@@ -738,20 +743,20 @@
 <div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>🧾 الحسابات — آجل المحلات</h2>
+      <h2 data-i18n="acc.title">🧾 الحسابات — آجل المحلات</h2>
       <button class="close-btn" onclick="closeAccounts()">×</button>
     </div>
     <div style="padding:0 20px 8px;">
       <div class="acc-payform">
-        <div style="font-size:14px;font-weight:800;margin-bottom:10px;">تسجيل دفعة من محل</div>
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px;" data-i18n="acc.recordPayment">تسجيل دفعة من محل</div>
         <div class="acc-payform-row">
-          <input id="payShop" list="accShopsList" placeholder="اسم المحل" />
-          <input id="payAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="المبلغ بالجنيه" />
-          <input id="payNote" placeholder="ملاحظة (اختياري)" />
-          <button class="btn-primary" style="box-shadow:none;" onclick="recordPayment()">تسجيل الدفعة</button>
+          <input id="payShop" list="accShopsList" data-i18n-ph="acc.shopNamePh" placeholder="اسم المحل" />
+          <input id="payAmount" type="number" min="1" step="1" inputmode="numeric" data-i18n-ph="acc.amountPh" placeholder="المبلغ بالجنيه" />
+          <input id="payNote" data-i18n-ph="acc.notePh" placeholder="ملاحظة (اختياري)" />
+          <button class="btn-primary" style="box-shadow:none;" data-i18n="acc.submitPayment" onclick="recordPayment()">تسجيل الدفعة</button>
         </div>
         <datalist id="accShopsList"></datalist>
-        <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
+        <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" data-i18n="acc.openingBalance" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
       </div>
       <div class="modal-search" style="margin-top:10px;"><input id="accSearch" oninput="renderAccounts()" data-i18n-ph="search.accounts.ph" placeholder="ابحث باسم المحل..." /></div>
     </div>
@@ -1244,12 +1249,12 @@ function startRealtimeSync(){
 // حالات العرض/الفلترة — "تم التسليم" اتقسمت لحالتين حسب حالة الدفع
 const STATUSES = [
   { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
-  { key: "diagnosing", label: "قيد الفحص", labelKey:"status.diagnosing", varname:"diagnosing" },
-  { key: "repairing", label: "قيد الإصلاح", labelKey:"status.repairing", varname:"repairing" },
-  { key: "done", label: "تم الإصلاح بنجاح", labelKey:"status.done", varname:"done" },
+  { key: "diagnosing", label: "جاري الكشف", labelKey:"status.diagnosing", varname:"diagnosing" },
+  { key: "repairing", label: "جاري الصيانة", labelKey:"status.repairing", varname:"repairing" },
+  { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
   { key: "delivered_paid", label: "تم التسليم والدفع", labelKey:"status.delivered_paid", varname:"delivered_paid" },
-  { key: "delivered_unpaid", label: "تم التسليم - بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
-  { key: "rejected", label: "مرفوض", labelKey:"status.rejected", varname:"rejected" },
+  { key: "delivered_unpaid", label: "تم التسليم بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
+  { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
   { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
 ];
 // اسم الحالة حسب اللغة الحالية
@@ -1257,11 +1262,11 @@ function stLabel(s){ return s ? (typeof t === 'function' && s.labelKey ? t(s.lab
 // حالات الأزرار (الإجراءات) — التسليم زرار واحد، والنظام بيحدد الخانة حسب الدفع
 const ACTION_STATUSES = [
   { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
-  { key: "diagnosing", label: "قيد الفحص", labelKey:"status.diagnosing", varname:"diagnosing" },
-  { key: "repairing", label: "قيد الإصلاح", labelKey:"status.repairing", varname:"repairing" },
-  { key: "done", label: "تم الإصلاح بنجاح", labelKey:"status.done", varname:"done" },
+  { key: "diagnosing", label: "جاري الكشف", labelKey:"status.diagnosing", varname:"diagnosing" },
+  { key: "repairing", label: "جاري الصيانة", labelKey:"status.repairing", varname:"repairing" },
+  { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
   { key: "delivered", label: "تم التسليم", labelKey:"status.delivered", varname:"delivered" },
-  { key: "rejected", label: "مرفوض", labelKey:"status.rejected", varname:"rejected" },
+  { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
   { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
 ];
 
@@ -2152,7 +2157,7 @@ function viewLockImage(id){
 
 // عرض القفل في تفاصيل الجهاز
 function lockDisplayHtml(d){
-  const editBtn = `<button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin:8px 0 10px;" onclick="openEditLock()">🔐 تعديل رمز قفل الجهاز</button>`;
+  const editBtn = `<button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin:8px 0 10px;" onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
     return `<div class="detail-row"><span>🔒 رمز القفل</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
@@ -2162,11 +2167,11 @@ function lockDisplayHtml(d){
         <img id="lockPatImg" src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="width:130px;height:130px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;">
         <div id="patReplayBox" style="display:none;"></div>
       </div>
-      ${d.lockPattern ? `<button class="acc-mini-btn" style="margin-top:8px;" onclick="replayPattern('${esc(d.lockPattern)}')">▶️ تشغيل النمط خطوة بخطوة</button>` : ''}
+      ${d.lockPattern ? `<button class="acc-mini-btn" style="margin-top:8px;" onclick="replayPattern('${esc(d.lockPattern)}')">▶️ ${t('lock.replay')}</button>` : ''}
     </div>${editBtn}`;
   if(d.lockType==='image' && d.lockImage)
     return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 صورة القفل</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>${editBtn}`;
-  return `<div style="font-size:13px;color:#94A3B8;margin:8px 0 0;">🔓 مفيش رمز قفل متسجل</div>${editBtn}`;
+  return `<div style="font-size:13px;color:#94A3B8;margin:8px 0 0;">🔓 ${t('lock.none')}</div>${editBtn}`;
 }
 
 // تشغيل النمط خطوة بخطوة (حوالي 300ms لكل نقطة)
@@ -2367,10 +2372,10 @@ function renderDetail(){
   if(!d) return closeDetail();
   const s = statusInfo(d.status);
   const rows = [
-    ['تاريخ ووقت الدخول', formatDateTime(d.intakeDate)],
-    d.serialNumber ? ['الرقم التسلسلي', d.serialNumber, true] : null,
-    d.conditionNotes ? ['حالة الجهاز عند الاستلام', d.conditionNotes] : null,
-    d.lastModifiedAt ? ['آخر تعديل', formatDateTime(d.lastModifiedAt)] : null,
+    [t('det.intakeAt'), formatDateTime(d.intakeDate)],
+    d.serialNumber ? [t('det.serial'), d.serialNumber, true] : null,
+    d.conditionNotes ? [t('det.condition'), d.conditionNotes] : null,
+    d.lastModifiedAt ? [t('det.lastEdit'), formatDateTime(d.lastModifiedAt)] : null,
   ].filter(Boolean).map(([label,val,mono]) => `<div class="detail-row"><span>${esc(label)}</span><span ${mono?'style="font-family:monospace;color:var(--accent);font-weight:700"':''}>${esc(val)}</span></div>`).join('');
 
   const pills = ACTION_STATUSES.map(st => {
@@ -2397,7 +2402,7 @@ function renderDetail(){
   }).join('');
 
   const history = (d.statusHistory||[]).map(h =>
-    `<div class="hist-item">‹ ${esc(h.label || statusInfo(h.status)?.label)} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">بواسطة ${esc(h.by)}</b>` : ''}</div>`
+    `<div class="hist-item">‹ ${esc(h.label || stLabel(statusInfo(h.status)))} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">${t('det.by')} ${esc(h.by)}</b>` : ''}</div>`
   ).join('');
 
   document.getElementById('detailModal').innerHTML = `
@@ -2408,55 +2413,55 @@ function renderDetail(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
 
     <div class="row2">
-      <label class="field"><span>اسم العميل</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>اسم المحل</span><input value="${esc(d.shopName||'')}" placeholder="اسم المحل" onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}" onblur="editField('shopName', this.value)" /></label>
     </div>
-    <label class="field"><span>السعر — أرقام صحيحة بالجنيه</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
     ${(parseInt(d.agreedPrice)||0) > 0 && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
-          <div class="approval-pending">⏳ في انتظار رد العميل على السعر...</div>
+          <div class="approval-pending">${t('det.priceWaiting')}</div>
         ` : trackResponses.price_response === 'accepted' ? `
-          <div class="approval-yes">✅ العميل وافق على السعر</div>
+          <div class="approval-yes">${t('det.priceYes')}</div>
         ` : `
-          <div class="approval-no">❌ العميل رفض السعر</div>
+          <div class="approval-no">${t('det.priceNo')}</div>
         `}
       </div>
     ` : ''}
     ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
-      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
+      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
       <div class="pay-choice">
-        <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">دفع فوري</button>
-        <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
+        <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
       </div>
       ${d.paymentType === 'deferred'
         ? (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
-                 ✓ اتضاف على حساب المحل${d.billedShop?` "${esc(d.billedShop)}"`:''} — محاسَب عليه
+                 ✓ ${t('det.paidViaAccount')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.settled')}
                </div>`
             : `<div style="background:#FEF3C7;color:#B45309;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
-                 🕐 آجل على حساب المحل${d.billedShop?` "${esc(d.billedShop)}"`:''} — هيتضاف على الحساب أول ما الجهاز يتسلّم
+                 🕐 ${t('det.deferredPending')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.deferredPendingHint')}
                </div>`)
         : (isPaidDevice(d)
-            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ تم الدفع (فوري)</div>`
-            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 تأكيد الدفع</button>`)}
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
-    ${d.billedShop ? `<div class="detail-row"><span>متحاسب على حساب محل</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
+    ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
-    <label class="field"><span>العطل / المشكلة</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+    <label class="field"><span>${t('det.issue')}</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
 
     <div class="approval-box">
       ${!d.deepInspection || !d.deepInspection.requested ? `
-        <button class="btn-secondary" style="width:100%; color:#7C3AED; border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 طلب موافقة العميل على فحص دقيق</button>
+        <button class="btn-secondary" style="width:100%; color:#7C3AED; border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 ${t('det.deepReq')}</button>
       ` : !trackResponses.deep_inspection_response ? `
-        <div class="approval-pending">⏳ في انتظار رد العميل على طلب الفحص الدقيق...
-          <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">إلغاء الطلب</button>
+        <div class="approval-pending">⏳ ${t('det.deepWaiting')}
+          <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">${t('det.deepCancel')}</button>
         </div>
       ` : trackResponses.deep_inspection_response === 'accepted' ? `
-        <div class="approval-yes">✅ العميل وافق على الفحص الدقيق</div>
+        <div class="approval-yes">${t('det.deepYes')}</div>
       ` : `
-        <div class="approval-no">❌ العميل رفض الفحص الدقيق
-          <button class="acc-mini-btn" onclick="requestDeepInspection()" style="margin-inline-start:8px;">إعادة الطلب</button>
+        <div class="approval-no">❌ ${t('det.deepNo')}
+          <button class="acc-mini-btn" onclick="requestDeepInspection()" style="margin-inline-start:8px;">${t('det.deepRetry')}</button>
         </div>
       `}
     </div>
@@ -2466,67 +2471,67 @@ function renderDetail(){
 
     <div class="tech-row">
       <label class="field">
-        <span>الفني المسؤول عن الصيانة</span>
-        <input id="techInput" list="technicianList" value="${esc(d.technician||'')}" placeholder="اسم الفني" onblur="assignTechnician(this.value)" />
+        <span>${t('det.technician')}</span>
+        <input id="techInput" list="technicianList" value="${esc(d.technician||'')}" placeholder="${t('det.technicianPh')}" onblur="assignTechnician(this.value)" />
       </label>
       <label class="field">
-        <span>اسم المحاسب اللي سجله</span>
-        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="اسم المحاسب" onblur="editField('registeredBy', this.value)" />
+        <span>${t('det.accountant')}</span>
+        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}" onblur="editField('registeredBy', this.value)" />
       </label>
     </div>
     <datalist id="technicianList">${technicianOptions()}</datalist>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
-    ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ لازم تحدد الفني المسؤول قبل ما الجهاز يخرج من "قيد الانتظار"</div>` : ''}
+    ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
-      <span>⭐ إدارة النقاط والفني المساعد</span>
+      <span>⭐ ${t('det.pointsToggle')}</span>
       <span id="pointsToggleArrow">${pointsBoxOpen ? '▲' : '▼'}</span>
     </button>
     <div class="points-box" id="pointsBox" style="${pointsBoxOpen ? '' : 'display:none;'}">
       <div style="margin-bottom:10px;">
-        <span style="font-size:13px; color:#64748B; display:block; margin-bottom:6px;">نوع التعامل</span>
+        <span style="font-size:13px; color:#64748B; display:block; margin-bottom:6px;">${t('det.dealType')}</span>
         <div class="pay-choice">
-          <button type="button" style="border-color:#2563EB;${!d.isWholesale?'background:#2563EB;color:#fff;':'background:#fff;color:#2563EB;'}" onclick="setWholesale(false)">قطاعي</button>
-          <button type="button" style="border-color:#7C3AED;${d.isWholesale?'background:#7C3AED;color:#fff;':'background:#fff;color:#7C3AED;'}" onclick="setWholesale(true)">جملة (بدون نقاط)</button>
+          <button type="button" style="border-color:#2563EB;${!d.isWholesale?'background:#2563EB;color:#fff;':'background:#fff;color:#2563EB;'}" onclick="setWholesale(false)">${t('det.retail')}</button>
+          <button type="button" style="border-color:#7C3AED;${d.isWholesale?'background:#7C3AED;color:#fff;':'background:#fff;color:#7C3AED;'}" onclick="setWholesale(true)">${t('det.wholesale')}</button>
         </div>
       </div>
       ${!d.isWholesale ? `
-        <label class="field"><span>⭐ نقاط الصيانة (لتقييم الفني في الملخص)</span>
+        <label class="field"><span>⭐ ${t('det.points')}</span>
           <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)" onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
         </label>
         ${d.technician ? `
         <div class="tech-row">
-          <label class="field"><span>🤝 فني مساعد (اختياري)</span>
-            <input list="technicianList" value="${esc(d.assistTechnician||'')}" placeholder="اسم الفني المساعد" onblur="editField('assistTechnician', this.value)" />
+          <label class="field"><span>🤝 ${t('det.assistTech')}</span>
+            <input list="technicianList" value="${esc(d.assistTechnician||'')}" placeholder="${t('det.assistTechPh')}" onblur="editField('assistTechnician', this.value)" />
           </label>
-          <label class="field"><span>نسبته من النقاط %</span>
+          <label class="field"><span>${t('det.assistPercent')}</span>
             <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)" onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
           </label>
-        </div>` : `<div style="font-size:12px;color:#94A3B8;">حدد الفني الرئيسي الأول عشان تقدر تضيف مساعد</div>`}
-      ` : `<div style="font-size:12px;color:#94A3B8;">الجهاز مسجل جملة — مش بيتحسب عليه نقاط لأي فني</div>`}
+        </div>` : `<div style="font-size:12px;color:#94A3B8;">${t('det.assistNeedMain')}</div>`}
+      ` : `<div style="font-size:12px;color:#94A3B8;">${t('det.wholesaleNote')}</div>`}
     </div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <span style="font-size:12px;color:#64748B;">تغيير حالة الجهاز</span>
-      <button class="btn-secondary" style="color:#2563EB;border-color:#BFDBFE;padding:5px 10px;font-size:11px;" onclick="copyTrackLink('${d.id}')">🔗 لينك المتابعة</button>
-      ${d.customerPhone ? `<button class="btn-secondary" style="color:#16A34A;border-color:#BBF7D0;padding:5px 10px;font-size:11px;" onclick="openWa('${esc(d.customerPhone)}', waStatusMsg(devices.find(x=>x.id==='${d.id}'), devices.find(x=>x.id==='${d.id}').status))">💬 واتساب العميل</button>` : ''}
-      <button class="btn-secondary" style="color:var(--ink);border-color:#E2E8F0;padding:5px 10px;font-size:11px;" onclick="toggleDetailLabel('${d.id}')">🖨 طباعة ليبل</button>
+      <span style="font-size:12px;color:#64748B;">${t('det.changeStatus')}</span>
+      <button class="btn-secondary" style="color:#2563EB;border-color:#BFDBFE;padding:5px 10px;font-size:11px;" onclick="copyTrackLink('${d.id}')">🔗 ${t('det.trackLink')}</button>
+      ${d.customerPhone ? `<button class="btn-secondary" style="color:#16A34A;border-color:#BBF7D0;padding:5px 10px;font-size:11px;" onclick="openWa('${esc(d.customerPhone)}', waStatusMsg(devices.find(x=>x.id==='${d.id}'), devices.find(x=>x.id==='${d.id}').status))">💬 ${t('det.waCustomer')}</button>` : ''}
+      <button class="btn-secondary" style="color:var(--ink);border-color:#E2E8F0;padding:5px 10px;font-size:11px;" onclick="toggleDetailLabel('${d.id}')">🖨 ${t('det.printLabel')}</button>
     </div>
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
     <div class="status-pills">${pills}</div>
-    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">سجل الحالات</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${t('det.statusLog')}</div>
     <div style="margin-bottom:10px;">${history}</div>
-    <div style="font-size:12px;color:#64748B;margin:14px 0 8px;">📝 ملاحظات إضافية (سجل بيتزاد وميتعدّلش)</div>
+    <div style="font-size:12px;color:#64748B;margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
     <div style="margin-bottom:8px;">${(d.activityNotes||[]).length
       ? (d.activityNotes||[]).map(n => `<div style="background:#F8FAFC;border:1px solid #EEF0F3;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
           <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc(n.text)}</div>
           <div style="font-size:11px;color:#94A3B8;margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by||'')}${n.role?` (${esc(n.role)})`:''}</div>
         </div>`).join('')
-      : '<div style="color:#94A3B8;font-size:12px;">مفيش ملاحظات إضافية لسه</div>'}</div>
-    <textarea id="newActivityNote" rows="2" placeholder="اكتب ملاحظة جديدة تتسجّل باسمك ووقتها..." style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
-    <button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin-bottom:10px;" onclick="addActivityNote()">➕ إضافة ملاحظة</button>
-    <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:#E2E8F0;margin-bottom:8px;" onclick="openTimeline()">⏱ فروقات التوقيت بين الخانات</button>
-    <button class="danger-btn" onclick="deleteDevice()">حذف الجهاز</button>
+      : `<div style="color:#94A3B8;font-size:12px;">${t('det.noNotes')}</div>`}</div>
+    <textarea id="newActivityNote" rows="2" placeholder="${t('det.newNotePh')}" style="width:100%;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
+    <button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin-bottom:10px;" onclick="addActivityNote()">➕ ${t('det.addNote')}</button>
+    <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:#E2E8F0;margin-bottom:8px;" onclick="openTimeline()">⏱ ${t('det.timeline')}</button>
+    <button class="danger-btn" onclick="deleteDevice()">${t('det.delete')}</button>
   `;
 }
 
@@ -3927,15 +3932,15 @@ function accShopBlockHtml(n, s){
   const safe = esc(n).replace(/'/g,"\\'");
   const starts = cycleStartIds(s.entries);
   const sortedDesc = s.entries.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
-  const cycleDivider = (e) => `<div style="text-align:center; margin:8px 0; color:#0891A8; font-size:12.5px; font-weight:800; border-top:1px dashed #CBD5E1; padding-top:8px;">🔄 بداية دورة حسابية جديدة — ${new Date(e.date).toLocaleDateString('ar-EG')}</div>`;
+  const cycleDivider = (e) => `<div style="text-align:center; margin:8px 0; color:#0891A8; font-size:12.5px; font-weight:800; border-top:1px dashed #CBD5E1; padding-top:8px;">🔄 ${t('acc.newCycle')} — ${new Date(e.date).toLocaleDateString('ar-EG')}</div>`;
   const entriesHtml = !open ? '' : `
     <div class="acc-toolbar">
-      <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 واتساب</button>
-      <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ رقم</button>
-      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#2563EB;border-color:#BFDBFE;" onclick="addDiscount('${safe}')">🏷️ خصم</button>
+      <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 ${t('acc.wa')}</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ ${t('acc.phone')}</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#2563EB;border-color:#BFDBFE;" onclick="addDiscount('${safe}')">🏷️ ${t('acc.discount')}</button>
       <button class="btn-secondary" style="color:#166534;border-color:#BBF7D0;" onclick="exportShopExcel('${safe}')">📊 Excel</button>
       <button class="btn-secondary" style="color:#B91C1C;border-color:#FECACA;" onclick="exportShopPdf('${safe}')">📄 PDF</button>
-      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#DC2626;border-color:#FCA5A5;" onclick="deleteAccount('${safe}')">🗑 حذف الحساب</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#DC2626;border-color:#FCA5A5;" onclick="deleteAccount('${safe}')">🗑 ${t('acc.deleteAccount')}</button>
     </div>
     <div class="acc-entries">${sortedDesc.map(e => accEntryHtml(e) + (starts.has(e.id) ? cycleDivider(e) : '')).join('')}</div>`;
 
@@ -3943,9 +3948,9 @@ function accShopBlockHtml(n, s){
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
       <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}</span>
       <span class="acc-nums">
-        <span>عليه: <b>${s.owed.toLocaleString('en-EG')}</b></span>
-        <span>مدفوع/خصم: <b style="color:#16A34A;">${s.paid.toLocaleString('en-EG')}</b></span>
-        <span>المتبقي: <b style="color:${balance > 0 ? '#DC2626' : '#16A34A'};">${balance.toLocaleString('en-EG')}</b> ج.م</span>
+        <span>${t('acc.owed')}: <b>${s.owed.toLocaleString('en-EG')}</b></span>
+        <span>${t('acc.paidDisc')}: <b style="color:#16A34A;">${s.paid.toLocaleString('en-EG')}</b></span>
+        <span>${t('acc.remaining')}: <b style="color:${balance > 0 ? '#DC2626' : '#16A34A'};">${balance.toLocaleString('en-EG')}</b> ${t('acc.egp')}</span>
         <span style="color:#94A3B8;">${open ? '▲' : '▼'}</span>
       </span>
     </button>
@@ -3964,7 +3969,7 @@ function renderAccounts(){
   if(q) names = names.filter(n => n.includes(q));
 
   if(names.length === 0){
-    document.getElementById('accountsBody').innerHTML = `<div class="empty-col">${q ? 'مفيش محل بالاسم ده' : 'لسه مفيش حسابات آجلة — أول جهاز آجل يتسلم هيظهر هنا'}</div>`;
+    document.getElementById('accountsBody').innerHTML = `<div class="empty-col">${q ? t('acc.noMatch') : t('acc.empty')}</div>`;
     return;
   }
 
@@ -3981,16 +3986,16 @@ function renderAccounts(){
       <button onclick="toggleAccGroup('${key}')" style="width:100%; display:flex; justify-content:space-between; align-items:center; background:${bg}; color:${fg}; border:none; border-radius:12px; padding:14px 16px; font-family:inherit; font-weight:800; font-size:15px; cursor:pointer;">
         <span>${title} (${list.length})</span><span>${accGroupOpen[key] ? '▲' : '▼'}</span>
       </button>
-      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? list.map(n => accShopBlockHtml(n, shops[n])).join('') : '<div class="empty-col">مفيش</div>'}</div>` : ''}
+      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? list.map(n => accShopBlockHtml(n, shops[n])).join('') : `<div class="empty-col">${t('acc.none')}</div>`}</div>` : ''}
     </div>`;
 
   document.getElementById('accountsBody').innerHTML = `
     <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:12px; padding:12px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-      <span style="font-weight:800; color:#991B1B;">إجمالي الديون المفتوحة على المحلات</span>
-      <span style="font-weight:900; font-size:18px; color:#DC2626;">${totalOpen.toLocaleString('en-EG')} ج.م</span>
+      <span style="font-weight:800; color:#991B1B;">${t('acc.totalOpen')}</span>
+      <span style="font-weight:900; font-size:18px; color:#DC2626;">${totalOpen.toLocaleString('en-EG')} ${t('acc.egp')}</span>
     </div>
-    ${groupHtml('📂 الحسابات المفتوحة', '#FEF2F2', '#991B1B', 'open', openNames)}
-    ${groupHtml('✅ الحسابات المدفوعة', '#F0FDF4', '#166534', 'paid', paidNames)}
+    ${groupHtml('📂 ' + t('acc.groupOpen'), '#FEF2F2', '#991B1B', 'open', openNames)}
+    ${groupHtml('✅ ' + t('acc.groupPaid'), '#F0FDF4', '#166534', 'paid', paidNames)}
   `;
   if(_scroller) _scroller.scrollTop = _y;
 }
