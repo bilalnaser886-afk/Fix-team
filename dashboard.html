@@ -28,6 +28,8 @@
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
     --delivered:#64748B; --delivered-bg:#EEF1F3;
+    --delivered_paid:#16A34A; --delivered_paid-bg:#DCFCE7;
+    --delivered_unpaid:#D97706; --delivered_unpaid-bg:#FEF3C7;
     --paid:#15803D; --paid-bg:#EAF6EE;
     --unpaid:#B45309; --unpaid-bg:#FEF3E2;
     --rejected:#DC2626; --rejected-bg:#FEF2F2;
@@ -1226,7 +1228,19 @@ function startRealtimeSync(){
   }catch(e){ /* المزامنة اللحظية اختيارية — السيستم شغال من غيرها */ }
 }
 
+// حالات العرض/الفلترة — "تم التسليم" اتقسمت لحالتين حسب حالة الدفع
 const STATUSES = [
+  { key: "waiting", label: "قيد الانتظار", varname:"waiting" },
+  { key: "diagnosing", label: "جاري الكشف", varname:"diagnosing" },
+  { key: "repairing", label: "جاري الصيانة", varname:"repairing" },
+  { key: "done", label: "تم الصيانة", varname:"done" },
+  { key: "delivered_paid", label: "تم التسليم والدفع", varname:"delivered_paid" },
+  { key: "delivered_unpaid", label: "تم التسليم - بانتظار الدفع", varname:"delivered_unpaid" },
+  { key: "rejected", label: "تم الرفض", varname:"rejected" },
+  { key: "returned", label: "المرتجعات", varname:"returned" },
+];
+// حالات الأزرار (الإجراءات) — التسليم زرار واحد، والنظام بيحدد الخانة حسب الدفع
+const ACTION_STATUSES = [
   { key: "waiting", label: "قيد الانتظار", varname:"waiting" },
   { key: "diagnosing", label: "جاري الكشف", varname:"diagnosing" },
   { key: "repairing", label: "جاري الصيانة", varname:"repairing" },
@@ -1235,6 +1249,15 @@ const STATUSES = [
   { key: "rejected", label: "تم الرفض", varname:"rejected" },
   { key: "returned", label: "المرتجعات", varname:"returned" },
 ];
+
+// هل الجهاز محاسَب عليه فعلاً؟
+function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
+// الحالة الفعلية للعرض: بتقسم "تم التسليم" لمدفوع / بانتظار الدفع
+function effStatus(d){
+  if(!d) return '';
+  if(d.status === 'delivered') return isPaidDevice(d) ? 'delivered_paid' : 'delivered_unpaid';
+  return d.status;
+}
 const STORAGE_KEY = "repair-devices";
 let devices = [];
 let selectedId = null;
@@ -1242,7 +1265,7 @@ let currentColumn = null;
 
 function accent(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key).trim(); }
 function accentBg(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key+'-bg').trim(); }
-function statusInfo(key){ return STATUSES.find(s => s.key === key); }
+function statusInfo(key){ return STATUSES.find(s => s.key === key) || ACTION_STATUSES.find(s => s.key === key); }
 function esc(str){ const d=document.createElement('div'); d.innerText = str==null?'':str; return d.innerHTML; }
 function daysSince(dateStr){ return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000); }
 function formatDateTime(iso){
@@ -1803,7 +1826,7 @@ function refreshOpenOverlays(){
 function renderBoard(){
   const board = document.getElementById('board');
   board.innerHTML = STATUSES.map(s => {
-    const count = devices.filter(d => d.status === s.key).length;
+    const count = devices.filter(d => effStatus(d) === s.key).length;
     return `<button class="column" onclick="openColumn('${s.key}')">
       <div class="column-head">
         <span class="title" style="color:${accent(s.varname)}">${s.label}</span>
@@ -1850,7 +1873,7 @@ let colScrollAttached = false;
 function renderColumn(keepPos){
   const s = statusInfo(currentColumn);
   const q = document.getElementById('columnSearch').value.trim();
-  colFullList = devices.filter(d => d.status === currentColumn && matchesSearch(d, q));
+  colFullList = devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q));
   document.getElementById('columnTitle').textContent = `${s.label} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
 
@@ -1946,30 +1969,18 @@ function paymentBadge(d){
 }
 
 // بلوك الدفع في التفاصيل + زرار "تم الدفع" للكاش
-function paymentDetailHtml(d){
-  if(d.status !== 'delivered') return '';
-  const price = parseInt(d.agreedPrice) || 0;
-  if(d.paymentStatus === 'paid'){
-    const how = d.paymentType === 'deferred' ? 'آجل على حساب المحل' : 'كاش';
-    return `<div style="background:var(--paid-bg);color:var(--paid);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-weight:700;">✓ محاسَب عليه (${how})${price?` — ${price.toLocaleString('en-EG')} ج.م`:''}</div>`;
-  }
-  if(price > 0 && d.paymentType !== 'deferred'){
-    return `<div style="background:var(--unpaid-bg);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-      <div style="color:var(--unpaid);font-weight:700;margin-bottom:8px;">⏳ كاش — لسه ماتحصّلش (${price.toLocaleString('en-EG')} ج.م)</div>
-      <button class="btn-primary" style="box-shadow:none;background:var(--paid);" onclick="markPaid()">💵 تم الدفع</button>
-    </div>`;
-  }
-  return `<div style="background:var(--unpaid-bg);color:var(--unpaid);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-weight:700;">⏳ لسه مش متسعّر — اكتب السعر</div>`;
-}
-
+// (اتشالت — بلوك الدفع الموحّد فوق بقى بيغطيها)
 async function markPaid(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const price = parseInt(d.agreedPrice) || 0;
   if(price <= 0){ alert('لازم تكتب السعر الأول قبل ما تأكّد الدفع'); return; }
+  const label = d.status === 'delivered'
+    ? 'تم الدفع (فوري) — تم التسليم والدفع'
+    : 'تم الدفع (فوري) — محاسَب عليه';
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
-        statusHistory:[...(x.statusHistory||[]), {status:'delivered', label:'تم الدفع (كاش) — محاسَب عليه', date:new Date().toISOString(), by:currentUser.name}] }
+        statusHistory:[...(x.statusHistory||[]), {status:x.status, label, date:new Date().toISOString(), by:currentUser.name}] }
     : x);
   renderDetail(); render(); await persist();
   const t = devices.find(x=>x.id===selectedId);
@@ -2347,13 +2358,15 @@ function renderDetail(){
     d.lastModifiedAt ? ['آخر تعديل', formatDateTime(d.lastModifiedAt)] : null,
   ].filter(Boolean).map(([label,val,mono]) => `<div class="detail-row"><span>${esc(label)}</span><span ${mono?'style="font-family:monospace;color:var(--accent);font-weight:700"':''}>${esc(val)}</span></div>`).join('');
 
-  const pills = STATUSES.map(st => {
+  const pills = ACTION_STATUSES.map(st => {
     if(st.key === 'delivered'){
       const active = d.status==='delivered';
       const priced = (parseInt(d.agreedPrice)||0) > 0;
-      const hint = priced
-        ? (d.paymentType==='deferred' ? 'تم التسليم — آجل يتضاف على حساب المحل' : 'تم التسليم — محاسَب عليه فوري')
-        : 'تم التسليم — هيفضل "مش متسعر" لحد ما تحدد السعر';
+      const hint = !priced
+        ? 'تم التسليم — هيفضل "بانتظار الدفع" لحد ما تحدد السعر'
+        : (d.paymentType==='deferred'
+            ? 'تم التسليم والدفع — المبلغ بيتضاف على حساب المحل'
+            : 'تم التسليم - بانتظار الدفع — لحد ما تدوس "تأكيد الدفع"');
       return `
         <button class="pill" style="border-color:${accent('paid')};
           background:${active?accent('paid'):'#fff'}; color:${active?'#fff':accent('paid')}"
@@ -2396,13 +2409,18 @@ function renderDetail(){
       </div>
     ` : ''}
     ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
-      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع${d.status==='delivered' ? ' (اتحددت عند التسليم)' : ''}</span>
-      ${d.status==='delivered'
-        ? `<div style="font-size:14.5px;font-weight:700;">${d.paymentType==='deferred' ? '🕐 آجل — على حساب المحل' : '💵 فوري'}</div>`
-        : `<div class="pay-choice">
-            <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">فوري</button>
-            <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
-          </div>`}
+      <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">طريقة الدفع</span>
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">دفع فوري</button>
+        <button type="button" class="pay-btn" style="border-color:#B45309;${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:#B45309;background:#fff;'}" onclick="editPayType('deferred')">آجل — على حساب المحل</button>
+      </div>
+      ${d.paymentType === 'deferred'
+        ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
+             ✓ اتضاف على حساب المحل${d.billedShop?` "${esc(d.billedShop)}"`:''} — محاسَب عليه
+           </div>`
+        : (isPaidDevice(d)
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ تم الدفع (فوري)</div>`
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 تأكيد الدفع</button>`)}
     </div>` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>متحاسب على حساب محل</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
@@ -2476,7 +2494,6 @@ function renderDetail(){
       <button class="btn-secondary" style="color:var(--ink);border-color:#E2E8F0;padding:5px 10px;font-size:11px;" onclick="toggleDetailLabel('${d.id}')">🖨 طباعة ليبل</button>
     </div>
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
-    ${paymentDetailHtml(d)}
     <div class="status-pills">${pills}</div>
     <div style="font-size:12px;color:#64748B;margin-bottom:8px;">سجل الحالات</div>
     <div style="margin-bottom:10px;">${history}</div>
@@ -2696,19 +2713,25 @@ async function changeStatus(newStatus, paymentChoice){
   if(newStatus === 'delivered'){
     const price = parseInt(d.agreedPrice) || 0;
     if(price > 0 && d.paymentType === 'deferred'){
-      // آجل: يتضاف على حساب المحل + يتسجّل "تم الدفع" تلقائياً (مفيش زرار)
+      // آجل: يتقيّد على حساب المحل (لو ماتقيّدش قبل كده) ويعتبر متسوّى
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      historyLabel = `تم التسليم — آجل، اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
-      addLedgerDebit({...d, billedShop: shop}, price);
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+        addLedgerDebit({...d, billedShop: shop}, price);
+        historyLabel = `تم التسليم والدفع — آجل، اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+      } else {
+        historyLabel = `تم التسليم والدفع — آجل على حساب "${shop}" (مقيّد قبل كده)`;
+      }
     } else if(price > 0){
-      // كاش: ما يتحسبش مدفوع تلقائياً — مستني زرار "تم الدفع"
-      newPaymentStatus = 'unpaid';
-      historyLabel = 'تم التسليم — كاش، لسه ماتحصّلش';
+      // فوري: مستني "تأكيد الدفع"
+      newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
+      historyLabel = isPaidDevice(d)
+        ? 'تم التسليم والدفع — فوري'
+        : 'تم التسليم - بانتظار الدفع (فوري)';
     } else {
       newPaymentStatus = 'unpaid';
-      historyLabel = 'تم التسليم — لسه مش متسعّر';
+      historyLabel = 'تم التسليم - بانتظار الدفع — لسه مش متسعّر';
     }
   }
 
@@ -2851,11 +2874,7 @@ function dayKey(dateLike){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function fullStatusLabel(d){
-  const s = statusInfo(d.status);
-  if(d.status === 'delivered'){
-    if(d.paymentStatus === 'paid') return 'تم التسليم — محاسَب عليه';
-    if(d.paymentStatus === 'unpaid') return 'تم التسليم — لسه مش متسعر';
-  }
+  const s = statusInfo(effStatus(d));
   return s ? s.label : d.status;
 }
 
@@ -2866,6 +2885,8 @@ function toNumber(v){
 
 function renderFinancialSummary(){
   const delivered = devices.filter(d => d.status === 'delivered');
+  const deliveredPaid = delivered.filter(d => isPaidDevice(d));
+  const deliveredUnpaid = delivered.filter(d => !isPaidDevice(d));
   const paid = delivered.filter(d => d.paymentStatus === 'paid');
   const unpaid = delivered.filter(d => d.paymentStatus === 'unpaid');
   const paidTotal = paid.reduce((sum,d) => sum + toNumber(d.agreedPrice), 0);
@@ -2945,7 +2966,7 @@ function renderEmployeeView(query){
   });
 
   const byStatus = {};
-  matched.forEach(d => { (byStatus[d.status] = byStatus[d.status] || []).push(d); });
+  matched.forEach(d => { const k = effStatus(d); (byStatus[k] = byStatus[k] || []).push(d); });
 
   const todayHtml = todayList.length === 0
     ? `<div class="empty-col">مفيش نشاط النهاردة</div>`
@@ -2974,7 +2995,7 @@ function renderEmployeeView(query){
 }
 
 function expandEmpStatus(statusKey, query){
-  const list = devices.filter(d => d.status === statusKey &&
+  const list = devices.filter(d => effStatus(d) === statusKey &&
     ((d.technician && d.technician.includes(query)) || (d.registeredBy && d.registeredBy.includes(query))));
   document.getElementById('empExpanded').innerHTML =
     `<div style="margin-top:12px; border-top:1px solid #F1F5F9; padding-top:12px;">${list.map(d => dayCardHtml(d)).join('')}</div>`;
@@ -3569,9 +3590,46 @@ function setAddPayType(t){
   f.style.cssText = 'border-color:#B45309;' + (t==='deferred' ? 'background:#B45309;color:#fff;' : 'background:#fff;color:#B45309;');
 }
 
+// تغيير طريقة الدفع في أي مرحلة — بيقيّد على حساب المحل أو يرجّع القيد
 async function editPayType(t){
-  devices = devices.map(d => d.id === selectedId ? { ...d, paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
-  renderDetail(); await persist();
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const price = parseInt(d.agreedPrice) || 0;
+  if(t === d.paymentType && (t !== 'deferred' || isPaidDevice(d))) return;   // مفيش تغيير
+
+  let extra = { paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let note = null;
+
+  if(t === 'deferred'){
+    if(price <= 0){ alert('اكتب السعر الأول عشان يتحاسب على حساب المحل'); return; }
+    const shop = (d.billedShop || d.shopName || '').trim();
+    if(!shop){ alert('الجهاز ده مش متسجل عليه اسم محل — اكتب اسم المحل الأول عشان يتحاسب آجل.'); return; }
+    // لو مفيش قيد قديم للجهاز، نضيفه دلوقتي
+    if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      addLedgerDebit({ ...d, billedShop: shop }, price);
+    }
+    extra.billedShop = shop;
+    extra.paymentStatus = 'paid';   // اتسوّى عن طريق حساب المحل
+    note = `اتحوّل لآجل — اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+  } else {
+    // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
+    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id);
+    if(had){
+      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id));
+      await persistLedger();
+    }
+    extra.paymentStatus = 'unpaid';   // مستني "تأكيد الدفع"
+    note = had ? 'اتحوّل لفوري — اتشال القيد من حساب المحل، مستني تأكيد الدفع'
+               : 'اتحوّل لفوري — مستني تأكيد الدفع';
+  }
+
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory:[...(x.statusHistory||[]),
+        { status:x.status, label:note, date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
+  const t2 = devices.find(x => x.id === selectedId);
+  if(t2) syncTrack(t2);
 }
 
 // تعديل السعر: أرقام صحيحة — ولو الجهاز "متسلم بس مش متسعر" واتسعر دلوقتي يتحاسب تلقائياً
@@ -3588,17 +3646,19 @@ async function editPrice(value){
     resetTrackResponse(d.trackToken, 'price');
   }
 
-  if(d.status === 'delivered' && d.paymentStatus !== 'paid' && price){
-    if(d.paymentType === 'deferred'){
-      // آجل: يتضاف على الحساب + يتسجّل "تم الدفع" تلقائياً
+  // تسعير في أي مرحلة: لو آجل يتقيّد على حساب المحل فوراً ويعتبر متسوّى
+  if(price && d.paymentType === 'deferred' && !isPaidDevice(d)){
+    const shop = (d.billedShop || d.shopName || '').trim();
+    if(shop){
       extra.paymentStatus = 'paid';
-      const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      histEntry = { status:'delivered', label:`اتسعر بعد التسليم — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
-      addLedgerDebit({...d, billedShop: shop}, parseInt(price));
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+        addLedgerDebit({...d, billedShop: shop}, parseInt(price));
+      }
+      histEntry = { status:d.status, label:`اتسعّر — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
     }
-    // كاش: بنحدّث السعر بس، وبيفضل "لسه ماتحصّلش" لحد ما يتدوس زرار "تم الدفع"
   }
+  // فوري: بنحدّث السعر بس، وبيفضل "بانتظار الدفع" لحد ما يتدوس "تأكيد الدفع"
 
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
@@ -4198,6 +4258,8 @@ function renderSummaries(){
   invLists = {
     received: received,
     delivered: delivered,
+    delivered_paid: deliveredPaid,
+    delivered_unpaid: deliveredUnpaid,
     progress: inProgress,
     stuck: stuck.map(x => x.d),
   };
@@ -4210,7 +4272,8 @@ function renderSummaries(){
   const cards = `
     <div class="inv-cards">
       ${card('received', received.length, '#2563EB', 'جهاز استُلم في الفترة')}
-      ${card('delivered', delivered.length, '#16A34A', 'جهاز اتسلّم في الفترة')}
+      ${card('delivered_paid', deliveredPaid.length, '#16A34A', 'تم التسليم والدفع')}
+      ${card('delivered_unpaid', deliveredUnpaid.length, '#D97706', 'تم التسليم - بانتظار الدفع')}
       ${card('progress', inProgress.length, '#B45309', 'جهاز شغال عليه دلوقتي')}
       ${card('stuck', stuck.length, '#DC2626', `⚠️ جهاز تجاوز ${STUCK_DAYS} أيام — محتاج متابعة`)}
     </div>
