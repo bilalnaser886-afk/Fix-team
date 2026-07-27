@@ -4195,6 +4195,8 @@ function renderSummaries(){
 
   const received = devices.filter(d => inRange(d.intakeDate));
   const delivered = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inRange(dd); });
+  const deliveredPaid = delivered.filter(d => isPaidDevice(d));
+  const deliveredUnpaid = delivered.filter(d => !isPaidDevice(d));
   const inProgress = devices.filter(d => OPEN_STATUSES.includes(d.status));
   const stuck = stuckDevices();
   // الكروت قابلة للضغط — تفتح قائمة الأجهزة اللي جواها
@@ -4264,14 +4266,14 @@ function renderSummaries(){
   const techCards = techNames.length === 0
     ? `<div class="empty-col">${t('inv.noTechDevices')}</div>`
     : `<div class="inv-cards">
-        ${techNames.map(t => {
-          const late = withTech[t].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
-          const safe = esc(t).replace(/'/g, "\\'");
-          return `<div class="inv-card ${invOpenTech===t ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
-            <div class="inv-card-num" style="color:#0891A8;">${withTech[t].length}</div>
-            <div class="inv-card-label">🔧 ${esc(t)}</div>
+        ${techNames.map(techName => {
+          const late = withTech[techName].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
+          const safe = esc(techName).replace(/'/g, "\\'");
+          return `<div class="inv-card ${invOpenTech===techName ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
+            <div class="inv-card-num" style="color:#0891A8;">${withTech[techName].length}</div>
+            <div class="inv-card-label">🔧 ${esc(techName)}</div>
             ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
-            <div class="inv-card-more">${invOpenTech===t ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
+            <div class="inv-card-more">${invOpenTech===techName ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
           </div>`;
         }).join('')}
       </div>
@@ -4537,16 +4539,17 @@ function renderTechEval(){
   ])];
 
   const round1 = n => Math.round(n * 10) / 10;
-  teRows = names.map(t => {
-    const mine = completedInRange.filter(d => d.technician === t);
+  teRows = names.map(techName => {
+    const t = techName;   // ملاحظة: بنسمّيه techName عشان مايحجبش دالة الترجمة t()
+    const mine = completedInRange.filter(d => d.technician === techName);
     const durations = mine.map(repairDays).filter(x => x !== null);
     const avg = durations.length ? durations.reduce((a,b) => a+b, 0) / durations.length : null;
     const returns = devices.filter(d => {
-      if(d.technician !== t) return false;
+      if(d.technician !== techName) return false;
       const rd = returnAfterDeliveryDate(d);
       return rd && inTeRange(rd);
     }).length;
-    const items = contrib[t] || [];
+    const items = contrib[techName] || [];
     return {
       t,
       points: round1(items.reduce((s, x) => s + x.share, 0)),
