@@ -41,6 +41,8 @@
   .log-item{ border-bottom:1px solid #F1F5F9; padding:7px 0; font-size:12.5px; line-height:1.6; }
   .log-meta{ color:#94A3B8; font-size:11px; }
   .loading{ text-align:center; padding:50px 20px; color:var(--muted); }
+  .lang-toggle{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:#fff;
+    border-radius:9px; min-height:36px; padding:0 12px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
   .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:#fff; text-align:center;
     font-weight:800; font-size:14px; padding:13px; }
 </style>
@@ -51,6 +53,7 @@
   <h1>⚙️ <span data-i18n="adm.title">لوحة تحكم الأدمن</span></h1>
   <div class="sub" data-i18n="adm.subtitle">I Fix Team — إدارة النظام</div>
   <div class="who" id="whoBox" data-i18n="adm.checking">جارٍ التحقق…</div>
+  <div id="langHost" style="margin-top:10px;"></div>
 </div>
 
 <div class="wrap" id="wrap"><div class="loading">جاري التحميل…</div></div>
@@ -330,6 +333,7 @@ async function doLogout(){
     return;
   }
   document.getElementById('whoBox').textContent = `${currentUser.name} — ${t('adm.roleSuper')}`;
+  try{ I18N.setUser(currentUser.email); I18N.mountLangToggle(document.getElementById('langHost')); }catch(e){}
   await loadAll();
   render();
 })();

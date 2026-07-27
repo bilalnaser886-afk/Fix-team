@@ -559,7 +559,7 @@
       <div id="annIcon" style="font-size:46px;">🛠️</div>
       <h2 id="annTitle" style="margin:12px 0 8px;">مرحباً</h2>
       <p id="annBody" style="color:#475569; line-height:1.8; font-size:14.5px; margin:0;"></p>
-      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" onclick="closeAnnouncement()">تمام، فهمت 👍</button>
+      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" data-i18n="btn.understood" onclick="closeAnnouncement()">تمام، فهمت 👍</button>
     </div>
   </div>
 </div>
@@ -573,7 +573,7 @@
       <div id="bcIcon" style="font-size:46px;">📢</div>
       <h2 id="bcTitle" style="margin:12px 0 8px;"></h2>
       <p id="bcBody" style="color:#475569; line-height:1.8; font-size:14.5px; margin:0; white-space:pre-wrap;"></p>
-      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" onclick="dismissBroadcast()">فهمت 👍</button>
+      <button class="btn-primary" style="margin-top:18px; box-shadow:none;" data-i18n="btn.understood" onclick="dismissBroadcast()">فهمت 👍</button>
     </div>
   </div>
 </div>
@@ -929,13 +929,13 @@ function applySystemMode(){
   if(!banner) return;
   const m = systemConfig.mode;
   if(m === 'beta'){
-    banner.textContent = '🛠️ فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق';
+    banner.textContent = '🛠️ ' + t('sys.betaBanner');
     banner.style.background = '#1E293B'; banner.style.color = '#fff';
     banner.classList.remove('hidden');
     maybeShowAnnouncement('beta');
   } else if(m === 'trial'){
     const left = trialDaysLeft();
-    banner.textContent = `🎁 فترة مجانية — متبقّي ${left} يوماً على الاشتراك`;
+    banner.textContent = '🎁 ' + t('sys.trialBanner',{n:left});
     banner.style.background = '#B45309'; banner.style.color = '#fff';
     banner.classList.remove('hidden');
     maybeShowAnnouncement('trial');
@@ -951,13 +951,13 @@ function maybeShowAnnouncement(kind){
   const o = document.getElementById('annOverlay');
   if(kind === 'beta'){
     document.getElementById('annIcon').textContent = '🛠️';
-    document.getElementById('annTitle').textContent = 'مرحباً بك في I Fix Team!';
-    document.getElementById('annBody').textContent = 'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.';
+    document.getElementById('annTitle').textContent = t('sys.betaTitle');
+    document.getElementById('annBody').textContent = t('sys.betaBody');
   } else {
     const left = trialDaysLeft();
     document.getElementById('annIcon').textContent = '🎁';
-    document.getElementById('annTitle').textContent = 'بدأت فترتك المجانية';
-    document.getElementById('annBody').textContent = `أنت الآن في الفترة المجانية (${systemConfig.trialDays||30} يوماً). متبقّي ${left} يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.`;
+    document.getElementById('annTitle').textContent = t('sys.trialTitle');
+    document.getElementById('annBody').textContent = t('sys.trialBody',{d:(systemConfig.trialDays||30), n:left});
   }
   o.setAttribute('data-seen-key', seenKey);
   o.classList.remove('hidden');
@@ -976,7 +976,7 @@ function injectAdminMenu(){
   if(!dd || document.getElementById('adminMenuBtn')) return;
   const b = document.createElement('button');
   b.id = 'adminMenuBtn';
-  b.textContent = '⚙️ لوحة الأدمن';
+  b.textContent = '⚙️ ' + t('menu.admin');
   b.style.color = '#7C3AED';
   b.onclick = () => { location.href = 'admin.html'; };
   const logoutBtn = dd.querySelector('button[onclick="logout()"]');
@@ -1002,8 +1002,11 @@ function showBroadcastIfUnseen(){
   if(localStorage.getItem('ifix_seen_bc_' + currentBroadcast.id)) return;
   const t = currentBroadcast.type;
   document.getElementById('bcIcon').textContent = t==='warning' ? '⚠️' : (t==='success' ? '✅' : '📢');
-  document.getElementById('bcTitle').textContent = currentBroadcast.title || 'إشعار';
-  document.getElementById('bcBody').textContent = currentBroadcast.body || '';
+  // لو الأدمن كتب نسخة إنجليزية، بنعرضها للمستخدم اللي مختار إنجليزي
+  const lang = (typeof I18N !== 'undefined') ? I18N.getLang() : 'ar';
+  const pick = (base) => (lang === 'en' && currentBroadcast[base + '_en']) ? currentBroadcast[base + '_en'] : (currentBroadcast[base] || '');
+  document.getElementById('bcTitle').textContent = pick('title') || t('bc.default');
+  document.getElementById('bcBody').textContent = pick('body');
   document.getElementById('broadcastOverlay').classList.remove('hidden');
 }
 function dismissBroadcast(){
@@ -1030,6 +1033,7 @@ async function requireAccess(){
   if(!session){ window.location.href = 'index.html'; return false; }
   try{
     currentUser.email = session.user.email || '';
+    try{ I18N.setUser(currentUser.email); }catch(e){}   // كل محاسب بلغته
     const { data: prof } = await sb.from('profiles').select('full_name').eq('id', session.user.id).single();
     currentUser.name = (prof && prof.full_name && prof.full_name.trim())
       ? prof.full_name.trim()
@@ -1167,6 +1171,7 @@ const ACTION_STATUSES = [
 ];
 
 // هل الجهاز محاسَب عليه فعلاً؟
+function getLocale(){ return (typeof I18N!=='undefined' && I18N.getLang()==='en') ? 'en-GB' : 'ar-EG'; }
 function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
 // الحالة الفعلية للعرض: بتقسم "تم التسليم" لمدفوع / بانتظار الدفع
 function effStatus(d){
@@ -2286,7 +2291,7 @@ function renderDetail(){
       return `
         <button class="pill" style="border-color:${accent('paid')};
           background:${active?accent('paid'):'#fff'}; color:${active?'#fff':accent('paid')}"
-          title="${hint}" onclick="changeStatus('delivered')">تم التسليم</button>
+          title="${hint}" onclick="changeStatus('delivered')">${t('status.delivered')}</button>
       `;
     }
     return `
@@ -2769,6 +2774,15 @@ function renderTimeline(){
 function toggleMenu(){
   document.getElementById('menuDropdown').classList.toggle('hidden');
 }
+// بعد اختيار عنصر من القائمة، الضغطة ممكن "تعدّي" للكارت اللي تحتها وتفتح خانة غلط.
+// الدرع ده بيبلع أي ضغطة تايهة لجزء من الثانية — تحت النوافذ فمش بيعطّل حاجة.
+function shieldGhostClick(ms){
+  const s = document.createElement('div');
+  s.id = 'ghostShield';
+  s.style.cssText = 'position:fixed;inset:0;z-index:25;background:transparent;';
+  document.body.appendChild(s);
+  setTimeout(() => { const el = document.getElementById('ghostShield'); if(el) el.remove(); }, ms || 450);
+}
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('menuDropdown');
   const btn = document.querySelector('.menu-btn');
@@ -2779,6 +2793,7 @@ document.addEventListener('click', (e) => {
 
 function openSummaries(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   clearSearchBox('invSearch');
   renderSummaries();
   document.getElementById('summariesOverlay').classList.remove('hidden');
@@ -3740,6 +3755,7 @@ async function transferDebit(entryId){
 // ============================================================
 function openAccounts(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   clearSearchBox('accSearch');
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
@@ -3790,34 +3806,34 @@ function cycleStartIds(entries){
 // رسم حركة واحدة في كشف المحل حسب نوعها
 function accEntryHtml(e){
   const amt = (e.amount||0).toLocaleString('en-EG');
-  const meta = `<div class="acc-entry-meta">${new Date(e.date).toLocaleString('ar-EG')} — بواسطة ${esc(e.by||'')}</div>`;
+  const meta = `<div class="acc-entry-meta">${new Date(e.date).toLocaleString(getLocale())} — ${t('acc.by')} ${esc(e.by||'')}</div>`;
   if(e.type === 'credit'){
     return `<div class="acc-entry" style="background:#F0FDF4;">
-      <div><div style="font-weight:700; color:#16A34A;">💵 دفعة${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
+      <div><div style="font-weight:700; color:#16A34A;">💵 ${t('acc.entryPayment')}${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:#16A34A;">− ${amt} ج.م</div>
-        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button></div>
+        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button></div>
     </div>`;
   }
   if(e.type === 'discount'){
     return `<div class="acc-entry" style="background:#EFF6FF;">
-      <div><div style="font-weight:700; color:#2563EB;">🏷️ خصم${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
+      <div><div style="font-weight:700; color:#2563EB;">🏷️ ${t('acc.entryDiscount')}${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:#2563EB;">− ${amt} ج.م</div>
-        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button></div>
+        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button></div>
     </div>`;
   }
   if(e.type === 'opening'){
     return `<div class="acc-entry" style="background:#FFFBEB;">
-      <div><div style="font-weight:700; color:#B45309;">🧾 رصيد افتتاحي سابق</div>${meta}</div>
+      <div><div style="font-weight:700; color:#B45309;">🧾 ${t('acc.entryOpening')}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:#B45309;">+ ${amt} ج.م</div>
-        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">حذف</button></div>
+        <button class="acc-mini-btn" style="color:#DC2626;border-color:#FCA5A5;" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button></div>
     </div>`;
   }
   // debit (جهاز آجل)
   return `<div class="acc-entry">
     <div><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
-      <div class="acc-entry-meta">${new Date(e.date).toLocaleString('ar-EG')} — بواسطة ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
+      <div class="acc-entry-meta">${new Date(e.date).toLocaleString(getLocale())} — ${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
     <div style="text-align:left;"><div style="font-weight:800; color:#B45309;">+ ${amt} ج.م</div>
-      <button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ نقل لمحل تاني</button></div>
+      <button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ ${t('acc.moveShop')}</button></div>
   </div>`;
 }
 
@@ -4290,6 +4306,7 @@ let anPeriod = { mode: 'month', from: '', to: '' };
 
 function openAnalytics(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
   renderAnalytics();
 }
@@ -4429,6 +4446,7 @@ let teRows = [];
 
 function openTechEval(){
   document.getElementById('menuDropdown').classList.add('hidden');
+  shieldGhostClick();
   document.getElementById('techEvalOverlay').classList.remove('hidden');
   teOpenTech = null;
   renderTechEval();

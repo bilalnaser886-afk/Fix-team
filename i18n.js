@@ -381,6 +381,22 @@
       'msg.badOpening': 'اكتب رصيد افتتاحي صحيح',
       'msg.deleteDevice': 'متأكد إنك عايز تمسح "{name}"؟ الحذف ده نهائي ومش هينفع ترجّعه.',
 
+      /* حركات الحساب + بانرات النظام */
+      'acc.by': 'بواسطة',
+      'acc.entryPayment': 'دفعة',
+      'acc.entryDiscount': 'خصم',
+      'acc.entryOpening': 'رصيد افتتاحي سابق',
+      'acc.moveShop': 'نقل لمحل تاني',
+      'acc.deleteEntry': 'حذف',
+      'sys.betaBanner': 'فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق',
+      'sys.trialBanner': 'فترة مجانية — متبقّي {n} يوماً على الاشتراك',
+      'sys.betaTitle': 'مرحباً بك في I Fix Team!',
+      'sys.betaBody': 'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.',
+      'sys.trialTitle': 'بدأت فترتك المجانية',
+      'sys.trialBody': 'أنت الآن في الفترة المجانية ({d} يوماً). متبقّي {n} يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.',
+
+      'bc.default': 'إشعار',
+
       /* اللغة */
       'lang.switch': 'English',
       'lang.switchTitle': 'تغيير لغة النظام'
@@ -740,6 +756,21 @@
       'msg.badOpening': 'Enter a valid opening balance',
       'msg.deleteDevice': 'Delete "{name}"? This is permanent and cannot be undone.',
 
+      /* Ledger entries + system banners */
+      'acc.by': 'by',
+      'acc.entryPayment': 'Payment',
+      'acc.entryDiscount': 'Discount',
+      'acc.entryOpening': 'Previous opening balance',
+      'acc.moveShop': 'Move to another store',
+      'acc.deleteEntry': 'Delete',
+      'sys.betaBanner': 'Beta period before the full app release',
+      'sys.trialBanner': 'Free trial — {n} days left before subscription',
+      'sys.betaTitle': 'Welcome to I Fix Team!',
+      'sys.betaBody': 'You are currently using the Beta version, ahead of the official full release.',
+      'sys.trialTitle': 'Your free trial has started',
+      'sys.trialBody': 'You are in the free trial ({d} days). {n} days remain, after which a subscription is required to continue.',
+
+      'bc.default': 'Announcement',
       'lang.switch': 'العربية',
       'lang.switchTitle': 'Change system language'
     }
@@ -806,10 +837,29 @@
   }
 
   /* تغيير اللغة: بنحفظ ونعيد التحميل عشان كل الشاشات تتبني باللغة الجديدة */
+  /* كل محاسب له لغته: بنخزّن التفضيل باسم المستخدم كمان */
+  let currentUserKey = '';
+  function setUser(email) {
+    currentUserKey = (email || '').toLowerCase();
+    if (!currentUserKey) return currentLang;
+    try {
+      const per = localStorage.getItem(STORAGE_KEY + '_' + currentUserKey);
+      if (per && STRINGS[per] && per !== currentLang) {
+        currentLang = per;
+        applyDirection();
+        applyTranslations(document);
+      }
+    } catch (e) {}
+    return currentLang;
+  }
+
   function setLang(lang) {
     if (!STRINGS[lang] || lang === currentLang) return;
     currentLang = lang;
-    try { localStorage.setItem(STORAGE_KEY, lang); } catch (e) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+      if (currentUserKey) localStorage.setItem(STORAGE_KEY + '_' + currentUserKey, lang);
+    } catch (e) {}
     location.reload();
   }
 
@@ -829,7 +879,7 @@
   }
 
   global.I18N = {
-    t: t, has: has, getLang: getLang, setLang: setLang, toggleLang: toggleLang,
+    t: t, has: has, getLang: getLang, setLang: setLang, toggleLang: toggleLang, setUser: setUser,
     applyI18n: applyI18n, applyTranslations: applyTranslations,
     mountLangToggle: mountLangToggle, STRINGS: STRINGS
   };
