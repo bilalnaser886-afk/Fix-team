@@ -1159,6 +1159,20 @@ const STATUSES = [
 ];
 // اسم الحالة حسب اللغة الحالية
 function stLabel(s){ return s ? (typeof t === 'function' && s.labelKey ? t(s.labelKey) : s.label) : ''; }
+
+// اسم الحالة في السجل: بيفضّل المفتاح المخزّن (الجديد)، وبيترجم النصوص العربية القديمة كمان
+const _AR_STATUS_BACKMAP = null;   // بيتبني عند أول استخدام
+function histLabel(hEntry){
+  if(!hEntry) return '';
+  if(hEntry.labelKey) return t(hEntry.labelKey, hEntry.labelVars || {});
+  if(hEntry.label){
+    // سجلات قديمة اتخزنت بالعربي: لو النص اسم حالة معروف، نرجّعه مترجم
+    const hit = STATUSES.concat(ACTION_STATUSES).find(s => s.label === hEntry.label);
+    if(hit) return stLabel(hit);
+    return hEntry.label;   // نص مركّب قديم — بيفضل زي ما اتخزن
+  }
+  return stLabel(statusInfo(hEntry.status));
+}
 // حالات الأزرار (الإجراءات) — التسليم زرار واحد، والنظام بيحدد الخانة حسب الدفع
 const ACTION_STATUSES = [
   { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
@@ -1721,10 +1735,10 @@ function showImportProgress(done, total){
   }
   const pct = Math.round((done / total) * 100);
   bar.innerHTML = `<div class="ip-inner">
-    <div class="ip-title">📥 جاري استيراد البيانات القديمة</div>
+    <div class="ip-title">📥 ${t('ui.importing')}</div>
     <div class="ip-track"><div class="ip-fill" style="width:${pct}%"></div></div>
     <div class="ip-nums">${done.toLocaleString('en')} من ${total.toLocaleString('en')} (${pct}%)</div>
-    <div class="ip-hint">سيب الصفحة مفتوحة — متقفلهاش لحد ما تخلص</div>
+    <div class="ip-hint">${t('ui.keepOpen')}</div>
   </div>`;
 }
 function hideImportProgress(){
@@ -1883,10 +1897,10 @@ function cardHtml(d, s){
 }
 
 function paymentBadge(d){
-  if(d.paymentStatus === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ محاسَب عليه</span>`;
+  if(d.paymentStatus === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ ${t('ui.settled')}</span>`;
   const price = parseInt(d.agreedPrice) || 0;
-  if(price > 0) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ لسه ماتحصّلش</span>`;
-  return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ لسه مش متسعّر</span>`;
+  if(price > 0) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notCollected')}</span>`;
+  return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notPriced')}</span>`;
 }
 
 // بلوك الدفع في التفاصيل + زرار "تم الدفع" للكاش
@@ -1896,12 +1910,10 @@ async function markPaid(){
   if(!d) return;
   const price = parseInt(d.agreedPrice) || 0;
   if(price <= 0){ alert(t('msg.needPriceFirst')); return; }
-  const label = d.status === 'delivered'
-    ? 'تم الدفع (فوري) — تم التسليم والدفع'
-    : 'تم الدفع (فوري) — محاسَب عليه';
+  const labelKey = d.status === 'delivered' ? 'hist.paidDelivered' : 'hist.paidCash';
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
-        statusHistory:[...(x.statusHistory||[]), {status:x.status, label, date:new Date().toISOString(), by:currentUser.name}] }
+        statusHistory:[...(x.statusHistory||[]), {status:x.status, labelKey, date:new Date().toISOString(), by:currentUser.name}] }
     : x);
   renderDetail(); render(); await persist();
   const t = devices.find(x=>x.id===selectedId);
@@ -2060,7 +2072,7 @@ function viewLockImage(id){
 function lockDisplayHtml(d){
   const editBtn = `<button class="btn-secondary" style="width:100%;color:#2563EB;border-color:#BFDBFE;margin:8px 0 10px;" onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
-    return `<div class="detail-row"><span>🔒 رمز القفل</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
+    return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
     return `<div style="margin:10px 0;">
       <div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 نمط القفل${d.lockPattern?` — <span style="font-family:monospace;font-weight:700;">${esc(d.lockPattern)}</span>`:''}</div>
@@ -2071,7 +2083,7 @@ function lockDisplayHtml(d){
       ${d.lockPattern ? `<button class="acc-mini-btn" style="margin-top:8px;" onclick="replayPattern('${esc(d.lockPattern)}')">▶️ ${t('lock.replay')}</button>` : ''}
     </div>${editBtn}`;
   if(d.lockType==='image' && d.lockImage)
-    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 صورة القفل</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>${editBtn}`;
+    return `<div style="margin:10px 0;"><div style="font-size:13px;color:#64748B;margin-bottom:5px;">🔒 ${t('ui.lockImage')}</div><img src="${d.lockImage}" onclick="viewLockImage('${d.id}')" style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;"></div>${editBtn}`;
   return `<div style="font-size:13px;color:#94A3B8;margin:8px 0 0;">🔓 ${t('lock.none')}</div>${editBtn}`;
 }
 
@@ -2303,7 +2315,7 @@ function renderDetail(){
   }).join('');
 
   const history = (d.statusHistory||[]).map(h =>
-    `<div class="hist-item">‹ ${esc(h.label || stLabel(statusInfo(h.status)))} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">${t('det.by')} ${esc(h.by)}</b>` : ''}</div>`
+    `<div class="hist-item">‹ ${esc(histLabel(h))} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">${t('det.by')} ${esc(h.by)}</b>` : ''}</div>`
   ).join('');
 
   document.getElementById('detailModal').innerHTML = `
@@ -2511,16 +2523,16 @@ async function onImportFileChosen(file){
   }
   pendingImportDevices = normalizeImportIds(incoming);
   pendingImportFile = file;
-  // نوري المستخدم الملف فيه إيه وكام جهاز جديد فعلاً — جوه الصفحة، من غير نوافذ متصفح
+  // نوري المستخدم ${t('ui.importFileHas')} إيه وكام جهاز جديد فعلاً — جوه الصفحة، من غير نوافذ متصفح
   const have = new Set(devices.map(d => d.id));
   const newCount = pendingImportDevices.filter(d => d && d.id && !have.has(d.id)).length;
   const info = document.getElementById('importChoiceInfo');
   if(info){
     info.innerHTML = `<div style="background:#F1F5F9;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.9;margin-bottom:12px;">
       📄 <b>${esc(file.name)}</b><br>
-      الملف فيه <b>${pendingImportDevices.length.toLocaleString('en-EG')}</b> جهاز —
+      ${t('ui.importFileHas')} <b>${pendingImportDevices.length.toLocaleString('en-EG')}</b> جهاز —
       منهم <b style="color:${newCount ? '#16A34A' : '#DC2626'};">${newCount.toLocaleString('en-EG')}</b> جديد مش موجود عندك.
-      ${newCount === 0 ? '<br><span style="color:#DC2626;">الدمج مش هيضيف حاجة — كلهم موجودين بالفعل.</span>' : ''}
+      ${newCount === 0 ? `<br><span style="color:#DC2626;">${t('ui.mergeNothing')}</span>` : ''}
     </div>`;
   }
   document.getElementById('backupMenu').classList.add('hidden');
@@ -2556,8 +2568,8 @@ async function doImportReplace(){
   if(info && !info.dataset.confirmReplace){
     info.dataset.confirmReplace = '1';
     info.insertAdjacentHTML('beforeend', `<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.8;color:#B91C1C;">
-      ⚠️ الاستبدال الكامل هيمسح <b>كل</b> بياناتك الحالية ويحط اللي في الملف بدالها.<br>
-      دوس «استبدال كامل» تاني للتأكيد.</div>`);
+      ⚠️ ${t('ui.replaceWarn')} <b>كل</b> ${t('ui.replaceWarn2')}<br>
+      ${t('ui.replaceAgain')}</div>`);
     pendingImportDevices = list; pendingImportFile = null;   // نستنى الضغطة التانية
     return;
   }
@@ -2631,7 +2643,7 @@ async function changeStatus(newStatus, paymentChoice){
     return;
   }
 
-  let historyLabel = statusInfo(newStatus)?.label;
+  let historyLabel = null; let historyKey = null; let historyVars = null;
   let newPaymentStatus = null;
   let extra = {};
 
@@ -2644,19 +2656,17 @@ async function changeStatus(newStatus, paymentChoice){
       extra.billedShop = shop;
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
         addLedgerDebit({...d, billedShop: shop}, price);
-        historyLabel = `تم التسليم والدفع — آجل، اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+        historyKey = 'hist.deliveredDeferred'; historyVars = { amount: price.toLocaleString('en-EG'), shop };
       } else {
-        historyLabel = `تم التسليم والدفع — آجل على حساب "${shop}" (مقيّد قبل كده)`;
+        historyKey = 'hist.deliveredDeferredPrev'; historyVars = { shop };
       }
     } else if(price > 0){
       // فوري: مستني "تأكيد الدفع"
       newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
-      historyLabel = isPaidDevice(d)
-        ? 'تم التسليم والدفع — فوري'
-        : 'تم التسليم - بانتظار الدفع (فوري)';
+      historyKey = isPaidDevice(d) ? 'hist.deliveredPaidCash' : 'hist.deliveredPending';
     } else {
       newPaymentStatus = 'unpaid';
-      historyLabel = 'تم التسليم - بانتظار الدفع — لسه مش متسعّر';
+      historyKey = 'hist.deliveredNoPrice';
     }
   }
 
@@ -2666,7 +2676,7 @@ async function changeStatus(newStatus, paymentChoice){
         ...x, ...extra,
         status:newStatus,
         paymentStatus: newStatus === 'delivered' ? newPaymentStatus : null,
-        statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, date:new Date().toISOString(), by: currentUser.name}]
+        statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, labelKey:historyKey, labelVars:historyVars, date:new Date().toISOString(), by: currentUser.name}]
       }
     : x);
   renderDetail();
@@ -2691,7 +2701,16 @@ async function deleteDevice(){
 function formatDuration(ms){
   if(ms <= 0) return '—';
   const minutes = Math.round(ms/60000);
-  if(minutes < 1) return 'أقل من دقيقة';
+  // في الإنجليزي بنستخدم صيغة رقمية بسيطة؛ العربي بيحتفظ بصيغه الطبيعية
+  if(typeof I18N !== 'undefined' && I18N.getLang() === 'en'){
+    if(minutes < 1) return t('dur.lessMin');
+    if(minutes < 60) return minutes === 1 ? t('dur.min1') : t('dur.minN',{n:minutes});
+    const hrs = ms/3600000, dys = ms/86400000;
+    if(hrs < 24){ const wh = Math.round(hrs); return wh === 1 ? t('dur.hour1') : t('dur.hourN',{n:wh}); }
+    const wd = Math.round(dys);
+    return wd === 1 ? t('dur.day1') : t('dur.dayN',{n:wd});
+  }
+  if(minutes < 1) return t('dur.lessMin');
   if(minutes < 60){
     if(minutes === 15) return 'ربع ساعة';
     if(minutes === 30) return 'نص ساعة';
@@ -2741,13 +2760,13 @@ function renderTimeline(){
   const hist = d.statusHistory || [];
   let itemsHtml;
   if(hist.length < 2){
-    itemsHtml = `<div class="empty-col">لسه مفيش انتقالات كفاية بين الخانات</div>`;
+    itemsHtml = `<div class="empty-col">${t('tl.notEnough')}</div>`;
   }else{
     const items = [];
     for(let i=1; i<hist.length; i++){
       const prev = hist[i-1], cur = hist[i];
-      const fromLabel = prev.label || statusInfo(prev.status)?.label;
-      const toLabel = cur.label || statusInfo(cur.status)?.label;
+      const fromLabel = histLabel(prev);
+      const toLabel = histLabel(cur);
       const duration = new Date(cur.date) - new Date(prev.date);
       items.push(`<div class="timeline-item">
         <div class="timeline-transition">${esc(fromLabel)} ← ${esc(toLabel)}</div>
@@ -2757,14 +2776,14 @@ function renderTimeline(){
     }
     const totalDuration = new Date(hist[hist.length-1].date) - new Date(hist[0].date);
     items.push(`<div class="timeline-item" style="border-right-color:var(--ink);background:#F1F5F9;">
-      <div class="timeline-transition">إجمالي الوقت من التسجيل لحد آخر حالة</div>
+      <div class="timeline-transition">${t('tl.total')}</div>
       <div class="timeline-duration">${formatDuration(totalDuration)}</div>
     </div>`);
     itemsHtml = items.join('');
   }
   document.getElementById('timelineModal').innerHTML = `
     <div class="modal-head">
-      <h2>فروقات التوقيت — ${esc(d.deviceType)} ${esc(d.model)}</h2>
+      <h2>${t('tl.title')} — ${esc(d.deviceType)} ${esc(d.model)}</h2>
       <button class="close-btn" onclick="closeTimeline()">×</button>
     </div>
     ${itemsHtml}
@@ -2846,7 +2865,7 @@ function renderFinancialSummary(){
 /* renderSummaries الجديدة معرفة تحت مع نظام الحسابات */
 
 function renderDayColumns(){
-  if(devices.length === 0) return `<div class="empty-col">لسه مفيش أجهزة متسجلة في النظام</div>`;
+  if(devices.length === 0) return `<div class="empty-col">${t('ui.noDevices')}</div>`;
   const groups = {};
   devices.forEach(d => {
     const k = dayKey(d.intakeDate);
@@ -2868,7 +2887,7 @@ function dayCardHtml(d){
   const s = statusInfo(d.status);
   // وسم أحمر واضح للمرتجع (محتاج إعادة فحص)، وباقي الحالات بلون حالتها
   const badge = d.status === 'returned'
-    ? `<span class="status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 مرتجع — إعادة فحص</span>`
+    ? `<span class="status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 ${t('ui.returnedBadge')}</span>`
     : `<span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
   // مؤشّر رمز القفل عشان الفني يشوفه على طول
   const lock = (d.lockType==='text' && d.lockText)
@@ -2891,7 +2910,7 @@ function renderEmployeeView(query){
     (d.technician && d.technician.includes(query)) || (d.registeredBy && d.registeredBy.includes(query))
   );
   if(matched.length === 0){
-    return `<div class="empty-col">مفيش حد بالاسم ده ليه أجهزة متسجلة</div>`;
+    return `<div class="empty-col">${t('ui.noOneNamed')}</div>`;
   }
 
   const todayList = matched.filter(d => {
@@ -2904,7 +2923,7 @@ function renderEmployeeView(query){
   matched.forEach(d => { const k = effStatus(d); (byStatus[k] = byStatus[k] || []).push(d); });
 
   const todayHtml = todayList.length === 0
-    ? `<div class="empty-col">مفيش نشاط النهاردة</div>`
+    ? `<div class="empty-col">${t('ui.noActivityToday')}</div>`
     : todayList.map(d => dayCardHtml(d)).join('');
 
   const statusChips = STATUSES.map(s => {
@@ -3101,11 +3120,11 @@ function renderLabelInto(containerId, d){
       ${d.conditionNotes ? `<div style="border-top:1px solid #CBD5E1; margin-top:8px; padding-top:6px; font-size:${d.conditionNotes.length > 60 ? 9 : d.conditionNotes.length > 30 ? 10 : 11}px; font-weight:700; line-height:1.5; text-align:right;">${esc(d.conditionNotes)}</div>` : ''}
     </div>
     <div class="label-size-row">
-      <label>عرض الليبل (مم)<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
-      <label>ارتفاع الليبل (مم)<input id="lblH" type="text" inputmode="decimal" value="${sz.h}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
+      <label>${t('ui.labelW')}<input id="lblW" type="text" inputmode="decimal" value="${sz.w}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
+      <label>${t('ui.labelH')}<input id="lblH" type="text" inputmode="decimal" value="${sz.h}" oninput="fixDigitsInput(this)" onchange="saveLabelSize()" /></label>
     </div>
-    <div class="label-hint">اكتب مقاس الليبل الحقيقي بالمليمتر (نفس المقاس المضبوط في إعدادات الطابعة). بيتحفظ تلقائياً للمرات الجاية.</div>
-    <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 طباعة الليبل</button>
+    <div class="label-hint">${t('ui.labelHint')}</div>
+    <button class="btn-primary" style="width:100%;justify-content:center;" onclick="printLabel()">🖨 ${t('ui.printingLabel')}</button>
   `;
   drawQr(d.id);
 }
@@ -3121,14 +3140,14 @@ function drawQr(text, attempt){
       holder.innerHTML = '';
       new QRCode(holder, { text: text, width:110, height:110, correctLevel: QRCode.CorrectLevel.M });
     }catch(e){
-      holder.innerHTML = `<div style="font-size:11px;color:#DC2626;">حصل خطأ في توليد الكود</div>`;
+      holder.innerHTML = `<div style="font-size:11px;color:#DC2626;">${t('ui.barcodeError')}</div>`;
     }
     return;
   }
 
   if(attempt === 0){
     // محاولة تحميل المكتبة من جديد (ممكن تكون فشلت أول مرة)
-    holder.innerHTML = `<div style="font-size:11px;color:#94A3B8;">⏳ جاري تجهيز الباركود...</div>`;
+    holder.innerHTML = `<div style="font-size:11px;color:#94A3B8;">⏳ ${t('ui.barcodePrep')}</div>`;
     const sc = document.createElement('script');
     sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
     sc.onload = () => drawQr(text, 1);
@@ -3145,8 +3164,8 @@ function drawQr(text, attempt){
   }
 
   holder.innerHTML = `<div style="font-size:11px;color:#DC2626;line-height:1.7;">
-    ❌ الباركود مش متاح — الملف الخارجي بتاعه مش بيوصل<br>
-    <span style="color:#94A3B8;font-size:10.5px;">جرّب Ctrl+Shift+R، ولو المشكلة فضلت يبقى النت بيحجب cdnjs</span>
+    ❌ ${t('ui.barcodeFail')}<br>
+    <span style="color:#94A3B8;font-size:10.5px;">${t('ui.cdnHint')}</span>
   </div>`;
 }
 
@@ -3533,7 +3552,7 @@ async function editPayType(t){
   if(t === d.paymentType && (t !== 'deferred' || isPaidDevice(d))) return;   // مفيش تغيير
 
   let extra = { paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
-  let note = null;
+  let note = null; let noteKey = null; let noteVars = null;
 
   if(t === 'deferred'){
     if(price <= 0){ alert(t('msg.needPriceForCredit')); return; }
@@ -3546,11 +3565,11 @@ async function editPayType(t){
         addLedgerDebit({ ...d, billedShop: shop }, price);
       }
       extra.paymentStatus = 'paid';
-      note = `آجل — اتضاف ${price.toLocaleString('en-EG')} ج.م على حساب "${shop}"`;
+      note = null; noteKey = 'hist.toDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
     } else {
       // لسه في المحل → مجرد تحديد طريقة الدفع، والقيد بيتعمل أول ما يتسلّم
       extra.paymentStatus = 'unpaid';
-      note = `اتحدد آجل على حساب "${shop}" — هيتقيّد أول ما الجهاز يتسلّم`;
+      note = null; noteKey = 'hist.toDeferredPending'; noteVars = { shop };
     }
   } else {
     // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
@@ -3560,13 +3579,12 @@ async function editPayType(t){
       await persistLedger();
     }
     extra.paymentStatus = 'unpaid';   // مستني "تأكيد الدفع"
-    note = had ? 'اتحوّل لفوري — اتشال القيد من حساب المحل، مستني تأكيد الدفع'
-               : 'اتحوّل لفوري — مستني تأكيد الدفع';
+    note = null; noteKey = had ? 'hist.toCashRemoved' : 'hist.toCash';
   }
 
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...extra, statusHistory:[...(x.statusHistory||[]),
-        { status:x.status, label:note, date:new Date().toISOString(), by:currentUser.name }] }
+        { status:x.status, label:note, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
     : x);
   renderDetail(); render(); await persist();
   const t2 = devices.find(x => x.id === selectedId);
@@ -3597,7 +3615,7 @@ async function editPrice(value){
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
         addLedgerDebit({...d, billedShop: shop}, parseInt(price));
       }
-      histEntry = { status:d.status, label:`اتسعّر بعد التسليم — آجل، اتضاف ${parseInt(price).toLocaleString('en-EG')} ج.م على حساب "${shop}"`, date:new Date().toISOString(), by: currentUser.name };
+      histEntry = { status:d.status, labelKey:'hist.pricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
     }
   }
   // فوري: بنحدّث السعر بس، وبيفضل "بانتظار الدفع" لحد ما يتدوس "تأكيد الدفع"
@@ -4371,8 +4389,8 @@ function renderAnalytics(){
     <div class="inv-filter">
       ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
-        من <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
-        إلى <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
+        ${t('inv.from')} <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
+        ${t('inv.to')} <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
       </span>
     </div>`;
 
@@ -4496,8 +4514,8 @@ function renderTechEval(){
     <div class="inv-filter">
       ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
       <span class="inv-custom">
-        من <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
-        إلى <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
+        ${t('inv.from')} <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
+        ${t('inv.to')} <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
       </span>
     </div>`;
 
@@ -4620,7 +4638,7 @@ function renderTechEval(){
     ${filterBar}
     ${cards}
     ${notes}
-    <div class="inv-section-title">ترتيب الفنيين بالنقاط</div>
+    <div class="inv-section-title">⭐ ${t('ui.techRanking')}</div>
     ${table}
   `;
 }
