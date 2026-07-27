@@ -3182,7 +3182,129 @@ function grabQrDataUrl(){
   return '';
 }
 
-function printLabel(){
+// ============================================================
+// الطباعة الصامتة المباشرة (عبر وكيل محلي على الكمبيوتر)
+// الفكرة: المتصفح يرسم الليبل كصورة (عشان العربي والخطوط تطلع مظبوطة)،
+// والوكيل على الكمبيوتر يطبعها على طول من غير نافذة طباعة.
+// لو الوكيل مش شغال أو حصل أي مشكلة → بنرجع لنافذة الطباعة العادية.
+// ============================================================
+const PRINT_AGENT_URL = 'http://localhost:9123';
+const PX_PER_MM = 8;   // ≈203 نقطة/بوصة وهو دقة طابعات الليبل الحرارية
+
+function loadImg(src){
+  return new Promise((res, rej) => {
+    if(!src) return res(null);
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+
+// بيرسم نفس محتوى الليبل على canvas ويرجّع صورة PNG
+async function renderLabelImage(d, sz, qrDataUrl){
+  const W = Math.round(sz.w * PX_PER_MM), H = Math.round(sz.h * PX_PER_MM);
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0,0,W,H);
+  x.fillStyle = '#000';
+  x.direction = 'rtl';
+  x.textBaseline = 'top';
+
+  const pad = Math.max(6, Math.round(H * 0.045));
+  const cond = (d.conditionNotes || '').trim();
+  const condH = cond ? Math.round(H * 0.20) : 0;
+  const topH = H - condH - pad;
+
+  // عمود الكود على الشمال
+  const qrSide = Math.min(Math.round(topH * 0.62), Math.round(W * 0.32));
+  const qrImg = await loadImg(qrDataUrl);
+  if(qrImg) x.drawImage(qrImg, pad, pad, qrSide, qrSide);
+  x.font = `700 ${Math.max(7, Math.round(H*0.075))}px Tajawal, sans-serif`;
+  x.direction = 'ltr'; x.textAlign = 'center';
+  x.fillText('I FIX TEAM', pad + qrSide/2, pad + qrSide + Math.round(H*0.015), qrSide);
+
+  // النصوص على اليمين
+  x.direction = 'rtl'; x.textAlign = 'right';
+  const rx = W - pad;                       // حافة اليمين
+  const availW = W - (pad*3) - qrSide;      // العرض المتاح للنص
+  let y = pad;
+  const line = (txt, size, weight, gap) => {
+    if(!txt) return;
+    x.font = `${weight} ${size}px Tajawal, sans-serif`;
+    x.fillText(String(txt), rx, y, availW);
+    y += size + (gap || Math.round(H*0.012));
+  };
+  const k = cond ? 0.90 : 1;
+  line(d.shopName || '',                        Math.max(9, Math.round(H*0.148*k)), 800);
+  line(d.customerName || '',                    Math.max(8, Math.round(H*0.122*k)), 700);
+  line(`${d.deviceType||''} ${d.model||''}`.trim(), Math.max(8, Math.round(H*0.122*k)), 700);
+  if(d.reportedIssue) line(d.reportedIssue,     Math.max(7, Math.round(H*0.100*k)), 500);
+  line(shortDateTime(d.intakeDate),             Math.max(6, Math.round(H*0.090*k)), 500);
+
+  // شريط حالة الجهاز تحت
+  if(cond){
+    const by = H - condH;
+    x.fillStyle = '#000'; x.fillRect(pad, by, W - pad*2, 1);
+    const fs = Math.max(6, Math.min(Math.round(H*0.078), Math.round(Math.sqrt(((W-pad*2)*condH)/(cond.length*0.6*1.3)))));
+    x.font = `500 ${fs}px Tajawal, sans-serif`;
+    x.textAlign = 'center'; x.direction = 'rtl';
+    // نلف النص على أكتر من سطر لو طويل
+    const words = cond.split(/\s+/); let ln = ''; let ly = by + Math.round(fs*0.35);
+    for(const wd of words){
+      const test = ln ? ln + ' ' + wd : wd;
+      if(x.measureText(test).width > (W - pad*2) && ln){
+        x.fillText(ln, W/2, ly, W - pad*2); ly += fs*1.15; ln = wd;
+        if(ly > H - fs) break;
+      } else ln = test;
+    }
+    if(ln && ly <= H - fs*0.6) x.fillText(ln, W/2, ly, W - pad*2);
+  }
+  return c.toDataURL('image/png');
+}
+
+// بيحاول يطبع صامت عبر الوكيل؛ بيرجّع true لو نجح
+async function trySilentPrint(d, sz, qrDataUrl){
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  try{
+    const image = await renderLabelImage(d, sz, qrDataUrl);
+    const res = await fetch(PRINT_AGENT_URL + '/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, widthMm: sz.w, heightMm: sz.h, ref: devRef(d) }),
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    if(!res.ok) return false;
+    const out = await res.json().catch(() => ({}));
+    return out && out.ok === true;
+  }catch(e){
+    clearTimeout(timer);
+    return false;   // الوكيل مش شغال أو المتصفح منع الاتصال → هنرجع للطريقة العادية
+  }
+}
+
+async function printLabel(){
+  const dv = devices.find(x => x.id === labelDeviceId);
+  if(dv && typeof isFeatureEnabled === 'function' && isFeatureEnabled('silent_label_print')){
+    saveLabelSize();
+    const ok = await trySilentPrint(dv, getLabelSize(), grabQrDataUrl());
+    if(ok){
+      showImportDone(t('print.silentDone'));
+      // نقفل معاينة الليبل بعد الطباعة (مفيش دالة closeLabel — الليبل معروض داخل الصفحة)
+      ['detailLabelArea','addLabelArea'].forEach(idA => {
+        const el = document.getElementById(idA); if(el) el.innerHTML = '';
+      });
+      return;
+    }
+    showError(t('print.silentFailed'));
+  }
+  browserPrintLabel();
+}
+
+function browserPrintLabel(){
   saveLabelSize();
   const d = devices.find(x => x.id === labelDeviceId);
   if(!d){ alert(t('msg.labelError')); return; }
