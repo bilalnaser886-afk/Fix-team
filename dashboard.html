@@ -721,7 +721,7 @@
 <div id="analyticsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>📊 الملخص</h2>
+      <h2 data-i18n="an.title">📊 الملخص</h2>
       <button class="close-btn" onclick="closeAnalytics()">×</button>
     </div>
     <div id="analyticsBody" style="padding:12px 20px 40px;"></div>
@@ -732,7 +732,7 @@
 <div id="techEvalOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
-      <h2>🏆 تقييم الفنيين</h2>
+      <h2 data-i18n="te.title">🏆 تقييم الفنيين</h2>
       <button class="close-btn" onclick="closeTechEval()">×</button>
     </div>
     <div id="techEvalBody" style="padding:12px 20px 40px;"></div>
@@ -899,17 +899,6 @@ function isFeatureEnabled(key){
   const f = featureFlags[key];
   return !!(f && f.is_enabled);
 }
-async function adminToggleFlag(key){
-  if(!isSuperAdmin()) return;
-  const f = featureFlags[key];
-  if(!f) return;
-  f.is_enabled = !f.is_enabled;
-  f.updated_at = new Date().toISOString();
-  await saveFeatureFlags();
-  await addAudit(`${f.is_enabled ? 'فعّل' : 'قفل'} ميزة: ${key}`);
-  renderAdmin();
-}
-
 // ============================================================
 // سجل العمليات الإدارية (Audit Log)
 // ============================================================
@@ -994,15 +983,11 @@ function injectAdminMenu(){
   dd.insertBefore(b, logoutBtn);
 }
 
-let adminUnlocked = false;
-function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36); }
 
 function openAdmin(){
   // لوحة الأدمن بقت صفحة مستقلة (admin.html) — من غير باسورد إضافي
   location.href = 'admin.html';
 }
-function closeAdmin(){ document.getElementById('adminOverlay').classList.add('hidden'); }
-
 // ===== الإشعارات اللحظية للمستخدمين =====
 const BROADCAST_KEY = 'broadcast';
 let currentBroadcast = null;
@@ -1025,96 +1010,7 @@ function dismissBroadcast(){
   if(currentBroadcast && currentBroadcast.id){ try{ localStorage.setItem('ifix_seen_bc_'+currentBroadcast.id,'1'); }catch(e){} }
   document.getElementById('broadcastOverlay').classList.add('hidden');
 }
-async function adminSendBroadcast(){
-  const title = (document.getElementById('bcInTitle')?.value || '').trim();
-  const body = (document.getElementById('bcInBody')?.value || '').trim();
-  const type = document.getElementById('bcInType')?.value || 'info';
-  if(!title && !body){ alert('اكتب عنوان أو نص الإشعار الأول'); return; }
-  if(!confirm('تبعت الإشعار ده لكل المستخدمين دلوقتي؟')) return;
-  const bc = { id: Date.now(), title, body, type };
-  try{
-    await window.storage.set(BROADCAST_KEY, JSON.stringify(bc));
-    currentBroadcast = bc;
-    document.getElementById('bcInTitle').value=''; document.getElementById('bcInBody').value='';
-    await addAudit('بعت إشعار: ' + (title || body).slice(0,60));
-    alert('اتبعت الإشعار للكل ✅');
-  }catch(e){ alert('حصل خطأ في الإرسال — تأكد من النت'); }
-}
-
 function renderAdmin(){ /* اللوحة اتنقلت لـ admin.html */ }
-
-async function adminAddSuperAdmin(){
-  const em = prompt('إيميل المستخدم اللي هيبقى Super Admin:');
-  if(em === null) return;
-  const e = (em||'').trim().toLowerCase();
-  if(!e || !e.includes('@')){ alert('اكتب إيميل صحيح'); return; }
-  userRoles[e] = 'super_admin';
-  await saveUserRoles();
-  await addAudit('أضاف Super Admin: ' + e);
-  renderAdmin();
-}
-async function adminRemoveRole(em){
-  if(!confirm(`تشيل صلاحية "${em}"؟`)) return;
-  delete userRoles[(em||'').toLowerCase()];
-  await saveUserRoles();
-  await addAudit('شال صلاحية: ' + em);
-  renderAdmin();
-}
-
-async function adminSetBeta(){
-  if(!confirm('تفعيل وضع البيتا؟ هيظهر شريط علوي للكل ونافذة ترحيب مرة واحدة لكل مستخدم.')) return;
-  systemConfig.mode = 'beta';
-  systemConfig.betaAnnId = Date.now();
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  await addAudit('فعّل وضع البيتا');
-  alert('تم تفعيل وضع البيتا ✅');
-}
-async function adminSetTrial(){
-  if(!confirm(`تحويل لوضع التجربة المجانية؟ هيبدأ عدّاد ${systemConfig.trialDays||30} يوم من دلوقتي.`)) return;
-  systemConfig.mode = 'trial';
-  systemConfig.trialStart = new Date().toISOString();
-  systemConfig.trialAnnId = Date.now();
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  await addAudit('بدأ الفترة المجانية');
-  alert('تم بدء الفترة المجانية 🎁');
-}
-async function adminSetNormal(){
-  if(!confirm('رجوع للوضع العادي وإيقاف كل التنبيهات؟')) return;
-  systemConfig.mode = 'normal';
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  alert('رجع للوضع العادي ✅');
-}
-async function adminCancelBeta(){
-  if(!confirm('إلغاء تفعيل وضع البيتا والرجوع للوضع العادي؟')) return;
-  systemConfig.mode = 'normal';
-  systemConfig.betaAnnId = null;
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  await addAudit('ألغى وضع البيتا');
-  alert('تم إلغاء وضع البيتا ✅');
-}
-async function adminCancelTrial(){
-  if(!confirm('إلغاء الوضع المجاني والرجوع للوضع العادي؟\nالعدّاد هيتلغي والمستخدمين مش هيتوجّهوا لصفحة الاشتراك.')) return;
-  systemConfig.mode = 'normal';
-  systemConfig.trialStart = null;
-  systemConfig.trialAnnId = null;
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-  await addAudit('ألغى الوضع المجاني');
-  alert('تم إلغاء الوضع المجاني ✅');
-}
-async function adminSetTrialDays(){
-  const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||30));
-  if(v === null) return;
-  const n = parseInt(v)||0;
-  if(n <= 0){ alert('اكتب رقم صحيح'); return; }
-  systemConfig.trialDays = n;
-  await saveSystemConfig();
-  applySystemMode(); renderAdmin();
-}
 
 // ممنوع الدخول من غير تسجيل + اشتراك المحل ساري
 async function requireAccess(){
@@ -1555,17 +1451,17 @@ async function checkAutoBackup(){
 // محمي بتأكيدين + كتابة كلمة، وبيعمل نسخة احتياطية تلقائية قبل المسح
 // ============================================================
 async function wipeAllData(){
-  if(!isSuperAdmin()){ showError('العملية دي للـ Super Admin بس.'); return; }
+  if(!isSuperAdmin()){ showError(t('msg.superAdminOnly')); return; }
   document.getElementById('backupMenu').classList.add('hidden');
 
-  if(devices.length === 0){ alert('مفيش بيانات تتمسح أصلاً.'); return; }
+  if(devices.length === 0){ alert(t('msg.nothingToWipe')); return; }
 
   if(!confirm(`⚠️ تحذير مهم جداً\n\nهتمسح كل الأجهزة المسجلة (${devices.length} جهاز) نهائياً من السيستم ومن السيرفر.\n\nده مناسب بس لما تبدأ شغل فعلي جديد.\n\nتكمل؟`)) return;
 
   // كتابة كلمة تأكيد — حماية من الضغط بالغلط
   const word = prompt('للتأكيد النهائي، اكتب كلمة: مسح');
   if(word === null) return;
-  if(word.trim() !== 'مسح'){ alert('الكلمة مش مظبوطة — اتلغى المسح، بياناتك زي ما هي.'); return; }
+  if(word.trim() !== 'مسح'){ alert(t('msg.wipeWordWrong')); return; }
 
   // نسخة احتياطية سريعة قبل المسح — مضغوطة (من غير تنسيق) عشان ما تهنّجش الصفحة على ١٩ ألف جهاز
   try{
@@ -1577,9 +1473,9 @@ async function wipeAllData(){
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }catch(e){}
 
-  if(!confirm('آخر تأكيد: نزّلنا نسخة احتياطية أوتوماتيك دلوقتي على جهازك.\n\nنمسح كل البيانات؟')) return;
+  if(!confirm(t('msg.wipeFinal'))) return;
 
-  if(!isOnline()){ alert('المسح محتاج نت.'); return; }
+  if(!isOnline()){ alert(t('msg.wipeNeedNet')); return; }
 
   setSaving(true);
   importing = true;   // نوقف المزامنة اللحظية أثناء المسح (مهم جداً عشان الصفحة ما تهنجش من إشعارات الحذف)
@@ -1642,11 +1538,11 @@ async function wipeAllData(){
     hideImportProgress();
     render();
     showError('');
-    alert('تم مسح كل البيانات ✅ (السيرفر اتأكد إنه فاضي)\nاعمل ريفريش للتأكيد، وابدأ الاستيراد.');
+    alert(t('msg.wipeDone'));
   }catch(e){
     importing = false;
     hideImportProgress();
-    showError('حصل خطأ في المسح: ' + ((e && e.message) || e) + ' — جرّب تاني، أو امسح جدول devices_data من Supabase مباشرة');
+    showError(t('msg.wipeError') + ((e && e.message) || e) + ' — جرّب تاني، أو امسح جدول devices_data من Supabase مباشرة');
   }finally{
     setSaving(false);
   }
@@ -1699,12 +1595,12 @@ async function importBackup(incoming){
   // ملاحظة: مفيش alert/confirm هنا خالص — النوافذ دي بتتبلع على الآيفون بعد تنزيل نسخة الأمان،
   // فالاستيراد كان بيقف من غير ما يبان أي حاجة. كل الرسايل بقت تبان جوه الصفحة.
   if(toAdd.length === 0){
-    showError('كل الأجهزة اللي في الملف موجودة عندك بالفعل — مفيش حاجة جديدة تتضاف.');
+    showError(t('msg.importAllExist'));
     return;
   }
 
   if(!isOnline()){
-    showError('الاستيراد محتاج نت — اتصل بالنت وجرّب تاني عشان البيانات ترفع كاملة.');
+    showError(t('msg.importNeedNet'));
     return;
   }
 
@@ -1994,7 +1890,7 @@ async function markPaid(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const price = parseInt(d.agreedPrice) || 0;
-  if(price <= 0){ alert('لازم تكتب السعر الأول قبل ما تأكّد الدفع'); return; }
+  if(price <= 0){ alert(t('msg.needPriceFirst')); return; }
   const label = d.status === 'delivered'
     ? 'تم الدفع (فوري) — تم التسليم والدفع'
     : 'تم الدفع (فوري) — محاسَب عليه';
@@ -2239,7 +2135,7 @@ async function saveEditedLock(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const lock = collectLock();
-  if(!lock.lockType){ alert('اختار نوع القفل واكتب/ارسم الرمز الأول'); return; }
+  if(!lock.lockType){ alert(t('msg.needLock')); return; }
   const label = lock.lockType==='text' ? 'رمز رقمي/نصي' : (lock.lockType==='pattern' ? 'نمط مرسوم' : 'صورة');
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...lock, lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
@@ -2587,7 +2483,7 @@ function onCustomerNameInput(){
 let pendingImportFile = null;
 let pendingImportDevices = null;
 async function onImportFileChosen(file){
-  if(!isSuperAdmin()){ showError('الاستيراد للـ Super Admin بس.'); return; }
+  if(!isSuperAdmin()){ showError(t('msg.importSuperOnly')); return; }
   if(!file) return;
   pendingImportDevices = null;
   const _info0 = document.getElementById('importChoiceInfo');
@@ -2647,7 +2543,7 @@ async function doImportReplace(){
   if(!list) return;
   if(!isOnline()){
     document.getElementById('importChoiceOverlay').classList.add('hidden');
-    showError('الاستبدال محتاج نت — اتصل بالنت وجرّب تاني.');
+    showError(t('msg.replaceNeedNet'));
     return;
   }
   // تأكيد جوه الصفحة (مش confirm بتاع المتصفح — ده بيتبلع على الآيفون بعد التنزيل)
@@ -2664,7 +2560,7 @@ async function doImportReplace(){
   try{ exportBackup(); }catch(e){}
   await new Promise(r => setTimeout(r, 1500));   // مهلة بعد التنزيل عشان الشبكة تستقر
   const ok = await purgeAllData();
-  if(!ok){ showError('المسح ما اكتملش — الاستبدال اتوقف والبيانات زي ما هي'); return; }
+  if(!ok){ showError(t('msg.replaceAborted')); return; }
   await addAudit('استبدال كامل للبيانات من ملف نسخة احتياطية');
   await importBackup(list);
 }
@@ -2725,7 +2621,7 @@ async function changeStatus(newStatus, paymentChoice){
   if(!d) return;
 
   if(d.status === 'waiting' && !['waiting','rejected','returned'].includes(newStatus) && !d.technician){
-    showError('لازم تحدد الفني المسؤول عن الصيانة الأول، قبل ما الجهاز يدخل مراحل الفحص أو الصيانة');
+    showError(t('msg.needTech'));
     renderDetail();
     return;
   }
@@ -2780,7 +2676,7 @@ async function deleteDevice(){
   if(delDev && delDev.trackToken){ try{ sb.from('public_track').delete().eq('token', delDev.trackToken); }catch(e){} }
   const d = devices.find(x => x.id === selectedId);
   const name = d ? `${d.deviceType} ${d.model} — ${d.customerName}` : 'الجهاز ده';
-  if(!confirm(`متأكد إنك عايز تمسح "${name}"؟ الحذف ده نهائي ومش هينفع ترجّعه.`)) return;
+  if(!confirm(t('msg.deleteDevice',{name:name}))) return;
   devices = devices.filter(d => d.id !== selectedId);
   closeDetail();
   render();
@@ -3255,7 +3151,7 @@ function grabQrDataUrl(){
 function printLabel(){
   saveLabelSize();
   const d = devices.find(x => x.id === labelDeviceId);
-  if(!d){ alert('حصل خطأ في تجهيز الليبل، اقفل وافتح تاني'); return; }
+  if(!d){ alert(t('msg.labelError')); return; }
 
   const sz = getLabelSize();
   const qr = grabQrDataUrl();
@@ -3284,7 +3180,7 @@ function printLabel(){
   }
 
   const w = window.open('', '_blank', 'width=420,height=320');
-  if(!w){ alert('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة للموقع وحاول تاني'); return; }
+  if(!w){ alert(t('msg.printBlocked')); return; }
 
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <title>ليبل ${esc(devRef(d))}</title>
@@ -3405,7 +3301,7 @@ async function checkSessionStillMine(){
     const { data } = await sb.from('active_sessions').select('session_tag').eq('user_id', session.user.id).maybeSingle();
     if(data && data.session_tag && data.session_tag !== sessionTag){
       await sb.auth.signOut();
-      alert('تم تسجيل الدخول بنفس الحساب من جهاز آخر — هيتم تسجيل خروجك من هنا.');
+      alert(t('msg.sessionTaken'));
       window.location.href = 'index.html';
     }
   }catch(e){ /* تجاهل أخطاء الشبكة المؤقتة */ }
@@ -3625,9 +3521,9 @@ async function editPayType(t){
   let note = null;
 
   if(t === 'deferred'){
-    if(price <= 0){ alert('اكتب السعر الأول عشان يتحاسب على حساب المحل'); return; }
+    if(price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
-    if(!shop){ alert('الجهاز ده مش متسجل عليه اسم محل — اكتب اسم المحل الأول عشان يتحاسب آجل.'); return; }
+    if(!shop){ alert(t('msg.needShopForCredit')); return; }
     extra.billedShop = shop;
     if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
@@ -3725,7 +3621,7 @@ async function resetTrackResponse(token, kind){
 
 async function requestDeepInspection(){
   if(!isOnline()){
-    alert('طلب الفحص الدقيق محتاج نت — عشان الطلب يوصل لصفحة العميل فعلاً.');
+    alert(t('msg.deepNeedNet'));
     return;
   }
   const d = devices.find(x => x.id === selectedId);
@@ -3788,12 +3684,12 @@ function addLedgerDebit(d, price){
 }
 
 async function recordPayment(){
-  if(!isOnline()){ alert('تسجيل الدفعات محتاج نت — استنى النت يرجع الأول عشان الفلوس متتسجلش مرتين بالغلط.'); return; }
+  if(!isOnline()){ alert(t('msg.payNeedNet')); return; }
   const shop = document.getElementById('payShop').value.trim();
   const amount = parseInt(document.getElementById('payAmount').value) || 0;
   const note = document.getElementById('payNote').value.trim();
-  if(!shop){ alert('اكتب اسم المحل الأول'); return; }
-  if(amount <= 0){ alert('اكتب مبلغ صحيح'); return; }
+  if(!shop){ alert(t('msg.needShopName')); return; }
+  if(amount <= 0){ alert(t('msg.badAmount')); return; }
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'credit', shop, amount, note,
@@ -4005,7 +3901,7 @@ async function addDiscount(shop){
   const raw = prompt(`إضافة خصم لحساب "${shop}".\nاكتب قيمة الخصم بالجنيه:`);
   if(raw === null) return;
   const amount = parseInt(raw) || 0;
-  if(amount <= 0){ alert('اكتب قيمة خصم صحيحة'); return; }
+  if(amount <= 0){ alert(t('msg.badDiscount')); return; }
   const note = (prompt('سبب الخصم (اختياري):') || '').trim();
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
@@ -4023,7 +3919,7 @@ async function addOpeningBalance(){
   const raw = prompt(`الرصيد الافتتاحي السابق لمحل "${shop}" بالجنيه\n(المديونية القديمة قبل استخدام السيستم):`);
   if(raw === null) return;
   const amount = parseInt(raw) || 0;
-  if(amount <= 0){ alert('اكتب رصيد افتتاحي صحيح'); return; }
+  if(amount <= 0){ alert(t('msg.badOpening')); return; }
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'opening', shop, amount, note: 'رصيد افتتاحي سابق (قبل السيستم)',
@@ -4477,13 +4373,13 @@ function renderAnalytics(){
 
   const fmt = n => n.toLocaleString('en-EG');
   const moneyCards = `
-    <div class="inv-section-title">💰 الفلوس</div>
+    <div class="inv-section-title">💰 ${t('an.money')}</div>
     <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${fmt(totalCashIn)}</div><div class="inv-card-label">إجمالي الكاش المحصّل في الفترة (ج.م)</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${fmt(cashCollected)}</div><div class="inv-card-label">منها فوري من التسليمات</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">ومنها دفعات من المحلات</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${fmt(deferredAdded)}</div><div class="inv-card-label">آجل اتسجل في الفترة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">إجمالي المتبقي على المحلات (كل الوقت)</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${fmt(totalCashIn)}</div><div class="inv-card-label">${t('an.totalCash')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${fmt(cashCollected)}</div><div class="inv-card-label">${t('an.fromDeliveries')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">${t('an.fromShops')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#B45309;">${fmt(deferredAdded)}</div><div class="inv-card-label">${t('an.deferredAdded')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? '#DC2626' : '#16A34A'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${t('an.outstanding')}</div></div>
     </div>`;
 
   // ===== كبار العملاء =====
@@ -4501,23 +4397,23 @@ function renderAnalytics(){
   const topCustomers = Object.values(byCustomer).sort((a,b) => b.count - a.count).slice(0, 10);
 
   const custList = topCustomers.length === 0
-    ? `<div class="empty-col">مفيش عملاء في الفترة دي</div>`
+    ? `<div class="empty-col">${t('an.noCustomers')}</div>`
     : topCustomers.map((c, i) => `
       <div class="cust-item">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="cust-rank">${i + 1}</div>
           <div>
-            <div style="font-weight:800;">${esc(c.name || 'بدون اسم')}${c.shop ? ` <span style="color:#94A3B8; font-weight:500; font-size:13px;">— ${esc(c.shop)}</span>` : ''}</div>
-            <div style="font-size:13px; color:#64748B;">${c.count} جهاز في الفترة${c.paid ? ` — دفع فوري ${fmt(c.paid)} ج.م` : ''}</div>
+            <div style="font-weight:800;">${esc(c.name || t('an.noName'))}${c.shop ? ` <span style="color:#94A3B8; font-weight:500; font-size:13px;">— ${esc(c.shop)}</span>` : ''}</div>
+            <div style="font-size:13px; color:#64748B;">${c.count} ${t('an.devicesInPeriod')}${c.paid ? ` — ${t('an.paidCash')} ${fmt(c.paid)} ${t('acc.egp')}` : ''}</div>
           </div>
         </div>
-        ${c.phone ? `<button class="btn-secondary" style="color:#16A34A; border-color:#BBF7D0;" onclick="sendThanks('${esc(c.phone)}', '${esc(c.name || '').replace(/'/g, "\\\\'")}')">💬 رسالة شكر</button>` : ''}
+        ${c.phone ? `<button class="btn-secondary" style="color:#16A34A; border-color:#BBF7D0;" onclick="sendThanks('${esc(c.phone)}', '${esc(c.name || '').replace(/'/g, "\\\\'")}')">💬 ${t('an.thanksMsg')}</button>` : ''}
       </div>`).join('');
 
   document.getElementById('analyticsBody').innerHTML = `
     ${filterBar}
     ${moneyCards}
-    <div class="inv-section-title">⭐ كبار العملاء (الأكتر تعاملاً في الفترة)</div>
+    <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
     ${custList}
   `;
 }
@@ -4650,28 +4546,28 @@ function renderTechEval(){
 
   const cards = `
     <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">إجمالي النقاط في الفترة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">جهاز اتحسبت عليه نقاط</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">فني له شغل في الفترة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">${t('te.totalPoints')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">${t('te.scoredDevices')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">${t('te.techsActive')}</div></div>
     </div>`;
 
   // تنبيهات توضح ليه ممكن رقم يبان ناقص
   let notes = '';
   if(pendingCount > 0){
-    notes += `<div class="te-note">⏳ فيه <b>${pendingCount}</b> جهاز عليهم <b>${round1(pendingPts)}</b> نقطة لسه الشغل فيهم ما خلصش — هيتحسبوا أول ما يوصلوا "تم الصيانة".</div>`;
+    notes += `<div class="te-note">⏳ ${t('te.pendingNote',{n:pendingCount,p:round1(pendingPts)})}</div>`;
   }
   if(wholesaleSkipped > 0){
-    notes += `<div class="te-note">📦 اتجاهل <b>${wholesaleSkipped}</b> جهاز مسجل <b>جملة</b> — الجملة مش بتتحسب نقاط زي ما اتفقنا.</div>`;
+    notes += `<div class="te-note">📦 ${t('te.wholesaleNote',{n:wholesaleSkipped})}</div>`;
   }
 
-  const avgFmt = v => v === null ? '—' : (v < 1 ? 'أقل من يوم' : v.toFixed(1) + ' يوم');
+  const avgFmt = v => v === null ? '—' : (v < 1 ? t('te.lessThanDay') : v.toFixed(1) + ' ' + t('te.day'));
 
   const table = teRows.length === 0
-    ? `<div class="empty-col">مفيش شغل خلص في الفترة دي</div>`
+    ? `<div class="empty-col">${t('te.noWork')}</div>`
     : `<table class="inv-table">
-        <tr><th>الفني</th><th>⭐ النقاط</th><th>أجهزة خلصت</th><th>متوسط المدة</th><th>مرتجعات</th><th>نسبة المرتجع</th></tr>
+        <tr><th>${t('te.colTech')}</th><th>⭐ ${t('te.colPoints')}</th><th>${t('te.colDone')}</th><th>${t('te.colAvg')}</th><th>${t('te.colReturns')}</th><th>${t('te.colRate')}</th></tr>
         ${teRows.map((r, i) => `
-          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="اضغط لتفاصيل النقاط">
+          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="${t('te.tapForDetails')}">
             <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:#94A3B8;font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span></td>
             <td style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
             <td style="font-weight:800; color:#16A34A;">${r.count}</td>
@@ -4683,13 +4579,13 @@ function renderTechEval(){
           <tr><td colspan="6" style="padding:0; background:#F8FAFC;">
             <div class="te-breakdown">
               ${r.items.length === 0
-                ? '<div style="color:#94A3B8; font-size:13px; padding:6px;">مفيش نقاط محسوبة — الأجهزة اللي خلصها مكتبتش عليها نقاط</div>'
+                ? `<div style="color:#94A3B8; font-size:13px; padding:6px;">${t('te.noPoints')}</div>`
                 : r.items.slice().sort((a,b) => b.share - a.share).map(x => `
                   <div class="te-item" onclick="event.stopPropagation(); closeTechEval(); openDetail('${x.d.id}')">
                     <div>
                       <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
                       <div style="font-size:12px; color:#94A3B8;">
-                        ${x.role === 'مساعد' ? `🤝 مساعد (${esc(x.d.assistPercent)}% من ${esc(x.d.points)})` : `👤 رئيسي${x.d.assistTechnician ? ` (بعد نصيب المساعد من ${esc(x.d.points)})` : ''}`}
+                        ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
                       </div>
                     </div>
                     <div style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif;">${round1(x.share)}</div>

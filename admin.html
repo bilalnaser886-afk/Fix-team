@@ -7,6 +7,7 @@
 <link rel="icon" href="favicon32.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="i18n.js"></script>
 <style>
   *{box-sizing:border-box;}
   :root{ --ink:#101014; --muted:#64748B; --line:#EEF0F3; }
@@ -47,9 +48,9 @@
 <body>
 
 <div class="topbar">
-  <h1>⚙️ لوحة تحكم الأدمن</h1>
-  <div class="sub">I Fix Team — إدارة النظام</div>
-  <div class="who" id="whoBox">جاري التحقق…</div>
+  <h1>⚙️ <span data-i18n="adm.title">لوحة تحكم الأدمن</span></h1>
+  <div class="sub" data-i18n="adm.subtitle">I Fix Team — إدارة النظام</div>
+  <div class="who" id="whoBox" data-i18n="adm.checking">جارٍ التحقق…</div>
 </div>
 
 <div class="wrap" id="wrap"><div class="loading">جاري التحميل…</div></div>
@@ -158,54 +159,54 @@ async function loadAll(){
 // ===== الواجهة =====
 function render(){
   const m = systemConfig.mode;
-  const modeLabel = m==='beta' ? '🛠️ وضع البيتا' : (m==='trial' ? '🎁 وضع التجربة المجانية' : '✅ وضع عادي (مدفوع)');
+  const modeLabel = m==='beta' ? '🛠️ '+t('adm.modeBeta') : (m==='trial' ? '🎁 '+t('adm.modeTrial') : '✅ '+t('adm.modeNormal'));
   const left = trialDaysLeft();
 
   document.getElementById('wrap').innerHTML = `
     <div class="sec">
       <div class="mode-box">
-        <div style="font-size:13px;color:var(--muted);">الوضع الحالي للنظام</div>
+        <div style="font-size:13px;color:var(--muted);">${t('adm.currentMode')}</div>
         <div style="font-weight:800;font-size:17px;margin-top:2px;">${modeLabel}</div>
-        ${m==='trial' ? `<div style="font-size:13px;color:#B45309;margin-top:4px;">متبقّي ${left} يوماً على الاشتراك</div>` : ''}
+        ${m==='trial' ? `<div style="font-size:13px;color:#B45309;margin-top:4px;">${t('adm.daysLeft',{n:left})}</div>` : ''}
       </div>
-      <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ فتح شاشة الصيانة (المحاسب)</button>
+      <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ ${t('adm.openDashboard')}</button>
     </div>
 
     <div class="sec">
-      <div class="sec-title">🛠️ وضع البيتا (قبل الإطلاق)</div>
-      <p class="hint">شريط علوي للكل + نافذة ترحيب مرة واحدة لكل مستخدم.</p>
+      <div class="sec-title">🛠️ ${t('adm.betaSection')}</div>
+      <p class="hint">${t('adm.betaHint')}</p>
       ${m==='beta'
-        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● مُفعّل حالياً</div>
-           <button class="btn danger" onclick="setMode('cancelBeta')">🛑 إلغاء وضع البيتا</button>`
-        : `<button class="btn" onclick="setMode('beta')">تفعيل تنبيه وضع البيتا</button>`}
+        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● ${t('adm.betaOn')}</div>
+           <button class="btn danger" onclick="setMode('cancelBeta')">🛑 ${t('adm.betaCancel')}</button>`
+        : `<button class="btn" onclick="setMode('beta')">${t('adm.betaEnable')}</button>`}
     </div>
 
     <div class="sec">
-      <div class="sec-title">🎁 الفترة المجانية والاشتراك</div>
-      <p class="hint">عدّاد ${systemConfig.trialDays||30} يوم من لحظة التفعيل، وبعدها توجيه تلقائي لصفحة الاشتراك.</p>
+      <div class="sec-title">🎁 ${t('adm.trialSection')}</div>
+      <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||30)})}</p>
       ${m==='trial'
-        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● مُفعّل — متبقّي ${left} يوماً</div>
-           <button class="btn danger" onclick="setMode('cancelTrial')">🛑 إلغاء الوضع المجاني</button>`
-        : `<button class="btn warn" onclick="setMode('trial')">تحويل لوضع التجربة المجانية</button>`}
-      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ تغيير عدد الأيام (${systemConfig.trialDays||30})</button></div>
+        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
+           <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
+        : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
+      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||30})</button></div>
     </div>
 
     <div class="sec">
-      <div class="sec-title">📢 إرسال إشعار لحظي</div>
-      <p class="hint">بيظهر فوراً لكل مستخدم بنافذة فيها زر «فهمت» — مرة واحدة لكل مستخدم.</p>
-      <input id="bcTitle" placeholder="عنوان الإشعار" />
-      <textarea id="bcBody" rows="2" placeholder="نص الإشعار"></textarea>
+      <div class="sec-title">📢 ${t('adm.bcSection')}</div>
+      <p class="hint">${t('adm.bcHint')}</p>
+      <input id="bcTitle" placeholder="${t('adm.bcTitlePh')}" />
+      <textarea id="bcBody" rows="2" placeholder="${t('adm.bcBodyPh')}"></textarea>
       <select id="bcType">
-        <option value="info">📢 معلومة</option>
-        <option value="warning">⚠️ تنبيه</option>
-        <option value="success">✅ خبر كويس</option>
+        <option value="info">📢 ${t('adm.bcInfo')}</option>
+        <option value="warning">⚠️ ${t('adm.bcWarn')}</option>
+        <option value="success">✅ ${t('adm.bcGood')}</option>
       </select>
-      <button class="btn" onclick="sendBroadcast()">إرسال للكل الآن</button>
+      <button class="btn" onclick="sendBroadcast()">${t('adm.bcSend')}</button>
     </div>
 
     <div class="sec">
-      <div class="sec-title">🎛️ مفاتيح الميزات (Feature Flags)</div>
-      <p class="hint">أي ميزة جديدة بتفضل مقفولة لحد ما تفتحها من هنا.</p>
+      <div class="sec-title">🎛️ ${t('adm.flagsSection')}</div>
+      <p class="hint">${t('adm.flagsHint')}</p>
       ${KNOWN_FLAGS.map(f => {
         const on = isFeatureEnabled(f.key);
         return `<div class="row">
@@ -213,38 +214,38 @@ function render(){
             <div style="font-size:13.5px;font-weight:700;">${esc(f.desc)}</div>
             <div style="font-size:11px;color:#94A3B8;font-family:monospace;">${esc(f.key)}</div>
           </div>
-          <button class="mini ${on?'on':''}" style="min-width:92px;" onclick="toggleFlag('${f.key}')">${on?'● مفعّلة':'○ مقفولة'}</button>
+          <button class="mini ${on?'on':''}" style="min-width:92px;" onclick="toggleFlag('${f.key}')">${on ? '● '+t('adm.flagOn') : '○ '+t('adm.flagOff')}</button>
         </div>`;
       }).join('')}
     </div>
 
     <div class="sec">
-      <div class="sec-title">👥 صلاحيات المستخدمين</div>
-      <p class="hint">المحاسب مالوش وصول لأدوات النظام (نسخ احتياطي / استيراد / مسح) ولا للوحة دي.</p>
+      <div class="sec-title">👥 ${t('adm.rolesSection')}</div>
+      <p class="hint">${t('adm.rolesHint')}</p>
       <div style="font-size:12.5px;color:#475569;line-height:1.9;margin-bottom:10px;">
-        أدمن هذه البيئة (${APP_ENV==='production'?'إنتاج':'تجريبي'}):
+        ${t('adm.envAdmins')} (${APP_ENV==='production'?t('adm.envProd'):t('adm.envStaging')}):
         <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b>
         ${Object.keys(userRoles).length
           ? Object.entries(userRoles).map(([em,rl]) => `<div class="row">
-              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${rl==='super_admin'?'Super Admin':'محاسب'}</span>
-              <button class="mini" style="color:#DC2626;" onclick="removeRole('${esc(em)}')">حذف</button>
+              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${rl==='super_admin'?t('adm.roleSuper'):t('adm.roleAcc')}</span>
+              <button class="mini" style="color:#DC2626;" onclick="removeRole('${esc(em)}')">${t('adm.delete')}</button>
             </div>`).join('')
-          : '<div style="color:#94A3B8;margin-top:6px;">مفيش صلاحيات إضافية متسجلة</div>'}
+          : `<div style="color:#94A3B8;margin-top:6px;">${t('adm.noRoles')}</div>`}
       </div>
-      <button class="mini" onclick="addSuperAdmin()">➕ إضافة Super Admin بالإيميل</button>
+      <button class="mini" onclick="addSuperAdmin()">➕ ${t('adm.addSuperAdmin')}</button>
     </div>
 
     <div class="sec">
-      <div class="sec-title">📜 سجل العمليات الإدارية</div>
-      <p class="hint">آخر العمليات الحساسة على النظام.</p>
+      <div class="sec-title">📜 ${t('adm.auditSection')}</div>
+      <p class="hint">${t('adm.auditHint')}</p>
       ${auditLog.length
         ? `<div class="log">${auditLog.slice(0,50).map(a => `<div class="log-item">${esc(a.action)}
              <div class="log-meta">${new Date(a.at).toLocaleString('ar-EG')} — ${esc(a.by)}</div></div>`).join('')}</div>`
-        : '<div style="color:#94A3B8;font-size:12.5px;">مفيش عمليات متسجلة لسه</div>'}
+        : `<div style="color:#94A3B8;font-size:12.5px;">${t('adm.noAudit')}</div>`}
     </div>
 
     <div class="sec">
-      <button class="btn ghost" onclick="doLogout()">تسجيل الخروج</button>
+      <button class="btn ghost" onclick="doLogout()">${t('adm.logout')}</button>
     </div>
   `;
 }
@@ -328,7 +329,7 @@ async function doLogout(){
     location.href = 'dashboard.html';
     return;
   }
-  document.getElementById('whoBox').textContent = `${currentUser.name} — Super Admin`;
+  document.getElementById('whoBox').textContent = `${currentUser.name} — ${t('adm.roleSuper')}`;
   await loadAll();
   render();
 })();

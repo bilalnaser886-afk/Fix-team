@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="i18n.js"></script>
 <style>
   :root{
     --red:#E8321E;        /* أحمر اللوجو */
@@ -111,17 +112,17 @@
 <div class="stage">
   <img class="logo-hero" src="logo.jpg" alt="I Fix Team — for mobile services">
   <div class="card">
-    <h1>تسجيل الدخول</h1>
-    <p class="sub">نظام إدارة الصيانة</p>
+    <h1 data-i18n="login.title">تسجيل الدخول</h1>
+    <p class="sub" data-i18n="app.subtitle">نظام إدارة الصيانة</p>
     <div id="loginError"></div>
 
-    <label class="field"><span>البريد الإلكتروني</span>
+    <label class="field"><span data-i18n="login.email">البريد الإلكتروني</span>
       <input type="email" id="email" autocomplete="email">
     </label>
-    <label class="field"><span>كلمة المرور</span>
+    <label class="field"><span data-i18n="login.password">كلمة المرور</span>
       <input type="password" id="password" autocomplete="current-password">
     </label>
-    <button class="login" id="loginBtn" onclick="login()">دخول</button>
+    <button class="login" id="loginBtn" data-i18n="login.submit" onclick="login()">دخول</button>
 
     <!-- تظهر فقط عند انتهاء اشتراك المحل -->
     <div id="renewBox" class="renew-box">
@@ -232,7 +233,7 @@ if(APP_ENV === "staging"){
                 if (error.message.includes('Email not confirmed')) {
                     $('loginError').textContent = 'الحساب غير مؤكد — فعّله من لوحة تحكم Supabase';
                 } else if (error.message.includes('Invalid login credentials')) {
-                    $('loginError').textContent = 'خطأ في البريد أو كلمة المرور';
+                    $('loginError').textContent = t('login.badCreds');
                 } else {
                     $('loginError').textContent = 'خطأ: ' + error.message;
                 }
