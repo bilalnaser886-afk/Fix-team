@@ -4492,6 +4492,7 @@ function deliveredUnpaidRows(list){
   return src
     .map(d => ({
       device: `${d.deviceType||''} ${d.model||''}`.trim(),
+      issue: (d.reportedIssue || '').trim(),
       customer: d.customerName || '',
       shop: d.shopName || '',
       phone: d.customerPhone || '',
@@ -4513,17 +4514,17 @@ async function exportDeliveredUnpaidExcel(list){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('تم التسليم بانتظار الدفع', { views:[{ rightToLeft:true }] });
 
-  ws.mergeCells('A1:G1');
+  ws.mergeCells('A1:H1');
   ws.getCell('A1').value = 'تم التسليم بانتظار الدفع';
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF9A6A0C'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
-  ws.mergeCells('A2:G2');
+  ws.mergeCells('A2:H2');
   ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
 
   const head = ws.getRow(4);
-  head.values = ['الجهاز','العميل','المحل','رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
+  head.values = ['الجهاز','العطل','العميل','المحل','رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -4534,25 +4535,26 @@ async function exportDeliveredUnpaidExcel(list){
 
   rows.forEach(r => {
     const row = ws.addRow([
-      r.device, r.customer, r.shop, r.phone, r.technician,
+      r.device, r.issue || '—', r.customer, r.shop, r.phone, r.technician,
       r.deliveredDate ? new Date(r.deliveredDate).toLocaleDateString('ar-EG') : '',
       r.amount
     ]);
     row.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
-    row.getCell(7).numFmt = money;
+    row.getCell(2).alignment = { horizontal:'right', vertical:'middle', wrapText:true };
+    row.getCell(8).numFmt = money;
   });
 
   ws.addRow([]);
-  const totalRow = ws.addRow(['', '', '', '', '', 'الإجمالي المستحق', total]);
-  totalRow.getCell(6).font = { bold:true };
+  const totalRow = ws.addRow(['', '', '', '', '', '', 'الإجمالي المستحق', total]);
   totalRow.getCell(7).font = { bold:true };
-  totalRow.getCell(7).numFmt = money;
+  totalRow.getCell(8).font = { bold:true };
+  totalRow.getCell(8).numFmt = money;
   totalRow.eachCell({ includeEmpty:true }, cell => {
     cell.border = border;
     cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFDE68A'} };
   });
 
-  [26,20,18,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [24,38,20,18,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -4568,6 +4570,7 @@ function exportDeliveredUnpaidPdf(list){
   const rowsHtml = rows.map((r,i) => `
     <tr style="background:${i%2 ? '#FFF8EC' : '#fff'};">
       <td style="text-align:right;">${esc(r.device)}</td>
+      <td class="issue">${r.issue ? esc(r.issue) : '—'}</td>
       <td>${esc(r.customer)}</td>
       <td>${esc(r.shop)}</td>
       <td>${esc(r.phone)}</td>
@@ -4593,8 +4596,10 @@ function exportDeliveredUnpaidPdf(list){
     table{width:100%; border-collapse:collapse; font-size:13px;}
     th{background:#101014; color:#fff; padding:11px 6px; font-size:12.5px;}
     td{padding:9px 6px; border-bottom:1px solid #E5E7EB; text-align:center;}
+    td.issue{text-align:right; max-width:240px; white-space:pre-wrap; word-break:break-word; color:#3730A3; font-weight:600;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
-    @media print{ body{padding:12px;} }
+    @page{ size:A4 landscape; margin:10mm; }
+    @media print{ body{padding:0;} }
   </style></head><body>
     <div class="head">
       <div><h1>تم التسليم بانتظار الدفع</h1><div class="sub">تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}</div></div>
@@ -4605,8 +4610,8 @@ function exportDeliveredUnpaidPdf(list){
       <div class="tcard" style="background:#DC2626;"><div class="lbl">إجمالي المبلغ المستحق</div><div class="num">${total.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th>الجهاز</th><th>العميل</th><th>المحل</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
-      ${rowsHtml || '<tr><td colspan="7">مفيش أجهزة حالياً</td></tr>'}
+      <tr><th>الجهاز</th><th>العطل</th><th>العميل</th><th>المحل</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
+      ${rowsHtml || '<tr><td colspan="8">مفيش أجهزة حالياً</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الأجهزة: ${rows.length}</span></div>
     <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
