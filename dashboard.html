@@ -596,6 +596,7 @@
       <h2 id="columnTitle"></h2>
       <button class="close-btn" onclick="closeColumn()">×</button>
     </div>
+    <div id="columnToolbar"></div>
     <div class="modal-search"><input id="columnSearch" oninput="renderColumn()" data-i18n-ph="search.column.ph" placeholder="ابحث بالاسم أو المحل أو الرقم التسلسلي..." /></div>
     <div id="columnList"></div>
     <div id="colMoreFooter" style="text-align:center; padding:12px; color:#64748B; font-size:13px; display:none;"></div>
@@ -1811,6 +1812,15 @@ function renderColumn(keepPos){
   colFullList = devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q));
   document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
+
+  const toolbar = document.getElementById('columnToolbar');
+  if(toolbar){
+    toolbar.innerHTML = (currentColumn === 'delivered_unpaid' && colFullList.length > 0) ? `
+      <div class="acc-toolbar" style="margin:0 0 12px;">
+        <button class="btn-secondary" style="color:#166534;border-color:#BBF7D0;" onclick="exportDeliveredUnpaidExcel(colFullList)">📊 Excel</button>
+        <button class="btn-secondary" style="color:#B91C1C;border-color:#FECACA;" onclick="exportDeliveredUnpaidPdf(colFullList)">📄 PDF</button>
+      </div>` : '';
+  }
 
   const scroller = document.querySelector('#columnOverlay .modal');
   const prevY = scroller ? scroller.scrollTop : 0;
@@ -4485,9 +4495,9 @@ function toggleInvTech(name){
 // ============================================================
 // تصدير "تم التسليم بانتظار الدفع": Excel حقيقي + PDF ملون
 // ============================================================
-function deliveredUnpaidRows(){
-  return devices
-    .filter(d => d.status === 'delivered' && !isPaidDevice(d))
+function deliveredUnpaidRows(list){
+  const src = list || devices.filter(d => d.status === 'delivered' && !isPaidDevice(d));
+  return src
     .map(d => ({
       device: `${d.deviceType||''} ${d.model||''}`.trim(),
       customer: d.customerName || '',
@@ -4500,8 +4510,8 @@ function deliveredUnpaidRows(){
     .sort((a,b) => new Date(b.deliveredDate||0) - new Date(a.deliveredDate||0));
 }
 
-async function exportDeliveredUnpaidExcel(){
-  const rows = deliveredUnpaidRows();
+async function exportDeliveredUnpaidExcel(list){
+  const rows = deliveredUnpaidRows(list);
   const total = rows.reduce((t,r) => t + r.amount, 0);
   const border = {
     top:{style:'thin',color:{argb:'FFCBD5E1'}}, bottom:{style:'thin',color:{argb:'FFCBD5E1'}},
@@ -4560,8 +4570,8 @@ async function exportDeliveredUnpaidExcel(){
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-function exportDeliveredUnpaidPdf(){
-  const rows = deliveredUnpaidRows();
+function exportDeliveredUnpaidPdf(list){
+  const rows = deliveredUnpaidRows(list);
   const total = rows.reduce((t,r) => t + r.amount, 0);
   const rowsHtml = rows.map((r,i) => `
     <tr style="background:${i%2 ? '#FFF8EC' : '#fff'};">
