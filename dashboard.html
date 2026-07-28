@@ -4384,7 +4384,6 @@ function renderSummaries(){
   const received = devices.filter(d => inRange(d.intakeDate));
   const delivered = devices.filter(d => { const dd = deliveredDateOf(d); return dd && inRange(dd); });
   const deliveredPaid = delivered.filter(d => isPaidDevice(d));
-  const deliveredUnpaid = delivered.filter(d => !isPaidDevice(d));
   const inProgress = devices.filter(d => OPEN_STATUSES.includes(d.status));
   const stuck = stuckDevices();
   // الكروت قابلة للضغط — تفتح قائمة الأجهزة اللي جواها
@@ -4392,7 +4391,6 @@ function renderSummaries(){
     received: received,
     delivered: delivered,
     delivered_paid: deliveredPaid,
-    delivered_unpaid: deliveredUnpaid,
     progress: inProgress,
     stuck: stuck.map(x => x.d),
   };
@@ -4406,16 +4404,10 @@ function renderSummaries(){
     <div class="inv-cards">
       ${card('received', received.length, '#2563EB', t('inv.received'))}
       ${card('delivered_paid', deliveredPaid.length, '#16A34A', t('inv.deliveredPaid'))}
-      ${card('delivered_unpaid', deliveredUnpaid.length, '#D97706', t('inv.deliveredUnpaid'))}
       ${card('progress', inProgress.length, '#B45309', t('inv.inProgress'))}
       ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
     </div>
     ${invOpenCard ? `<div class="inv-open-list">
-      ${invOpenCard === 'delivered_unpaid' && deliveredUnpaid.length > 0 ? `
-        <div class="acc-toolbar" style="margin-bottom:10px;">
-          <button class="btn-secondary" style="color:#166534;border-color:#BBF7D0;" onclick="exportDeliveredUnpaidExcel()">📊 Excel</button>
-          <button class="btn-secondary" style="color:#B91C1C;border-color:#FECACA;" onclick="exportDeliveredUnpaidPdf()">📄 PDF</button>
-        </div>` : ''}
       ${(invLists[invOpenCard] || []).length === 0
         ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
         : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
