@@ -454,6 +454,10 @@
       'ui.labelH': 'ارتفاع الليبل (مم)',
       'ui.labelHint': 'اكتب مقاس الليبل الحقيقي بالمليمتر (نفس المقاس المضبوط في إعدادات الطابعة). بيتحفظ تلقائياً للمرات الجاية.',
 
+      /* الطباعة الصامتة */
+      'print.silentDone': 'اتطبع الليبل مباشرة على الطابعة ✅',
+      'print.silentFailed': 'برنامج الطباعة المباشرة مش شغال — هنفتح نافذة الطباعة العادية.',
+
       /* اللغة */
       'lang.switch': 'English',
       'lang.switchTitle': 'تغيير لغة النظام'
@@ -884,6 +888,10 @@
       'ui.labelW': 'Label width (mm)',
       'ui.labelH': 'Label height (mm)',
       'ui.labelHint': 'Enter the real label size in millimetres (same as configured in your printer settings). Saved automatically for next time.',
+
+      /* Silent printing */
+      'print.silentDone': 'Label sent directly to the printer ✅',
+      'print.silentFailed': 'Direct print service is not running — opening the normal print dialog.',
 
       'lang.switch': 'العربية',
       'lang.switchTitle': 'Change system language'
