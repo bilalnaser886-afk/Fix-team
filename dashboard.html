@@ -417,25 +417,6 @@
     max-height:52vh; overflow-y:auto;
   }
 
-  /* ===== صفحة تفاصيل خانة الجرد (بتفتح كصفحة كاملة مش بتفتح لتحت) ===== */
-  .inv-list-head{
-    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    background:#fff; border:1px solid #EEF0F3; border-radius:14px;
-    padding:15px 17px; margin-bottom:14px; box-shadow:0 2px 8px rgba(16,16,20,.04);
-  }
-  .inv-list-head .ilh-num{font-family:'Cairo',sans-serif; font-size:36px; font-weight:900; line-height:1;}
-  .inv-list-head .ilh-lbl{font-size:15px; color:#475569; font-weight:700;}
-  .inv-list-head .ilh-sub{font-size:12.5px; color:#94A3B8; margin-top:3px;}
-  .inv-back{
-    border:1px solid #E2E8F0; background:#fff; color:#334155; border-radius:9px;
-    padding:9px 15px; font-size:13.5px; font-weight:800; font-family:inherit;
-    cursor:pointer; margin-inline-start:auto;
-  }
-  .inv-back:hover{background:#F1F5F9;}
-  .inv-list-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px;}
-  .inv-list-grid .day-card{margin-bottom:0;}
-  @media (max-width:640px){ .inv-list-grid{grid-template-columns:1fr;} }
-
   /* ===== تقييم الفنيين ===== */
   .te-note{
     background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px;
@@ -734,21 +715,6 @@
              style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
     </div>
     <div id="summariesBody" style="padding:16px 20px 40px;"></div>
-  </div>
-</div>
-
-<!-- صفحة تفاصيل خانة الجرد -->
-<div id="invListOverlay" class="overlay hidden" style="z-index:35; align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
-  <div class="summaries-page">
-    <div class="modal-head" style="padding:16px 20px;">
-      <h2 id="invListTitle">📋</h2>
-      <button class="close-btn" onclick="closeInvList()">×</button>
-    </div>
-    <div class="modal-search" style="padding:0 20px 8px;">
-      <input id="invListSearch" oninput="renderInvList()" placeholder="🔍 فلترة جوه الخانة دي..."
-             style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
-    </div>
-    <div id="invListBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -1790,11 +1756,7 @@ function render(){
 // يحدّث صفحة الجرد المفتوحة في الخلفية لحظياً (مع الحفاظ على مكان السكرول)
 function refreshOpenOverlays(){
   const el = document.getElementById('summariesOverlay');
-  const inv = document.getElementById('invListOverlay');
-  const invOpen = inv && !inv.classList.contains('hidden');
-  // لازم نحدّث الجرد الأول عشان قوايم الخانات تبقى محدّثة قبل ما نرسم صفحة الخانة
-  if((el && !el.classList.contains('hidden')) || invOpen) renderSummaries();
-  if(invOpen) renderInvList();
+  if(el && !el.classList.contains('hidden')) renderSummaries();
 }
 
 function renderBoard(){
@@ -2868,7 +2830,6 @@ function openSummaries(){
 function closeSummaries(){
   invOpenCard = null;
   invOpenTech = null;
-  closeInvList();
   document.getElementById('summariesOverlay').classList.add('hidden');
 }
 
@@ -3079,8 +3040,8 @@ function openScannedDevice(hit){
     try{ el.dispatchEvent(new Event('input', { bubbles:true })); }catch(err){}
     el.blur();
   }
-  ['columnSearch','invSearch','invListSearch','scanInput','accSearch'].forEach(clearSearchBox);
-  ['columnOverlay','summariesOverlay','invListOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
+  ['columnSearch','invSearch','scanInput','accSearch'].forEach(clearSearchBox);
+  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
     .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
   gScanBuf = '';
   openDetail(hit.id);
@@ -4403,100 +4364,9 @@ let invOpenCard = null;
 let invLists = {};
 let invOpenTech = null;
 let invTechLists = {};
-let invTitles = {};
-let invColors = {};
-let invTechNames = [];
-let invStuckDays = {};        // id الجهاز → عدد أيام الوقوف
-let invView = null;           // الخانة المفتوحة كصفحة: {type:'card'|'tech', key}
-
-// نص صغير بلغتين من غير ما نلمس ملف الترجمة
-function invT(ar, en){
-  const lang = (typeof I18N !== 'undefined') ? I18N.getLang() : 'ar';
-  return lang === 'en' ? en : ar;
-}
-
-// ===== فتح الخانة كصفحة كاملة (مش قايمة بتفتح لتحت) =====
-function openInvList(key){
-  invView = { type:'card', key };
-  clearSearchBox('invListSearch');
-  renderInvList();
-  document.getElementById('invListOverlay').classList.remove('hidden');
-}
-function openInvTech(i){
-  const name = invTechNames[i];
-  if(!name) return;
-  invView = { type:'tech', key:name };
-  clearSearchBox('invListSearch');
-  renderInvList();
-  document.getElementById('invListOverlay').classList.remove('hidden');
-}
-function closeInvList(){
-  invView = null;
-  clearSearchBox('invListSearch');
-  document.getElementById('invListOverlay').classList.add('hidden');
-}
-function invViewDevices(){
-  if(!invView) return [];
-  return (invView.type === 'card' ? (invLists[invView.key] || []) : (invTechLists[invView.key] || []));
-}
-
-function renderInvList(){
-  if(!invView) return;
-  const overlay = document.getElementById('invListOverlay');
-  const body = document.getElementById('invListBody');
-  if(!overlay || !body) return;
-
-  const searchBox = document.getElementById('invListSearch');
-  if(searchBox) searchBox.placeholder = invT('🔍 فلترة جوه الخانة دي...', '🔍 Filter inside this group...');
-
-  const all = invViewDevices();
-  const q = (searchBox?.value || '').trim();
-  const list = q ? all.filter(d => matchesSearch(d, q)) : all;
-
-  const isTech = invView.type === 'tech';
-  const label = isTech ? ('🔧 ' + esc(invView.key)) : (invTitles[invView.key] || '');
-  const color = isTech ? '#0891A8' : (invColors[invView.key] || '#0891A8');
-
-  document.getElementById('invListTitle').innerHTML = label;
-
-  const showLate = isTech || invView.key === 'progress' || invView.key === 'stuck';
-  const late = showLate ? all.filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length : 0;
-  const head = `
-    <div class="inv-list-head">
-      <div class="ilh-num" style="color:${color};">${all.length}</div>
-      <div>
-        <div class="ilh-lbl">${label}</div>
-        <div class="ilh-sub">
-          ${q ? `${invT('نتيجة الفلترة','filtered')}: ${list.length} — ` : ''}
-          ${late ? `${late} ${invT('واقف بقاله كتير','stalled too long')}` : invT('اضغط على أي جهاز تشوف تفاصيله','tap any device for its details')}
-        </div>
-      </div>
-      <button class="inv-back" onclick="closeInvList()">${invT('رجوع للجرد ←','← Back to inventory')}</button>
-    </div>`;
-
-  let rows;
-  if(list.length === 0){
-    rows = `<div class="empty-col">${q ? t('inv.noResults') : t('inv.emptyCard')}</div>`;
-  }else if(invView.key === 'stuck' && !isTech){
-    rows = list.map(d => {
-      const st = statusInfo(effStatus(d));
-      const days = invStuckDays[d.id] != null ? invStuckDays[d.id] : daysSince(lastChangeOf(d));
-      return `<div class="stuck-item" onclick="openDetail('${d.id}')">
-        <div>
-          <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
-          <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}${t('inv.stuckIn')} "<b style="color:${accent(st.varname)}">${esc(stLabel(st))}</b>"</div>
-        </div>
-        <div class="stuck-days">${days} ${t('inv.days')}</div>
-      </div>`;
-    }).join('');
-  }else{
-    rows = `<div class="inv-list-grid">${list.map(d => dayCardHtml(d)).join('')}</div>`;
-  }
-
-  // نحافظ على مكان السكرول وقت التحديث اللحظي
-  const y = overlay.scrollTop;
-  body.innerHTML = head + rows;
-  overlay.scrollTop = y;
+function toggleInvCard(key){
+  invOpenCard = (invOpenCard === key) ? null : key;
+  renderSummaries();
 }
 
 function renderSummaries(){
@@ -4524,26 +4394,11 @@ function renderSummaries(){
     progress: inProgress,
     stuck: stuck.map(x => x.d),
   };
-  // عناوين وألوان كل خانة — بتستعملها صفحة التفاصيل
-  invTitles = {
-    received: t('inv.received'),
-    delivered: t('inv.deliveredPaid'),
-    delivered_paid: t('inv.deliveredPaid'),
-    progress: t('inv.inProgress'),
-    stuck: `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`,
-  };
-  invColors = {
-    received:'#2563EB', delivered:'#16A34A', delivered_paid:'#16A34A',
-    progress:'#B45309', stuck:'#DC2626',
-  };
-  invStuckDays = {};
-  stuck.forEach(x => { invStuckDays[x.d.id] = x.days; });
-
   const card = (key, num, color, label) => `
-    <div class="inv-card" onclick="openInvList('${key}')" title="${t('inv.tapToView')}">
+    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="${t('inv.tapToView')}">
       <div class="inv-card-num" style="color:${color};">${num}</div>
       <div class="inv-card-label">${label}</div>
-      <div class="inv-card-more">${t('inv.showDevices')} ←</div>
+      <div class="inv-card-more">${invOpenCard===key ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
     </div>`;
   const cards = `
     <div class="inv-cards">
@@ -4551,7 +4406,12 @@ function renderSummaries(){
       ${card('delivered_paid', deliveredPaid.length, '#16A34A', t('inv.deliveredPaid'))}
       ${card('progress', inProgress.length, '#B45309', t('inv.inProgress'))}
       ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
-    </div>`;
+    </div>
+    ${invOpenCard ? `<div class="inv-open-list">
+      ${(invLists[invOpenCard] || []).length === 0
+        ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
+        : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
+    </div>` : ''}`;
 
   const stuckHtml = stuck.length === 0
     ? `<div class="empty-col">${t('inv.noStuck')}</div>`
@@ -4588,20 +4448,23 @@ function renderSummaries(){
   invTechLists = withTech;
   const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
 
-  invTechNames = techNames;
   const techCards = techNames.length === 0
     ? `<div class="empty-col">${t('inv.noTechDevices')}</div>`
     : `<div class="inv-cards">
-        ${techNames.map((techName, i) => {
+        ${techNames.map(techName => {
           const late = withTech[techName].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
-          return `<div class="inv-card" onclick="openInvTech(${i})" title="${t('inv.techTapToView')}">
+          const safe = esc(techName).replace(/'/g, "\\'");
+          return `<div class="inv-card ${invOpenTech===techName ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
             <div class="inv-card-num" style="color:#0891A8;">${withTech[techName].length}</div>
             <div class="inv-card-label">🔧 ${esc(techName)}</div>
             ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
-            <div class="inv-card-more">${t('inv.showDevices')} ←</div>
+            <div class="inv-card-more">${invOpenTech===techName ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
           </div>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${invOpenTech && withTech[invOpenTech] ? `<div class="inv-open-list">
+        ${withTech[invOpenTech].map(d => dayCardHtml(d)).join('')}
+      </div>` : ''}`;
 
   // نحافظ على مكان السكرول وقت التحديث اللحظي عشان الصفحة ماتنطّش لفوق
   const _sumScroller = document.getElementById('summariesOverlay');
@@ -4616,6 +4479,10 @@ function renderSummaries(){
   if(_sumScroller) _sumScroller.scrollTop = _sumY;
 }
 
+function toggleInvTech(name){
+  invOpenTech = (invOpenTech === name) ? null : name;
+  renderSummaries();
+}
 
 // ============================================================
 // تصدير "تم التسليم بانتظار الدفع": Excel حقيقي + PDF ملون
@@ -4625,6 +4492,7 @@ function deliveredUnpaidRows(list){
   return src
     .map(d => ({
       device: `${d.deviceType||''} ${d.model||''}`.trim(),
+      issue: (d.reportedIssue || '').trim(),
       customer: d.customerName || '',
       shop: d.shopName || '',
       phone: d.customerPhone || '',
@@ -4646,17 +4514,17 @@ async function exportDeliveredUnpaidExcel(list){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('تم التسليم بانتظار الدفع', { views:[{ rightToLeft:true }] });
 
-  ws.mergeCells('A1:G1');
+  ws.mergeCells('A1:H1');
   ws.getCell('A1').value = 'تم التسليم بانتظار الدفع';
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF9A6A0C'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
-  ws.mergeCells('A2:G2');
+  ws.mergeCells('A2:H2');
   ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
 
   const head = ws.getRow(4);
-  head.values = ['الجهاز','العميل','المحل','رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
+  head.values = ['الجهاز','العطل','العميل','المحل','رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -4667,25 +4535,26 @@ async function exportDeliveredUnpaidExcel(list){
 
   rows.forEach(r => {
     const row = ws.addRow([
-      r.device, r.customer, r.shop, r.phone, r.technician,
+      r.device, r.issue || '—', r.customer, r.shop, r.phone, r.technician,
       r.deliveredDate ? new Date(r.deliveredDate).toLocaleDateString('ar-EG') : '',
       r.amount
     ]);
     row.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
-    row.getCell(7).numFmt = money;
+    row.getCell(2).alignment = { horizontal:'right', vertical:'middle', wrapText:true };
+    row.getCell(8).numFmt = money;
   });
 
   ws.addRow([]);
-  const totalRow = ws.addRow(['', '', '', '', '', 'الإجمالي المستحق', total]);
-  totalRow.getCell(6).font = { bold:true };
+  const totalRow = ws.addRow(['', '', '', '', '', '', 'الإجمالي المستحق', total]);
   totalRow.getCell(7).font = { bold:true };
-  totalRow.getCell(7).numFmt = money;
+  totalRow.getCell(8).font = { bold:true };
+  totalRow.getCell(8).numFmt = money;
   totalRow.eachCell({ includeEmpty:true }, cell => {
     cell.border = border;
     cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFDE68A'} };
   });
 
-  [26,20,18,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [24,38,20,18,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -4701,6 +4570,7 @@ function exportDeliveredUnpaidPdf(list){
   const rowsHtml = rows.map((r,i) => `
     <tr style="background:${i%2 ? '#FFF8EC' : '#fff'};">
       <td style="text-align:right;">${esc(r.device)}</td>
+      <td class="issue">${r.issue ? esc(r.issue) : '—'}</td>
       <td>${esc(r.customer)}</td>
       <td>${esc(r.shop)}</td>
       <td>${esc(r.phone)}</td>
@@ -4726,8 +4596,10 @@ function exportDeliveredUnpaidPdf(list){
     table{width:100%; border-collapse:collapse; font-size:13px;}
     th{background:#101014; color:#fff; padding:11px 6px; font-size:12.5px;}
     td{padding:9px 6px; border-bottom:1px solid #E5E7EB; text-align:center;}
+    td.issue{text-align:right; max-width:240px; white-space:pre-wrap; word-break:break-word; color:#3730A3; font-weight:600;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
-    @media print{ body{padding:12px;} }
+    @page{ size:A4 landscape; margin:10mm; }
+    @media print{ body{padding:0;} }
   </style></head><body>
     <div class="head">
       <div><h1>تم التسليم بانتظار الدفع</h1><div class="sub">تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}</div></div>
@@ -4738,8 +4610,8 @@ function exportDeliveredUnpaidPdf(list){
       <div class="tcard" style="background:#DC2626;"><div class="lbl">إجمالي المبلغ المستحق</div><div class="num">${total.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th>الجهاز</th><th>العميل</th><th>المحل</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
-      ${rowsHtml || '<tr><td colspan="7">مفيش أجهزة حالياً</td></tr>'}
+      <tr><th>الجهاز</th><th>العطل</th><th>العميل</th><th>المحل</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
+      ${rowsHtml || '<tr><td colspan="8">مفيش أجهزة حالياً</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الأجهزة: ${rows.length}</span></div>
     <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
