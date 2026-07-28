@@ -7,10 +7,9 @@ const APP_SHELL = [
   'index.html',
   'dashboard.html',
   'track.html',
-  'admin.html',
-  'checkout.html',
-  'i18n.js',
   'manifest.json',
+  'i18n.js',
+  'ai-invoice.js',
   'logo.jpg',
   'favicon.ico',
   'favicon-32.png',
@@ -58,20 +57,6 @@ self.addEventListener('fetch', (event) => {
         .catch(() =>
           caches.match(req).then(hit => hit || caches.match('dashboard.html').then(d => d || caches.match('index.html')))
         )
-    );
-    return;
-  }
-
-  // ملفات JS بتاعتنا (زي i18n.js): النت الأول عشان تحديثات الترجمة والكود توصل فوراً
-  if(url.origin === self.location.origin && url.pathname.endsWith('.js')){
-    event.respondWith(
-      fetch(req)
-        .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(req, copy));
-          return res;
-        })
-        .catch(() => caches.match(req))
     );
     return;
   }
