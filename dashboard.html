@@ -19,7 +19,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#F3F5F7; --surface:#FFFFFF; --ink:#1A2332; --muted:#64748B;
@@ -3201,6 +3201,15 @@ function grabQrDataUrl(){
 const PRINT_AGENT_URL = 'http://localhost:9123';
 const PX_PER_MM = 8;   // ≈203 نقطة/بوصة وهو دقة طابعات الليبل الحرارية
 
+// بنرسم الليبل بـ3 أضعاف الدقة وبعدين نصغّره — الرسام بياخد راحته في
+// تشكيل الحروف العربية والنتيجة أنضف بكتير من الرسم على المقاس النهائي.
+const LABEL_SS = 3;
+// الطابعة الحرارية بتطبع أسود أو أبيض بس، مبتعرفش رمادي. لو سبنا لها
+// الحواف الرمادية بتحوّلها نقط متفرقة والكلام بيطلع مغبّش — فبنحسمها
+// إحنا: أي بكسل أغمق من الحد ده يبقى أسود صافي، وغير كده أبيض صافي.
+// لو الخط طلع رفيع زوّد الرقم شوية (0.70)، ولو طلع تخين قلّله (0.55).
+const INK_THRESHOLD = 0.62;
+
 function loadImg(src){
   return new Promise((res, rej) => {
     if(!src) return res(null);
@@ -3211,12 +3220,47 @@ function loadImg(src){
   });
 }
 
+// بيتأكد إن خط Tajawal اتحمّل فعلاً قبل الرسم. لو رسمنا والخط لسه
+// جاي من النت، الكانفس بيقع على خط احتياطي وشكل العربي بيبوظ.
+async function ensureLabelFont(){
+  if(!document.fonts || !document.fonts.load) return;
+  try{
+    await Promise.all([
+      document.fonts.load('500 20px Tajawal'),
+      document.fonts.load('700 20px Tajawal'),
+      document.fonts.load('800 20px Tajawal')
+    ]);
+    await document.fonts.ready;
+  }catch(e){}
+}
+
+// كود QR بدقة عالية مخصوص للطباعة. الكود اللي في المعاينة 110 بكسل بس،
+// وتصغيره لمقاس الليبل بيخبط حواف المربعات ويصعّب القراءة.
+async function hiResQr(text, px){
+  if(!window.QRCode || !text) return null;
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:-9999px;top:0;visibility:hidden;';
+  document.body.appendChild(box);
+  try{
+    new QRCode(box, { text:String(text), width:px, height:px, correctLevel:QRCode.CorrectLevel.M });
+    await new Promise(r => setTimeout(r, 80));
+    const cv = box.querySelector('canvas');
+    if(cv) return cv.toDataURL('image/png');
+    const im = box.querySelector('img');
+    return (im && im.src) ? im.src : null;
+  }catch(e){ return null; }
+  finally{ box.remove(); }
+}
+
 // بيرسم نفس محتوى الليبل على canvas ويرجّع صورة PNG
 async function renderLabelImage(d, sz, qrDataUrl){
+  await ensureLabelFont();
   const W = Math.round(sz.w * PX_PER_MM), H = Math.round(sz.h * PX_PER_MM);
+  const S = LABEL_SS;
   const c = document.createElement('canvas');
-  c.width = W; c.height = H;
+  c.width = W * S; c.height = H * S;
   const x = c.getContext('2d');
+  x.scale(S, S);                    // بنكتب بنفس الإحداثيات القديمة والباقي بيتظبط لوحده
   x.fillStyle = '#fff'; x.fillRect(0,0,W,H);
   x.fillStyle = '#000';
   x.direction = 'rtl';
@@ -3229,7 +3273,7 @@ async function renderLabelImage(d, sz, qrDataUrl){
 
   // عمود الكود على الشمال
   const qrSide = Math.min(Math.round(topH * 0.62), Math.round(W * 0.32));
-  const qrImg = await loadImg(qrDataUrl);
+  const qrImg = await loadImg((await hiResQr(d.id, qrSide * S * 2)) || qrDataUrl);
   if(qrImg) x.drawImage(qrImg, pad, pad, qrSide, qrSide);
   x.font = `700 ${Math.max(7, Math.round(H*0.075))}px Tajawal, sans-serif`;
   x.direction = 'ltr'; x.textAlign = 'center';
@@ -3271,7 +3315,27 @@ async function renderLabelImage(d, sz, qrDataUrl){
     }
     if(ln && ly <= H - fs*0.6) x.fillText(ln, W/2, ly, W - pad*2);
   }
-  return c.toDataURL('image/png');
+
+  // نصغّر لدقة الطابعة بالظبط (296x200 لليبل 37x25)
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const o = out.getContext('2d');
+  o.fillStyle = '#fff'; o.fillRect(0,0,W,H);
+  o.imageSmoothingEnabled = true;
+  o.imageSmoothingQuality = 'high';
+  o.drawImage(c, 0, 0, W, H);
+
+  // ونحسم الرمادي: أسود صافي أو أبيض صافي، مفيش بينهم
+  try{
+    const id = o.getImageData(0, 0, W, H), p = id.data, th = INK_THRESHOLD * 255;
+    for(let i = 0; i < p.length; i += 4){
+      const v = (p[i]*0.299 + p[i+1]*0.587 + p[i+2]*0.114) < th ? 0 : 255;
+      p[i] = p[i+1] = p[i+2] = v; p[i+3] = 255;
+    }
+    o.putImageData(id, 0, 0);
+  }catch(e){ /* لو المتصفح منع قراءة الكانفس، بنطبع من غير الحسم */ }
+
+  return out.toDataURL('image/png');
 }
 
 // بيحاول يطبع صامت عبر الوكيل المحلي (لو على نفس الكمبيوتر)؛ بيرجّع true لو نجح
