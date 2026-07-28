@@ -4401,6 +4401,11 @@ function renderSummaries(){
       ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
     </div>
     ${invOpenCard ? `<div class="inv-open-list">
+      ${invOpenCard === 'delivered_unpaid' && deliveredUnpaid.length > 0 ? `
+        <div class="acc-toolbar" style="margin-bottom:10px;">
+          <button class="btn-secondary" style="color:#166534;border-color:#BBF7D0;" onclick="exportDeliveredUnpaidExcel()">📊 Excel</button>
+          <button class="btn-secondary" style="color:#B91C1C;border-color:#FECACA;" onclick="exportDeliveredUnpaidPdf()">📄 PDF</button>
+        </div>` : ''}
       ${(invLists[invOpenCard] || []).length === 0
         ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
         : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
@@ -4475,6 +4480,136 @@ function renderSummaries(){
 function toggleInvTech(name){
   invOpenTech = (invOpenTech === name) ? null : name;
   renderSummaries();
+}
+
+// ============================================================
+// تصدير "تم التسليم بانتظار الدفع": Excel حقيقي + PDF ملون
+// ============================================================
+function deliveredUnpaidRows(){
+  return devices
+    .filter(d => d.status === 'delivered' && !isPaidDevice(d))
+    .map(d => ({
+      device: `${d.deviceType||''} ${d.model||''}`.trim(),
+      customer: d.customerName || '',
+      shop: d.shopName || '',
+      phone: d.customerPhone || '',
+      technician: d.technician || '',
+      deliveredDate: deliveredDateOf(d),
+      amount: parseInt(d.agreedPrice) || 0
+    }))
+    .sort((a,b) => new Date(b.deliveredDate||0) - new Date(a.deliveredDate||0));
+}
+
+async function exportDeliveredUnpaidExcel(){
+  const rows = deliveredUnpaidRows();
+  const total = rows.reduce((t,r) => t + r.amount, 0);
+  const border = {
+    top:{style:'thin',color:{argb:'FFCBD5E1'}}, bottom:{style:'thin',color:{argb:'FFCBD5E1'}},
+    left:{style:'thin',color:{argb:'FFCBD5E1'}}, right:{style:'thin',color:{argb:'FFCBD5E1'}}
+  };
+  const money = '#,##0" ج.م"';
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('تم التسليم بانتظار الدفع', { views:[{ rightToLeft:true }] });
+
+  ws.mergeCells('A1:G1');
+  ws.getCell('A1').value = 'تم التسليم بانتظار الدفع';
+  ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF9A6A0C'} };
+  ws.getCell('A1').alignment = { horizontal:'center' };
+  ws.mergeCells('A2:G2');
+  ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG');
+  ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
+  ws.getCell('A2').alignment = { horizontal:'center' };
+
+  const head = ws.getRow(4);
+  head.values = ['الجهاز','العميل','المحل','رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
+  head.height = 22;
+  head.eachCell(cell => {
+    cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD97706'} };
+    cell.alignment = { horizontal:'center', vertical:'middle' };
+    cell.border = border;
+  });
+
+  rows.forEach(r => {
+    const row = ws.addRow([
+      r.device, r.customer, r.shop, r.phone, r.technician,
+      r.deliveredDate ? new Date(r.deliveredDate).toLocaleDateString('ar-EG') : '',
+      r.amount
+    ]);
+    row.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
+    row.getCell(7).numFmt = money;
+  });
+
+  ws.addRow([]);
+  const totalRow = ws.addRow(['', '', '', '', '', 'الإجمالي المستحق', total]);
+  totalRow.getCell(6).font = { bold:true };
+  totalRow.getCell(7).font = { bold:true };
+  totalRow.getCell(7).numFmt = money;
+  totalRow.eachCell({ includeEmpty:true }, cell => {
+    cell.border = border;
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFDE68A'} };
+  });
+
+  [26,20,18,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `تم-التسليم-بانتظار-الدفع-${new Date().toISOString().slice(0,10)}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function exportDeliveredUnpaidPdf(){
+  const rows = deliveredUnpaidRows();
+  const total = rows.reduce((t,r) => t + r.amount, 0);
+  const rowsHtml = rows.map((r,i) => `
+    <tr style="background:${i%2 ? '#FFF8EC' : '#fff'};">
+      <td style="text-align:right;">${esc(r.device)}</td>
+      <td>${esc(r.customer)}</td>
+      <td>${esc(r.shop)}</td>
+      <td>${esc(r.phone)}</td>
+      <td>${esc(r.technician)}</td>
+      <td>${r.deliveredDate ? new Date(r.deliveredDate).toLocaleDateString('ar-EG') : '—'}</td>
+      <td style="color:#B45309; font-weight:800;">${r.amount.toLocaleString('en-EG')} ج.م</td>
+    </tr>`).join('');
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+  <title>تم التسليم بانتظار الدفع</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Tajawal',sans-serif; color:#101014; margin:0; padding:28px;}
+    .head{background:linear-gradient(135deg,#D97706,#B45309); color:#fff; border-radius:14px; padding:22px 26px; display:flex; justify-content:space-between; align-items:center;}
+    .head h1{font-family:'Cairo',sans-serif; font-size:24px; margin:0;}
+    .head .sub{font-size:13px; opacity:.9; margin-top:4px;}
+    .head .brand{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; text-align:left;}
+    .totals{display:flex; gap:14px; margin:18px 0;}
+    .tcard{flex:1; border-radius:12px; padding:14px 18px; color:#fff; background:#B45309;}
+    .tcard .lbl{font-size:13px; opacity:.92;}
+    .tcard .num{font-family:'Cairo',sans-serif; font-size:26px; font-weight:900; margin-top:2px;}
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th{background:#101014; color:#fff; padding:11px 6px; font-size:12.5px;}
+    td{padding:9px 6px; border-bottom:1px solid #E5E7EB; text-align:center;}
+    .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
+    @media print{ body{padding:12px;} }
+  </style></head><body>
+    <div class="head">
+      <div><h1>تم التسليم بانتظار الدفع</h1><div class="sub">تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}</div></div>
+      <div class="brand">I FIX TEAM<br><small style="font-weight:400;font-size:11px;">FOR MOBILE SERVICES</small></div>
+    </div>
+    <div class="totals">
+      <div class="tcard"><div class="lbl">عدد الأجهزة</div><div class="num">${rows.length}</div></div>
+      <div class="tcard" style="background:#DC2626;"><div class="lbl">إجمالي المبلغ المستحق</div><div class="num">${total.toLocaleString('en-EG')} ج.م</div></div>
+    </div>
+    <table>
+      <tr><th>الجهاز</th><th>العميل</th><th>المحل</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
+      ${rowsHtml || '<tr><td colspan="7">مفيش أجهزة حالياً</td></tr>'}
+    </table>
+    <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الأجهزة: ${rows.length}</span></div>
+    <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 
