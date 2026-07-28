@@ -19,7 +19,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#F3F5F7; --surface:#FFFFFF; --ink:#1A2332; --muted:#64748B;
@@ -3226,9 +3226,10 @@ async function ensureLabelFont(){
   if(!document.fonts || !document.fonts.load) return;
   try{
     await Promise.all([
+      document.fonts.load('700 20px Cairo'),
+      document.fonts.load('900 20px Cairo'),
       document.fonts.load('500 20px Tajawal'),
-      document.fonts.load('700 20px Tajawal'),
-      document.fonts.load('800 20px Tajawal')
+      document.fonts.load('700 20px Tajawal')
     ]);
     await document.fonts.ready;
   }catch(e){}
@@ -3253,79 +3254,134 @@ async function hiResQr(text, px){
 }
 
 // بيرسم نفس محتوى الليبل على canvas ويرجّع صورة PNG
+// ⚠️ التخطيط هنا لازم يفضل مطابق لـ browserPrintLabel() بالظبط:
+//    الكود على اليمين والنصوص على الشمال، نفس الخطوط ونفس المقاسات.
+//    أي تعديل في الاتنين لازم يتعمل في التاني.
 async function renderLabelImage(d, sz, qrDataUrl){
   await ensureLabelFont();
-  const W = Math.round(sz.w * PX_PER_MM), H = Math.round(sz.h * PX_PER_MM);
+
   const S = LABEL_SS;
+  const W = Math.round(sz.w * PX_PER_MM), H = Math.round(sz.h * PX_PER_MM);
+  const mm = v => v * PX_PER_MM;                 // مليمتر → بكسل
+
+  // نفس معادلات المقاسات الموجودة في browserPrintLabel بالحرف
+  const cond = (d.conditionNotes || '').trim();
+  const k    = cond ? 0.90 : 1;
+  const padMm = Math.max(0.8, sz.h * 0.045);
+  const pad   = mm(padMm);
+  const qrSz  = mm(Math.min(sz.h * 0.62, sz.w * 0.32));
+  const fShop  = mm(Math.max(2.2, sz.h * 0.148 * k));
+  const fCust  = mm(Math.max(1.9, sz.h * 0.122 * k));
+  const fDev   = mm(Math.max(1.9, sz.h * 0.122 * k));
+  const fIssue = mm(Math.max(1.7, sz.h * 0.100 * k));
+  const fDate  = mm(Math.max(1.5, sz.h * 0.090 * k));
+  const fBrand = mm(Math.max(1.4, sz.h * 0.088 * k));
+
+  const stripWmm = sz.w - (padMm * 2);
+  const stripHmm = Math.max(2.6, sz.h * 0.20);
+  let fCond = 0;
+  if(cond){
+    const ideal = Math.sqrt((stripWmm * stripHmm) / (cond.length * 0.52 * 1.25));
+    fCond = mm(Math.min(sz.h * 0.078, Math.max(0.95, ideal)));
+  }
+
+  // نرسم بـ3 أضعاف الدقة، والتصغير والحسم بيحصلوا في الآخر
   const c = document.createElement('canvas');
   c.width = W * S; c.height = H * S;
   const x = c.getContext('2d');
-  x.scale(S, S);                    // بنكتب بنفس الإحداثيات القديمة والباقي بيتظبط لوحده
-  x.fillStyle = '#fff'; x.fillRect(0,0,W,H);
+  x.scale(S, S);
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
   x.fillStyle = '#000';
-  x.direction = 'rtl';
-  x.textBaseline = 'top';
+  x.textBaseline = 'middle';
 
-  const pad = Math.max(6, Math.round(H * 0.045));
-  const cond = (d.conditionNotes || '').trim();
-  const condH = cond ? Math.round(H * 0.20) : 0;
-  const topH = H - condH - pad;
-
-  // عمود الكود على الشمال
-  const qrSide = Math.min(Math.round(topH * 0.62), Math.round(W * 0.32));
-  const qrImg = await loadImg((await hiResQr(d.id, qrSide * S * 2)) || qrDataUrl);
-  if(qrImg) x.drawImage(qrImg, pad, pad, qrSide, qrSide);
-  x.font = `700 ${Math.max(7, Math.round(H*0.075))}px Tajawal, sans-serif`;
-  x.direction = 'ltr'; x.textAlign = 'center';
-  x.fillText('I FIX TEAM', pad + qrSide/2, pad + qrSide + Math.round(H*0.015), qrSide);
-
-  // النصوص على اليمين
-  x.direction = 'rtl'; x.textAlign = 'right';
-  const rx = W - pad;                       // حافة اليمين
-  const availW = W - (pad*3) - qrSide;      // العرض المتاح للنص
-  let y = pad;
-  const line = (txt, size, weight, gap) => {
-    if(!txt) return;
-    x.font = `${weight} ${size}px Tajawal, sans-serif`;
-    x.fillText(String(txt), rx, y, availW);
-    y += size + (gap || Math.round(H*0.012));
+  const setFont = (weight, size, fam) => { x.font = `${weight} ${size}px ${fam}, sans-serif`; };
+  // قص النص بثلاث نقط — نفس شغل text-overflow:ellipsis
+  const fit = (txt, maxW) => {
+    if(!txt) return '';
+    if(x.measureText(txt).width <= maxW) return txt;
+    let out = String(txt);
+    while(out.length > 1 && x.measureText(out + '…').width > maxW) out = out.slice(0, -1);
+    return out + '…';
   };
-  const k = cond ? 0.90 : 1;
-  line(d.shopName || '',                        Math.max(9, Math.round(H*0.148*k)), 800);
-  line(d.customerName || '',                    Math.max(8, Math.round(H*0.122*k)), 700);
-  line(`${d.deviceType||''} ${d.model||''}`.trim(), Math.max(8, Math.round(H*0.122*k)), 700);
-  if(d.reportedIssue) line(d.reportedIssue,     Math.max(7, Math.round(H*0.100*k)), 500);
-  line(shortDateTime(d.intakeDate),             Math.max(6, Math.round(H*0.090*k)), 500);
 
-  // شريط حالة الجهاز تحت
+  // ============ شريط حالة الجهاز تحت ============
+  const condMargin = mm(sz.h * 0.012);
+  const condPadTop = mm(sz.h * 0.012);
+  const condBorder = Math.max(1, Math.round(mm(0.18)));
+  let topBottom = H - pad;
+
   if(cond){
-    const by = H - condH;
-    x.fillStyle = '#000'; x.fillRect(pad, by, W - pad*2, 1);
-    const fs = Math.max(6, Math.min(Math.round(H*0.078), Math.round(Math.sqrt(((W-pad*2)*condH)/(cond.length*0.6*1.3)))));
-    x.font = `500 ${fs}px Tajawal, sans-serif`;
-    x.textAlign = 'center'; x.direction = 'rtl';
-    // نلف النص على أكتر من سطر لو طويل
-    const words = cond.split(/\s+/); let ln = ''; let ly = by + Math.round(fs*0.35);
+    setFont(700, fCond, 'Tajawal');
+    x.direction = 'rtl'; x.textAlign = 'right';
+    const lineH = fCond * 1.25;
+    const maxW  = W - pad * 2;
+    const words = cond.split(/\s+/);
+    const lines = [];
+    let ln = '';
     for(const wd of words){
       const test = ln ? ln + ' ' + wd : wd;
-      if(x.measureText(test).width > (W - pad*2) && ln){
-        x.fillText(ln, W/2, ly, W - pad*2); ly += fs*1.15; ln = wd;
-        if(ly > H - fs) break;
-      } else ln = test;
+      if(x.measureText(test).width > maxW && ln){ lines.push(ln); ln = wd; }
+      else ln = test;
     }
-    if(ln && ly <= H - fs*0.6) x.fillText(ln, W/2, ly, W - pad*2);
+    if(ln) lines.push(ln);
+    const room = mm(stripHmm) - condBorder - condPadTop;
+    const shown = lines.slice(0, Math.max(1, Math.floor(room / lineH)));
+    const blockH = condBorder + condPadTop + shown.length * lineH;
+    const bTop = H - pad - blockH;
+
+    x.fillRect(pad, bTop, W - pad * 2, condBorder);
+    let ly = bTop + condBorder + condPadTop;
+    for(const l of shown){ x.fillText(l, W - pad, ly + lineH / 2); ly += lineH; }
+    topBottom = bTop - condMargin;
   }
 
-  // نصغّر لدقة الطابعة بالظبط (296x200 لليبل 37x25)
+  // ============ الجزء العلوي — الكل متمركز رأسياً ============
+  const topMid = (pad + topBottom) / 2;
+
+  // عمود الكود على اليمين
+  const brandMargin = mm(sz.h * 0.022);
+  const qrBoxH = qrSz + brandMargin + fBrand;
+  const qrX = W - pad - qrSz;
+  const qrY = topMid - qrBoxH / 2;
+  const qrImg = await loadImg((await hiResQr(d.id, Math.round(qrSz) * S * 2)) || qrDataUrl);
+  if(qrImg) x.drawImage(qrImg, qrX, qrY, qrSz, qrSz);
+  setFont(900, fBrand, 'Cairo');
+  x.direction = 'ltr'; x.textAlign = 'center';
+  try{ x.letterSpacing = mm(0.15).toFixed(2) + 'px'; }catch(e){}
+  x.fillText('I FIX TEAM', qrX + qrSz / 2, qrY + qrSz + brandMargin + fBrand / 2);
+  try{ x.letterSpacing = '0px'; }catch(e){}
+
+  // النصوص على الشمال (المسافة بين العمودين = نفس الحشو)
+  const infoR = W - pad - qrSz - pad;
+  const infoW = infoR - pad;
+  const rows = [
+    { t: d.shopName || '',                            f: fShop,  w: 900, fam: 'Cairo' },
+    { t: d.customerName || '',                        f: fCust,  w: 700, fam: 'Cairo' },
+    { t: `${d.deviceType||''} ${d.model||''}`.trim(), f: fDev,   w: 700, fam: 'Cairo' }
+  ];
+  if(d.reportedIssue) rows.push({ t: d.reportedIssue, f: fIssue, w: 700, fam: 'Tajawal' });
+  rows.push({ t: shortDateTime(d.intakeDate), f: fDate, w: 700, fam: 'Tajawal', ltr: true });
+
+  const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);
+  let ry = topMid - infoH / 2;
+  x.textAlign = 'right';
+  for(const r of rows){
+    const lineH = r.f * 1.3;
+    setFont(r.w, r.f, r.fam);
+    x.direction = r.ltr ? 'ltr' : 'rtl';       // التاريخ بيتكتب من الشمال لليمين
+    if(r.t) x.fillText(fit(r.t, infoW), infoR, ry + lineH / 2);
+    ry += lineH;
+  }
+
+  // ============ التصغير لدقة الطابعة + حسم الرمادي ============
   const out = document.createElement('canvas');
   out.width = W; out.height = H;
   const o = out.getContext('2d');
-  o.fillStyle = '#fff'; o.fillRect(0,0,W,H);
+  o.fillStyle = '#fff'; o.fillRect(0, 0, W, H);
   o.imageSmoothingEnabled = true;
   o.imageSmoothingQuality = 'high';
   o.drawImage(c, 0, 0, W, H);
 
-  // ونحسم الرمادي: أسود صافي أو أبيض صافي، مفيش بينهم
   try{
     const id = o.getImageData(0, 0, W, H), p = id.data, th = INK_THRESHOLD * 255;
     for(let i = 0; i < p.length; i += 4){
