@@ -215,6 +215,11 @@
       'acc.deleteAccount': 'حذف الحساب',
       'acc.newCycle': 'بداية دورة حسابية جديدة',
       'acc.egp': 'ج.م',
+      'acc.viewMode': 'طريقة العرض',
+      'acc.viewList': 'قائمة تفصيلية',
+      'acc.viewSmall': 'مربعات صغيرة',
+      'acc.viewLarge': 'مربعات كبيرة',
+      'acc.printPdf': 'طباعة كشف الحساب PDF',
 
       /* شاشة الجرد */
       'inv.title': 'الجرد',
@@ -661,6 +666,11 @@
       'acc.deleteAccount': 'Delete account',
       'acc.newCycle': 'Start of a new billing cycle',
       'acc.egp': 'EGP',
+      'acc.viewMode': 'View',
+      'acc.viewList': 'Detailed list',
+      'acc.viewSmall': 'Small grid',
+      'acc.viewLarge': 'Large grid',
+      'acc.printPdf': 'Print statement PDF',
 
       /* Inventory screen */
       'inv.title': 'Inventory',

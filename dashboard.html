@@ -382,6 +382,54 @@
   .acc-nums{display:flex; gap:16px; align-items:center; font-size:13.5px; color:#475569; flex-wrap:wrap;}
   .acc-toolbar{display:flex; gap:8px; padding:0 18px 4px; justify-content:flex-end; flex-wrap:wrap;}
   .acc-entries{padding:6px 18px 14px;}
+
+  /* ===== مبدّل طريقة العرض (قائمة / مربعات صغيرة / مربعات كبيرة) ===== */
+  .acc-viewbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px;}
+  .acc-viewbar-label{font-size:12.5px; font-weight:700; color:#64748B;}
+  .acc-viewbtns{display:inline-flex; background:#fff; border:1px solid #E3E4E8; border-radius:12px; padding:3px; gap:2px; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .acc-viewbtn{
+    display:inline-flex; align-items:center; gap:6px; border:none; background:none; cursor:pointer;
+    font-family:inherit; font-size:13px; font-weight:700; color:#475569;
+    padding:8px 12px; border-radius:9px; transition:background .15s, color .15s; white-space:nowrap;
+  }
+  .acc-viewbtn .acc-viewbtn-ic{font-size:15px; line-height:1;}
+  .acc-viewbtn:hover{background:#F1F5F9;}
+  .acc-viewbtn.active{background:#E8321E; color:#fff; box-shadow:0 4px 12px rgba(232,50,30,.28);}
+  .acc-viewbtn.active:hover{background:#E8321E;}
+
+  /* شبكات المربعات */
+  .acc-grid-small{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px;}
+  .acc-grid-large{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:16px;}
+
+  /* كارت عام */
+  .acc-card{
+    background:#fff; border:1px solid #EEF0F3; border-radius:14px; text-align:right;
+    box-shadow:0 2px 8px rgba(16,16,20,.04);
+    transition:transform .12s, box-shadow .12s, border-color .12s; font-family:inherit;
+  }
+  .acc-card:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(16,16,20,.10); border-color:#E2E8F0;}
+
+  /* كارت صغير: اسم + متبقّي بارز */
+  .acc-card-sm{display:flex; flex-direction:column; gap:6px; align-items:flex-start; width:100%; cursor:pointer; padding:14px;}
+  .acc-card-sm .acc-card-name{
+    font-weight:800; font-size:14px; color:var(--ink); line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .acc-card-sm .acc-card-bal{font-family:'Cairo',sans-serif; font-weight:900; font-size:19px;}
+  .acc-card-sm .acc-card-bal small{font-size:11px; font-weight:700;}
+
+  /* كارت كبير: رأس باسم + إجراء، وجسم بالأرقام */
+  .acc-card-lg{display:flex; flex-direction:column; overflow:hidden;}
+  .acc-card-lg-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; border-bottom:1px solid #F1F5F9;}
+  .acc-card-open{flex:1; min-width:0; background:none; border:none; cursor:pointer; text-align:right; font-family:inherit; padding:0;}
+  .acc-card-open span{font-weight:800; font-size:16px; color:var(--ink); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-card-print{flex:none; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:9px; cursor:pointer; font-size:15px; padding:6px 9px; line-height:1;}
+  .acc-card-print:hover{background:#FEF2F2; border-color:#FECACA;}
+  .acc-card-lg-body{padding:12px 16px 16px; cursor:pointer;}
+  .acc-card-row{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; color:#475569; padding:4px 0;}
+  .acc-card-row b{font-size:15px; color:#334155;}
+  .acc-card-bal-badge{display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13px; font-weight:700;}
+  .acc-card-bal-badge b{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;}
   .acc-entry{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     border:1px solid #F1F5F9; border-radius:10px; padding:11px 13px; margin-bottom:8px; font-size:14px;
@@ -762,6 +810,20 @@
         <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" data-i18n="acc.openingBalance" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
       </div>
       <div class="modal-search" style="margin-top:10px;"><input id="accSearch" oninput="renderAccounts()" data-i18n-ph="search.accounts.ph" placeholder="ابحث باسم المحل..." /></div>
+      <div id="accViewBar" class="acc-viewbar">
+        <span class="acc-viewbar-label" data-i18n="acc.viewMode">طريقة العرض</span>
+        <div class="acc-viewbtns">
+          <button type="button" class="acc-viewbtn" data-mode="list" onclick="setAccViewMode('list')">
+            <span class="acc-viewbtn-ic">📜</span><span data-i18n="acc.viewList">قائمة تفصيلية</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-small" onclick="setAccViewMode('grid-small')">
+            <span class="acc-viewbtn-ic">🔲</span><span data-i18n="acc.viewSmall">مربعات صغيرة</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-large" onclick="setAccViewMode('grid-large')">
+            <span class="acc-viewbtn-ic">🔳</span><span data-i18n="acc.viewLarge">مربعات كبيرة</span>
+          </button>
+        </div>
+      </div>
     </div>
     <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
@@ -4122,6 +4184,9 @@ function openAccounts(){
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   clearSearchBox('accSearch');
+  // نرجّع طريقة العرض المحفوظة (بعد أي فتح كشف مؤقت حوّلها لقائمة)
+  try{ const v = localStorage.getItem(ACC_VIEW_KEY); if(ACC_VIEW_MODES.includes(v)) accViewMode = v; }catch(e){}
+  syncAccViewButtons();
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
 }
@@ -4221,7 +4286,7 @@ function accShopBlockHtml(n, s){
     </div>
     <div class="acc-entries">${sortedDesc.map(e => accEntryHtml(e) + (starts.has(e.id) ? cycleDivider(e) : '')).join('')}</div>`;
 
-  return `<div class="acc-shop">
+  return `<div class="acc-shop" data-accshop="${esc(n)}">
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
       <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}</span>
       <span class="acc-nums">
@@ -4258,12 +4323,19 @@ function renderAccounts(){
   const _scroller = document.getElementById('accountsOverlay');
   const _y = _scroller ? _scroller.scrollTop : 0;
 
+  // رسم عناصر المجموعة حسب طريقة العرض المختارة — البحث بيتفلتر قبل هنا فبيسري على الأنواع الـ3
+  const groupItems = (list) => {
+    if(accViewMode === 'grid-small') return `<div class="acc-grid-small">${list.map(n => accShopCardSmall(n, shops[n])).join('')}</div>`;
+    if(accViewMode === 'grid-large') return `<div class="acc-grid-large">${list.map(n => accShopCardLarge(n, shops[n])).join('')}</div>`;
+    return list.map(n => accShopBlockHtml(n, shops[n])).join('');
+  };
+
   const groupHtml = (title, bg, fg, key, list) => `
     <div style="margin-bottom:14px;">
       <button onclick="toggleAccGroup('${key}')" style="width:100%; display:flex; justify-content:space-between; align-items:center; background:${bg}; color:${fg}; border:none; border-radius:12px; padding:14px 16px; font-family:inherit; font-weight:800; font-size:15px; cursor:pointer;">
         <span>${title} (${list.length})</span><span>${accGroupOpen[key] ? '▲' : '▼'}</span>
       </button>
-      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? list.map(n => accShopBlockHtml(n, shops[n])).join('') : `<div class="empty-col">${t('acc.none')}</div>`}</div>` : ''}
+      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? groupItems(list) : `<div class="empty-col">${t('acc.none')}</div>`}</div>` : ''}
     </div>`;
 
   document.getElementById('accountsBody').innerHTML = `
@@ -4275,6 +4347,81 @@ function renderAccounts(){
     ${groupHtml('✅ ' + t('acc.groupPaid'), '#F0FDF4', '#166534', 'paid', paidNames)}
   `;
   if(_scroller) _scroller.scrollTop = _y;
+}
+
+// ============================================================
+// طريقة عرض الحسابات: قائمة تفصيلية / مربعات صغيرة / مربعات كبيرة
+// التفضيل بيتحفظ لكل جهاز في localStorage — إضافي بالكامل، مش بيمس بيانات أو سكيمة
+// ============================================================
+const ACC_VIEW_KEY = 'store_accounts_view_mode';
+const ACC_VIEW_MODES = ['list', 'grid-small', 'grid-large'];
+let accViewMode = (function(){
+  try{ const v = localStorage.getItem(ACC_VIEW_KEY); return ACC_VIEW_MODES.includes(v) ? v : 'list'; }
+  catch(e){ return 'list'; }
+})();
+
+// تلوين الزر الفعّال في المبدّل حسب الوضع الحالي
+function syncAccViewButtons(){
+  document.querySelectorAll('#accViewBar .acc-viewbtn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-mode') === accViewMode);
+  });
+}
+
+// تغيير الوضع من أزرار المبدّل — بيحفظ التفضيل ويعيد الرسم
+function setAccViewMode(mode){
+  if(!ACC_VIEW_MODES.includes(mode)) mode = 'list';
+  accViewMode = mode;
+  try{ localStorage.setItem(ACC_VIEW_KEY, mode); }catch(e){}
+  syncAccViewButtons();
+  renderAccounts();
+}
+
+// فتح كشف المحل بالكامل من كارت (صغير/كبير): بيعرض القائمة ويفتح الأكورديون ويمرّر ليه
+// ملحوظة: بيحوّل العرض لقائمة وقتياً بس من غير ما يغيّر التفضيل المحفوظ
+function openShopFromCard(name){
+  accOpenShop = name;
+  accGroupOpen.open = true;
+  accGroupOpen.paid = true;   // نتأكد إن المجموعة اللي فيها المحل مفتوحة
+  accViewMode = 'list';
+  syncAccViewButtons();
+  renderAccounts();
+  requestAnimationFrame(() => {
+    const el = Array.from(document.querySelectorAll('#accountsBody [data-accshop]'))
+      .find(x => x.getAttribute('data-accshop') === name);
+    if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+}
+
+// كارت صغير: اسم المحل + المتبقّي بارز — للمسح البصري السريع
+function accShopCardSmall(n, s){
+  const balance = s.balance;
+  const safe = esc(n).replace(/'/g,"\\'");
+  const balColor = balance > 0 ? '#DC2626' : '#16A34A';
+  return `<button type="button" class="acc-card acc-card-sm" data-accshop="${esc(n)}" onclick="openShopFromCard('${safe}')">
+    <span class="acc-card-name">🏪 ${esc(n)}</span>
+    <span class="acc-card-bal" style="color:${balColor};">${balance.toLocaleString('en-EG')}<small> ${t('acc.egp')}</small></span>
+  </button>`;
+}
+
+// كارت كبير: رأس (اسم + طباعة كشف) وجسم (عليه / مدفوع-خصم / المتبقّي كشارة)
+function accShopCardLarge(n, s){
+  const balance = s.balance;
+  const safe = esc(n).replace(/'/g,"\\'");
+  const balColor = balance > 0 ? '#DC2626' : '#16A34A';
+  const balBg = balance > 0 ? '#FEF2F2' : '#F0FDF4';
+  return `<div class="acc-card acc-card-lg" data-accshop="${esc(n)}">
+    <div class="acc-card-lg-head">
+      <button type="button" class="acc-card-open" onclick="openShopFromCard('${safe}')"><span>🏪 ${esc(n)}</span></button>
+      <button type="button" class="acc-card-print" title="${t('acc.printPdf')}" onclick="event.stopPropagation(); exportShopPdf('${safe}')">🖨️</button>
+    </div>
+    <div class="acc-card-lg-body" onclick="openShopFromCard('${safe}')">
+      <div class="acc-card-row"><span>${t('acc.owed')}</span><b>${s.owed.toLocaleString('en-EG')}</b></div>
+      <div class="acc-card-row"><span>${t('acc.paidDisc')}</span><b style="color:#16A34A;">${s.paid.toLocaleString('en-EG')}</b></div>
+      <div class="acc-card-bal-badge" style="background:${balBg}; color:${balColor};">
+        <span>${t('acc.remaining')}</span><b>${balance.toLocaleString('en-EG')} ${t('acc.egp')}</b>
+      </div>
+    </div>
+  </div>`;
 }
 
 // إضافة خصم كحركة مالية مستقلة
