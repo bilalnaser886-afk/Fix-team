@@ -229,13 +229,15 @@ function render(){
         ${t('adm.envAdmins')} (${APP_ENV==='production'?t('adm.envProd'):t('adm.envStaging')}):
         <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b>
         ${Object.keys(userRoles).length
-          ? Object.entries(userRoles).map(([em,rl]) => `<div class="row">
-              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${rl==='super_admin'?t('adm.roleSuper'):t('adm.roleAcc')}</span>
+          ? Object.entries(userRoles).map(([em,rl]) => {
+              const en = normRole(rl);
+              return `<div class="row">
+              <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${esc(roleLabel(en.role))}${en.techName ? ' (' + esc(en.techName) + ')' : ''}</span>
               <button class="mini" style="color:#DC2626;" onclick="removeRole('${esc(em)}')">${t('adm.delete')}</button>
-            </div>`).join('')
+            </div>`;}).join('')
           : `<div style="color:#94A3B8;margin-top:6px;">${t('adm.noRoles')}</div>`}
       </div>
-      <button class="mini" onclick="addSuperAdmin()">➕ ${t('adm.addSuperAdmin')}</button>
+      <button class="mini" onclick="addRole()">➕ ${t('adm.addRole')}</button>
     </div>
 
     <div class="sec">
@@ -286,12 +288,49 @@ async function toggleFlag(key){
     render(); toast(f.is_enabled ? 'الميزة اتفعّلت ✅' : 'الميزة اتقفلت');
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
-async function addSuperAdmin(){
-  const em = prompt('إيميل المستخدم اللي هيبقى Super Admin:');
+// الأدوار المتاحة — لازم تفضل زي اللي في dashboard.html
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician'];
+const ROLE_LABEL_KEYS = {
+  super_admin: 'adm.roleSuper',
+  accountant:  'adm.roleAcc',
+  dispatcher:  'adm.roleDisp',
+  technician:  'adm.roleTech'
+};
+function roleLabel(r){ const k = ROLE_LABEL_KEYS[r]; try{ return k ? t(k) : r; }catch(e){ return r; } }
+
+// بيقرا الشكلين: النص القديم "super_admin" والكائن الجديد {role, techName}
+function normRole(v){
+  if(typeof v === 'string') return { role: v, techName: '' };
+  if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '' };
+  return { role: 'accountant', techName: '' };
+}
+
+async function addRole(){
+  const em = prompt(t('adm.emailPrompt'));
   if(em===null) return;
   const e = (em||'').trim().toLowerCase();
-  if(!e || !e.includes('@')){ toast('اكتب إيميل صحيح', false); return; }
-  try{ userRoles[e]='super_admin'; await saveRoles(); await addAudit('أضاف Super Admin: '+e); render(); toast('تمت الإضافة ✅'); }
+  if(!e || !e.includes('@')){ toast(t('adm.badEmail'), false); return; }
+
+  const menu = ROLES.map((r,i) => (i+1) + ') ' + roleLabel(r)).join('\n');
+  const pick = prompt(t('adm.pickRole') + '\n' + menu, '2');
+  if(pick===null) return;
+  const role = ROLES[(parseInt(pick,10) || 0) - 1];
+  if(!role){ toast(t('adm.badRole'), false); return; }
+
+  // الفني بس هو اللي محتاج ربط بالاسم المكتوب على الأجهزة
+  let techName = '';
+  if(role === 'technician'){
+    const nm = prompt(t('adm.techNamePrompt'));
+    if(nm===null) return;
+    techName = (nm||'').trim();
+  }
+
+  try{
+    userRoles[e] = techName ? { role, techName } : { role };
+    await saveRoles();
+    await addAudit('ظبط صلاحية ' + roleLabel(role) + ' لـ: ' + e + (techName ? ' (' + techName + ')' : ''));
+    render(); toast('تمت الإضافة ✅');
+  }
   catch(err){ toast('فشل الحفظ: ' + (err.message||err), false); }
 }
 async function removeRole(em){

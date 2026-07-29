@@ -834,12 +834,23 @@ async function saveSystemConfig(){
 function isAdmin(){ return isSuperAdmin(); }
 
 // ============================================================
-// أدوار المستخدمين: Super Admin مقابل محاسب
+// أدوار المستخدمين
+// ------------------------------------------------------------
+// أربع أدوار:
+//   super_admin  مالك النظام — كل حاجة + أدوات النظام + لوحة الأدمن
+//   accountant   محاسب       — الشغل اليومي والفلوس والاعتمادات (الافتراضي)
+//   dispatcher   مسؤول الحركة — استلام وتسليم وإرجاع الأجهزة
+//   technician   فني          — أجهزته هو بس
+//
+// التوافق مع القديم مضمون: الشكل { "email": "super_admin" } لسه شغال زي ما هو.
+// والشكل الجديد بيسمح بربط اسم الفني بحسابه:
+//     { "email": { "role": "technician", "techName": "محمد" } }
 // ============================================================
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-let userRoles = {};   // { "email": "super_admin" }
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician'];
+let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
   try{
@@ -850,19 +861,63 @@ async function loadUserRoles(){
 async function saveUserRoles(){
   try{ await window.storage.set(ROLES_KEY, JSON.stringify(userRoles)); }catch(e){}
 }
-function isSuperAdmin(){
-  if(!ADMIN_EMAIL_SET) return true;   // وضع آمن: الإعداد لسه ماتعملش
-  const e = (currentUser.email || '').toLowerCase();
-  if(!e) return false;
-  if(ADMIN_EMAILS.includes(e)) return true;
-  return userRoles[e] === 'super_admin';
-}
-function currentRoleLabel(){ return isSuperAdmin() ? 'Super Admin' : 'محاسب'; }
 
-// بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن المحاسب
+// بيقرا الشكلين — النص القديم والكائن الجديد
+function roleEntry(email){
+  const v = userRoles[(email || '').toLowerCase()];
+  if(typeof v === 'string') return { role: v, techName: '' };
+  if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '' };
+  return null;
+}
+
+function roleOf(email){
+  if(!ADMIN_EMAIL_SET) return 'super_admin';   // وضع آمن: الإعداد لسه ماتعملش
+  const e = (email || '').toLowerCase();
+  if(!e) return 'accountant';
+  if(ADMIN_EMAILS.includes(e)) return 'super_admin';
+  const en = roleEntry(e);
+  return (en && ROLES.includes(en.role)) ? en.role : 'accountant';
+}
+
+function myRole(){ return roleOf(currentUser.email); }
+function isSuperAdmin(){ return myRole() === 'super_admin'; }
+function isAccountant(){ return myRole() === 'accountant'; }
+function isDispatcher(){ return myRole() === 'dispatcher'; }
+function isTechnician(){ return myRole() === 'technician'; }
+
+// الأسعار والأرباح والملخص المالي
+function canSeeMoney(){ const r = myRole(); return r === 'super_admin' || r === 'accountant'; }
+// اعتماد طلبات مسؤول الحركة (قبول / رفض)
+function canApprove(){ return canSeeMoney(); }
+
+// اسم الفني المربوط بالحساب — بيستخدم في بوابة الفني
+function myTechName(){
+  const en = roleEntry(currentUser.email);
+  return (en && en.techName) || currentUser.name || '';
+}
+
+const ROLE_LABEL_KEYS = {
+  super_admin: 'adm.roleSuper',
+  accountant:  'adm.roleAcc',
+  dispatcher:  'adm.roleDisp',
+  technician:  'adm.roleTech'
+};
+function roleLabel(r){
+  const k = ROLE_LABEL_KEYS[r];
+  try{ return k ? t(k) : r; }catch(e){ return r; }
+}
+function currentRoleLabel(){ return roleLabel(myRole()); }
+
+// بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن غير الـ Super Admin،
+// وبيحط كلاس بالدور على body عشان الـ CSS يقدر يخفي حاجات حسب الدور
 function applyRoleVisibility(){
   const wrap = document.getElementById('backupWrap');
   if(wrap) wrap.style.display = isSuperAdmin() ? '' : 'none';
+  try{
+    ROLES.forEach(r => document.body.classList.remove('role-' + r));
+    document.body.classList.add('role-' + myRole());
+    document.body.classList.toggle('no-money', !canSeeMoney());
+  }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
 }
 
