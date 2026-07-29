@@ -166,6 +166,53 @@
   .no-money .money-menu-item{display:none !important;}
   /* بند "أجهزتي" للفني بس */
   body:not(.role-technician) .tech-only-menu{display:none !important;}
+
+  /* ===== عزل واجهة الفني: مايشوفش غير "أجهزتي" ===== */
+  /* مفيش نسخة احتياطية ولا "+ جهاز جديد" */
+  body.role-technician #backupWrap,
+  body.role-technician .topbar-actions > .btn-primary{display:none !important;}
+  /* في المنيو: "أجهزتي" وتسجيل الخروج بس — وده بيشيل كمان أي بند
+     بيتحقن لاحقاً من ai-invoice.js (فواتير المشتريات / مخزن قطع الغيار) */
+  body.role-technician #menuDropdown > button:not(.tech-only-menu):not(.logout-menu-item){display:none !important;}
+  /* البوابة هي كل الواجهة — مفيش زرار قفل */
+  body.role-technician #techPortalClose{display:none !important;}
+
+  /* ===== مودال الفني المبسّط ===== */
+  #techViewOverlay .modal{width:100%; max-width:520px;}
+  .tv-row{display:flex; gap:10px; padding:9px 0; border-bottom:1px solid #F1F5F9; font-size:14px;}
+  .tv-row:last-child{border-bottom:none;}
+  .tv-k{color:var(--muted); font-weight:700; min-width:106px; flex:0 0 auto;}
+  .tv-v{color:var(--ink); font-weight:800; line-height:1.6;}
+  .tv-issue{background:#F8FAFC; border:1px solid #EEF0F3; border-radius:10px; padding:10px 12px;
+            font-size:13.5px; color:#334155; line-height:1.7; margin-top:6px;}
+  .tv-block{margin-top:18px;}
+  .tv-block-head{font-family:'Cairo',sans-serif; font-weight:900; font-size:14.5px; color:var(--ink); margin-bottom:9px;}
+  .tv-note{width:100%; min-height:82px; border:1px solid #E2E8F0; border-radius:10px; padding:10px 12px;
+           font-family:'Tajawal',sans-serif; font-size:14px; resize:vertical; box-sizing:border-box;}
+  .tv-hist{margin-top:10px; max-height:210px; overflow-y:auto;}
+  .tv-hist-item{background:#F8FAFC; border:1px solid #EEF0F3; border-radius:9px; padding:8px 10px;
+                margin-bottom:6px; font-size:13px; line-height:1.7; color:#334155;}
+  .tv-hist-meta{color:#94A3B8; font-size:11.5px; margin-top:3px;}
+  .tv-toggle{display:flex; align-items:center; justify-content:space-between; gap:10px; background:#F8FAFC;
+             border:1px solid #E2E8F0; border-radius:11px; padding:11px 13px; cursor:pointer;}
+  .tv-toggle-label{font-weight:800; font-size:14px; color:var(--ink);}
+  .tv-sw{width:44px; height:25px; border-radius:99px; background:#CBD5E1; position:relative; flex:0 0 auto; transition:background .16s;}
+  .tv-sw::after{content:''; position:absolute; top:3px; inset-inline-start:3px; width:19px; height:19px;
+                border-radius:50%; background:#fff; transition:inset-inline-start .16s;}
+  .tv-sw.on{background:var(--accent);}
+  .tv-sw.on::after{inset-inline-start:22px;}
+  .tv-hand{margin-top:12px; padding:13px; border:1px solid #E2E8F0; border-radius:11px; background:#fff;}
+  .tv-sel{width:100%; border:1px solid #E2E8F0; border-radius:10px; padding:11px 12px;
+          font-family:'Tajawal',sans-serif; font-size:14px; background:#fff; box-sizing:border-box;}
+  .tv-mode{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .tv-mode-btn{flex:1 1 145px; border:2px solid #E2E8F0; background:#fff; border-radius:10px; padding:11px 10px;
+               font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer; color:#475569;}
+  .tv-mode-btn.sel{border-color:var(--accent); background:#E8F6F8; color:var(--accent-dark);}
+  .tv-ok{width:100%; margin-top:12px; border:none; border-radius:11px; padding:13px; background:var(--accent);
+         color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;}
+  .tv-ok:disabled{background:#CBD5E1; cursor:not-allowed;}
+  .tp-flash{background:#EAF6EE; border:1px solid #A7D8B8; color:#15803D; border-radius:10px;
+            padding:11px 13px; margin:0 0 14px; font-size:13.5px; font-weight:800; line-height:1.7;}
   /* قسم الاعتمادات — بيظهر للمحاسب/الأدمن فوق الأعمدة لما يكون فيه طلبات معلّقة، وبيختفي تماماً عند صفر */
   #approvalsHost:empty{display:none;}
   .appr-panel{background:#fff; border:1px solid #FCD34D; border-radius:16px; margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px rgba(180,120,20,.10);}
@@ -635,10 +682,10 @@
     <div id="menuDropdown" class="menu-dropdown hidden">
     <button class="tech-only-menu" data-i18n="menu.myDevices" onclick="openTechPortal()">📱 أجهزتي</button>
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
-    <button data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
-    <button data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
+    <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
-    <button data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
+    <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
     </div>
   </div>
 </div>
@@ -785,12 +832,23 @@
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
       <h2 id="techPortalTitle" data-i18n="tp.title">📱 أجهزتي</h2>
-      <button class="close-btn" onclick="closeTechPortal()">×</button>
+      <button id="techPortalClose" class="close-btn" onclick="closeTechPortal()">×</button>
     </div>
     <div style="padding:0 20px;">
       <div class="modal-search"><input id="techSearch" oninput="renderTechPortal()" data-i18n-ph="tp.searchPh" placeholder="ابحث في الأجهزة..." /></div>
     </div>
     <div id="techPortalBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- مودال الفني المبسّط: بيانات الجهاز + ملاحظات + تحويل لفني تاني. مفيش أي فلوس. -->
+<div id="techViewOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="tvTitle">📱</h2>
+      <button class="close-btn" onclick="closeTechDevice()">×</button>
+    </div>
+    <div id="techViewBody" style="padding:16px 20px 28px;"></div>
   </div>
 </div>
 
@@ -1041,7 +1099,7 @@ function applyRoleVisibility(){
     document.body.classList.toggle('no-money', !canSeeMoney());
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
-  // الفني: نفتحله بوابة "أجهزتي" تلقائياً كواجهته الأساسية (مرة واحدة بس، ويقدر يقفلها)
+  // الفني: بوابة "أجهزتي" هي واجهته الوحيدة — بتتفتح تلقائياً ومايقدرش يقفلها
   if(!techPortalAutoOpened && isTechnician()){ techPortalAutoOpened = true; openTechPortal(); }
 }
 
@@ -2455,6 +2513,8 @@ function togglePointsBox(){
 }
 
 function openDetail(id){
+  // الفني مايشوفش المودال الإداري (أسعار/أرباح/حذف) — يتحوّل للمبسّط
+  if(isTechnician()){ openTechDevice(id); return; }
   selectedId = id;
   trackResponses = {};
   pointsBoxOpen = false;
@@ -3250,8 +3310,10 @@ function dayCardHtml(d){
 let techPortalName = '';           // اسم الفني اللي البوابة مفتوحة عليه
 let techPortalAutoOpened = false;  // فتح تلقائي مرة واحدة بس
 
-// الحالات "النشطة" في البوابة: كل حاجة قبل التسليم/الرفض + المرتجع (محتاج شغل تاني)
-const TP_ACTIVE = ['waiting','diagnosing','repairing','done','returned'];
+// الحالات "النشطة" في البوابة: الشغل الجاري بس.
+// "تم الصيانة" و"تم التسليم" و"تم الرفض" و"المرتجعات" مخفيين تماماً عن الفني —
+// بمجرد ما يدوس "تم الإصلاح" الجهاز يخرج من قائمته (وبيظهر تنبيه إنه اتحرك).
+const TP_ACTIVE = ['waiting','diagnosing','repairing'];
 
 function openTechPortal(name){
   const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
@@ -3260,7 +3322,19 @@ function openTechPortal(name){
   renderTechPortal();
   document.getElementById('techPortalOverlay').classList.remove('hidden');
 }
-function closeTechPortal(){ document.getElementById('techPortalOverlay').classList.add('hidden'); }
+// الفني مايقدرش يقفل البوابة — دي واجهته الوحيدة
+function closeTechPortal(){
+  if(isTechnician()) return;
+  document.getElementById('techPortalOverlay').classList.add('hidden');
+}
+
+// تنبيه صغير جوه البوابة (بيختفي لوحده) — بيستخدم لما جهاز يخرج من القائمة
+let tpFlashMsg = '';
+function tpFlash(msg){
+  tpFlashMsg = msg;
+  renderTechPortal();
+  setTimeout(() => { if(tpFlashMsg === msg){ tpFlashMsg = ''; renderTechPortal(); } }, 4500);
+}
 
 // كارت جهاز في البوابة — من غير أي سعر/فلوس. canAct = يظهر أزرار تغيير الحالة
 function techCardHtml(d, canAct){
@@ -3278,7 +3352,7 @@ function techCardHtml(d, canAct){
     ${d.status!=='done' ? `<button class="tp-btn tp-done" onclick="event.stopPropagation(); techSetStatus('${d.id}','done')">✅ ${t('tp.fixed')}</button>` : ''}
     <button class="tp-btn tp-problem" onclick="event.stopPropagation(); techReportProblem('${d.id}')">⚠️ ${t('tp.problem')}</button>
   </div>`;
-  return `<div class="tp-card" onclick="openDetail('${d.id}')">
+  return `<div class="tp-card" onclick="openTechDevice('${d.id}')">
     <div class="tp-card-title">📱 ${esc(d.deviceType)} ${esc(d.model)}</div>
     <div class="tp-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
     ${d.reportedIssue ? `<div class="tp-card-issue">🛠️ ${esc(d.reportedIssue)}</div>` : ''}
@@ -3314,6 +3388,7 @@ function renderTechPortal(){
     : `<div class="empty-col">${q ? t('tp.noMatch') : t('tp.emptyAssist')}</div>`;
 
   body.innerHTML = `
+    ${tpFlashMsg ? `<div class="tp-flash">✅ ${esc(tpFlashMsg)}</div>` : ''}
     <div class="tp-section">
       <div class="tp-section-head">🔧 ${t('tp.sectionMine')} <span class="tp-count">${mine.length}</span></div>
       ${mineHtml}
@@ -3332,7 +3407,19 @@ async function techSetStatus(deviceId, newStatus){
   selectedId = deviceId;
   await changeStatus(newStatus);
   selectedId = prevSel;
-  renderTechPortal();
+  // لو الحالة الجديدة مش من الحالات النشطة، الجهاز هيخرج من القائمة —
+  // لازم نوضّح ده للفني عشان مايفتكرش إنه ضاع
+  const after = devices.find(x => x.id === deviceId);
+  if(after && !TP_ACTIVE.includes(after.status)){
+    if(document.getElementById('techViewOverlay') &&
+       !document.getElementById('techViewOverlay').classList.contains('hidden') && tvId === deviceId){
+      closeTechDevice();
+    }
+    tpFlash(t('tp.movedOut', { name: (after.deviceType||'') + ' ' + (after.model||'') }));
+  } else {
+    renderTechPortal();
+    if(tvId === deviceId) renderTechDevice();
+  }
 }
 
 // "واجهتني مشكلة" — بيسجّل ملاحظة في سجل نشاط الجهاز من غير ما يغيّر الحالة
@@ -3348,6 +3435,192 @@ async function techReportProblem(deviceId){
   renderTechPortal();
   render();
   await persist();
+}
+
+// ============================================================
+// مودال الفني المبسّط
+// بيانات الجهاز الأساسية + ملاحظات الفني + تحويل/مشاركة مع فني تاني.
+// مفيش أسعار، ولا أرباح، ولا تكلفة قطع، ولا حذف، ولا أي بند محاسبي.
+// ============================================================
+// تاريخ آمن: formatDateTime بترجّع NaN لو الحقل فاضي
+function tvDate(iso){
+  if(!iso) return '—';
+  const dt = new Date(iso);
+  return isNaN(dt.getTime()) ? '—' : formatDateTime(iso);
+}
+
+let tvId = '';          // الجهاز المفتوح
+let tvHandOn = false;   // مفتاح "تحويل/مشاركة"
+let tvMode = '';        // 'assist' = فني مساعد | 'full' = تسليم كامل
+
+function openTechDevice(id){
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  tvId = id; tvHandOn = false; tvMode = '';
+  renderTechDevice();
+  document.getElementById('techViewOverlay').classList.remove('hidden');
+}
+function closeTechDevice(){
+  tvId = ''; tvHandOn = false; tvMode = '';
+  const ov = document.getElementById('techViewOverlay');
+  if(ov) ov.classList.add('hidden');
+}
+
+// أسماء الفنيين المتاحين: من الأدوار المسجلة + من الأجهزة، من غير الفني الحالي
+function tvTechChoices(exclude){
+  const ex = (exclude || '').trim();
+  const fromRoles = Object.keys(userRoles)
+    .map(e => roleEntry(e))
+    .filter(x => x && x.role === 'technician' && x.techName)
+    .map(x => x.techName.trim());
+  const fromDevices = devices.map(d => (d.technician || '').trim()).filter(Boolean);
+  return [...new Set([...fromRoles, ...fromDevices])]
+    .filter(n => n && n !== ex)
+    .sort((a,b) => a.localeCompare(b, 'ar'));
+}
+
+function tvHandHtml(d){
+  if(!tvHandOn) return '';
+  const opts = tvTechChoices(d.technician);
+  return `<div class="tv-hand">
+    <div class="tv-block-head" style="font-size:13.5px;">${t('tv.pickTech')}</div>
+    <select id="tvTech" class="tv-sel" onchange="renderTvHand()">
+      <option value="">${t('tv.pickTechPh')}</option>
+      ${opts.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+    </select>
+    ${opts.length ? '' : `<div class="tv-hist-meta" style="margin-top:7px;">${t('tv.noTechs')}</div>`}
+    <div class="tv-block-head" style="font-size:13.5px;margin-top:14px;">${t('tv.modeHead')}</div>
+    <div class="tv-mode">
+      <button class="tv-mode-btn ${tvMode==='assist'?'sel':''}" onclick="tvSetMode('assist')">🤝 ${t('tv.modeAssist')}</button>
+      <button class="tv-mode-btn ${tvMode==='full'?'sel':''}" onclick="tvSetMode('full')">🔄 ${t('tv.modeFull')}</button>
+    </div>
+    <div class="tv-hist-meta" style="margin-top:8px;line-height:1.8;">
+      ${tvMode==='assist' ? t('tv.hintAssist') : tvMode==='full' ? t('tv.hintFull') : t('tv.hintPick')}
+    </div>
+    <button class="tv-ok" onclick="tvDoHandoff()" ${tvMode ? '' : 'disabled'}>${t('tv.confirm')}</button>
+  </div>`;
+}
+
+// تحديث جزء التحويل لوحده — عشان مسوّدة الملاحظة ما تضيعش
+function renderTvHand(){
+  const d = devices.find(x => x.id === tvId); if(!d) return;
+  const wrap = document.getElementById('tvHandWrap');
+  if(wrap) wrap.innerHTML = tvHandHtml(d);
+  const sw = document.getElementById('tvSw');
+  if(sw) sw.classList.toggle('on', tvHandOn);
+}
+function tvToggleHand(){ tvHandOn = !tvHandOn; if(!tvHandOn) tvMode = ''; renderTvHand(); }
+function tvSetMode(m){ tvMode = m; renderTvHand(); }
+
+function renderTechDevice(){
+  const d = devices.find(x => x.id === tvId);
+  const body = document.getElementById('techViewBody');
+  if(!d || !body) return;
+
+  const ttl = document.getElementById('tvTitle');
+  if(ttl) ttl.textContent = '📱 ' + [d.deviceType, d.model].filter(Boolean).join(' ');
+
+  const notes = [...(d.activityNotes || [])].reverse().slice(0, 20);
+  const s = statusInfo(d.status);
+
+  body.innerHTML = `
+    <div>
+      <div class="tv-row"><span class="tv-k">${t('tv.device')}</span>
+        <span class="tv-v">${esc([d.deviceType, d.model].filter(Boolean).join(' ')) || '—'}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.customer')}</span>
+        <span class="tv-v">${esc(d.customerName) || '—'}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.shop')}</span>
+        <span class="tv-v">${esc(d.shopName) || '—'}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.intake')}</span>
+        <span class="tv-v">${esc(tvDate(d.intakeDate))}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.status')}</span>
+        <span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span></div>
+      ${d.assistTechnician ? `<div class="tv-row"><span class="tv-k">${t('tv.assist')}</span>
+        <span class="tv-v">🤝 ${esc(d.assistTechnician)}</span></div>` : ''}
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-block-head">🛠️ ${t('tv.issue')}</div>
+      <div class="tv-issue">${d.reportedIssue ? esc(d.reportedIssue) : '—'}</div>
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-block-head">📝 ${t('tv.notesHead')}</div>
+      <textarea id="tvNote" class="tv-note" placeholder="${t('tv.notesPh')}"></textarea>
+      <button class="tv-ok" onclick="tvSubmitNote()">${t('tv.notesSave')}</button>
+      ${notes.length ? `<div class="tv-hist">${notes.map(n => `<div class="tv-hist-item">
+        ${esc(n.text)}
+        <div class="tv-hist-meta">${esc(n.by || '')}${n.role ? ' — ' + esc(n.role) : ''} · ${esc(tvDate(n.at))}</div>
+      </div>`).join('')}</div>` : ''}
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-toggle" onclick="tvToggleHand()">
+        <span class="tv-toggle-label">🔀 ${t('tv.handHead')}</span>
+        <span id="tvSw" class="tv-sw ${tvHandOn?'on':''}"></span>
+      </div>
+      <div id="tvHandWrap">${tvHandHtml(d)}</div>
+    </div>`;
+}
+
+// حفظ ملاحظة — بتتزاد على سجل الأنشطة زي أي ملاحظة تانية
+async function tvSubmitNote(){
+  const ta = document.getElementById('tvNote');
+  if(!ta) return;
+  const text = (ta.value || '').trim();
+  if(!text) return;
+  const note = { text, at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+  devices = devices.map(x => x.id === tvId
+    ? { ...x, activityNotes:[...(x.activityNotes||[]), note], lastModifiedAt:new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+  ta.value = '';
+  renderTechDevice();
+  render();
+  await persist();
+}
+
+// التحويل: مساعد (الأساسي فاضل زي ما هو) أو تسليم كامل (نقل المسؤولية)
+async function tvDoHandoff(){
+  const d = devices.find(x => x.id === tvId);
+  if(!d) return;
+  const target = (document.getElementById('tvTech')?.value || '').trim();
+  if(!target){ showError(t('tv.errNoTech')); return; }
+  if(!tvMode){ showError(t('tv.errNoMode')); return; }
+  showError('');
+
+  const from = (d.technician || '').trim();
+  let patchObj, noteText;
+
+  if(tvMode === 'assist'){
+    patchObj = { assistTechnician: target };
+    noteText = '🤝 ' + t('tv.logAssist', { name: target });
+  } else {
+    patchObj = { technician: target };
+    // لو المستلم كان هو المساعد، مبقاش مساعد — بقى الأساسي
+    if((d.assistTechnician || '').trim() === target) patchObj.assistTechnician = '';
+    noteText = '🔄 ' + t('tv.logFull', { from: from || '—', to: target });
+  }
+
+  const note = { text: noteText, at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+  devices = devices.map(x => x.id === tvId
+    ? { ...x, ...patchObj, activityNotes:[...(x.activityNotes||[]), note],
+        lastModifiedAt:new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+
+  const full = tvMode === 'full';
+  render();
+  await persist();
+
+  if(full){
+    // الجهاز مبقاش تحت مسؤوليته — نقفل ونطلّعه من القائمة
+    closeTechDevice();
+    tpFlash(t('tv.doneFull', { to: target }));
+  } else {
+    tvHandOn = false; tvMode = '';
+    renderTechDevice();
+    renderTechPortal();
+    tpFlash(t('tv.doneAssist', { to: target }));
+  }
 }
 
 function renderEmployeeView(query){
