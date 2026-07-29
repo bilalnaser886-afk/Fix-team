@@ -1,6 +1,10 @@
 // I Fix Team — Service Worker
 // الوظيفة: تخزين ملفات النظام على الجهاز عشان يفتح ويشتغل من غير نت
-const CACHE_NAME = 'ifixteam-v2';
+//
+// ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده في APP_SHELL تحت،
+//    وزوّد رقم الإصدار (v3 → v4). تعديل ملف موجود مش محتاج تزويد الرقم —
+//    ملفات الكود بتتقرا من النت الأول (شوف قسم fetch).
+const CACHE_NAME = 'ifixteam-v3';
 
 const APP_SHELL = [
   './',
@@ -9,8 +13,9 @@ const APP_SHELL = [
   'track.html',
   'admin.html',
   'checkout.html',
-  'i18n.js',
   'manifest.json',
+  'i18n.js',
+  'ai-invoice.js',
   'logo.jpg',
   'favicon.ico',
   'favicon-32.png',
@@ -23,7 +28,14 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
+      // reload = تجاهل كاش المتصفح نفسه وهات نسخة طازة من السيرفر.
+      // addAll بتفشل كلها لو ملف واحد مش موجود، فبنخزّن كل ملف لوحده
+      // عشان ملف ناقص ما يمنعش التثبيت كله.
+      .then(cache => Promise.all(
+        APP_SHELL.map(u =>
+          cache.add(new Request(u, { cache: 'reload' })).catch(() => {})
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });
@@ -46,32 +58,29 @@ self.addEventListener('fetch', (event) => {
   // طلبات Supabase (بيانات) متتخزنش أبداً — دي شغل طبقة الأوفلاين جوه التطبيق
   if(url.hostname.endsWith('.supabase.co')) return;
 
-  // صفحات HTML: النت الأول (عشان التحديثات توصل)، ولو مفيش نت → النسخة المخزنة
-  if(req.mode === 'navigate' || req.destination === 'document'){
+  const sameOrigin = url.origin === self.location.origin;
+  const isDocument = req.mode === 'navigate' || req.destination === 'document';
+  // ملفات الكود بتاعتنا (i18n.js / ai-invoice.js / أي css): أي تعديل لازم يوصل فوراً
+  const isAppCode = sameOrigin && /\.(js|css)$/i.test(url.pathname);
+
+  // صفحات HTML وملفات الكود: النت الأول (عشان التحديثات توصل)،
+  // ولو مفيش نت → النسخة المخزنة
+  if(isDocument || isAppCode){
     event.respondWith(
       fetch(req)
         .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(req, copy));
+          // ما نخزّنش رد بايظ (404 أو صفحة خطأ) فوق نسخة شغالة
+          if(res && res.status === 200){
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(req, copy));
+          }
           return res;
         })
         .catch(() =>
-          caches.match(req).then(hit => hit || caches.match('dashboard.html').then(d => d || caches.match('index.html')))
+          caches.match(req).then(hit => hit || (isDocument
+            ? caches.match('dashboard.html').then(d => d || caches.match('index.html'))
+            : undefined))
         )
-    );
-    return;
-  }
-
-  // ملفات JS بتاعتنا (زي i18n.js): النت الأول عشان تحديثات الترجمة والكود توصل فوراً
-  if(url.origin === self.location.origin && url.pathname.endsWith('.js')){
-    event.respondWith(
-      fetch(req)
-        .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(req, copy));
-          return res;
-        })
-        .catch(() => caches.match(req))
     );
     return;
   }

@@ -18,8 +18,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="i18n.js"></script>
+<!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
+<script src="ai-invoice.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#F3F5F7; --surface:#FFFFFF; --ink:#1A2332; --muted:#64748B;
@@ -137,6 +139,12 @@
   .card-shop{font-weight:700; color:#334155;}
   .card-issue{font-size:12px; color:#475569; background:#F8FAFC; border-radius:6px; padding:6px 8px;}
   .card-price{margin-top:6px; font-size:12px; font-family:monospace; color:var(--accent); font-weight:700;}
+  /* إخفاء الأسعار عن الأدوار اللي مش بتشوف فلوس (مسؤول الحركة / الفني) — بيتفعّل بكلاس no-money على body */
+  .no-money .card-price{display:none !important;}
+  .no-money .money-only{display:none !important;}
+  /* شارة "بانتظار الموافقة" على الكروت + بانر في التفاصيل */
+  .pending-appr-chip{margin-top:6px; font-size:11.5px; font-weight:800; color:#B45309; background:#FEF3C7; border:1px solid #FDE68A; border-radius:7px; padding:4px 8px; display:inline-block; line-height:1.5;}
+  .pending-appr-banner{font-size:13.5px; font-weight:800; color:#92400E; background:#FEF3C7; border:1px solid #FCD34D; border-radius:10px; padding:11px 13px; margin:0 0 12px; line-height:1.7;}
   .card-tech{font-size:11px; color:#475569; margin-top:6px; display:flex; align-items:center; gap:4px;}
   .card-tech::before{content:"🔧"; font-size:10px;}
   .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
@@ -380,6 +388,54 @@
   .acc-nums{display:flex; gap:16px; align-items:center; font-size:13.5px; color:#475569; flex-wrap:wrap;}
   .acc-toolbar{display:flex; gap:8px; padding:0 18px 4px; justify-content:flex-end; flex-wrap:wrap;}
   .acc-entries{padding:6px 18px 14px;}
+
+  /* ===== مبدّل طريقة العرض (قائمة / مربعات صغيرة / مربعات كبيرة) ===== */
+  .acc-viewbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px;}
+  .acc-viewbar-label{font-size:12.5px; font-weight:700; color:#64748B;}
+  .acc-viewbtns{display:inline-flex; background:#fff; border:1px solid #E3E4E8; border-radius:12px; padding:3px; gap:2px; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .acc-viewbtn{
+    display:inline-flex; align-items:center; gap:6px; border:none; background:none; cursor:pointer;
+    font-family:inherit; font-size:13px; font-weight:700; color:#475569;
+    padding:8px 12px; border-radius:9px; transition:background .15s, color .15s; white-space:nowrap;
+  }
+  .acc-viewbtn .acc-viewbtn-ic{font-size:15px; line-height:1;}
+  .acc-viewbtn:hover{background:#F1F5F9;}
+  .acc-viewbtn.active{background:#E8321E; color:#fff; box-shadow:0 4px 12px rgba(232,50,30,.28);}
+  .acc-viewbtn.active:hover{background:#E8321E;}
+
+  /* شبكات المربعات */
+  .acc-grid-small{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px;}
+  .acc-grid-large{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:16px;}
+
+  /* كارت عام */
+  .acc-card{
+    background:#fff; border:1px solid #EEF0F3; border-radius:14px; text-align:right;
+    box-shadow:0 2px 8px rgba(16,16,20,.04);
+    transition:transform .12s, box-shadow .12s, border-color .12s; font-family:inherit;
+  }
+  .acc-card:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(16,16,20,.10); border-color:#E2E8F0;}
+
+  /* كارت صغير: اسم + متبقّي بارز */
+  .acc-card-sm{display:flex; flex-direction:column; gap:6px; align-items:flex-start; width:100%; cursor:pointer; padding:14px;}
+  .acc-card-sm .acc-card-name{
+    font-weight:800; font-size:14px; color:var(--ink); line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .acc-card-sm .acc-card-bal{font-family:'Cairo',sans-serif; font-weight:900; font-size:19px;}
+  .acc-card-sm .acc-card-bal small{font-size:11px; font-weight:700;}
+
+  /* كارت كبير: رأس باسم + إجراء، وجسم بالأرقام */
+  .acc-card-lg{display:flex; flex-direction:column; overflow:hidden;}
+  .acc-card-lg-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; border-bottom:1px solid #F1F5F9;}
+  .acc-card-open{flex:1; min-width:0; background:none; border:none; cursor:pointer; text-align:right; font-family:inherit; padding:0;}
+  .acc-card-open span{font-weight:800; font-size:16px; color:var(--ink); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-card-print{flex:none; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:9px; cursor:pointer; font-size:15px; padding:6px 9px; line-height:1;}
+  .acc-card-print:hover{background:#FEF2F2; border-color:#FECACA;}
+  .acc-card-lg-body{padding:12px 16px 16px; cursor:pointer;}
+  .acc-card-row{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; color:#475569; padding:4px 0;}
+  .acc-card-row b{font-size:15px; color:#334155;}
+  .acc-card-bal-badge{display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13px; font-weight:700;}
+  .acc-card-bal-badge b{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;}
   .acc-entry{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     border:1px solid #F1F5F9; border-radius:10px; padding:11px 13px; margin-bottom:8px; font-size:14px;
@@ -760,6 +816,20 @@
         <button class="acc-mini-btn" style="margin-top:12px; color:#B45309; border-color:#FDE68A;" data-i18n="acc.openingBalance" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
       </div>
       <div class="modal-search" style="margin-top:10px;"><input id="accSearch" oninput="renderAccounts()" data-i18n-ph="search.accounts.ph" placeholder="ابحث باسم المحل..." /></div>
+      <div id="accViewBar" class="acc-viewbar">
+        <span class="acc-viewbar-label" data-i18n="acc.viewMode">طريقة العرض</span>
+        <div class="acc-viewbtns">
+          <button type="button" class="acc-viewbtn" data-mode="list" onclick="setAccViewMode('list')">
+            <span class="acc-viewbtn-ic">📜</span><span data-i18n="acc.viewList">قائمة تفصيلية</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-small" onclick="setAccViewMode('grid-small')">
+            <span class="acc-viewbtn-ic">🔲</span><span data-i18n="acc.viewSmall">مربعات صغيرة</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-large" onclick="setAccViewMode('grid-large')">
+            <span class="acc-viewbtn-ic">🔳</span><span data-i18n="acc.viewLarge">مربعات كبيرة</span>
+          </button>
+        </div>
+      </div>
     </div>
     <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
@@ -832,12 +902,23 @@ async function saveSystemConfig(){
 function isAdmin(){ return isSuperAdmin(); }
 
 // ============================================================
-// أدوار المستخدمين: Super Admin مقابل محاسب
+// أدوار المستخدمين
+// ------------------------------------------------------------
+// أربع أدوار:
+//   super_admin  مالك النظام — كل حاجة + أدوات النظام + لوحة الأدمن
+//   accountant   محاسب       — الشغل اليومي والفلوس والاعتمادات (الافتراضي)
+//   dispatcher   مسؤول الحركة — استلام وتسليم وإرجاع الأجهزة
+//   technician   فني          — أجهزته هو بس
+//
+// التوافق مع القديم مضمون: الشكل { "email": "super_admin" } لسه شغال زي ما هو.
+// والشكل الجديد بيسمح بربط اسم الفني بحسابه:
+//     { "email": { "role": "technician", "techName": "محمد" } }
 // ============================================================
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-let userRoles = {};   // { "email": "super_admin" }
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician'];
+let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
   try{
@@ -848,19 +929,63 @@ async function loadUserRoles(){
 async function saveUserRoles(){
   try{ await window.storage.set(ROLES_KEY, JSON.stringify(userRoles)); }catch(e){}
 }
-function isSuperAdmin(){
-  if(!ADMIN_EMAIL_SET) return true;   // وضع آمن: الإعداد لسه ماتعملش
-  const e = (currentUser.email || '').toLowerCase();
-  if(!e) return false;
-  if(ADMIN_EMAILS.includes(e)) return true;
-  return userRoles[e] === 'super_admin';
-}
-function currentRoleLabel(){ return isSuperAdmin() ? 'Super Admin' : 'محاسب'; }
 
-// بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن المحاسب
+// بيقرا الشكلين — النص القديم والكائن الجديد
+function roleEntry(email){
+  const v = userRoles[(email || '').toLowerCase()];
+  if(typeof v === 'string') return { role: v, techName: '' };
+  if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '' };
+  return null;
+}
+
+function roleOf(email){
+  if(!ADMIN_EMAIL_SET) return 'super_admin';   // وضع آمن: الإعداد لسه ماتعملش
+  const e = (email || '').toLowerCase();
+  if(!e) return 'accountant';
+  if(ADMIN_EMAILS.includes(e)) return 'super_admin';
+  const en = roleEntry(e);
+  return (en && ROLES.includes(en.role)) ? en.role : 'accountant';
+}
+
+function myRole(){ return roleOf(currentUser.email); }
+function isSuperAdmin(){ return myRole() === 'super_admin'; }
+function isAccountant(){ return myRole() === 'accountant'; }
+function isDispatcher(){ return myRole() === 'dispatcher'; }
+function isTechnician(){ return myRole() === 'technician'; }
+
+// الأسعار والأرباح والملخص المالي
+function canSeeMoney(){ const r = myRole(); return r === 'super_admin' || r === 'accountant'; }
+// اعتماد طلبات مسؤول الحركة (قبول / رفض)
+function canApprove(){ return canSeeMoney(); }
+
+// اسم الفني المربوط بالحساب — بيستخدم في بوابة الفني
+function myTechName(){
+  const en = roleEntry(currentUser.email);
+  return (en && en.techName) || currentUser.name || '';
+}
+
+const ROLE_LABEL_KEYS = {
+  super_admin: 'adm.roleSuper',
+  accountant:  'adm.roleAcc',
+  dispatcher:  'adm.roleDisp',
+  technician:  'adm.roleTech'
+};
+function roleLabel(r){
+  const k = ROLE_LABEL_KEYS[r];
+  try{ return k ? t(k) : r; }catch(e){ return r; }
+}
+function currentRoleLabel(){ return roleLabel(myRole()); }
+
+// بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن غير الـ Super Admin،
+// وبيحط كلاس بالدور على body عشان الـ CSS يقدر يخفي حاجات حسب الدور
 function applyRoleVisibility(){
   const wrap = document.getElementById('backupWrap');
   if(wrap) wrap.style.display = isSuperAdmin() ? '' : 'none';
+  try{
+    ROLES.forEach(r => document.body.classList.remove('role-' + r));
+    document.body.classList.add('role-' + myRole());
+    document.body.classList.toggle('no-money', !canSeeMoney());
+  }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
 }
 
@@ -1903,6 +2028,7 @@ function cardHtml(d, s){
     ${d.technician ? `<div class="card-tech">${esc(d.technician)}</div>` : ''}
     ${d.agreedPrice ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
+    ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
   </div>`;
 }
 
@@ -2334,11 +2460,13 @@ function renderDetail(){
       <button class="close-btn" onclick="closeDetail()">×</button>
     </div>
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
+    ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
       <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}" onblur="editField('shopName', this.value)" /></label>
     </div>
+    <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
     ${(parseInt(d.agreedPrice)||0) > 0 && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
@@ -2370,6 +2498,7 @@ function renderDetail(){
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
+    </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
     <label class="field"><span>${t('det.issue')}</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
 
@@ -2643,9 +2772,57 @@ async function assignTechnician(value){
   await persist();
 }
 
+// ============================================================
+// سير موافقة مسؤول الحركة على التسليم والإرجاع (الخطوة ٢)
+// مسؤول الحركة بيطلب، والتغيير ما يتنفذش لحد ما المحاسب/الإدارة يوافقوا
+// (قسم الاعتمادات — الخطوة ٣ اللي جاية).
+// ============================================================
+// التغييرات اللي محتاجة موافقة لو اللي عملها مسؤول حركة
+const APPROVAL_STATUSES = ['delivered', 'returned'];
+
+// نص شارة "بانتظار الموافقة" حسب نوع الطلب (فاضي لو مفيش طلب معلّق)
+function pendingApprovalText(d){
+  if(!d || !d.pendingApproval || d.pendingApproval.status !== 'pending') return '';
+  return d.pendingApproval.type === 'return' ? t('appr.badgeReturn') : t('appr.badgeHandover');
+}
+
+// تسجيل طلب اعتماد معلّق على الجهاز بدل تنفيذ التغيير على طول
+async function requestApproval(type, newStatus, paymentChoice){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  // ممنوع أكتر من طلب معلّق على نفس الجهاز في نفس الوقت
+  if(d.pendingApproval && d.pendingApproval.status === 'pending'){
+    showError(t('appr.alreadyPending'));
+    renderDetail();
+    return;
+  }
+  const req = {
+    id: 'apr_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    type,                                                 // 'handover' | 'return'
+    requestedBy: currentUser.name,
+    requestedByEmail: currentUser.email || '',
+    requestedAt: new Date().toISOString(),
+    payload: { status: newStatus, paymentChoice: paymentChoice || null },   // التغيير المطلوب
+    status: 'pending',                                    // pending | approved | rejected
+    decidedBy: null, decidedAt: null, reason: null
+  };
+  showError('');
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, pendingApproval: req, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+  renderDetail();
+  render();
+  await persist();
+}
+
 async function changeStatus(newStatus, paymentChoice){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
+
+  // مسؤول الحركة: التسليم/الإرجاع بيتحوّلوا لطلب معلّق بدل تنفيذ فوري
+  if(isDispatcher() && APPROVAL_STATUSES.includes(newStatus)){
+    return requestApproval(newStatus === 'delivered' ? 'handover' : 'return', newStatus, paymentChoice);
+  }
 
   if(d.status === 'waiting' && !['waiting','rejected','returned'].includes(newStatus) && !d.technician){
     showError(t('msg.needTech'));
@@ -2910,6 +3087,7 @@ function dayCardHtml(d){
     <div class="day-card-title">${esc(d.deviceType)} ${esc(d.model)}</div>
     <div class="day-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
     ${badge}
+    ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
     ${lock}
   </div>`;
 }
@@ -3201,6 +3379,15 @@ function grabQrDataUrl(){
 const PRINT_AGENT_URL = 'http://localhost:9123';
 const PX_PER_MM = 8;   // ≈203 نقطة/بوصة وهو دقة طابعات الليبل الحرارية
 
+// بنرسم الليبل بـ3 أضعاف الدقة وبعدين نصغّره — الرسام بياخد راحته في
+// تشكيل الحروف العربية والنتيجة أنضف بكتير من الرسم على المقاس النهائي.
+const LABEL_SS = 4;
+// الطابعة الحرارية بتطبع أسود أو أبيض بس، مبتعرفش رمادي. لو سبنا لها
+// الحواف الرمادية بتحوّلها نقط متفرقة والكلام بيطلع مغبّش — فبنحسمها
+// إحنا: أي بكسل أغمق من الحد ده يبقى أسود صافي، وغير كده أبيض صافي.
+// لو الخط طلع رفيع زوّد الرقم شوية (0.70)، ولو طلع تخين قلّله (0.55).
+const INK_THRESHOLD = 0.62;
+
 function loadImg(src){
   return new Promise((res, rej) => {
     if(!src) return res(null);
@@ -3211,67 +3398,178 @@ function loadImg(src){
   });
 }
 
+// بيتأكد إن خط Tajawal اتحمّل فعلاً قبل الرسم. لو رسمنا والخط لسه
+// جاي من النت، الكانفس بيقع على خط احتياطي وشكل العربي بيبوظ.
+async function ensureLabelFont(){
+  if(!document.fonts || !document.fonts.load) return;
+  try{
+    await Promise.all([
+      document.fonts.load('700 20px Cairo'),
+      document.fonts.load('900 20px Cairo'),
+      document.fonts.load('500 20px Tajawal'),
+      document.fonts.load('700 20px Tajawal')
+    ]);
+    await document.fonts.ready;
+  }catch(e){}
+}
+
+// كود QR بدقة عالية مخصوص للطباعة. الكود اللي في المعاينة 110 بكسل بس،
+// وتصغيره لمقاس الليبل بيخبط حواف المربعات ويصعّب القراءة.
+async function hiResQr(text, px){
+  if(!window.QRCode || !text) return null;
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:-9999px;top:0;visibility:hidden;';
+  document.body.appendChild(box);
+  try{
+    new QRCode(box, { text:String(text), width:px, height:px, correctLevel:QRCode.CorrectLevel.M });
+    await new Promise(r => setTimeout(r, 80));
+    const cv = box.querySelector('canvas');
+    if(cv) return cv.toDataURL('image/png');
+    const im = box.querySelector('img');
+    return (im && im.src) ? im.src : null;
+  }catch(e){ return null; }
+  finally{ box.remove(); }
+}
+
 // بيرسم نفس محتوى الليبل على canvas ويرجّع صورة PNG
+// ⚠️ التخطيط هنا لازم يفضل مطابق لـ browserPrintLabel() بالظبط:
+//    الكود على اليمين والنصوص على الشمال، نفس الخطوط ونفس المقاسات.
+//    أي تعديل في الاتنين لازم يتعمل في التاني.
 async function renderLabelImage(d, sz, qrDataUrl){
+  await ensureLabelFont();
+
+  const S = LABEL_SS;
   const W = Math.round(sz.w * PX_PER_MM), H = Math.round(sz.h * PX_PER_MM);
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const x = c.getContext('2d');
-  x.fillStyle = '#fff'; x.fillRect(0,0,W,H);
-  x.fillStyle = '#000';
-  x.direction = 'rtl';
-  x.textBaseline = 'top';
+  const mm = v => v * PX_PER_MM;                 // مليمتر → بكسل
 
-  const pad = Math.max(6, Math.round(H * 0.045));
+  // نفس معادلات المقاسات الموجودة في browserPrintLabel بالحرف
   const cond = (d.conditionNotes || '').trim();
-  const condH = cond ? Math.round(H * 0.20) : 0;
-  const topH = H - condH - pad;
+  const k    = cond ? 0.90 : 1;
+  const padMm = Math.max(0.8, sz.h * 0.045);
+  const pad   = mm(padMm);
+  const qrSz  = mm(Math.min(sz.h * 0.62, sz.w * 0.32));
+  const fShop  = mm(Math.max(2.2, sz.h * 0.148 * k));
+  const fCust  = mm(Math.max(1.9, sz.h * 0.122 * k));
+  const fDev   = mm(Math.max(1.9, sz.h * 0.122 * k));
+  const fIssue = mm(Math.max(1.7, sz.h * 0.100 * k));
+  const fDate  = mm(Math.max(1.5, sz.h * 0.090 * k));
+  const fBrand = mm(Math.max(1.4, sz.h * 0.088 * k));
 
-  // عمود الكود على الشمال
-  const qrSide = Math.min(Math.round(topH * 0.62), Math.round(W * 0.32));
-  const qrImg = await loadImg(qrDataUrl);
-  if(qrImg) x.drawImage(qrImg, pad, pad, qrSide, qrSide);
-  x.font = `700 ${Math.max(7, Math.round(H*0.075))}px Tajawal, sans-serif`;
-  x.direction = 'ltr'; x.textAlign = 'center';
-  x.fillText('I FIX TEAM', pad + qrSide/2, pad + qrSide + Math.round(H*0.015), qrSide);
-
-  // النصوص على اليمين
-  x.direction = 'rtl'; x.textAlign = 'right';
-  const rx = W - pad;                       // حافة اليمين
-  const availW = W - (pad*3) - qrSide;      // العرض المتاح للنص
-  let y = pad;
-  const line = (txt, size, weight, gap) => {
-    if(!txt) return;
-    x.font = `${weight} ${size}px Tajawal, sans-serif`;
-    x.fillText(String(txt), rx, y, availW);
-    y += size + (gap || Math.round(H*0.012));
-  };
-  const k = cond ? 0.90 : 1;
-  line(d.shopName || '',                        Math.max(9, Math.round(H*0.148*k)), 800);
-  line(d.customerName || '',                    Math.max(8, Math.round(H*0.122*k)), 700);
-  line(`${d.deviceType||''} ${d.model||''}`.trim(), Math.max(8, Math.round(H*0.122*k)), 700);
-  if(d.reportedIssue) line(d.reportedIssue,     Math.max(7, Math.round(H*0.100*k)), 500);
-  line(shortDateTime(d.intakeDate),             Math.max(6, Math.round(H*0.090*k)), 500);
-
-  // شريط حالة الجهاز تحت
+  const stripWmm = sz.w - (padMm * 2);
+  const stripHmm = Math.max(2.6, sz.h * 0.20);
+  let fCond = 0;
   if(cond){
-    const by = H - condH;
-    x.fillStyle = '#000'; x.fillRect(pad, by, W - pad*2, 1);
-    const fs = Math.max(6, Math.min(Math.round(H*0.078), Math.round(Math.sqrt(((W-pad*2)*condH)/(cond.length*0.6*1.3)))));
-    x.font = `500 ${fs}px Tajawal, sans-serif`;
-    x.textAlign = 'center'; x.direction = 'rtl';
-    // نلف النص على أكتر من سطر لو طويل
-    const words = cond.split(/\s+/); let ln = ''; let ly = by + Math.round(fs*0.35);
+    const ideal = Math.sqrt((stripWmm * stripHmm) / (cond.length * 0.52 * 1.25));
+    fCond = mm(Math.min(sz.h * 0.078, Math.max(0.95, ideal)));
+  }
+
+  // نرسم بـ3 أضعاف الدقة، والتصغير والحسم بيحصلوا في الآخر
+  const c = document.createElement('canvas');
+  c.width = W * S; c.height = H * S;
+  const x = c.getContext('2d');
+  x.scale(S, S);
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#000';
+  x.textBaseline = 'middle';
+
+  const setFont = (weight, size, fam) => { x.font = `${weight} ${size}px ${fam}, sans-serif`; };
+  // قص النص بثلاث نقط — نفس شغل text-overflow:ellipsis
+  const fit = (txt, maxW) => {
+    if(!txt) return '';
+    if(x.measureText(txt).width <= maxW) return txt;
+    let out = String(txt);
+    while(out.length > 1 && x.measureText(out + '…').width > maxW) out = out.slice(0, -1);
+    return out + '…';
+  };
+
+  // ============ شريط حالة الجهاز تحت ============
+  const condMargin = mm(sz.h * 0.012);
+  const condPadTop = mm(sz.h * 0.012);
+  const condBorder = Math.max(1, Math.round(mm(0.18)));
+  let topBottom = H - pad;
+
+  if(cond){
+    setFont(700, fCond, 'Tajawal');
+    x.direction = 'rtl'; x.textAlign = 'right';
+    const lineH = fCond * 1.25;
+    const maxW  = W - pad * 2;
+    const words = cond.split(/\s+/);
+    const lines = [];
+    let ln = '';
     for(const wd of words){
       const test = ln ? ln + ' ' + wd : wd;
-      if(x.measureText(test).width > (W - pad*2) && ln){
-        x.fillText(ln, W/2, ly, W - pad*2); ly += fs*1.15; ln = wd;
-        if(ly > H - fs) break;
-      } else ln = test;
+      if(x.measureText(test).width > maxW && ln){ lines.push(ln); ln = wd; }
+      else ln = test;
     }
-    if(ln && ly <= H - fs*0.6) x.fillText(ln, W/2, ly, W - pad*2);
+    if(ln) lines.push(ln);
+    const room = mm(stripHmm) - condBorder - condPadTop;
+    const shown = lines.slice(0, Math.max(1, Math.floor(room / lineH)));
+    const blockH = condBorder + condPadTop + shown.length * lineH;
+    const bTop = H - pad - blockH;
+
+    x.fillRect(pad, bTop, W - pad * 2, condBorder);
+    let ly = bTop + condBorder + condPadTop;
+    for(const l of shown){ x.fillText(l, W - pad, ly + lineH / 2); ly += lineH; }
+    topBottom = bTop - condMargin;
   }
-  return c.toDataURL('image/png');
+
+  // ============ الجزء العلوي — الكل متمركز رأسياً ============
+  const topMid = (pad + topBottom) / 2;
+
+  // عمود الكود على اليمين
+  const brandMargin = mm(sz.h * 0.022);
+  const qrBoxH = qrSz + brandMargin + fBrand;
+  const qrX = W - pad - qrSz;
+  const qrY = topMid - qrBoxH / 2;
+  const qrImg = await loadImg((await hiResQr(d.id, Math.round(qrSz) * S * 2)) || qrDataUrl);
+  if(qrImg) x.drawImage(qrImg, qrX, qrY, qrSz, qrSz);
+  setFont(900, fBrand, 'Cairo');
+  x.direction = 'ltr'; x.textAlign = 'center';
+  try{ x.letterSpacing = mm(0.15).toFixed(2) + 'px'; }catch(e){}
+  x.fillText('I FIX TEAM', qrX + qrSz / 2, qrY + qrSz + brandMargin + fBrand / 2);
+  try{ x.letterSpacing = '0px'; }catch(e){}
+
+  // النصوص على الشمال (المسافة بين العمودين = نفس الحشو)
+  const infoR = W - pad - qrSz - pad;
+  const infoW = infoR - pad;
+  const rows = [
+    { t: d.shopName || '',                            f: fShop,  w: 900, fam: 'Cairo' },
+    { t: d.customerName || '',                        f: fCust,  w: 700, fam: 'Cairo' },
+    { t: `${d.deviceType||''} ${d.model||''}`.trim(), f: fDev,   w: 700, fam: 'Cairo' }
+  ];
+  if(d.reportedIssue) rows.push({ t: d.reportedIssue, f: fIssue, w: 700, fam: 'Tajawal' });
+  rows.push({ t: shortDateTime(d.intakeDate), f: fDate, w: 700, fam: 'Tajawal', ltr: true });
+
+  const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);
+  let ry = topMid - infoH / 2;
+  x.textAlign = 'right';
+  for(const r of rows){
+    const lineH = r.f * 1.3;
+    setFont(r.w, r.f, r.fam);
+    x.direction = r.ltr ? 'ltr' : 'rtl';       // التاريخ بيتكتب من الشمال لليمين
+    if(r.t) x.fillText(fit(r.t, infoW), infoR, ry + lineH / 2);
+    ry += lineH;
+  }
+
+  // ============ التصغير لدقة الطابعة + حسم الرمادي ============
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const o = out.getContext('2d');
+  o.fillStyle = '#fff'; o.fillRect(0, 0, W, H);
+  o.imageSmoothingEnabled = true;
+  o.imageSmoothingQuality = 'high';
+  o.drawImage(c, 0, 0, W, H);
+
+  try{
+    const id = o.getImageData(0, 0, W, H), p = id.data, th = INK_THRESHOLD * 255;
+    for(let i = 0; i < p.length; i += 4){
+      const v = (p[i]*0.299 + p[i+1]*0.587 + p[i+2]*0.114) < th ? 0 : 255;
+      p[i] = p[i+1] = p[i+2] = v; p[i+3] = 255;
+    }
+    o.putImageData(id, 0, 0);
+  }catch(e){ /* لو المتصفح منع قراءة الكانفس، بنطبع من غير الحسم */ }
+
+  return out.toDataURL('image/png');
 }
 
 // بيحاول يطبع صامت عبر الوكيل المحلي (لو على نفس الكمبيوتر)؛ بيرجّع true لو نجح
@@ -3945,6 +4243,9 @@ function openAccounts(){
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   clearSearchBox('accSearch');
+  // نرجّع طريقة العرض المحفوظة (بعد أي فتح كشف مؤقت حوّلها لقائمة)
+  try{ const v = localStorage.getItem(ACC_VIEW_KEY); if(ACC_VIEW_MODES.includes(v)) accViewMode = v; }catch(e){}
+  syncAccViewButtons();
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
 }
@@ -4044,7 +4345,7 @@ function accShopBlockHtml(n, s){
     </div>
     <div class="acc-entries">${sortedDesc.map(e => accEntryHtml(e) + (starts.has(e.id) ? cycleDivider(e) : '')).join('')}</div>`;
 
-  return `<div class="acc-shop">
+  return `<div class="acc-shop" data-accshop="${esc(n)}">
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
       <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}</span>
       <span class="acc-nums">
@@ -4081,12 +4382,19 @@ function renderAccounts(){
   const _scroller = document.getElementById('accountsOverlay');
   const _y = _scroller ? _scroller.scrollTop : 0;
 
+  // رسم عناصر المجموعة حسب طريقة العرض المختارة — البحث بيتفلتر قبل هنا فبيسري على الأنواع الـ3
+  const groupItems = (list) => {
+    if(accViewMode === 'grid-small') return `<div class="acc-grid-small">${list.map(n => accShopCardSmall(n, shops[n])).join('')}</div>`;
+    if(accViewMode === 'grid-large') return `<div class="acc-grid-large">${list.map(n => accShopCardLarge(n, shops[n])).join('')}</div>`;
+    return list.map(n => accShopBlockHtml(n, shops[n])).join('');
+  };
+
   const groupHtml = (title, bg, fg, key, list) => `
     <div style="margin-bottom:14px;">
       <button onclick="toggleAccGroup('${key}')" style="width:100%; display:flex; justify-content:space-between; align-items:center; background:${bg}; color:${fg}; border:none; border-radius:12px; padding:14px 16px; font-family:inherit; font-weight:800; font-size:15px; cursor:pointer;">
         <span>${title} (${list.length})</span><span>${accGroupOpen[key] ? '▲' : '▼'}</span>
       </button>
-      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? list.map(n => accShopBlockHtml(n, shops[n])).join('') : `<div class="empty-col">${t('acc.none')}</div>`}</div>` : ''}
+      ${accGroupOpen[key] ? `<div style="margin-top:10px;">${list.length ? groupItems(list) : `<div class="empty-col">${t('acc.none')}</div>`}</div>` : ''}
     </div>`;
 
   document.getElementById('accountsBody').innerHTML = `
@@ -4098,6 +4406,81 @@ function renderAccounts(){
     ${groupHtml('✅ ' + t('acc.groupPaid'), '#F0FDF4', '#166534', 'paid', paidNames)}
   `;
   if(_scroller) _scroller.scrollTop = _y;
+}
+
+// ============================================================
+// طريقة عرض الحسابات: قائمة تفصيلية / مربعات صغيرة / مربعات كبيرة
+// التفضيل بيتحفظ لكل جهاز في localStorage — إضافي بالكامل، مش بيمس بيانات أو سكيمة
+// ============================================================
+const ACC_VIEW_KEY = 'store_accounts_view_mode';
+const ACC_VIEW_MODES = ['list', 'grid-small', 'grid-large'];
+let accViewMode = (function(){
+  try{ const v = localStorage.getItem(ACC_VIEW_KEY); return ACC_VIEW_MODES.includes(v) ? v : 'list'; }
+  catch(e){ return 'list'; }
+})();
+
+// تلوين الزر الفعّال في المبدّل حسب الوضع الحالي
+function syncAccViewButtons(){
+  document.querySelectorAll('#accViewBar .acc-viewbtn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-mode') === accViewMode);
+  });
+}
+
+// تغيير الوضع من أزرار المبدّل — بيحفظ التفضيل ويعيد الرسم
+function setAccViewMode(mode){
+  if(!ACC_VIEW_MODES.includes(mode)) mode = 'list';
+  accViewMode = mode;
+  try{ localStorage.setItem(ACC_VIEW_KEY, mode); }catch(e){}
+  syncAccViewButtons();
+  renderAccounts();
+}
+
+// فتح كشف المحل بالكامل من كارت (صغير/كبير): بيعرض القائمة ويفتح الأكورديون ويمرّر ليه
+// ملحوظة: بيحوّل العرض لقائمة وقتياً بس من غير ما يغيّر التفضيل المحفوظ
+function openShopFromCard(name){
+  accOpenShop = name;
+  accGroupOpen.open = true;
+  accGroupOpen.paid = true;   // نتأكد إن المجموعة اللي فيها المحل مفتوحة
+  accViewMode = 'list';
+  syncAccViewButtons();
+  renderAccounts();
+  requestAnimationFrame(() => {
+    const el = Array.from(document.querySelectorAll('#accountsBody [data-accshop]'))
+      .find(x => x.getAttribute('data-accshop') === name);
+    if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+}
+
+// كارت صغير: اسم المحل + المتبقّي بارز — للمسح البصري السريع
+function accShopCardSmall(n, s){
+  const balance = s.balance;
+  const safe = esc(n).replace(/'/g,"\\'");
+  const balColor = balance > 0 ? '#DC2626' : '#16A34A';
+  return `<button type="button" class="acc-card acc-card-sm" data-accshop="${esc(n)}" onclick="openShopFromCard('${safe}')">
+    <span class="acc-card-name">🏪 ${esc(n)}</span>
+    <span class="acc-card-bal" style="color:${balColor};">${balance.toLocaleString('en-EG')}<small> ${t('acc.egp')}</small></span>
+  </button>`;
+}
+
+// كارت كبير: رأس (اسم + طباعة كشف) وجسم (عليه / مدفوع-خصم / المتبقّي كشارة)
+function accShopCardLarge(n, s){
+  const balance = s.balance;
+  const safe = esc(n).replace(/'/g,"\\'");
+  const balColor = balance > 0 ? '#DC2626' : '#16A34A';
+  const balBg = balance > 0 ? '#FEF2F2' : '#F0FDF4';
+  return `<div class="acc-card acc-card-lg" data-accshop="${esc(n)}">
+    <div class="acc-card-lg-head">
+      <button type="button" class="acc-card-open" onclick="openShopFromCard('${safe}')"><span>🏪 ${esc(n)}</span></button>
+      <button type="button" class="acc-card-print" title="${t('acc.printPdf')}" onclick="event.stopPropagation(); exportShopPdf('${safe}')">🖨️</button>
+    </div>
+    <div class="acc-card-lg-body" onclick="openShopFromCard('${safe}')">
+      <div class="acc-card-row"><span>${t('acc.owed')}</span><b>${s.owed.toLocaleString('en-EG')}</b></div>
+      <div class="acc-card-row"><span>${t('acc.paidDisc')}</span><b style="color:#16A34A;">${s.paid.toLocaleString('en-EG')}</b></div>
+      <div class="acc-card-bal-badge" style="background:${balBg}; color:${balColor};">
+        <span>${t('acc.remaining')}</span><b>${balance.toLocaleString('en-EG')} ${t('acc.egp')}</b>
+      </div>
+    </div>
+  </div>`;
 }
 
 // إضافة خصم كحركة مالية مستقلة
