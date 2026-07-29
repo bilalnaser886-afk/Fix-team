@@ -355,11 +355,34 @@
     const model = [d.deviceType, d.model].filter(Boolean).join(' ').trim();
     return '#' + ticketNo(d) + (d.customerName ? ' — ' + d.customerName : '') + (model ? ' — ' + model : '');
   }
+  // ============================================================
+  // ⚠️ الوصول لمتغيرات الداشبورد العامة
+  // ------------------------------------------------------------
+  // في dashboard.html المتغيرات دي معرّفة بـ let:
+  //     let devices = [];   let selectedId = null;   let currentUser = {...}
+  // والمتغيّر المعرّف بـ let مش بيتعلّق على window — ده سلوك جافاسكريبت نفسها
+  // مش غلط في الداشبورد. يعني window.devices بترجع undefined دايماً، وأي
+  // كود بيعتمد عليها بيفشل بصمت (زي قسم قطع الغيار في شاشة الجهاز).
+  // بس الاسم متاح في النطاق العام المشترك، فبنقراه كاسم مجرد.
+  // ============================================================
+  function allDevices() {
+    try { if (typeof devices !== 'undefined' && Array.isArray(devices)) return devices; } catch (e) {}
+    return Array.isArray(window.devices) ? window.devices : [];
+  }
+  function openDeviceId() {
+    try { if (typeof selectedId !== 'undefined' && selectedId) return selectedId; } catch (e) {}
+    return window.selectedId || null;
+  }
+  function meName() {
+    try { if (typeof currentUser !== 'undefined' && currentUser) return currentUser.name || ''; } catch (e) {}
+    return (window.currentUser && window.currentUser.name) || '';
+  }
+
   function deviceById(id) {
-    try { return (window.devices || []).find(d => d.id === id) || null; } catch (e) { return null; }
+    try { return allDevices().find(d => d.id === id) || null; } catch (e) { return null; }
   }
   function searchDevices(q, limit) {
-    const list = window.devices || [];
+    const list = allDevices();
     const s = String(q || '').trim().toLowerCase();
     if (!s) return [];
     const cap = limit || CFG.deviceSearchLimit;
@@ -388,8 +411,8 @@
       </div>`;
     }
     const q = chosen.devQuery || '';
-    // نتايج البحث في حاوية منفصلة بمعرّف خاص — عشان نحدّثها لوحدها
-    // من غير ما نلمس خانة الكتابة (اللمس بيقفل الكيبورد على الموبايل).
+    // النتايج في حاوية منفصلة — عشان نحدّثها لوحدها من غير ما نلمس
+    // خانة الكتابة (لمسها بيقفل الكيبورد على الموبايل)
     return `<div class="dsrch" id="${domId}">
       <input class="dsrch-inp" value="${esc(q)}" placeholder="${esc(T('dsrch.ph'))}"
              oninput="${onQuery}" autocomplete="off" />
@@ -1003,7 +1026,7 @@
   }
 
   // خانة البحث بتفضل برّه الحاويتين اللي بيتحدّثوا مع كل حرف —
-  // لو اتعادت هي كمان، المتصفح بيفقد التركيز والكيبورد بتقفل.
+  // لو اتعادت هي كمان، المتصفح بيفقد التركيز والكيبورد بتقفل
   function listHtml() {
     return `
       <h3 class="inv-section-title">${esc(T('pur.recent'))}</h3>
@@ -1108,7 +1131,7 @@
     },
 
     // ⚠️ الكتابة مش بتعيد رسم الشاشة أبداً — بنحدّث الحالة والأجزاء الحيّة بس.
-    // إعادة الرسم أثناء الكتابة بتلغي الخانة من الصفحة وتعملها من جديد،
+    // إعادة الرسم أثناء الكتابة بتشيل الخانة من الصفحة وتعملها من جديد،
     // فالمتصفح بيفقد التركيز والكيبورد بتقفل بعد كل حرف.
     setH(f, v) {
       S.header[f] = v;
@@ -1132,7 +1155,7 @@
     setI(id, f, v) {
       const it = S.items.find(x => x.id === id); if (!it) return;
       if (f === 'target') {
-        // تغيير الوجهة بيغيّر شكل البند نفسه — إعادة رسم هنا مقبولة
+        // تغيير الوجهة بيغيّر شكل البند نفسه — إعادة الرسم هنا مقبولة
         // لأنها جاية من قايمة منسدلة مش من كتابة
         it.target = v;
         if (v !== 'allocated') { it.device_id = ''; it.device_label = ''; it.devQuery = ''; }
@@ -1246,7 +1269,7 @@
           ai_model: S.model,
           edited_fields: edited,
           created_by: user ? user.id : null,
-          created_by_name: (window.currentUser && currentUser.name) || ''
+          created_by_name: meName()
         }).select('id').single();
         if (error) throw error;
         const invId = inserted && inserted.id ? inserted.id : null;
@@ -1270,7 +1293,7 @@
               device_label: alloc ? (it.device_label || null) : null,
               source_invoice_id: invId,
               created_by: user ? user.id : null,
-              created_by_name: (window.currentUser && currentUser.name) || ''
+              created_by_name: meName()
             };
           });
         if (partsRows.length) {
@@ -1625,7 +1648,7 @@
   function paintDeviceSection(id) {
     if (DP.openId !== id) return;
     const host = $('dpSection');
-    const d = (window.devices || []).find(x => x.id === id);
+    const d = allDevices().find(x => x.id === id);
     if (host && d) host.innerHTML = devicePartsSectionHtml(d);
   }
 
@@ -1648,11 +1671,11 @@
     if (!flagOn()) return;
     const modal = $('detailModal');
     // احتياطي: لو تغليف openDetail ما اشتغلش لأي سبب، بنجيب الجهاز المفتوح
-    // من المتغيّر العام بتاع الداشبورد بدل ما القسم يختفي خالص
-    const id = DP.openId || window.selectedId || null;
+    // من الداشبورد مباشرة بدل ما القسم يختفي خالص
+    const id = DP.openId || openDeviceId();
     if (!modal || !id) return;
     DP.openId = id;
-    const d = (window.devices || []).find(x => x.id === id);
+    const d = allDevices().find(x => x.id === id);
     if (!d) return;
 
     let host = $('dpSection');
@@ -1721,7 +1744,7 @@
           name, quantity: qty, unit_cost: unit, total_cost: +(qty * unit).toFixed(2),
           category: cat, device_id: null, device_label: null,
           created_by: user ? user.id : null,
-          created_by_name: (window.currentUser && currentUser.name) || ''
+          created_by_name: meName()
         });
         if (error) throw error;
         toast(T('inv.added'), true);
@@ -1817,7 +1840,7 @@
     linkToDevice(partId) {
       const id = DP.openId;
       if (!id) return;
-      const d = (window.devices || []).find(x => x.id === id);
+      const d = allDevices().find(x => x.id === id);
       sb.from(CFG.partsTable).update({
         category: 'allocated', device_id: id, device_label: d ? deviceLabelOf(d) : null
       }).eq('id', partId).then(({ error }) => {
