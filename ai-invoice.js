@@ -388,19 +388,24 @@
       </div>`;
     }
     const q = chosen.devQuery || '';
-    const hits = searchDevices(q, CFG.deviceSearchLimit);
-    const drop = q.trim()
-      ? `<div class="dsrch-drop">${
-          hits.length
-            ? hits.map(d => `<button type="button" class="dsrch-opt" onclick="${onPick}'${esc(d.id)}')">${esc(deviceLabelOf(d))}</button>`).join('')
-            : `<div class="dsrch-empty">${esc(T('dsrch.none'))}</div>`
-        }</div>`
-      : '';
+    // نتايج البحث في حاوية منفصلة بمعرّف خاص — عشان نحدّثها لوحدها
+    // من غير ما نلمس خانة الكتابة (اللمس بيقفل الكيبورد على الموبايل).
     return `<div class="dsrch" id="${domId}">
       <input class="dsrch-inp" value="${esc(q)}" placeholder="${esc(T('dsrch.ph'))}"
              oninput="${onQuery}" autocomplete="off" />
-      ${drop}
+      <div id="${domId}_drop">${deviceDropHtml(q, onPick)}</div>
     </div>`;
+  }
+
+  // نتايج بحث الأجهزة لوحدها
+  function deviceDropHtml(q, onPick) {
+    if (!String(q || '').trim()) return '';
+    const hits = searchDevices(q, CFG.deviceSearchLimit);
+    return `<div class="dsrch-drop">${
+      hits.length
+        ? hits.map(d => `<button type="button" class="dsrch-opt" onclick="${onPick}'${esc(d.id)}')">${esc(deviceLabelOf(d))}</button>`).join('')
+        : `<div class="dsrch-empty">${esc(T('dsrch.none'))}</div>`
+    }</div>`;
   }
 
   // ============================================================
@@ -780,8 +785,8 @@
     const need = headerNeeds(f);
     const v = S.header[f] == null ? '' : S.header[f];
     return `<label class="pur-f">
-      <span>${esc(label)}${need ? `<button class="pur-chip" onclick="PUR.ack('${f}')">${esc(T('pur.reviewChip'))} ✓</button>` : ''}</span>
-      <input type="${type}" value="${esc(v)}" class="${need ? 'pur-low' : ''}"
+      <span>${esc(label)}<span id="purHchip_${f}">${need ? `<button class="pur-chip" onclick="PUR.ack('${f}')">${esc(T('pur.reviewChip'))} ✓</button>` : ''}</span></span>
+      <input id="purH_${f}" type="${type}" value="${esc(v)}" class="${need ? 'pur-low' : ''}"
              oninput="PUR.setH('${f}', this.value)" />
     </label>`;
   }
@@ -790,8 +795,8 @@
     const cell = (f, label, type, step) => {
       const need = itemNeeds(it, f);
       return `<label class="pur-f" style="margin:0;">
-        <span>${esc(label)}${need ? `<button class="pur-chip" onclick="PUR.ackI('${it.id}','${f}')">✓</button>` : ''}</span>
-        <input type="${type}" ${step ? 'step="' + step + '" inputmode="decimal"' : ''} value="${esc(it[f])}"
+        <span>${esc(label)}<span id="purIchip_${it.id}_${f}">${need ? `<button class="pur-chip" onclick="PUR.ackI('${it.id}','${f}')">✓</button>` : ''}</span></span>
+        <input id="purI_${it.id}_${f}" type="${type}" ${step ? 'step="' + step + '" inputmode="decimal"' : ''} value="${esc(it[f])}"
                class="${need ? 'pur-low' : ''}" oninput="PUR.setI('${it.id}','${f}',this.value)" />
       </label>`;
     };
@@ -821,13 +826,59 @@
     </div>`;
   }
 
-  function viewVerify() {
+  // ---- الأجزاء الحيّة: بتتحدّث لوحدها مع كل تعديل من غير إعادة رسم الشاشة ----
+  function reviewBarHtml() {
     const n = reviewCount();
+    return `<div class="pur-review ${n ? 'warn' : 'ok'}">
+      <span>${n ? esc(T('pur.reviewCount', { n: n })) : esc(T('pur.reviewNone'))}</span>
+      ${n ? `<button class="pur-mini" onclick="PUR.ackAll()">${esc(T('pur.reviewAll'))}</button>` : ''}
+    </div>`;
+  }
+
+  function sumsHtml() {
     const sum = sumItems();
     const gt = num(S.header.grand_total);
     const diff = sum - gt;
     const mismatch = Math.abs(diff) > CFG.totalTolerance;
+    return `
+      ${mismatch ? `<div class="pur-alert" style="margin-top:12px;">${esc(T('pur.mismatch'))}</div>` : ''}
+      <div class="pur-sums">
+        <span>${esc(T('pur.sumItems'))}: <b>${money(sum)}</b> ج.م</span>
+        <span>${esc(T('pur.grandTotal'))}: <b>${money(gt)}</b> ج.م</span>
+        <span style="color:${mismatch ? '#DC2626' : '#15803D'};">
+          ${esc(T('pur.diff'))}: <b>${money(diff)}</b> ج.م</span>
+      </div>`;
+  }
 
+  function saveBarHtml() {
+    const n = reviewCount();
+    return `
+      <button class="pur-cta" ${n || S.saving ? 'disabled' : ''} onclick="PUR.save()">
+        ${S.saving ? esc(T('pur.saving')) : esc(T('pur.save'))}
+      </button>
+      ${n ? `<div class="pur-note" style="color:#B45309;">${esc(T('pur.needReview'))}</div>` : ''}`;
+  }
+
+  const setHtml = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
+
+  // بتتنادى بعد أي تعديل في خانة — بتحدّث العدّادات والإجماليات وزرار الحفظ بس
+  function refreshLive() {
+    setHtml('purReviewBar', reviewBarHtml());
+    setHtml('purSumsBar', sumsHtml());
+    setHtml('purSaveBar', saveBarHtml());
+  }
+
+  // شيل علامة "محتاج مراجعة" من خانة واحدة من غير إعادة رسم
+  function clearNeedH(f) {
+    const inp = $('purH_' + f); if (inp) inp.classList.remove('pur-low');
+    setHtml('purHchip_' + f, '');
+  }
+  function clearNeedI(id, f) {
+    const inp = $('purI_' + id + '_' + f); if (inp) inp.classList.remove('pur-low');
+    setHtml('purIchip_' + id + '_' + f, '');
+  }
+
+  function viewVerify() {
     const preview = /pdf/.test(S.mime)
       ? `<iframe class="pur-pdf" src="${S.url}"></iframe>
          <div class="pur-note">${esc(T('pur.pdfNoPreview'))}
@@ -863,10 +914,7 @@
         <div class="pur-pane">
           <h3 class="pur-pane-title">${esc(T('pur.verifyTitle'))}</h3>
 
-          <div class="pur-review ${n ? 'warn' : 'ok'}">
-            <span>${n ? esc(T('pur.reviewCount', { n: n })) : esc(T('pur.reviewNone'))}</span>
-            ${n ? `<button class="pur-mini" onclick="PUR.ackAll()">${esc(T('pur.reviewAll'))}</button>` : ''}
-          </div>
+          <div id="purReviewBar">${reviewBarHtml()}</div>
           ${warn}
 
           ${fieldHtml('supplier_name', T('pur.supplier'), 'text')}
@@ -888,30 +936,24 @@
           ${S.items.map(itemHtml).join('')}
           <button class="pur-mini" style="color:var(--accent,#0891A8);" onclick="PUR.addI()">${esc(T('pur.addItem'))}</button>
 
-          ${mismatch ? `<div class="pur-alert" style="margin-top:12px;">${esc(T('pur.mismatch'))}</div>` : ''}
-          <div class="pur-sums">
-            <span>${esc(T('pur.sumItems'))}: <b>${money(sum)}</b> ج.م</span>
-            <span>${esc(T('pur.grandTotal'))}: <b>${money(gt)}</b> ج.م</span>
-            <span style="color:${mismatch ? '#DC2626' : '#15803D'};">
-              ${esc(T('pur.diff'))}: <b>${money(diff)}</b> ج.م</span>
-          </div>
-
-          <button class="pur-cta" ${n || S.saving ? 'disabled' : ''} onclick="PUR.save()">
-            ${S.saving ? esc(T('pur.saving')) : esc(T('pur.save'))}
-          </button>
-          ${n ? `<div class="pur-note" style="color:#B45309;">${esc(T('pur.needReview'))}</div>` : ''}
+          <div id="purSumsBar">${sumsHtml()}</div>
+          <div id="purSaveBar">${saveBarHtml()}</div>
         </div>
       </div>`;
   }
 
-  function listHtml() {
+  // الفواتير بعد تصفية البحث
+  function listRows() {
     const q = S.q.trim().toLowerCase();
-    const rows = S.list.filter(r => !q ||
+    return S.list.filter(r => !q ||
       String(r.supplier_name || '').toLowerCase().includes(q) ||
       String(r.invoice_number || '').toLowerCase().includes(q));
+  }
 
+  function listCardsHtml() {
+    const rows = listRows();
     const tot = k => rows.reduce((t, r) => t + num(r[k]), 0);
-    const cards = `
+    return `
       <div class="pur-tot-cards">
         <div class="pur-tot"><div class="pur-tot-n" style="color:#1A2332;">${money(tot('grand_total'))}</div>
           <div class="pur-tot-l">${esc(T('pur.periodTotals'))} (ج.م)</div></div>
@@ -922,8 +964,11 @@
             <div class="pur-tot-l">${esc(T(tg.k))}</div></div>`;
         }).join('')}
       </div>`;
+  }
 
-    const body = rows.length === 0
+  function listBodyHtml() {
+    const rows = listRows();
+    return rows.length === 0
       ? `<div class="empty-col">${esc(T('pur.empty'))}</div>`
       : rows.map(r => {
         const open = S.listOpen === r.id;
@@ -955,14 +1000,18 @@
           </div>` : ''}
         </div>`;
       }).join('');
+  }
 
+  // خانة البحث بتفضل برّه الحاويتين اللي بيتحدّثوا مع كل حرف —
+  // لو اتعادت هي كمان، المتصفح بيفقد التركيز والكيبورد بتقفل.
+  function listHtml() {
     return `
       <h3 class="inv-section-title">${esc(T('pur.recent'))}</h3>
-      ${cards}
+      <div id="purListTop">${listCardsHtml()}</div>
       <div class="modal-search" style="position:static;padding:0 0 10px;">
         <input value="${esc(S.q)}" oninput="PUR.search(this.value)" placeholder="${esc(T('pur.searchPh'))}" />
       </div>
-      ${body}`;
+      <div id="purListBody">${listBodyHtml()}</div>`;
   }
 
   // ============================================================
@@ -1058,29 +1107,48 @@
       document.body.appendChild(z);
     },
 
-    setH(f, v) { S.header[f] = v; S.seen[f] = true; render(); },
-    ack(f) { S.seen[f] = true; render(); },
-    ackAll() {
-      ['supplier_name', 'invoice_date', 'invoice_number', 'grand_total'].forEach(f => S.seen[f] = true);
-      S.items.forEach(it => ['item_name', 'quantity', 'unit_cost_price', 'total_price'].forEach(f => it.seen[f] = true));
-      render();
+    // ⚠️ الكتابة مش بتعيد رسم الشاشة أبداً — بنحدّث الحالة والأجزاء الحيّة بس.
+    // إعادة الرسم أثناء الكتابة بتلغي الخانة من الصفحة وتعملها من جديد،
+    // فالمتصفح بيفقد التركيز والكيبورد بتقفل بعد كل حرف.
+    setH(f, v) {
+      S.header[f] = v;
+      S.seen[f] = true;
+      clearNeedH(f);
+      refreshLive();
     },
-    ackI(id, f) { const it = S.items.find(x => x.id === id); if (it) { it.seen[f] = true; render(); } },
+    ack(f) { S.seen[f] = true; clearNeedH(f); refreshLive(); },
+    ackAll() {
+      ['supplier_name', 'invoice_date', 'invoice_number', 'grand_total']
+        .forEach(f => { S.seen[f] = true; clearNeedH(f); });
+      S.items.forEach(it => ['item_name', 'quantity', 'unit_cost_price', 'total_price']
+        .forEach(f => { it.seen[f] = true; clearNeedI(it.id, f); }));
+      refreshLive();
+    },
+    ackI(id, f) {
+      const it = S.items.find(x => x.id === id); if (!it) return;
+      it.seen[f] = true; clearNeedI(id, f); refreshLive();
+    },
 
     setI(id, f, v) {
       const it = S.items.find(x => x.id === id); if (!it) return;
       if (f === 'target') {
+        // تغيير الوجهة بيغيّر شكل البند نفسه — إعادة رسم هنا مقبولة
+        // لأنها جاية من قايمة منسدلة مش من كتابة
         it.target = v;
         if (v !== 'allocated') { it.device_id = ''; it.device_label = ''; it.devQuery = ''; }
         render(); return;
       }
       it[f] = (f === 'item_name') ? v : num(v);
       it.seen[f] = true;
+      clearNeedI(id, f);
       // الوحدة والكمية بيحسبوا الإجمالي — إلا لو المحاسب كتب الإجمالي بإيده
       if ((f === 'quantity' || f === 'unit_cost_price') && !it.seen.total_price) {
         it.total_price = +(num(it.quantity) * num(it.unit_cost_price)).toFixed(2);
+        const tot = $('purI_' + id + '_total_price');
+        // ما نلمسش الخانة لو المحاسب واقف فيها بيكتب
+        if (tot && document.activeElement !== tot) tot.value = it.total_price;
       }
-      render();
+      refreshLive();
     },
     addI() {
       S.items.push({
@@ -1102,9 +1170,9 @@
     // بحث الجهاز جوه بند "موجهة"
     itemDevQuery(id, v) {
       const it = S.items.find(x => x.id === id); if (!it) return;
-      it.devQuery = v; render();
-      const inp = document.querySelector('#pdev_' + id + ' .dsrch-inp');
-      if (inp) { inp.focus(); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {} }
+      it.devQuery = v;
+      // نحدّث نتايج البحث بس — خانة الكتابة ما بتتلمسش
+      setHtml('pdev_' + id + '_drop', deviceDropHtml(v, `PUR.setItemDev('${id}', `));
     },
     setItemDev(id, devId) {
       const it = S.items.find(x => x.id === id); if (!it) return;
@@ -1236,12 +1304,10 @@
     toggle(id) { S.listOpen = S.listOpen === id ? null : id; render(); },
     search(v) {
       S.q = v;
-      const b = $('purBody');
-      if (!b || S.view !== 'home') return;
-      // بنعيد رسم القايمة بس عشان خانة البحث ما تفقدش التركيز
-      render();
-      const inp = b.querySelector('.modal-search input');
-      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+      if (S.view !== 'home') return;
+      // الإجماليات والنتايج بس — خانة البحث نفسها ما بتتلمسش
+      setHtml('purListTop', listCardsHtml());
+      setHtml('purListBody', listBodyHtml());
     },
     syncMenu: syncMenu
   };
@@ -1482,12 +1548,26 @@
 
     return `
       ${tabBar}
-      ${totCard}
+      <div id="invTotBar">${totCard}</div>
       <div class="modal-search" style="position:static;padding:0 0 10px;">
         <input value="${esc(IS.q)}" oninput="INV.search(this.value)" placeholder="${esc(T('inv.searchPh'))}" />
       </div>
       ${add}
-      ${list}`;
+      <div id="invListBody">${list}</div>`;
+  }
+
+  // الجزئين اللي بيتغيّروا مع البحث — من غير ما نلمس خانة البحث نفسها
+  function invTotHtml() {
+    const totalCost = invFiltered().reduce((t, p) => t + num(p.total_cost), 0);
+    return `<div class="inv-tot"><div class="inv-tot-n">${money(totalCost)}</div>
+      <div class="inv-tot-l">${esc(T('inv.totalCost'))}</div></div>`;
+  }
+
+  function invListBodyHtml() {
+    const rows = invFiltered();
+    const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
+      : IS.tab === 'supplies' ? 'inv.emptySupplies' : 'inv.emptyUnallocated';
+    return rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`;
   }
 
   function invRender() {
@@ -1567,8 +1647,11 @@
   function injectDeviceParts() {
     if (!flagOn()) return;
     const modal = $('detailModal');
-    const id = DP.openId;
+    // احتياطي: لو تغليف openDetail ما اشتغلش لأي سبب، بنجيب الجهاز المفتوح
+    // من المتغيّر العام بتاع الداشبورد بدل ما القسم يختفي خالص
+    const id = DP.openId || window.selectedId || null;
     if (!modal || !id) return;
+    DP.openId = id;
     const d = (window.devices || []).find(x => x.id === id);
     if (!d) return;
 
@@ -1602,10 +1685,10 @@
 
     setTab(tk) { IS.tab = tk; IS.adding = false; IS.allocId = null; invRender(); },
     search(v) {
-      IS.q = v; invRender();
-      const b = $('invBody'); if (!b) return;
-      const inp = b.querySelector('.modal-search input');
-      if (inp) { inp.focus(); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {} }
+      IS.q = v;
+      // الإجمالي والقايمة بس — خانة البحث ما بتتلمسش فالكيبورد بتفضل مفتوحة
+      setHtml('invTotBar', invTotHtml());
+      setHtml('invListBody', invListBodyHtml());
     },
 
     async loadParts() {
@@ -1669,10 +1752,9 @@
     beginAlloc(id) { IS.allocId = id; IS.allocQuery = ''; invRender(); },
     cancelAlloc() { IS.allocId = null; IS.allocQuery = ''; invRender(); },
     allocQueryFn(v) {
-      IS.allocQuery = v; invRender();
-      const box = $('ialloc_' + IS.allocId);
-      const inp = box && box.querySelector('.dsrch-inp');
-      if (inp) { inp.focus(); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {} }
+      IS.allocQuery = v;
+      // نتايج البحث بس — خانة الكتابة ما بتتلمسش
+      if (IS.allocId) setHtml('ialloc_' + IS.allocId + '_drop', deviceDropHtml(v, 'INV.pickAllocDev('));
     },
     async pickAllocDev(devId) {
       const partId = IS.allocId;
