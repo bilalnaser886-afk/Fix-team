@@ -385,6 +385,36 @@ function adapt(d){
   };
 }
 
+
+// ============================================================
+// الكاش المحلي — للأوفلاين بس
+// ------------------------------------------------------------
+// ⚠️ حفظ الكاش لازم يبقى في try *مستقل*. لو اتحط جوه try القراءة،
+// أي فشل في التخزين (تجاوز حد الـ ٥ ميجا) بيتعامل كفشل قراءة
+// وبنرمي بيانات وصلت سليمة. ده كان باج حقيقي.
+//
+// وبنخزّن نسخة مخفّفة: عدد أقل من الصفوف، من غير صور القفل،
+// وآخر ٨ ملاحظات بس. الكاش مش نسخة كاملة — هو إسعاف أوفلاين.
+// ============================================================
+function saveCache(rows){
+  try{
+    const slim = (rows || []).slice(0, 120).map(r => {
+      const c = Object.assign({}, r);
+      delete c.lockImage;
+      delete c.lockPattern;
+      if(Array.isArray(c.activityNotes) && c.activityNotes.length > 8){
+        c.activityNotes = c.activityNotes.slice(-8);
+      }
+      return c;
+    });
+    localStorage.setItem(CACHE_KEY, JSON.stringify(slim));
+  }catch(e){
+    // التخزين المحلي مليان أو مقفول — الأوفلاين بس اللي بيتأثر
+    try{ localStorage.removeItem(CACHE_KEY); }catch(_){}
+    console.warn('الكاش المحلي مش متاح:', e && e.message ? e.message : e);
+  }
+}
+
 async function loadDevices(){
   try{
     // ⚠️ الفلترة على السيرفر مش في المتصفح.
@@ -400,8 +430,9 @@ async function loadDevices(){
     const rows = (data || []).map(r => r.data).filter(Boolean);
     devices = rows.map(adapt);
     offline = false;
-    localStorage.setItem(CACHE_KEY, JSON.stringify(rows));
     document.querySelectorAll('.offbar').forEach(e => e.remove());
+    document.querySelectorAll('.errbar').forEach(e => e.remove());
+    saveCache(rows);   // ← بره الـ try الأساسي منطقياً: عنده try خاص
   }catch(e){
     // ⚠️ فرق مهم: "مفيش نت" حاجة، و"خطأ في القراءة" حاجة تانية خالص.
     // خلطهم كان بيدّي رسالة مضلّلة وبيخبّي السبب الحقيقي.
