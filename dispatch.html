@@ -288,7 +288,19 @@ const ST = {
   delivered:{label:'تم التسليم',c:'--delivered'}, rejected:{label:'تم الرفض',c:'--rejected'},
   returned:{label:'المرتجعات',c:'--returned'},
 };
-const IN_SHOP = ['waiting','diagnosing','repairing','done','returned'];  // لسه في المحل
+// "كل أجهزة المحل" = اللي لسه فعلاً في المحل.
+// النظام بيخزّن التسليم كحالة واحدة 'delivered'، والداشبورد بيقسمها
+// عند العرض لـ "تم التسليم والدفع" و"بانتظار الدفع" حسب حالة الدفع —
+// فاستثناء 'delivered' بيستثني الاتنين.
+// و'rejected' (تم الرفض) مستثنى كمان: الجهاز المرفوض بيرجع للعميل
+// ويخرج من المحل، فمش شغل الديسباتشر.
+// اللي فاضل: 'returned' (المرتجعات) — ده راجع للمحل تاني فعلاً.
+const IN_SHOP = ['waiting','diagnosing','repairing','done','returned'];
+
+// نافذة الأجهزة المسلَّمة: شهر. الجهاز اللي عدّى على تسليمه ٣٠ يوم
+// يختفي من عند الديسباتشر — والنافذة بتتحرك لوحدها مع كل تحميل،
+// فالتحديث يومي تلقائي من غير أي شغل إضافي.
+const DELIVERED_DAYS = 30;
 
 let ME = '';   // بيتظبط بعد تسجيل الدخول
 
@@ -381,11 +393,16 @@ async function loadDevices(){
       .limit(600);
     if(inShop.error) throw inShop.error;
 
+    // المسلَّمة: آخر ٣٠ يوم بس، بالفلترة على السيرفر.
+    // delivered_at عمود محسوب في الـ view من statusHistory.
+    // الحد بيتحسب مع كل تحميل، فالنافذة بتتحرك يوم بيوم لوحدها.
+    const cutoff = new Date(Date.now() - DELIVERED_DAYS * 86400000).toISOString();
     const out = await sb.from('devices_dispatch')
       .select('id,data')
       .eq('status', 'delivered')
-      .order('intake_date', { ascending:false })
-      .limit(200);
+      .gte('delivered_at', cutoff)
+      .order('delivered_at', { ascending:false })
+      .limit(400);
     if(out.error) throw out.error;
 
     const rows = [...(inShop.data || []), ...(out.data || [])]
@@ -586,7 +603,7 @@ function render(){
     .sort((a,b)=> new Date(b.intake) - new Date(a.intake));
   const emptyMsg = q ? 'مفيش نتيجة للبحث ده'
     : activeTab==='mine' ? 'لسه مسجّلتش أي جهاز — ابدأ بـ «جهاز جديد»'
-    : activeTab==='out'  ? 'مفيش أجهزة اتسلّمت لسه'
+    : activeTab==='out'  ? 'مفيش أجهزة اتسلّمت في آخر شهر'
     : 'مفيش أجهزة في المحل حالياً';
   $('app').innerHTML = list.length
     ? `<div class="grid">${list.map(ticketHtml).join('')}</div>`
