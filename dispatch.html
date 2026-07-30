@@ -268,7 +268,18 @@ const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging
 const sb = supabase.createClient(SUPABASE_ENVS[APP_ENV].url, SUPABASE_ENVS[APP_ENV].key);
 
 const CACHE_KEY = 'ifix_disp_cache';
-let offline = false, booted = false, MY_EMAIL = '';
+let offline = false, booted = false, MY_EMAIL = '', loadError = '';
+
+// شريط أحمر بيوري الخطأ الحقيقي بدل ما نقول "مفيش نت" غلط
+function showLoadError(msg){
+  document.querySelectorAll('.errbar').forEach(e => e.remove());
+  const b = document.createElement('div');
+  b.className = 'errbar';
+  b.style.cssText = 'background:#FEE2E2;color:#B91C1C;text-align:center;font-weight:800;font-size:12.5px;padding:9px 12px;line-height:1.8;';
+  b.innerHTML = '⚠️ مشكلة في قراءة البيانات:<br><span style="font-family:monospace;font-weight:700;font-size:11.5px;">'
+              + esc(msg) + '</span>';
+  document.body.insertBefore(b, document.body.firstChild.nextSibling);
+}
 
 const ST = {
   waiting:{label:'قيد الانتظار',c:'--waiting'}, diagnosing:{label:'جاري الكشف',c:'--diagnosing'},
@@ -335,10 +346,17 @@ async function loadDevices(){
     localStorage.setItem(CACHE_KEY, JSON.stringify(rows));
     document.querySelectorAll('.offbar').forEach(e => e.remove());
   }catch(e){
+    // ⚠️ فرق مهم: "مفيش نت" حاجة، و"خطأ في القراءة" حاجة تانية خالص.
     const c = localStorage.getItem(CACHE_KEY);
     devices = c ? (JSON.parse(c) || []).map(adapt) : [];
-    offline = true;
-    showOffline();
+    if(!navigator.onLine){
+      offline = true;
+      showOffline();
+    } else {
+      loadError = (e && e.message) ? e.message : String(e);
+      console.error('فشل قراءة devices_dispatch:', e);
+      showLoadError(loadError);
+    }
   }
 }
 
@@ -416,7 +434,7 @@ const nowIso = () => new Date().toISOString();
 const mkNote = txt => ({ text:txt, at:nowIso(), by:ME, role:'مسؤول الحركة' });
 
 async function patch(id, p){
-  if(offline){ toast('مفيش نت — التعديل مش هيتحفظ 📴'); return false; }
+  if(!navigator.onLine){ toast('مفيش نت — التعديل مش هيتحفظ 📴'); return false; }
   const { error } = await sb.rpc('device_patch', { p_id:id, p_patch:p });
   if(error){ toast('فشل الحفظ: ' + esc(error.message || error)); return false; }
   return true;
@@ -533,7 +551,7 @@ async function saveIntake(){
   if(saving) return;
   const type=$('f_type').value.trim(), model=$('f_model').value.trim(), cust=$('f_cust').value.trim();
   if(!type || !cust){ toast('محتاج على الأقل نوع الجهاز واسم العميل'); return; }
-  if(offline){ toast('مفيش نت — مش ينفع تسجّل جهاز دلوقتي 📴'); return; }
+  if(!navigator.onLine){ toast('مفيش نت — مش ينفع تسجّل جهاز دلوقتي 📴'); return; }
 
   const btn = $('btnSave');
   saving = true;
