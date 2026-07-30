@@ -215,10 +215,26 @@
   }
   @keyframes bvsp{to{transform:rotate(360deg);}}
 
-  /* ===== عزل واجهة الفني: مايشوفش غير "أجهزتي" ===== */
-  /* مفيش نسخة احتياطية ولا "+ جهاز جديد" */
-  body.role-technician #backupWrap,
-  body.role-technician .topbar-actions > .btn-primary{display:none !important;}
+  /* ===== عزل واجهة الفني: مايشوفش غير "أجهزتي" =====
+     display:none مش visibility:hidden — الفرق مهم: visibility بتخلي العنصر
+     ياخد مساحته وتبان من ورا الأوفرلاي الشفاف وقت السكرول. display:none
+     بتشيله من التخطيط خالص فمستحيل يبان. */
+  body.role-technician > .topbar,
+  body.role-technician > #board,
+  body.role-technician > #approvalsHost,
+  body.role-technician > #detailOverlay,
+  body.role-technician > #addOverlay,
+  body.role-technician > #columnOverlay,
+  body.role-technician > #summariesOverlay,
+  body.role-technician > #analyticsOverlay,
+  body.role-technician > #techEvalOverlay,
+  body.role-technician > #accountsOverlay,
+  body.role-technician > #broadcastOverlay,
+  body.role-technician > #importChoiceOverlay{display:none !important;}
+  /* البوابة بقت هي الصفحة: خلفية معتمة بالكامل بدل الشفافة */
+  body.role-technician #techPortalOverlay{background:#F3F5F7 !important; z-index:20;}
+  /* منع السكرول المزدوج (الصفحة ورا الأوفرلاي) */
+  body.role-technician{overflow:hidden;}
   /* في المنيو: "أجهزتي" وتسجيل الخروج بس — وده بيشيل كمان أي بند
      بيتحقن لاحقاً من ai-invoice.js (فواتير المشتريات / مخزن قطع الغيار) */
   body.role-technician #menuDropdown > button:not(.tech-only-menu):not(.logout-menu-item){display:none !important;}
@@ -259,6 +275,30 @@
   .tv-ok{width:100%; margin-top:12px; border:none; border-radius:11px; padding:13px; background:var(--accent);
          color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;}
   .tv-ok:disabled{background:#CBD5E1; cursor:not-allowed;}
+  /* ===== هيدر بوابة الفني ===== */
+  .tp-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 20px; background:#fff; border-bottom:1px solid #EEF0F3;
+    position:sticky; top:0; z-index:5;
+  }
+  .tp-head-mid{
+    flex:1 1 auto; min-width:0; text-align:center;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:15px; color:var(--ink);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .tp-head-mid small{display:block; font-family:'Tajawal',sans-serif; font-weight:700; font-size:11.5px; color:#94A3B8; margin-top:1px;}
+  .tp-head-side{display:flex; align-items:center; gap:7px; flex:0 0 auto;}
+  .tp-hbtn{
+    border:1px solid #E2E8F0; background:#fff; border-radius:9px; padding:8px 11px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; cursor:pointer; color:#475569;
+  }
+  .tp-hbtn.out{color:#DC2626; border-color:#FECACA;}
+  /* زرار اللغة اللي I18N بيحقنه — نوحّد شكله مع باقي الأزرار */
+  .tp-head-side .lang-toggle, .tp-head-side button{font-family:'Tajawal',sans-serif;}
+  /* حالة التحميل */
+  .tp-load{display:flex; align-items:center; justify-content:center; gap:10px; padding:40px 0; color:#94A3B8; font-size:14px; font-weight:700;}
+  .tp-load .bv-spin{width:20px; height:20px;}
+
   .tv-lock{background:#FFFBEB; border:1px solid #FDE68A; border-radius:11px; padding:12px 13px; margin-top:6px;}
   .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:#0F172A; letter-spacing:1px;}
   .tv-code-hidden{font-family:monospace; font-weight:800; font-size:19px; color:#94A3B8; letter-spacing:3px;}
@@ -890,9 +930,18 @@
 <!-- Technician portal (أجهزتي) -->
 <div id="techPortalOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
-    <div class="modal-head" style="padding:16px 20px;">
-      <h2 id="techPortalTitle" data-i18n="tp.title">📱 أجهزتي</h2>
-      <button id="techPortalClose" class="close-btn" onclick="closeTechPortal()">×</button>
+    <div class="tp-head">
+      <div class="tp-head-side">
+        <button id="techPortalClose" class="close-btn" onclick="closeTechPortal()">×</button>
+        <span id="tpLangHost"></span>
+      </div>
+      <div class="tp-head-mid">
+        <span id="techPortalTitle" data-i18n="tp.title">📱 أجهزتي</span>
+        <small id="tpWho"></small>
+      </div>
+      <div class="tp-head-side">
+        <button class="tp-hbtn out" onclick="logout()" data-i18n="menu.logout">تسجيل الخروج</button>
+      </div>
     </div>
     <div style="padding:0 20px;">
       <div class="modal-search"><input id="techSearch" oninput="renderTechPortal()" data-i18n-ph="tp.searchPh" placeholder="ابحث في الأجهزة..." /></div>
@@ -1162,12 +1211,27 @@ function applyRoleVisibility(){
   // الفني: بوابة "أجهزتي" هي واجهته الوحيدة — بتتفتح تلقائياً ومايقدرش يقفلها
   if(!techPortalAutoOpened && isTechnician()){ techPortalAutoOpened = true; openTechPortal(); }
 
-  // الدور اتحدد والبوابة اتفتحت لو لازم → نشيل الستارة
+  // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
     localStorage.setItem('ifix-last-role', myRole());
     const r = document.documentElement.classList;
-    r.remove('app-booting');
     r.toggle('pre-technician', isTechnician());
+    // الفني: الستارة تستنى الأجهزة كمان، عشان ما يشوفش "مفيش أجهزة" غلط.
+    // باقي الأدوار: الستارة تتشال على طول.
+    if(isTechnician()){
+      if(devicesLoaded) r.remove('app-booting');
+    } else {
+      r.remove('app-booting');
+    }
+  }catch(e){}
+
+  // زرار اللغة جوه هيدر البوابة
+  try{
+    const lh = document.getElementById('tpLangHost');
+    if(lh && !lh.dataset.mounted && window.I18N && I18N.mountLangToggle){
+      I18N.mountLangToggle(lh);
+      lh.dataset.mounted = '1';
+    }
   }catch(e){}
 }
 
@@ -1646,8 +1710,11 @@ async function loadDevices(){
     enterOfflineMode();
   }
   snapshotSynced();
+  devicesLoaded = true;   // خلاص عندنا بيانات — البوابة تقدر تعرض
   writeCache();
   render();
+  // لو البوابة مفتوحة وكانت بتوري "جاري التحميل"، تتحدّث دلوقتي
+  try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
 }
 
 async function persist(){
@@ -3377,6 +3444,16 @@ function dayCardHtml(d){
 // بتفتح للفني تلقائياً، وأي مدير يقدر يفتح بوابة فني معيّن من صفحة التقييم.
 // الربط: myTechName() (أو اسم ممرّر) ↔ حقل technician / assistTechnician على الجهاز.
 // ============================================================
+// الأجهزة خلصت تحميل ولا لأ — عشان ما نوريش "مفيش أجهزة" والبيانات لسه جايّة
+let devicesLoaded = false;
+
+// الفني: الستارة تفضل لحد ما الأدوار *و* الأجهزة يبقوا جاهزين
+function revealAfterDevices(){
+  if(!devicesLoaded) return;
+  renderTechPortal();
+  try{ document.documentElement.classList.remove('app-booting'); }catch(e){}
+}
+
 let techPortalName = '';           // اسم الفني اللي البوابة مفتوحة عليه
 let techPortalAutoOpened = false;  // فتح تلقائي مرة واحدة بس
 
@@ -3443,6 +3520,17 @@ function renderTechPortal(){
   const body = document.getElementById('techPortalBody');
   if(!body) return;
   if(!name){ body.innerHTML = `<div class="empty-col">${t('tp.noName')}</div>`; return; }
+
+  // اسم الفني في نص الهيدر
+  const who = document.getElementById('tpWho');
+  if(who) who.textContent = name;
+
+  // لسه بنحمّل؟ نوري دوّارة مش "مفيش أجهزة" — الفرق بين "مفيش شغل"
+  // و"لسه بنجيب الشغل" مهم للفني
+  if(!devicesLoaded){
+    body.innerHTML = `<div class="tp-load"><span class="bv-spin"></span><span>${t('tp.loading')}</span></div>`;
+    return;
+  }
 
   const q = (document.getElementById('techSearch')?.value || '').trim();
   const sMatch = (d) => !q || matchesSearch(d, q);
@@ -3522,11 +3610,12 @@ function tvDate(iso){
 let tvId = '';          // الجهاز المفتوح
 let tvHandOn = false;   // مفتاح "تحويل/مشاركة"
 let tvMode = '';        // 'assist' = فني مساعد | 'full' = تسليم كامل
+let tvTarget = '';      // الفني المختار — محفوظ في الحالة مش في الـ DOM
 
 function openTechDevice(id){
   const d = devices.find(x => x.id === id);
   if(!d) return;
-  tvId = id; tvHandOn = false; tvMode = ''; tvCodeShown = false;
+  tvId = id; tvHandOn = false; tvMode = ''; tvCodeShown = false; tvTarget = '';
   renderTechDevice();
   document.getElementById('techViewOverlay').classList.remove('hidden');
 }
@@ -3554,9 +3643,9 @@ function tvHandHtml(d){
   const opts = tvTechChoices(d.technician);
   return `<div class="tv-hand">
     <div class="tv-block-head" style="font-size:13.5px;">${t('tv.pickTech')}</div>
-    <select id="tvTech" class="tv-sel" onchange="renderTvHand()">
+    <select id="tvTech" class="tv-sel" onchange="tvPick(this.value)">
       <option value="">${t('tv.pickTechPh')}</option>
-      ${opts.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+      ${opts.map(n => `<option value="${esc(n)}" ${n === tvTarget ? 'selected' : ''}>${esc(n)}</option>`).join('')}
     </select>
     ${opts.length ? '' : `<div class="tv-hist-meta" style="margin-top:7px;">${t('tv.noTechs')}</div>`}
     <div class="tv-block-head" style="font-size:13.5px;margin-top:14px;">${t('tv.modeHead')}</div>
@@ -3567,7 +3656,7 @@ function tvHandHtml(d){
     <div class="tv-hist-meta" style="margin-top:8px;line-height:1.8;">
       ${tvMode==='assist' ? t('tv.hintAssist') : tvMode==='full' ? t('tv.hintFull') : t('tv.hintPick')}
     </div>
-    <button class="tv-ok" onclick="tvDoHandoff()" ${tvMode ? '' : 'disabled'}>${t('tv.confirm')}</button>
+    <button id="tvOk" class="tv-ok" onclick="tvDoHandoff()" ${(tvMode && tvTarget) ? '' : 'disabled'}>${t('tv.confirm')}</button>
   </div>`;
 }
 
@@ -3579,7 +3668,22 @@ function renderTvHand(){
   const sw = document.getElementById('tvSw');
   if(sw) sw.classList.toggle('on', tvHandOn);
 }
-function tvToggleHand(){ tvHandOn = !tvHandOn; if(!tvHandOn) tvMode = ''; renderTvHand(); }
+// ⚠️ الاختيار بيتحفظ في الحالة، والقائمة مابتتعادش بناؤها عند التغيير.
+// إعادة بناء الـ <select> جوه onchange كانت بتلغي الاختيار وتقفل القائمة
+// على الموبايل — نفس مصيدة إعادة الرسم أثناء الكتابة.
+function tvPick(v){
+  tvTarget = v;
+  // نحدّث زرار التأكيد بس (بيتفعل لما يكون فيه فني + نوع تولية)
+  const btn = document.getElementById('tvOk');
+  if(btn) btn.disabled = !(tvTarget && tvMode);
+}
+function tvToggleHand(){
+  tvHandOn = !tvHandOn;
+  if(!tvHandOn){ tvMode = ''; tvTarget = ''; }
+  renderTvHand();
+}
+// تغيير نوع التولية بيعيد بناء جزء التحويل — الاختيار محفوظ في tvTarget
+// فبيرجع مكانه عبر خاصية selected
 function tvSetMode(m){ tvMode = m; renderTvHand(); }
 
 // رمز القفل للفني — مخفي بشكل افتراضي وبيتعرض بزرار.
@@ -3706,7 +3810,7 @@ async function tvSubmitNote(){
 async function tvDoHandoff(){
   const d = devices.find(x => x.id === tvId);
   if(!d) return;
-  const target = (document.getElementById('tvTech')?.value || '').trim();
+  const target = (tvTarget || document.getElementById('tvTech')?.value || '').trim();
   if(!target){ showError(t('tv.errNoTech')); return; }
   if(!tvMode){ showError(t('tv.errNoMode')); return; }
   showError('');
@@ -3739,7 +3843,7 @@ async function tvDoHandoff(){
     closeTechDevice();
     tpFlash(t('tv.doneFull', { to: target }));
   } else {
-    tvHandOn = false; tvMode = '';
+    tvHandOn = false; tvMode = ''; tvTarget = '';
     renderTechDevice();
     renderTechPortal();
     tpFlash(t('tv.doneAssist', { to: target }));
