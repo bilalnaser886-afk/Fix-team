@@ -20,6 +20,29 @@
 <script src="i18n.js"></script>
 <!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
 <script src="ai-invoice.js"></script>
+<script>
+// ============================================================
+// ستارة الإقلاع — لازم تشتغل قبل أي رسم
+// ------------------------------------------------------------
+// الأدوار بتتقرا من Supabase (غير متزامن). قبل كده الواجهة كانت بترسم
+// شكل المحاسب الافتراضي، فالفني كان يشوف لمحة من واجهة مش بتاعته.
+// بنخفي كل حاجة، وبنشيل الستارة أول ما نعرف الدور.
+//
+// وعشان الفني ما يشوفش ستارة كل مرة، بنفضّل آخر دور معروف من التخزين
+// المحلي ونطبّق كلاسه فوراً — فالبوابة بتبان من أول لحظة.
+// ============================================================
+(function(){
+  try{
+    document.documentElement.classList.add('app-booting');
+    var last = localStorage.getItem('ifix-last-role');
+    if(last === 'technician') document.documentElement.classList.add('pre-technician');
+  }catch(e){}
+  // شبكة أمان: لو حصل خطأ ومنعش شيل الستارة، ما نسيبش المستخدم مقفول
+  setTimeout(function(){
+    try{ document.documentElement.classList.remove('app-booting'); }catch(e){}
+  }, 6000);
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -167,6 +190,31 @@
   /* بند "أجهزتي" للفني بس */
   body:not(.role-technician) .tech-only-menu{display:none !important;}
 
+  /* ===== ستارة الإقلاع =====
+     الأدوار بتتحمّل من السيرفر (غير متزامن)، فقبل ما نعرف الدور بنخفي
+     الواجهة كلها. من غير ده الفني كان يشوف واجهة المحاسب لحظة قبل
+     ما بوابته تتفتح. الستارة بتتشال أول ما الدور يتحدد. */
+  html.app-booting .topbar,
+  html.app-booting #board,
+  html.app-booting #approvalsHost{visibility:hidden !important;}
+  html.app-booting #bootVeil{display:flex !important;}
+  /* آخر دور معروف = فني → نخفي أدوات المحاسب من قبل ما الأدوار تتحمّل */
+  html.pre-technician #backupWrap,
+  html.pre-technician .topbar-actions > .btn-primary{display:none !important;}
+  #bootVeil{
+    display:none; position:fixed; inset:0; z-index:99999;
+    align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    background:#F3F5F7;
+  }
+  #bootVeil .bv-logo{width:72px; height:72px; border-radius:18px; overflow:hidden; box-shadow:0 6px 20px rgba(16,16,20,.12);}
+  #bootVeil .bv-logo img{width:100%; height:100%; object-fit:cover; display:block;}
+  #bootVeil .bv-spin{
+    width:26px; height:26px; border-radius:50%;
+    border:3px solid #E2E8F0; border-top-color:var(--accent);
+    animation:bvsp .8s linear infinite;
+  }
+  @keyframes bvsp{to{transform:rotate(360deg);}}
+
   /* ===== عزل واجهة الفني: مايشوفش غير "أجهزتي" ===== */
   /* مفيش نسخة احتياطية ولا "+ جهاز جديد" */
   body.role-technician #backupWrap,
@@ -211,6 +259,12 @@
   .tv-ok{width:100%; margin-top:12px; border:none; border-radius:11px; padding:13px; background:var(--accent);
          color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;}
   .tv-ok:disabled{background:#CBD5E1; cursor:not-allowed;}
+  .tv-lock{background:#FFFBEB; border:1px solid #FDE68A; border-radius:11px; padding:12px 13px; margin-top:6px;}
+  .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:#0F172A; letter-spacing:1px;}
+  .tv-code-hidden{font-family:monospace; font-weight:800; font-size:19px; color:#94A3B8; letter-spacing:3px;}
+  .tv-eye{border:1px solid #E2E8F0; background:#fff; border-radius:9px; padding:8px 12px;
+          font-family:'Tajawal',sans-serif; font-weight:800; font-size:13px; cursor:pointer; color:#475569;}
+  .tv-lock-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
   .tp-flash{background:#EAF6EE; border:1px solid #A7D8B8; color:#15803D; border-radius:10px;
             padding:11px 13px; margin:0 0 14px; font-size:13.5px; font-weight:800; line-height:1.7;}
   /* قسم الاعتمادات — بيظهر للمحاسب/الأدمن فوق الأعمدة لما يكون فيه طلبات معلّقة، وبيختفي تماماً عند صفر */
@@ -646,6 +700,12 @@
 </style>
 </head>
 <body>
+
+<!-- ستارة الإقلاع: بتغطي الواجهة لحد ما الدور يتحدد -->
+<div id="bootVeil">
+  <div class="bv-logo"><img src="icon-192.png" alt=""></div>
+  <div class="bv-spin"></div>
+</div>
 
 <div class="topbar">
   <div class="brand">
@@ -1101,6 +1161,14 @@ function applyRoleVisibility(){
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
   // الفني: بوابة "أجهزتي" هي واجهته الوحيدة — بتتفتح تلقائياً ومايقدرش يقفلها
   if(!techPortalAutoOpened && isTechnician()){ techPortalAutoOpened = true; openTechPortal(); }
+
+  // الدور اتحدد والبوابة اتفتحت لو لازم → نشيل الستارة
+  try{
+    localStorage.setItem('ifix-last-role', myRole());
+    const r = document.documentElement.classList;
+    r.remove('app-booting');
+    r.toggle('pre-technician', isTechnician());
+  }catch(e){}
 }
 
 // ============================================================
@@ -2347,11 +2415,13 @@ function lockDisplayHtml(d){
 }
 
 // تشغيل النمط خطوة بخطوة (حوالي 300ms لكل نقطة)
-function replayPattern(seqStr){
+function replayPattern(seqStr, boxId, imgId){
   const seq = String(seqStr||'').split('-').map(n => parseInt(n)).filter(n => n>=1 && n<=9);
   if(seq.length < 2) return;
-  const box = document.getElementById('patReplayBox');
-  const img = document.getElementById('lockPatImg');
+  // boxId/imgId اختياريين — عشان مودال الفني يستخدم حاوياته الخاصة
+  // من غير ما يتعارض مع نفس المعرّفات في مودال التفاصيل الإداري
+  const box = document.getElementById(boxId || 'patReplayBox');
+  const img = document.getElementById(imgId || 'lockPatImg');
   if(!box) return;
   box.style.display = 'block';
   if(img) img.style.display = 'none';
@@ -2361,13 +2431,13 @@ function replayPattern(seqStr){
   for(let r=0;r<3;r++) for(let c=0;c<3;c++) pts.push({ n:r*3+c+1, x:g*c+g/2, y:g*r+g/2 });
 
   box.innerHTML = `<svg id="patReplaySvg" width="${S}" height="${S}" style="border:1px solid #E2E8F0;border-radius:12px;background:#fff;">
-    <polyline id="patReplayLine" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points=""/>
-    ${pts.map(p=>`<circle id="rp${p.n}" cx="${p.x}" cy="${p.y}" r="6" fill="#CBD5E1"/>`).join('')}
+    <polyline class="pat-line" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points=""/>
+    ${pts.map(p=>`<circle class="pat-dot" data-n="${p.n}" cx="${p.x}" cy="${p.y}" r="6" fill="#CBD5E1"/>`).join('')}
   </svg>
-  <div id="patReplayStep" style="text-align:center;font-size:12px;color:#64748B;margin-top:4px;"></div>`;
+  <div class="pat-step" style="text-align:center;font-size:12px;color:#64748B;margin-top:4px;"></div>`;
 
-  const line = document.getElementById('patReplayLine');
-  const stepLbl = document.getElementById('patReplayStep');
+  const line = box.querySelector('.pat-line');
+  const stepLbl = box.querySelector('.pat-step');
   let i = 0;
   const timer = setInterval(() => {
     if(i >= seq.length){
@@ -2379,7 +2449,7 @@ function replayPattern(seqStr){
       return;
     }
     const p = pts[seq[i]-1];
-    const dot = document.getElementById('rp'+seq[i]);
+    const dot = box.querySelector('.pat-dot[data-n="'+seq[i]+'"]');
     if(dot){ dot.setAttribute('fill','#2563EB'); dot.setAttribute('r','9'); }
     const cur = line.getAttribute('points');
     line.setAttribute('points', (cur ? cur + ' ' : '') + p.x + ',' + p.y);
@@ -3456,7 +3526,7 @@ let tvMode = '';        // 'assist' = فني مساعد | 'full' = تسليم ك
 function openTechDevice(id){
   const d = devices.find(x => x.id === id);
   if(!d) return;
-  tvId = id; tvHandOn = false; tvMode = '';
+  tvId = id; tvHandOn = false; tvMode = ''; tvCodeShown = false;
   renderTechDevice();
   document.getElementById('techViewOverlay').classList.remove('hidden');
 }
@@ -3512,6 +3582,54 @@ function renderTvHand(){
 function tvToggleHand(){ tvHandOn = !tvHandOn; if(!tvHandOn) tvMode = ''; renderTvHand(); }
 function tvSetMode(m){ tvMode = m; renderTvHand(); }
 
+// رمز القفل للفني — مخفي بشكل افتراضي وبيتعرض بزرار.
+// الفني محتاج الرمز يفتح الجهاز، لكن مايتعرضش على الشاشة من غير قصد.
+let tvCodeShown = false;
+function tvToggleCode(){
+  tvCodeShown = !tvCodeShown;
+  const d = devices.find(x => x.id === tvId); if(!d) return;
+  const w = document.getElementById('tvLockWrap');
+  if(w) w.innerHTML = tvLockHtml(d);
+}
+
+function tvLockHtml(d){
+  if(!d.lockType) return `<div class="tv-hist-meta">🔓 ${t('lock.none')}</div>`;
+
+  if(d.lockType === 'text' && d.lockText){
+    return `<div class="tv-lock"><div class="tv-lock-row">
+      <span style="font-size:13px;color:#92400E;font-weight:800;">🔒 ${t('ui.lockCode')}</span>
+      ${tvCodeShown
+        ? `<span class="tv-code">${esc(d.lockText)}</span>`
+        : `<span class="tv-code-hidden">${'\u2022'.repeat(Math.max(4, String(d.lockText).length))}</span>`}
+      <button class="tv-eye" onclick="tvToggleCode()">${tvCodeShown ? '🙈 ' + t('tv.hideCode') : '👁️ ' + t('tv.showCode')}</button>
+    </div></div>`;
+  }
+
+  if(d.lockType === 'pattern' && d.lockImage){
+    return `<div class="tv-lock">
+      <div style="font-size:13px;color:#92400E;font-weight:800;margin-bottom:8px;">🔒 ${t('tv.lockPattern')}</div>
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <img id="tvPatImg" src="${d.lockImage}" onclick="viewLockImage('${d.id}')"
+             style="width:130px;height:130px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;background:#fff;">
+        <div id="tvPatBox" style="display:none;"></div>
+      </div>
+      ${d.lockPattern
+        ? `<button class="tv-eye" style="margin-top:9px;" onclick="replayPattern('${esc(d.lockPattern)}','tvPatBox','tvPatImg')">▶️ ${t('lock.replay')}</button>`
+        : ''}
+    </div>`;
+  }
+
+  if(d.lockType === 'image' && d.lockImage){
+    return `<div class="tv-lock">
+      <div style="font-size:13px;color:#92400E;font-weight:800;margin-bottom:8px;">🔒 ${t('ui.lockImage')}</div>
+      <img src="${d.lockImage}" onclick="viewLockImage('${d.id}')"
+           style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;background:#fff;">
+    </div>`;
+  }
+
+  return `<div class="tv-hist-meta">🔓 ${t('lock.none')}</div>`;
+}
+
 function renderTechDevice(){
   const d = devices.find(x => x.id === tvId);
   const body = document.getElementById('techViewBody');
@@ -3542,6 +3660,11 @@ function renderTechDevice(){
     <div class="tv-block">
       <div class="tv-block-head">🛠️ ${t('tv.issue')}</div>
       <div class="tv-issue">${d.reportedIssue ? esc(d.reportedIssue) : '—'}</div>
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-block-head">🔐 ${t('tv.lockHead')}</div>
+      <div id="tvLockWrap">${tvLockHtml(d)}</div>
     </div>
 
     <div class="tv-block">
@@ -6009,7 +6132,11 @@ requireAccess().then(ok => {
     I18N.applyI18n(document);
     I18N.mountLangToggle(document.querySelector('.topbar-actions'));
   }catch(e){}
-  loadUserRoles().then(loadFeatureFlags).then(loadAudit).then(applyRoleVisibility);
+  // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
+  // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
+  loadUserRoles().then(loadFeatureFlags).then(loadAudit)
+    .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
+    .then(applyRoleVisibility);
   injectAdminMenu();
   loadBroadcast();
   loadDevices();
