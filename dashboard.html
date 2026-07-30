@@ -782,6 +782,8 @@
     <div id="menuDropdown" class="menu-dropdown hidden">
     <button class="tech-only-menu" data-i18n="menu.myDevices" onclick="openTechPortal()">📱 أجهزتي</button>
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
+    <button class="admin-menu-item" onclick="window.open('my-devices.html','_blank')">👁️ معاينة صفحة الفني</button>
+    <button class="admin-menu-item" onclick="window.open('dispatch.html','_blank')">👁️ معاينة صفحة الحركة</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
@@ -1208,21 +1210,26 @@ function applyRoleVisibility(){
     document.body.classList.toggle('no-money', !canSeeMoney());
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
-  // الفني: بوابة "أجهزتي" هي واجهته الوحيدة — بتتفتح تلقائياً ومايقدرش يقفلها
-  if(!techPortalAutoOpened && isTechnician()){ techPortalAutoOpened = true; openTechPortal(); }
+  // ============================================================
+  // التوجيه لصفحات مستقلة
+  // ------------------------------------------------------------
+  // الفني والديسباتشر ممنوعين من قراءة devices_data على مستوى
+  // قاعدة البيانات، فالداشبورد هيوريهم صفر أجهزة. صفحاتهم بتقرا
+  // من views مخصصة، فلازم يتحوّلوا عليها.
+  //
+  // replace مش href — عشان زرار الرجوع مايرجّعهمش لصفحة فاضية.
+  // ============================================================
+  if(isTechnician()){ location.replace('my-devices.html'); return; }
+  if(isDispatcher()){ location.replace('dispatch.html');   return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
     localStorage.setItem('ifix-last-role', myRole());
     const r = document.documentElement.classList;
     r.toggle('pre-technician', isTechnician());
-    // الفني: الستارة تستنى الأجهزة كمان، عشان ما يشوفش "مفيش أجهزة" غلط.
-    // باقي الأدوار: الستارة تتشال على طول.
-    if(isTechnician()){
-      if(devicesLoaded) r.remove('app-booting');
-    } else {
-      r.remove('app-booting');
-    }
+    // ملحوظة: الفني والديسباتشر اتحوّلوا لصفحاتهم بـ return فوق،
+    // فاللي بيوصل هنا محاسب أو أدمن — الستارة تتشال على طول.
+    r.remove('app-booting');
   }catch(e){}
 
   // زرار اللغة جوه هيدر البوابة
