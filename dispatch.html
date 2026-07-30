@@ -192,7 +192,8 @@
       <div class="nm" id="dispName">كريم عادل</div>
     </div>
   </div>
-  <button onclick="doLogout()" class="logout" onclick="toast('ده عرض تصميم — الخروج بيشتغل في النظام')">خروج ⏻</button>
+  <button onclick="refresh()" class="logout" style="margin-inline-end:7px;" title="تحديث">🔄</button>
+      <button onclick="doLogout()" class="logout" onclick="toast('ده عرض تصميم — الخروج بيشتغل في النظام')">خروج ⏻</button>
 </div>
 
 <div class="newbar">
@@ -337,10 +338,28 @@ function adapt(d){
 
 async function loadDevices(){
   try{
-    // devices_dispatch: كل الأجهزة، من غير أسعار ولا بيانات دفع
-    const { data, error } = await sb.from('devices_dispatch').select('id,data').limit(5000);
-    if(error) throw error;
-    const rows = (data || []).map(r => r.data).filter(Boolean);
+    // ⚠️ الفلترة على السيرفر مش في المتصفح.
+    // النظام فيه آلاف الأجهزة — سحبها كلها بيتجاوز حصة المشروع.
+    //
+    // طلبين منفصلين عن قصد:
+    //   أجهزة المحل  → كلها (دي شغل اليوم)
+    //   المسلَّمة     → آخر ٢٠٠ بس (أرشيف، مش محتاجينه كله)
+    const inShop = await sb.from('devices_dispatch')
+      .select('id,data')
+      .in('status', IN_SHOP)
+      .order('intake_date', { ascending:false })
+      .limit(600);
+    if(inShop.error) throw inShop.error;
+
+    const out = await sb.from('devices_dispatch')
+      .select('id,data')
+      .eq('status', 'delivered')
+      .order('intake_date', { ascending:false })
+      .limit(200);
+    if(out.error) throw out.error;
+
+    const rows = [...(inShop.data || []), ...(out.data || [])]
+      .map(r => r.data).filter(Boolean);
     devices = rows.map(adapt);
     offline = false;
     localStorage.setItem(CACHE_KEY, JSON.stringify(rows));
@@ -593,17 +612,21 @@ async function doLogout(){
   location.replace('index.html');
 }
 
-/* ===== تحديث لحظي: اعتماد المحاسب يظهر فوراً ===== */
-try{
-  sb.channel('disp_sync')
-    .on('postgres_changes', { event:'*', schema:'public', table:'devices_data' }, async () => {
-      if(!booted) return;
-      await loadDevices();
-      render();
-    }).subscribe();
-}catch(e){}
+/* ============================================================
+   التحديث
+   ------------------------------------------------------------
+   شيلنا اشتراك Realtime على devices_data — بياكل حصة الـ Realtime
+   على الخطة المجانية وكان سبب مشترك في "تجاوز الحصة".
+   البديل: تحديث لما يرجع للصفحة + زرار تحديث يدوي.
+   ============================================================ */
+async function refresh(){
+  if(!booted || !navigator.onLine) return;
+  await loadDevices();
+  render();
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
 
-addEventListener('online',  async () => { if(booted){ await loadDevices(); render(); } });
+addEventListener('online', refresh);
 addEventListener('offline', () => { offline = true; showOffline(); });
 
 setTimeout(() => {

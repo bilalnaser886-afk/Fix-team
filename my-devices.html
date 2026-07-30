@@ -387,11 +387,17 @@ function adapt(d){
 
 async function loadDevices(){
   try{
-    // devices_safe: أجهزة الفني الحالي بس، ومن غير أسعار
-    const { data, error } = await sb.from('devices_safe').select('id,data').limit(5000);
+    // ⚠️ الفلترة على السيرفر مش في المتصفح.
+    // النظام فيه آلاف الأجهزة — سحبها كلها بيتجاوز حصة المشروع
+    // وبياخد وقت طويل. الفني محتاج أجهزته النشطة بس.
+    const { data, error } = await sb
+      .from('devices_safe')
+      .select('id,data')
+      .in('status', ACTIVE)
+      .order('intake_date', { ascending:false })
+      .limit(300);
     if(error) throw error;
     const rows = (data || []).map(r => r.data).filter(Boolean);
-    rows.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
     devices = rows.map(adapt);
     offline = false;
     localStorage.setItem(CACHE_KEY, JSON.stringify(rows));
@@ -741,22 +747,29 @@ async function doLogout(){
   location.replace('index.html');
 }
 
-/* ===== تحديث لحظي: أي تعديل من الداشبورد يوصل الصفحة ===== */
-try{
-  sb.channel('tech_sync')
-    .on('postgres_changes', { event:'*', schema:'public', table:'devices_data' }, async () => {
-      if(!booted) return;
-      const keepNote = $('noteTxt') ? $('noteTxt').value : '';
-      await loadDevices();
-      render();
-      if(sheetId){
-        if(devices.some(x => x.id === sheetId)){ renderSheet(); if($('noteTxt')) $('noteTxt').value = keepNote; }
-        else closeSheet();
-      }
-    }).subscribe();
-}catch(e){}
+/* ============================================================
+   التحديث
+   ------------------------------------------------------------
+   شيلنا اشتراك Realtime على devices_data. الاشتراك على جدول
+   بآلاف الصفوف بياكل حصة الـ Realtime بسرعة على الخطة المجانية،
+   وكان سبب مشترك في رسالة "تجاوز الحصة".
+   البديل: تحديث لما الفني يرجع للصفحة — كفاية عملياً.
+   ============================================================ */
+async function refresh(){
+  if(!booted || !navigator.onLine) return;
+  const keepNote = $('noteTxt') ? $('noteTxt').value : '';
+  await loadDevices();
+  render();
+  if(sheetId){
+    if(devices.some(x => x.id === sheetId)){
+      renderSheet();
+      if($('noteTxt')) $('noteTxt').value = keepNote;
+    } else closeSheet();
+  }
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
 
-addEventListener('online',  async () => { if(booted){ await loadDevices(); render(); } });
+addEventListener('online', refresh);
 addEventListener('offline', () => { offline = true; showOffline(); });
 
 /* ===== شبكة أمان: ما نسيبش المستخدم ورا الستارة ===== */
