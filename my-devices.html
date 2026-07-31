@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>أجهزتي — I Fix Team</title>
-<link rel="icon" href="favicon.ico">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.json">
+<link rel="icon" href="tech-icon-192.png">
+<link rel="apple-touch-icon" href="tech-icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="أجهزتي">
 <meta name="theme-color" content="#1B2A3A">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,8 +34,10 @@
   #veil{position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
         align-items:center; justify-content:center; gap:15px; background:var(--paper);}
   #veil.gone{display:none;}
-  #veil .mk{width:74px; height:74px; border-radius:18px; background:linear-gradient(135deg,#22344a,#33506b);
-            display:grid; place-items:center; font-size:34px;}
+  /* لوجو الفني — بيتحمّل مع الصفحة نفسها فمفيش لحظة يظهر فيها لوجو تاني */
+  #veil .mk{width:96px; height:96px; border-radius:22px; overflow:hidden;
+            box-shadow:0 8px 26px rgba(16,22,32,.14); background:#fff;}
+  #veil .mk img{width:100%; height:100%; object-fit:contain; display:block;}
   #veil .sp{width:26px; height:26px; border-radius:50%; border:3px solid #D7DEE7;
             border-top-color:var(--steel); animation:vsp .8s linear infinite;}
   @keyframes vsp{to{transform:rotate(360deg);}}
@@ -259,7 +263,7 @@
 
 <div class="topbar">
   <div class="who">
-    <div class="mark">🔧</div>
+    <div class="mark"><img src="tech-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:#fff;"></div>
     <div class="txt">
       <div class="hi">أهلاً بيك 👋</div>
       <div class="nm" id="techName">محمد صلاح</div>
@@ -282,7 +286,7 @@
 <div class="demo">🎨 نموذج تصميم — أجهزتي (الفني)</div>
 
 <div id="veil">
-  <div class="mk">🔧</div>
+  <div class="mk"><img src="tech-icon.png" alt="أجهزتي"></div>
   <div class="sp"></div>
   <div class="ms" id="veilMsg">جاري تحميل أجهزتك...</div>
 </div>

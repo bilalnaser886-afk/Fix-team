@@ -4,7 +4,7 @@
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده في APP_SHELL تحت،
 //    وزوّد رقم الإصدار (v4 → v5). تعديل ملف موجود مش محتاج تزويد الرقم —
 //    ملفات الكود بتتقرا من النت الأول (شوف قسم fetch).
-const CACHE_NAME = 'ifixteam-v6';
+const CACHE_NAME = 'ifixteam-v7';
 
 const APP_SHELL = [
   './',
@@ -16,6 +16,9 @@ const APP_SHELL = [
   'dispatch-icon.png',
   'dispatch-icon-192.png',
   'dispatch-icon-512.png',
+  'tech-icon.png',
+  'tech-icon-192.png',
+  'tech-icon-512.png',
   'admin.html',
   'checkout.html',
   'manifest.json',
