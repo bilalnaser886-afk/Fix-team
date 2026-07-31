@@ -32,10 +32,31 @@
 // المحلي ونطبّق كلاسه فوراً — فالبوابة بتبان من أول لحظة.
 // ============================================================
 (function(){
+  // ============================================================
+  // تحويل مبكّر — قبل أي رسم
+  // ------------------------------------------------------------
+  // الديسباتشر والفني ليهم صفحات مستقلة. من غير التحويل ده، الداشبورد
+  // بيرسم لوجو النظام لحد ما الأدوار توصل من السيرفر، وبعدين يحوّل —
+  // فالمستخدم يشوف لوجوين في تانيتين.
+  //
+  // بنعتمد على آخر دور معروف من التخزين المحلي. لو اتغيّر، الصفحة
+  // اللي هيروحها هتفحص الدور الحقيقي وترجّعه — والعلامة تحت بتمنع
+  // اللف اللانهائي.
+  // ============================================================
+  try{
+    var last = localStorage.getItem('ifix-last-role');
+    var bounced = sessionStorage.getItem('ifix-bounced');
+    if(!bounced && (last === 'dispatcher' || last === 'technician')){
+      sessionStorage.setItem('ifix-bounced', '1');
+      location.replace(last === 'dispatcher' ? 'dispatch.html' : 'my-devices.html');
+      return;
+    }
+  }catch(e){}
+
   try{
     document.documentElement.classList.add('app-booting');
-    var last = localStorage.getItem('ifix-last-role');
-    if(last === 'technician') document.documentElement.classList.add('pre-technician');
+    var last2 = localStorage.getItem('ifix-last-role');
+    if(last2 === 'technician') document.documentElement.classList.add('pre-technician');
   }catch(e){}
   // شبكة أمان: لو حصل خطأ ومنعش شيل الستارة، ما نسيبش المستخدم مقفول
   setTimeout(function(){
@@ -1443,6 +1464,12 @@ async function requireAccess(){
 
 async function logout(){
   await sb.auth.signOut();
+  // ⚠️ نمسح الدور المخزّن. من غير كده لو مستخدم تاني سجّل دخول من
+  // نفس الجهاز، التحويل المبكر هيوديه لصفحة مش بتاعته.
+  try{
+    localStorage.removeItem('ifix-last-role');
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(e){}
   window.location.href = 'index.html';
 }
 

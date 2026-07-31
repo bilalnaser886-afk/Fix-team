@@ -512,6 +512,10 @@ async function boot(){
   }catch(e){}
 
   localStorage.setItem('ifix_tech_me', JSON.stringify({ name:ME, email:MY_EMAIL, disp }));
+  try{
+    localStorage.setItem('ifix-last-role', 'technician');
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(e){}
   await loadDevices();
   finish(disp);
 }
@@ -774,7 +778,14 @@ function toast(msg){ const el=$('toast'); el.innerHTML=msg; el.classList.add('on
 /* ===== الخروج ===== */
 async function doLogout(){
   try{ await sb.auth.signOut(); }catch(e){}
-  try{ localStorage.removeItem('ifix_tech_me'); localStorage.removeItem(CACHE_KEY); }catch(e){}
+  try{
+    localStorage.removeItem('ifix_tech_me');
+    localStorage.removeItem(CACHE_KEY);
+    // ⚠️ لازم نمسح الدور المخزّن عشان مستخدم تاني على نفس الجهاز
+    // ما يتحوّلش لصفحة الفني بالغلط
+    localStorage.removeItem('ifix-last-role');
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(e){}
   location.replace('index.html');
 }
 

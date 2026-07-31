@@ -4,10 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>مسؤول الحركة — I Fix Team</title>
-<link rel="icon" href="favicon.ico">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.json">
+<link rel="icon" href="dispatch-icon-192.png">
+<link rel="apple-touch-icon" href="dispatch-icon-192.png">
 <meta name="theme-color" content="#1B2A3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="الحركة">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
@@ -34,8 +36,11 @@
   #veil{position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
         align-items:center; justify-content:center; gap:15px; background:var(--paper);}
   #veil.gone{display:none;}
-  #veil .mk{width:74px; height:74px; border-radius:18px; background:linear-gradient(135deg,#22344a,#33506b);
-            display:grid; place-items:center; font-size:34px;}
+  /* اللوجو المخصص لصفحة الحركة — بيتحمّل مع الصفحة نفسها
+     فمفيش لحظة يظهر فيها لوجو تاني */
+  #veil .mk{width:96px; height:96px; border-radius:22px; overflow:hidden;
+            box-shadow:0 8px 26px rgba(16,22,32,.14); background:#fff;}
+  #veil .mk img{width:100%; height:100%; object-fit:contain; display:block;}
   #veil .sp{width:26px; height:26px; border-radius:50%; border:3px solid #D7DEE7;
             border-top-color:var(--steel); animation:vsp .8s linear infinite;}
   @keyframes vsp{to{transform:rotate(360deg);}}
@@ -186,7 +191,7 @@
 
 <div class="topbar">
   <div class="who">
-    <div class="mark">🚦</div>
+    <div class="mark"><img src="dispatch-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:#fff;"></div>
     <div>
       <div class="hi">مسؤول الحركة</div>
       <div class="nm" id="dispName">كريم عادل</div>
@@ -230,7 +235,7 @@
 <div class="demo">🎨 تصميم مبدئي — واجهة مسؤول الحركة</div>
 
 <div id="veil">
-  <div class="mk">🚦</div>
+  <div class="mk"><img src="dispatch-icon.png" alt="مسؤول الحركة"></div>
   <div class="sp"></div>
   <div class="ms" id="veilMsg">جاري التحميل...</div>
 </div>
@@ -476,6 +481,12 @@ async function boot(){
   }catch(e){}
 
   localStorage.setItem('ifix_disp_me', JSON.stringify({ name:ME, email:MY_EMAIL }));
+  // نحدّث الدور المخزّن — الداشبورد بيستخدمه في التحويل المبكر،
+  // فلو الديسباتشر ما فتحش الداشبورد تاني يفضل التحويل شغال
+  try{
+    localStorage.setItem('ifix-last-role', 'dispatcher');
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(e){}
   await loadDevices();
   finish();
 }
@@ -656,7 +667,14 @@ function ask(msg){ toast(msg); }
 /* ===== الخروج ===== */
 async function doLogout(){
   try{ await sb.auth.signOut(); }catch(e){}
-  try{ localStorage.removeItem('ifix_disp_me'); localStorage.removeItem(CACHE_KEY); }catch(e){}
+  try{
+    localStorage.removeItem('ifix_disp_me');
+    localStorage.removeItem(CACHE_KEY);
+    // ⚠️ مهم: لازم نمسح الدور المخزّن. من غير كده لو حد تاني سجّل
+    // دخول من نفس الجهاز، الداشبورد هيحوّله لصفحة الحركة بالغلط.
+    localStorage.removeItem('ifix-last-role');
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(e){}
   location.replace('index.html');
 }
 
