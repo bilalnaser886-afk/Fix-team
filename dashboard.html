@@ -472,7 +472,9 @@
   body.modal-open{ position:fixed; left:0; right:0; width:100%; overflow:hidden; }
   /* تمرير سلس جوه الشاشات ومنع تسريب التمرير للخلفية */
   .overlay, .modal{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
-  /* التفاصيل لازم تظهر فوق شاشات الجرد/الملخص (اللي z-index بتاعها 30) عشان تفضل الجرد مفتوحة وراها */
+  /* التفاصيل لازم تظهر فوق شاشات الجرد/الملخص/التقييم (z-index 30)
+     عشان الشاشة اللي ورا تفضل مفتوحة — فلما تقفل التفاصيل ترجع
+     خطوة واحدة بس، مش للواجهة الرئيسية. */
   #detailOverlay{ z-index:50; }
   #timelineOverlay{ z-index:60; }
   /* ===== أقسام الحسابات (مفتوحة/مدفوعة) + علامة الدورة الجديدة ===== */
@@ -2289,6 +2291,9 @@ function refreshOpenOverlays(){
   if(el && !el.classList.contains('hidden')) renderSummaries();
   const tp = document.getElementById('techPortalOverlay');
   if(tp && !tp.classList.contains('hidden')) renderTechPortal();
+  // تقييم الفنيين كمان — التفاصيل بتفتح فوقه ولازم يعكس أي تغيير
+  const te = document.getElementById('techEvalOverlay');
+  if(te && !te.classList.contains('hidden')) renderTechEval();
 }
 
 function renderBoard(){
@@ -5814,7 +5819,7 @@ function invViewHtml(){
     : data.list.map(d => {
         const st  = statusInfo(effStatus(d));
         const dev = [d.deviceType, d.model].filter(Boolean).join(' ') || '—';
-        return `<tr onclick="closeSummaries(); openDetail('${d.id}')">
+        return `<tr onclick="openDetail('${d.id}')">
           <td class="iv-ref">${esc(devRef(d))}</td>
           <td>
             <div class="iv-dev">${esc(dev)}</div>
@@ -5897,7 +5902,7 @@ function renderSummaries(){
     ? `<div class="empty-col">${t('inv.noStuck')}</div>`
     : stuck.map(({d, days}) => {
         const st = statusInfo(d.status);
-        return `<div class="stuck-item" onclick="closeSummaries(); openDetail('${d.id}')">
+        return `<div class="stuck-item" onclick="openDetail('${d.id}')">
           <div>
             <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
             <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}${t('inv.stuckIn')} "<b style="color:${accent(st.varname)}">${esc(stLabel(st))}</b>"</div>
@@ -6412,7 +6417,7 @@ function renderTechEval(){
               ${r.items.length === 0
                 ? `<div style="color:#94A3B8; font-size:13px; padding:6px;">${t('te.noPoints')}</div>`
                 : r.items.slice().sort((a,b) => b.share - a.share).map(x => `
-                  <div class="te-item" onclick="event.stopPropagation(); closeTechEval(); openDetail('${x.d.id}')">
+                  <div class="te-item" onclick="event.stopPropagation(); openDetail('${x.d.id}')">
                     <div>
                       <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
                       <div style="font-size:12px; color:#94A3B8;">
