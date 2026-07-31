@@ -230,6 +230,91 @@
   /* بند "أجهزتي" للفني بس */
   body:not(.role-technician) .tech-only-menu{display:none !important;}
 
+  /* ============================================================
+     شريط البحث الرئيسي
+     ------------------------------------------------------------
+     بيدوّر في كل الأجهزة مهما كانت حالتها — يعني بيوصل لأجهزة
+     مش ظاهرة في اللوحة (المسلّمة والمرفوضة). عشان كده مكانه فوق
+     الأعمدة مباشرةً: هو المدخل الوحيد للأرشيف.
+     ============================================================ */
+  .gs-wrap{position:relative; margin:0 0 18px;}
+  .gs-box{
+    display:flex; align-items:center; gap:10px; background:var(--surface);
+    border:1px solid #E2E8F0; border-radius:14px; padding:0 14px;
+    box-shadow:0 2px 10px rgba(16,16,20,.05); transition:border-color .15s, box-shadow .15s;
+  }
+  .gs-box:focus-within{border-color:var(--accent); box-shadow:0 3px 16px rgba(8,145,168,.13);}
+  .gs-box .ic{font-size:17px; opacity:.5; flex:0 0 auto;}
+  .gs-box input{
+    flex:1 1 auto; border:none; outline:none; background:transparent; padding:15px 0;
+    font-family:'Tajawal',sans-serif; font-size:15px; color:var(--ink); min-width:0;
+  }
+  .gs-clear{
+    border:none; background:#F1F5F9; color:#64748B; width:26px; height:26px;
+    border-radius:50%; font-size:16px; line-height:1; cursor:pointer; flex:0 0 auto; display:none;
+  }
+  .gs-wrap.has-q .gs-clear{display:block;}
+  .gs-panel{
+    position:absolute; top:calc(100% + 8px); inset-inline:0; z-index:60;
+    background:var(--surface); border:1px solid #E2E8F0; border-radius:14px;
+    box-shadow:0 14px 40px rgba(16,16,20,.16); overflow:hidden; display:none;
+  }
+  .gs-wrap.open .gs-panel{display:block;}
+  .gs-head{
+    padding:9px 14px; font-size:12px; font-weight:800; color:#64748B;
+    background:#F8FAFC; border-bottom:1px solid #EEF0F3;
+  }
+  .gs-list{max-height:min(58vh,420px); overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .gs-item{
+    display:flex; align-items:center; gap:11px; width:100%; text-align:start;
+    padding:11px 14px; border:none; background:none; cursor:pointer;
+    border-bottom:1px solid #F3F5F7; font-family:'Tajawal',sans-serif;
+  }
+  .gs-item:last-child{border-bottom:none;}
+  .gs-item:hover, .gs-item:focus-visible{background:#F8FAFC; outline:none;}
+  .gs-ref{
+    font-family:monospace; font-size:11.5px; font-weight:700; color:#64748B;
+    background:#F1F5F9; border-radius:6px; padding:3px 7px; flex:0 0 auto;
+  }
+  .gs-main{flex:1 1 auto; min-width:0;}
+  .gs-t{font-weight:800; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .gs-s{font-size:12.5px; color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;}
+  .gs-tag{font-size:11px; font-weight:800; border-radius:7px; padding:3px 8px; flex:0 0 auto;}
+  .gs-empty{padding:24px 14px; text-align:center; color:#94A3B8; font-size:14px;}
+  .gs-more{padding:9px 14px; text-align:center; font-size:12.5px; color:#64748B; background:#F8FAFC;}
+
+  /* ===== صفحة الجرد المستقلة ===== */
+  .iv-head{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:14px 0 16px; border-bottom:1px solid #EEF0F3; margin-bottom:16px;
+  }
+  .iv-back{
+    border:1px solid #E2E8F0; background:#fff; border-radius:10px; padding:9px 14px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; color:#475569; cursor:pointer;
+  }
+  .iv-back:hover{background:#F8FAFC;}
+  .iv-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; color:var(--ink); margin:0;}
+  .iv-count{background:#EEF2F7; color:#475569; font-weight:800; font-size:12.5px; border-radius:11px; padding:3px 10px;}
+  .iv-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #EEF0F3; border-radius:12px; background:#fff;}
+  .iv-table{width:100%; border-collapse:collapse; min-width:760px;}
+  .iv-table th{
+    background:#F8FAFC; color:#475569; font-family:'Tajawal',sans-serif; font-weight:800;
+    font-size:12.5px; text-align:start; padding:11px 13px; border-bottom:1px solid #EEF0F3; white-space:nowrap;
+  }
+  .iv-table td{padding:12px 13px; border-bottom:1px solid #F3F5F7; font-size:13.5px; color:var(--ink); vertical-align:middle;}
+  .iv-table tr:last-child td{border-bottom:none;}
+  .iv-table tbody tr{cursor:pointer;}
+  .iv-table tbody tr:hover{background:#F8FAFC;}
+  .iv-ref{font-family:monospace; font-size:12px; font-weight:700; color:#64748B;}
+  .iv-dev{font-weight:800;}
+  .iv-sub{font-size:12px; color:#94A3B8; margin-top:2px;}
+  .iv-issue{max-width:230px; color:#475569; font-size:12.5px; line-height:1.6;}
+  .iv-price{font-weight:800; white-space:nowrap;}
+  .iv-act{
+    border:1px solid #E2E8F0; background:#fff; border-radius:8px; padding:6px 11px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; color:var(--accent); cursor:pointer; white-space:nowrap;
+  }
+
   /* ===== ستارة الإقلاع =====
      الأدوار بتتحمّل من السيرفر (غير متزامن)، فقبل ما نعرف الدور بنخفي
      الواجهة كلها. من غير ده الفني كان يشوف واجهة المحاسب لحظة قبل
@@ -833,6 +918,19 @@
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
 <div id="approvalsHost"></div>
+<!-- البحث الرئيسي: بيشوف كل الأجهزة، حتى اللي خرجت من اللوحة -->
+<div class="gs-wrap" id="gsWrap">
+  <div class="gs-box">
+    <span class="ic">🔍</span>
+    <input id="gsInput" type="search" autocomplete="off"
+           data-i18n-ph="search.global.ph"
+           placeholder="دوّر على عميل، محل، جهاز، أو رقم تليفون..."
+           oninput="gsType(this.value)" onfocus="gsType(this.value)">
+    <button class="gs-clear" onclick="gsClear()" aria-label="مسح البحث">×</button>
+  </div>
+  <div class="gs-panel" id="gsPanel"></div>
+</div>
+
 <div id="board" class="board"><div class="loading" data-i18n="app.loading">جارٍ التحميل...</div></div>
 
 <!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
@@ -2207,6 +2305,92 @@ function renderBoard(){
   }).join('');
 }
 
+// ============================================================
+// البحث الرئيسي
+// ------------------------------------------------------------
+// بيستخدم matchesSearch نفسها اللي بتشتغل في باقي الشاشات — فالمعايير
+// موحّدة: اسم العميل والمحل والتليفون والسيريال والموديل والعطل
+// والفني ورقم التذكرة.
+//
+// الفرق الوحيد: ده بيدوّر في *كل* الأجهزة من غير أي فلتر حالة،
+// فبيوصّلك لأجهزة مسلّمة أو مرفوضة مش ظاهرة في اللوحة.
+// ============================================================
+const GS_LIMIT = 40;   // سقف النتائج المعروضة — عندك آلاف الأجهزة
+
+function gsClose(){
+  const w = document.getElementById('gsWrap');
+  if(w) w.classList.remove('open');
+}
+
+function gsClear(){
+  const i = document.getElementById('gsInput');
+  if(i){ i.value = ''; i.focus(); }
+  gsType('');
+}
+
+function gsOpen(id){
+  gsClose();
+  const i = document.getElementById('gsInput');
+  if(i) i.blur();
+  openDetail(id);
+}
+
+function gsType(q){
+  const wrap  = document.getElementById('gsWrap');
+  const panel = document.getElementById('gsPanel');
+  if(!wrap || !panel) return;
+
+  const query = String(q || '').trim();
+  wrap.classList.toggle('has-q', query.length > 0);
+
+  if(query.length < 2){
+    wrap.classList.remove('open');
+    panel.innerHTML = '';
+    return;
+  }
+
+  const hits = devices.filter(d => matchesSearch(d, query));
+  wrap.classList.add('open');
+
+  if(hits.length === 0){
+    panel.innerHTML = `<div class="gs-empty">${t('search.global.none')}</div>`;
+    return;
+  }
+
+  // الأحدث الأول — الأقرب للذاكرة
+  const sorted = [...hits].sort((a,b) =>
+    new Date(b.intakeDate || 0) - new Date(a.intakeDate || 0));
+  const shown = sorted.slice(0, GS_LIMIT);
+
+  panel.innerHTML = `
+    <div class="gs-head">${t('search.global.count', { n: hits.length })}</div>
+    <div class="gs-list">
+      ${shown.map(d => {
+        const st  = statusInfo(effStatus(d));
+        const dev = [d.deviceType, d.model].filter(Boolean).join(' ') || '—';
+        const sub = [d.customerName, d.shopName, d.customerPhone].filter(Boolean).join(' · ');
+        return `<button class="gs-item" onclick="gsOpen('${d.id}')">
+          <span class="gs-ref">${esc(devRef(d))}</span>
+          <span class="gs-main">
+            <span class="gs-t">${esc(dev)}</span>
+            <span class="gs-s">${esc(sub) || '—'}</span>
+          </span>
+          <span class="gs-tag" style="background:${accentBg(st.varname)};color:${accent(st.varname)}">${esc(stLabel(st))}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    ${hits.length > GS_LIMIT
+      ? `<div class="gs-more">${t('search.global.more', { n: hits.length - GS_LIMIT })}</div>`
+      : ''}`;
+}
+
+// قفل القائمة عند الضغط برّه أو Escape
+document.addEventListener('click', e => {
+  const w = document.getElementById('gsWrap');
+  if(w && !w.contains(e.target)) gsClose();
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape') gsClose(); });
+
 function matchesSearch(d, q){
   if(!q) return true;
   const up = q.toUpperCase();
@@ -3399,6 +3583,7 @@ document.addEventListener('click', (e) => {
 });
 
 function openSummaries(){
+  invView = null;   // نفتح على القائمة دايماً، مش على آخر عرض
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   clearSearchBox('invSearch');
@@ -5571,13 +5756,101 @@ function stuckDevices(){
     .sort((a,b) => b.days - a.days);
 }
 
-let invOpenCard = null;
+let invOpenCard = null;   // مهجور: الكروت بقت تفتح صفحة مستقلة (invView)
 let invLists = {};
-let invOpenTech = null;
+let invOpenTech = null;   // مهجور: نفس السبب
 let invTechLists = {};
-function toggleInvCard(key){
-  invOpenCard = (invOpenCard === key) ? null : key;
+// ============================================================
+// صفحة الجرد المستقلة
+// ------------------------------------------------------------
+// الأكورديون كان بيحشر جدول جوه شبكة كروت — على الموبايل الجدول
+// بيتقصّ، وعلى الشاشة الكبيرة الكروت بتتزحلق. الصفحة المستقلة
+// بتدي الجدول عرض الشاشة كامل.
+//
+// invView = { kind:'card'|'tech', key, title } أو null للقائمة.
+// ============================================================
+let invView = null;
+
+function openInvView(kind, key){
+  invView = { kind, key };
+  invOpenCard = null; invOpenTech = null;   // نقفل أي أكورديون فاتح
   renderSummaries();
+  const sc = document.getElementById('summariesOverlay');
+  if(sc) sc.scrollTop = 0;
+}
+
+function closeInvView(){
+  invView = null;
+  renderSummaries();
+}
+
+// الأجهزة والعنوان بتاع العرض الحالي
+function invViewData(){
+  if(!invView) return null;
+  if(invView.kind === 'tech'){
+    return {
+      title: '🔧 ' + invView.key,
+      list:  invTechLists[invView.key] || []
+    };
+  }
+  const labels = {
+    received:       t('inv.received'),
+    delivered_paid: t('inv.deliveredPaid'),
+    progress:       t('inv.inProgress'),
+    stuck:          t('inv.stuckCard', { d: STUCK_DAYS })
+  };
+  return {
+    title: labels[invView.key] || invView.key,
+    list:  invLists[invView.key] || []
+  };
+}
+
+function invViewHtml(){
+  const data = invViewData();
+  if(!data) return '';
+
+  const rows = data.list.length === 0
+    ? `<tr><td colspan="7" style="text-align:center;padding:34px;color:#94A3B8;">${t('inv.emptyCard')}</td></tr>`
+    : data.list.map(d => {
+        const st  = statusInfo(effStatus(d));
+        const dev = [d.deviceType, d.model].filter(Boolean).join(' ') || '—';
+        return `<tr onclick="closeSummaries(); openDetail('${d.id}')">
+          <td class="iv-ref">${esc(devRef(d))}</td>
+          <td>
+            <div class="iv-dev">${esc(dev)}</div>
+            ${d.serialNumber ? `<div class="iv-sub">${esc(d.serialNumber)}</div>` : ''}
+          </td>
+          <td>
+            <div style="font-weight:700;">${esc(d.customerName) || '—'}</div>
+            ${d.shopName ? `<div class="iv-sub">${esc(d.shopName)}</div>` : ''}
+          </td>
+          <td class="iv-issue">${esc(d.reportedIssue) || '—'}</td>
+          <td><span class="status-tag" style="background:${accentBg(st.varname)};color:${accent(st.varname)}">${esc(stLabel(st))}</span></td>
+          <td class="iv-price money-only">${isPriced(d) ? esc(d.agreedPrice) + ' ' + t('acc.egp') : '—'}</td>
+          <td>${esc(formatDateTime(d.intakeDate))}</td>
+        </tr>`;
+      }).join('');
+
+  return `
+    <div class="iv-head">
+      <button class="iv-back" onclick="closeInvView()">⬅️ ${t('inv.backToList')}</button>
+      <h3 class="iv-title">${esc(data.title)}</h3>
+      <span class="iv-count">${data.list.length}</span>
+    </div>
+    <div class="iv-scroll">
+      <table class="iv-table">
+        <thead><tr>
+          <th>${t('inv.col.ref')}</th>
+          <th>${t('inv.col.device')}</th>
+          <th>${t('inv.col.customer')}</th>
+          <th>${t('inv.col.issue')}</th>
+          <th>${t('inv.col.status')}</th>
+          <th class="money-only">${t('inv.col.price')}</th>
+          <th>${t('inv.col.date')}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function renderSummaries(){
@@ -5606,10 +5879,10 @@ function renderSummaries(){
     stuck: stuck.map(x => x.d),
   };
   const card = (key, num, color, label) => `
-    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="${t('inv.tapToView')}">
+    <div class="inv-card" onclick="openInvView('card','${key}')" title="${t('inv.tapToView')}">
       <div class="inv-card-num" style="color:${color};">${num}</div>
       <div class="inv-card-label">${label}</div>
-      <div class="inv-card-more">${invOpenCard===key ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
+      <div class="inv-card-more">${t('inv.showDevices')} ←</div>
     </div>`;
   const cards = `
     <div class="inv-cards">
@@ -5618,11 +5891,7 @@ function renderSummaries(){
       ${card('progress', inProgress.length, '#B45309', t('inv.inProgress'))}
       ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
     </div>
-    ${invOpenCard ? `<div class="inv-open-list">
-      ${(invLists[invOpenCard] || []).length === 0
-        ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
-        : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
-    </div>` : ''}`;
+`;   // الأجهزة بقت تتعرض في صفحة مستقلة — شوف invViewHtml()
 
   const stuckHtml = stuck.length === 0
     ? `<div class="empty-col">${t('inv.noStuck')}</div>`
@@ -5665,22 +5934,23 @@ function renderSummaries(){
         ${techNames.map(techName => {
           const late = withTech[techName].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
           const safe = esc(techName).replace(/'/g, "\\'");
-          return `<div class="inv-card ${invOpenTech===techName ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
+          return `<div class="inv-card" onclick="openInvView('tech','${safe}')" title="${t('inv.techTapToView')}">
             <div class="inv-card-num" style="color:#0891A8;">${withTech[techName].length}</div>
             <div class="inv-card-label">🔧 ${esc(techName)}</div>
             ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
-            <div class="inv-card-more">${invOpenTech===techName ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
+            <div class="inv-card-more">${t('inv.showDevices')} ←</div>
           </div>`;
         }).join('')}
-      </div>
-      ${invOpenTech && withTech[invOpenTech] ? `<div class="inv-open-list">
-        ${withTech[invOpenTech].map(d => dayCardHtml(d)).join('')}
-      </div>` : ''}`;
+      </div>`;
 
   // نحافظ على مكان السكرول وقت التحديث اللحظي عشان الصفحة ماتنطّش لفوق
   const _sumScroller = document.getElementById('summariesOverlay');
   const _sumY = _sumScroller ? _sumScroller.scrollTop : 0;
-  document.getElementById('summariesBody').innerHTML = `
+  // عرض مفتوح؟ نوري الجدول لوحده. فلتر الفترة بيفضل ظاهر عشان
+  // المستخدم يقدر يغيّر المدى وهو جوه العرض.
+  document.getElementById('summariesBody').innerHTML = invView
+    ? `${filterBar}${invViewHtml()}`
+    : `
     ${filterBar}
     ${searchHtml}
     ${cards}
@@ -5688,11 +5958,6 @@ function renderSummaries(){
     ${techCards}
   `;
   if(_sumScroller) _sumScroller.scrollTop = _sumY;
-}
-
-function toggleInvTech(name){
-  invOpenTech = (invOpenTech === name) ? null : name;
-  renderSummaries();
 }
 
 // ============================================================
@@ -5933,16 +6198,33 @@ function renderAnalytics(){
     </div>`;
 
   // ===== كبار العملاء =====
+  // ⚠️ تمريرة أولى: خريطة اسم ← تليفون.
+  // العميل ساعات بيتسجّل من غير تليفون في تذكرة وبتليفون في تانية.
+  // من غير الخريطة دي كان بينقسم لصفّين: واحد بالاسم من غير زرار
+  // واتس، وواحد بالتليفون. ودي كانت سبب إن أغلب الصفوف من غير زرار.
+  const nameToPhone = {};
+  devices.forEach(d => {
+    const nm = (d.customerName || '').trim();
+    const ph = waPhone(d.customerPhone || '');
+    if(nm && ph && !nameToPhone[nm]) nameToPhone[nm] = d.customerPhone;
+  });
+
   const byCustomer = {};
   devices.forEach(d => {
     if(!inAnRange(d.intakeDate)) return;
-    const phone = waPhone(d.customerPhone || '');
-    const key = phone || ('name:' + (d.customerName || '').trim());
+    const nm       = (d.customerName || '').trim();
+    // تليفون الجهاز نفسه، وإلا أي تليفون اتسجّل لنفس الاسم
+    const rawPhone = d.customerPhone || nameToPhone[nm] || '';
+    const phone    = waPhone(rawPhone);
+    const key      = phone || ('name:' + nm);
     if(!key || key === 'name:') return;
-    byCustomer[key] = byCustomer[key] || { name: d.customerName || '', phone: d.customerPhone || '', shop: d.shopName || '', count: 0, paid: 0 };
+    byCustomer[key] = byCustomer[key] || { name: nm, phone: rawPhone, shop: d.shopName || '', count: 0, paid: 0 };
     byCustomer[key].count++;
     if(d.paymentStatus === 'paid' && d.paymentType !== 'deferred') byCustomer[key].paid += (parseInt(d.agreedPrice) || 0);
-    if(d.customerName) byCustomer[key].name = d.customerName;
+    if(nm) byCustomer[key].name = nm;
+    // لو تليفون ظهر في تذكرة أحدث، نكمّل بيه الصف
+    if(!byCustomer[key].phone && rawPhone) byCustomer[key].phone = rawPhone;
+    if(!byCustomer[key].shop && d.shopName) byCustomer[key].shop = d.shopName;
   });
   const topCustomers = Object.values(byCustomer).sort((a,b) => b.count - a.count).slice(0, 10);
 
@@ -6096,12 +6378,8 @@ function renderTechEval(){
   const scoredDevices = new Set();
   Object.values(contrib).forEach(list => list.forEach(x => scoredDevices.add(x.d.id)));
 
-  const cards = `
-    <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">${t('te.totalPoints')}</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">${t('te.scoredDevices')}</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">${t('te.techsActive')}</div></div>
-    </div>`;
+  // الكروت التلاتة اتشالت — أرقامها موجودة في الجدول نفسه،
+  // والجدول بقى أول حاجة في الشاشة.
 
   // تنبيهات توضح ليه ممكن رقم يبان ناقص
   let notes = '';
