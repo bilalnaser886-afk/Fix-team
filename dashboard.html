@@ -43,10 +43,29 @@
   // اللي هيروحها هتفحص الدور الحقيقي وترجّعه — والعلامة تحت بتمنع
   // اللف اللانهائي.
   // ============================================================
+  // الدور محفوظ ومعاه صاحبه. لو نفس الشخص رجع ← تحويل فوري من غير
+  // لمحة. لو حساب تاني دخل من نفس الجهاز ← الإيميل مش هيطابق
+  // والتحويل مش هيحصل. فمش محتاجين نمسح الدور عند كل خروج.
+  //
+  // بندوّر على الإيميل جوه توكن الجلسة المخزّن — أسرع بكتير من
+  // انتظار Supabase يرجّع الجلسة، وإحنا هنا قبل أي رسم.
   try{
-    var last = localStorage.getItem('ifix-last-role');
+    var last    = localStorage.getItem('ifix-last-role');
+    var lastEm  = (localStorage.getItem('ifix-last-email') || '').toLowerCase();
     var bounced = sessionStorage.getItem('ifix-bounced');
-    if(!bounced && (last === 'dispatcher' || last === 'technician')){
+
+    var sameUser = false;
+    if(lastEm){
+      for(var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && k.indexOf('-auth-token') !== -1){
+          var v = localStorage.getItem(k) || '';
+          if(v.toLowerCase().indexOf(lastEm) !== -1){ sameUser = true; break; }
+        }
+      }
+    }
+
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html' : 'my-devices.html');
       return;
@@ -1246,6 +1265,8 @@ function applyRoleVisibility(){
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
     localStorage.setItem('ifix-last-role', myRole());
+    localStorage.setItem('ifix-last-email', (currentUser.email || '').toLowerCase());
+    localStorage.setItem('ifix-last-email', (currentUser.email || '').toLowerCase());
     const r = document.documentElement.classList;
     r.toggle('pre-technician', isTechnician());
     // ملحوظة: الفني والديسباتشر اتحوّلوا لصفحاتهم بـ return فوق،
@@ -1464,12 +1485,10 @@ async function requireAccess(){
 
 async function logout(){
   await sb.auth.signOut();
-  // ⚠️ نمسح الدور المخزّن. من غير كده لو مستخدم تاني سجّل دخول من
-  // نفس الجهاز، التحويل المبكر هيوديه لصفحة مش بتاعته.
-  try{
-    localStorage.removeItem('ifix-last-role');
-    sessionStorage.removeItem('ifix-bounced');
-  }catch(e){}
+  // مش بنمسح ifix-last-role — الدور مربوط بالإيميل، فحساب تاني على
+  // نفس الجهاز مش هيتأثر بيه. مسحه كان بيرجّع لمحة لوجو النظام في
+  // كل دخول من غير أي فايدة.
+  try{ sessionStorage.removeItem('ifix-bounced'); }catch(e){}
   window.location.href = 'index.html';
 }
 

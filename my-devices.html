@@ -514,6 +514,7 @@ async function boot(){
   localStorage.setItem('ifix_tech_me', JSON.stringify({ name:ME, email:MY_EMAIL, disp }));
   try{
     localStorage.setItem('ifix-last-role', 'technician');
+    localStorage.setItem('ifix-last-email', MY_EMAIL);
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
   await loadDevices();
@@ -783,7 +784,7 @@ async function doLogout(){
     localStorage.removeItem(CACHE_KEY);
     // ⚠️ لازم نمسح الدور المخزّن عشان مستخدم تاني على نفس الجهاز
     // ما يتحوّلش لصفحة الفني بالغلط
-    localStorage.removeItem('ifix-last-role');
+    // الدور بيفضل محفوظ — مربوط بالإيميل، فحساب تاني مش هيتأثر بيه.
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
   location.replace('index.html');

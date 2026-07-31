@@ -485,6 +485,7 @@ async function boot(){
   // فلو الديسباتشر ما فتحش الداشبورد تاني يفضل التحويل شغال
   try{
     localStorage.setItem('ifix-last-role', 'dispatcher');
+    localStorage.setItem('ifix-last-email', MY_EMAIL);
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
   await loadDevices();
@@ -672,7 +673,7 @@ async function doLogout(){
     localStorage.removeItem(CACHE_KEY);
     // ⚠️ مهم: لازم نمسح الدور المخزّن. من غير كده لو حد تاني سجّل
     // دخول من نفس الجهاز، الداشبورد هيحوّله لصفحة الحركة بالغلط.
-    localStorage.removeItem('ifix-last-role');
+    // الدور بيفضل محفوظ — مربوط بالإيميل، فحساب تاني مش هيتأثر بيه.
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
   location.replace('index.html');
