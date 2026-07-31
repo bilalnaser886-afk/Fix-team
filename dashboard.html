@@ -822,8 +822,6 @@
     <div id="menuDropdown" class="menu-dropdown hidden">
     <button class="tech-only-menu" data-i18n="menu.myDevices" onclick="openTechPortal()">📱 أجهزتي</button>
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
-    <button class="admin-menu-item" onclick="window.open('my-devices.html','_blank')">👁️ معاينة صفحة الفني</button>
-    <button class="admin-menu-item" onclick="window.open('dispatch.html','_blank')">👁️ معاينة صفحة الحركة</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
@@ -942,7 +940,7 @@
       </div>
       <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
       <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
-      <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
+      <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه، و٠ يعني ببلاش</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
         <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;" data-i18n="add.payType">طريقة الدفع</span>
         <div class="pay-choice">
@@ -2337,7 +2335,7 @@ function cardHtml(d, s){
     </div>
     ${d.reportedIssue ? `<div class="card-issue">${esc(d.reportedIssue)}</div>` : ''}
     ${d.technician ? `<div class="card-tech">${esc(d.technician)}</div>` : ''}
-    ${d.agreedPrice ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
+    ${isPriced(d) ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
   </div>`;
@@ -2345,8 +2343,8 @@ function cardHtml(d, s){
 
 function paymentBadge(d){
   if(d.paymentStatus === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ ${t('ui.settled')}</span>`;
-  const price = parseInt(d.agreedPrice) || 0;
-  if(price > 0) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notCollected')}</span>`;
+  // الصفر سعر محدد — يبقى "لسه ماتحصّلش" مش "لسه ماتسعّرش"
+  if(isPriced(d)) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notCollected')}</span>`;
   return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notPriced')}</span>`;
 }
 
@@ -2355,8 +2353,8 @@ function paymentBadge(d){
 async function markPaid(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
-  const price = parseInt(d.agreedPrice) || 0;
-  if(price <= 0){ alert(t('msg.needPriceFirst')); return; }
+  // الصفر ينفع يتأكد دفعه — الجهاز اتسلّم واتحاسب، والمبلغ صفر.
+  if(!isPriced(d)){ alert(t('msg.needPriceFirst')); return; }
   const labelKey = d.status === 'delivered' ? 'hist.paidDelivered' : 'hist.paidCash';
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
@@ -2745,7 +2743,7 @@ function renderDetail(){
   const pills = ACTION_STATUSES.map(st => {
     if(st.key === 'delivered'){
       const active = d.status==='delivered';
-      const priced = (parseInt(d.agreedPrice)||0) > 0;
+      const priced = isPriced(d);
       const hint = !priced
         ? 'تم التسليم — هيفضل "بانتظار الدفع" لحد ما تحدد السعر'
         : (d.paymentType==='deferred'
@@ -2783,7 +2781,7 @@ function renderDetail(){
     </div>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
-    ${(parseInt(d.agreedPrice)||0) > 0 && d.priceConfirmation && d.priceConfirmation.requested ? `
+    ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
           <div class="approval-pending">${t('det.priceWaiting')}</div>
@@ -2794,7 +2792,7 @@ function renderDetail(){
         `}
       </div>
     ` : ''}
-    ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
+    ${isPriced(d) ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
       <div class="pay-choice">
         <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
@@ -3234,8 +3232,12 @@ async function changeStatus(newStatus, paymentChoice){
   let extra = {};
 
   if(newStatus === 'delivered'){
-    const price = parseInt(d.agreedPrice) || 0;
-    if(price > 0 && d.paymentType === 'deferred'){
+    const price  = parseInt(d.agreedPrice) || 0;
+    // ⚠️ الفرق بين "متسعّر بصفر" و"لسه ماتسعّرش":
+    //   الأول قرار (الصيانة ببلاش) → يعدي على مسار الدفع العادي
+    //   التاني نقص بيانات → يفضل "بانتظار الدفع"
+    const hasPrice = isPriced(d);
+    if(hasPrice && d.paymentType === 'deferred'){
       // آجل: يتقيّد على حساب المحل (لو ماتقيّدش قبل كده) ويعتبر متسوّى
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
@@ -3246,8 +3248,8 @@ async function changeStatus(newStatus, paymentChoice){
       } else {
         historyKey = 'hist.deliveredDeferredPrev'; historyVars = { shop };
       }
-    } else if(price > 0){
-      // فوري: مستني "تأكيد الدفع"
+    } else if(hasPrice){
+      // فوري: مستني "تأكيد الدفع" — والصفر منهم
       newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
       historyKey = isPaidDevice(d) ? 'hist.deliveredPaidCash' : 'hist.deliveredPending';
     } else {
@@ -4790,10 +4792,23 @@ async function waShop(shop){
 // ============================================================
 // السعر بالأرقام الصحيحة + طريقة الدفع (فوري/آجل)
 // ============================================================
+// الخانة فاضية = لسه ماتسعّرش (بترجّع '').
+// فيها رقم — والصفر منهم — = اتسعّر (بترجّع الرقم كنص).
+// الفرق ده مهم: "الصيانة ببلاش" قرار، و"لسه ماحددناش" نقص بيانات.
 const intPrice = v => {
-  const n = Math.round(Number(enDigits(v).replace(/[^\d.]/g,'')));
-  return (isFinite(n) && n > 0) ? String(n) : '';
+  const raw = enDigits(String(v ?? '')).replace(/[^\d.]/g, '');
+  if(raw === '') return '';
+  const n = Math.round(Number(raw));
+  return (isFinite(n) && n >= 0) ? String(n) : '';
 };
+
+// هل الجهاز اتسعّر؟ الصفر أيوة، الفاضي لأ.
+function isPriced(d){
+  if(!d) return false;
+  const v = d.agreedPrice;
+  if(v === null || v === undefined || v === '') return false;
+  return isFinite(Number(v));
+}
 
 let addPayType = 'cash';
 let addIsWholesale = false;
@@ -4810,7 +4825,8 @@ function setAddWholesale(val){
 function togglePayTypeVisibility(){
   const wrap = document.getElementById('payTypeWrap');
   if(!wrap) return;
-  const has = !!intPrice(document.getElementById('f_agreedPrice').value);
+  // '' = فاضي (نخفي)، '0' = سعر (نظهر). لاحظ إن '0' نص غير فاضي.
+  const has = intPrice(document.getElementById('f_agreedPrice').value) !== '';
   wrap.style.display = has ? 'block' : 'none';
   if(!has) setAddPayType('cash');
 }
@@ -4834,7 +4850,8 @@ async function editPayType(t){
   let note = null; let noteKey = null; let noteVars = null;
 
   if(t === 'deferred'){
-    if(price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    // الآجل بيتقيّد على حساب المحل، وقيد بصفر مالوش معنى محاسبي
+    if(!isPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
     extra.billedShop = shop;
@@ -4879,7 +4896,7 @@ async function editPrice(value){
   let histEntry = null;
 
   // لو السعر اتغيّر فعلياً والجهاز لسه ما اتسلّمش، نطلب تأكيد العميل من جديد
-  if(price && price !== d.agreedPrice && d.status !== 'delivered'){
+  if(price !== '' && price !== d.agreedPrice && d.status !== 'delivered'){
     extra.priceConfirmation = { requested: true, requestedAt: new Date().toISOString() };
     resetTrackResponse(d.trackToken, 'price');
   }
