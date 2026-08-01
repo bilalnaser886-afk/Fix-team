@@ -32,6 +32,26 @@
     --returned:#9333EA; --returned-bg:#F5EEFC;
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
+
+  /* ===== شريط وضع النظام + الإشعارات ===== */
+  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:#fff;}
+  .nt-ov{
+    position:fixed; inset:0; z-index:9500; background:rgba(16,22,32,.5);
+    display:flex; align-items:center; justify-content:center; padding:18px;
+  }
+  .nt-ov.hide{display:none;}
+  .nt-card{
+    background:#fff; border-radius:18px; max-width:400px; width:100%;
+    padding:26px 22px; text-align:center; box-shadow:0 20px 50px rgba(16,22,32,.28);
+  }
+  .nt-ic{font-size:44px; line-height:1;}
+  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
+  .nt-b{color:#475569; line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
+  .nt-ok{
+    margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
+    background:#16233A; color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+  }
+
   /* ===== ستارة الإقلاع ===== */
   #veil{position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
         align-items:center; justify-content:center; gap:15px; background:var(--paper);}
@@ -234,6 +254,19 @@
 <div class="toast" id="toast"></div>
 <div class="demo">🎨 تصميم مبدئي — واجهة مسؤول الحركة</div>
 
+
+<div id="sysbar" class="sysbar" style="display:none;"></div>
+
+<!-- إشعار النظام (بيتا / تجربة / إشعار من الأدمن) -->
+<div id="ntOv" class="nt-ov hide">
+  <div class="nt-card">
+    <div class="nt-ic" id="ntIcon">📢</div>
+    <h2 class="nt-t" id="ntTitle"></h2>
+    <p class="nt-b" id="ntBody"></p>
+    <button class="nt-ok" onclick="ntClose()">تمام، فهمت 👍</button>
+  </div>
+</div>
+
 <div id="veil">
   <div class="mk"><img src="dispatch-icon.png" alt="مسؤول الحركة"></div>
   <div class="sp"></div>
@@ -331,6 +364,91 @@ let activeTab = 'mine';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+
+/* ============================================================
+   وضع النظام والإشعارات
+   ------------------------------------------------------------
+   نفس مصدر البيانات بتاع الداشبورد: app_data → system-config
+   و broadcast. الدورين دول مسموح لهم يقروا المفتاحين (شوف
+   app_data_key_readable في schema-roles.sql).
+
+   الإشعار الموجّه لدور معيّن بيتجاهل لو مش لينا. والإشعارات
+   القديمة من غير audience بتعتبر للكل.
+
+   "اتشاف قبل كده" متخزّن محلياً بنفس مفاتيح الداشبورد، فلو الموظف
+   شاف الإشعار على الداشبورد مايتكررش هنا.
+   ============================================================ */
+let ntSeenKey = '';
+
+function ntShow(icon, title, body, seenKey){
+  if(seenKey && localStorage.getItem(seenKey)) return;
+  ntSeenKey = seenKey || '';
+  const ic = $('ntIcon'), tt = $('ntTitle'), bd = $('ntBody'), ov = $('ntOv');
+  if(!ov) return;
+  ic.textContent = icon; tt.textContent = title; bd.textContent = body;
+  ov.classList.remove('hide');
+}
+
+function ntClose(){
+  if(ntSeenKey){ try{ localStorage.setItem(ntSeenKey, '1'); }catch(e){} }
+  ntSeenKey = '';
+  const ov = $('ntOv'); if(ov) ov.classList.add('hide');
+}
+
+function ntBar(text, bg){
+  const b = $('sysbar'); if(!b) return;
+  b.textContent = text;
+  b.style.background = bg;
+  b.style.display = '';
+}
+
+async function loadNotices(){
+  if(!navigator.onLine) return;
+  try{
+    const { data, error } = await sb.from('app_data')
+      .select('key,value').in('key', ['system-config','broadcast']);
+    if(error) throw error;
+
+    const map = {};
+    (data || []).forEach(r => { try{ map[r.key] = JSON.parse(r.value); }catch(e){} });
+
+    // ===== وضع النظام =====
+    const cfg = map['system-config'] || {};
+    if(cfg.mode === 'beta'){
+      ntBar('🛠️ فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق', '#1E293B');
+      if(cfg.betaAnnId){
+        ntShow('🛠️', 'مرحباً بك في I Fix Team!',
+          'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.',
+          'ifix_seen_ann_beta_' + cfg.betaAnnId);
+      }
+    } else if(cfg.mode === 'trial'){
+      const days = cfg.trialDays || 30;
+      const left = cfg.trialStart
+        ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
+        : days;
+      ntBar('🎁 فترة مجانية — متبقّي ' + left + ' يوماً على الاشتراك', '#B45309');
+      if(cfg.trialAnnId){
+        ntShow('🎁', 'بدأت فترتك المجانية',
+          'أنت الآن في الفترة المجانية (' + days + ' يوماً). متبقّي ' + left +
+          ' يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.',
+          'ifix_seen_ann_trial_' + cfg.trialAnnId);
+      }
+    }
+
+    // ===== إشعار الأدمن =====
+    const bc = map['broadcast'];
+    if(bc && bc.id){
+      const aud = bc.audience || 'all';
+      if(aud === 'all' || aud === 'dispatcher'){
+        const ic = bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢');
+        ntShow(ic, bc.title || 'إشعار', bc.body || '', 'ifix_seen_bc_' + bc.id);
+      }
+    }
+  }catch(e){
+    console.warn('تعذّر قراءة إشعارات النظام:', e && e.message ? e.message : e);
+  }
+}
 
 /* ============================================================
    المحوّل: بيانات النظام → الشكل اللي التصميم بيفهمه
@@ -481,6 +599,7 @@ async function boot(){
   }catch(e){}
 
   localStorage.setItem('ifix_disp_me', JSON.stringify({ name:ME, email:MY_EMAIL }));
+  loadNotices();   // من غير await — ما توقفش عرض الصفحة
   // نحدّث الدور المخزّن — الداشبورد بيستخدمه في التحويل المبكر،
   // فلو الديسباتشر ما فتحش الداشبورد تاني يفضل التحويل شغال
   try{

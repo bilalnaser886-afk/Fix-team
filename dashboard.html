@@ -1516,8 +1516,17 @@ async function loadBroadcast(){
     if(r && r.value){ currentBroadcast = JSON.parse(r.value); showBroadcastIfUnseen(); }
   }catch(e){}
 }
+// الإشعار موجّه لدور معيّن؟ نتجاهله لو مش لينا.
+// الإشعارات القديمة من غير audience بتعتبر للكل — توافق للخلف.
+function bcIsForMe(bc){
+  const aud = (bc && bc.audience) || 'all';
+  if(aud === 'all') return true;
+  return myRole() === aud;
+}
+
 function showBroadcastIfUnseen(){
   if(!currentBroadcast || !currentBroadcast.id) return;
+  if(!bcIsForMe(currentBroadcast)) return;
   if(localStorage.getItem('ifix_seen_bc_' + currentBroadcast.id)) return;
   const t = currentBroadcast.type;
   document.getElementById('bcIcon').textContent = t==='warning' ? '⚠️' : (t==='success' ? '✅' : '📢');
