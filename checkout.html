@@ -2,32 +2,70 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme');
+    var d;
+    if(m === 'dark') d = true;
+    else if(m === 'light') d = false;
+    else if(m === 'auto'){ var h = new Date().getHours(); d = (h >= 19 || h < 7); }
+    else d = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  }catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>الاشتراك — I Fix Team</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="i18n.js"></script>
 <style>
+  :root{
+    --bg:#F1F5F9; --surface:#FFFFFF; --surface-2:#F8FAFC;
+    --border:#E2E8F0; --border-strong:#CBD5E1;
+    --ink:#101014; --ink-2:#334155; --muted:#64748B; --faint:#94A3B8;
+    --on-color:#FFFFFF;
+    --red:#E8321E; --red-dark:#C22513;
+    --danger:#DC2626; --danger-bg:#FEF2F2; --danger-border:#FEE2E2;
+    --success:#15803D; --success-bg:#EAF6EE;
+    --warn:#B45309; --warn-bg:#FEF3C7;
+    --accent:#0891A8;
+  }
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#131E29; --surface:#1B2A3A; --surface-2:#22323F;
+    --border:#2F4356; --border-strong:#3E5670;
+    --ink:#E9EFF5; --ink-2:#C3D2DF; --muted:#92A6B8; --faint:#71879B;
+    --on-color:#0E1721;
+    --red:#F0554A; --red-dark:#D13B2E;
+    --danger:#F87171; --danger-bg:rgba(248,113,113,.15); --danger-border:rgba(248,113,113,.42);
+    --success:#4ADE80; --success-bg:rgba(74,222,128,.14);
+    --warn:#FBBF24; --warn-bg:rgba(251,191,36,.15);
+    --accent:#2AB5CE;
+  }
+</style>
+<style>
   *{ box-sizing:border-box; }
-  body{ font-family:'Tajawal',sans-serif; margin:0; background:#F1F5F9; color:#101014; min-height:100vh;
+  body{ font-family:'Tajawal',sans-serif; margin:0; background:var(--bg); color:var(--ink); min-height:100vh;
     display:flex; align-items:center; justify-content:center; padding:20px; padding-top:max(20px, env(safe-area-inset-top)); }
-  .card{ background:#fff; border-radius:20px; max-width:440px; width:100%; overflow:hidden; box-shadow:0 20px 50px rgba(16,16,20,.12); }
+  .card{ background:var(--surface); border-radius:20px; max-width:440px; width:100%; overflow:hidden; box-shadow:0 20px 50px rgba(16,16,20,.12); }
   .hero{ background:linear-gradient(135deg,#E8321E,#C22513); color:#fff; padding:28px 26px; text-align:center; }
   .hero .brand{ font-family:'Cairo',sans-serif; font-weight:900; font-size:22px; letter-spacing:.5px; }
   .hero .sub{ font-size:12px; opacity:.85; margin-top:2px; }
   .hero h1{ font-family:'Cairo',sans-serif; font-size:20px; margin:16px 0 0; }
   .body{ padding:24px 26px 28px; }
-  .status{ text-align:center; font-size:13px; margin-bottom:14px; color:#64748B; line-height:1.6; }
-  .plan{ border:2px solid #FEE2E2; background:#FEF2F2; border-radius:14px; padding:18px; text-align:center; margin-bottom:18px; }
-  .plan .price{ font-family:'Cairo',sans-serif; font-size:34px; font-weight:900; color:#DC2626; }
-  .plan .per{ font-size:14px; color:#64748B; }
-  .feat{ font-size:13.5px; color:#334155; line-height:2; margin:14px 0 0; text-align:right; }
+  .status{ text-align:center; font-size:13px; margin-bottom:14px; color:var(--muted); line-height:1.6; }
+  .plan{ border:2px solid var(--danger-border); background:var(--danger-bg); border-radius:14px; padding:18px; text-align:center; margin-bottom:18px; }
+  .plan .price{ font-family:'Cairo',sans-serif; font-size:34px; font-weight:900; color:var(--danger); }
+  .plan .per{ font-size:14px; color:var(--muted); }
+  .feat{ font-size:13.5px; color:var(--ink-2); line-height:2; margin:14px 0 0; text-align:right; }
   .btn{ display:block; width:100%; border:none; border-radius:12px; padding:15px; font-family:'Tajawal',sans-serif;
     font-size:16px; font-weight:800; cursor:pointer; margin-top:12px; }
   .btn-pay{ background:linear-gradient(135deg,#E8321E,#C22513); color:#fff; }
-  .btn-refresh{ background:#fff; color:#334155; border:1px solid #E2E8F0; }
-  .btn-logout{ background:none; color:#94A3B8; border:none; font-size:13px; margin-top:16px; width:100%; cursor:pointer; }
-  .note{ font-size:12px; color:#94A3B8; text-align:center; margin-top:14px; line-height:1.7; }
+  .btn-refresh{ background:var(--surface); color:var(--ink-2); border:1px solid var(--border); }
+  .btn-logout{ background:none; color:var(--faint); border:none; font-size:13px; margin-top:16px; width:100%; cursor:pointer; }
+  .note{ font-size:12px; color:var(--faint); text-align:center; margin-top:14px; line-height:1.7; }
 </style>
 </head>
 <body>
@@ -79,7 +117,7 @@ const sb = supabase.createClient(_envCfg.url, _envCfg.key);
 if(APP_ENV === "staging"){
   addEventListener("DOMContentLoaded", function(){
     var b = document.createElement("div");
-    b.textContent = "🧪 بيئة تجريبية — STAGING";
+    b.textContent = (window.I18N && I18N.has("app.stagingBar")) ? I18N.t("app.stagingBar") : "🧪 بيئة تجريبية — STAGING";
     b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
     document.body.appendChild(b);
   });

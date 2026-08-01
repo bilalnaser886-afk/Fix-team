@@ -2,8 +2,22 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح الداشبورد (ifix-theme) عشان
+   الاختيار يسري على كل شاشات النظام. من غير ده فيه ومضة بيضا. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    var mt = document.querySelector('meta[name="theme-color"]');
+    if(mt) mt.setAttribute('content', d ? '#0E1721' : '#1B2A3A');
+  }catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>مسؤول الحركة — I Fix Team</title>
+<title data-i18n="dp.title">مسؤول الحركة — I Fix Team</title>
 <link rel="icon" href="dispatch-icon-192.png">
 <link rel="apple-touch-icon" href="dispatch-icon-192.png">
 <meta name="theme-color" content="#1B2A3A">
@@ -11,6 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="الحركة">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -19,6 +34,7 @@
      نفس لغة تصميم الفني: ستيل + خط التروس + تذاكر بشريط حالة.
      ============================================================ */
   :root{
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#475569;
     --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
@@ -33,8 +49,26 @@
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
+  /* ===== الوضع الداكن ===== */
+  /* الهيدر أصلاً بلون --steel، فالوضع الداكن بيمد نفس اللون على
+     الشاشة كلها بدل ما يخترع لون جديد. */
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --ink-2:#C3D2DF;
+    --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
+    --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
+    --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
+    --red:#F0554A; --red-dark:#D13B2E; --blue:#7C8FFF; --gold:#E3B85C;
+    --waiting:#E0A15C;    --waiting-bg:rgba(224,161,92,.15);
+    --diagnosing:#A78BFA; --diagnosing-bg:rgba(167,139,250,.15);
+    --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
+    --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
+    --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
+  }
+
+
   /* ===== شريط وضع النظام + الإشعارات ===== */
-  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:#fff;}
+  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--on-color);}
   .nt-ov{
     position:fixed; inset:0; z-index:9500; background:rgba(16,22,32,.5);
     display:flex; align-items:center; justify-content:center; padding:18px;
@@ -43,23 +77,23 @@
   /* ⚠️ max-height + overflow ضروريين: منشور طويل من غيرهم
      بيخلي زرار "فهمت" يخرج برّه الشاشة والمستخدم يتحبس. */
   .nt-card{
-    background:#fff; border-radius:18px; max-width:400px; width:100%;
+    background:var(--card); border-radius:18px; max-width:400px; width:100%;
     max-height:88vh; display:flex; flex-direction:column;
     padding:22px 20px 18px; text-align:center; position:relative;
     box-shadow:0 20px 50px rgba(16,22,32,.28);
   }
   .nt-x{
     position:absolute; top:10px; inset-inline-start:10px;
-    border:none; background:#F1F5F9; color:#64748B; width:32px; height:32px;
+    border:none; background:var(--paper); color:var(--muted); width:32px; height:32px;
     border-radius:50%; font-size:19px; line-height:1; cursor:pointer; flex:0 0 auto;
   }
   .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
   .nt-ic{font-size:44px; line-height:1;}
   .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
-  .nt-b{color:#475569; line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
+  .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:#16233A; color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -69,7 +103,7 @@
   /* اللوجو المخصص لصفحة الحركة — بيتحمّل مع الصفحة نفسها
      فمفيش لحظة يظهر فيها لوجو تاني */
   #veil .mk{width:96px; height:96px; border-radius:22px; overflow:hidden;
-            box-shadow:0 8px 26px rgba(16,22,32,.14); background:#fff;}
+            box-shadow:0 8px 26px rgba(16,22,32,.14); background:var(--card);}
   #veil .mk img{width:100%; height:100%; object-fit:contain; display:block;}
   #veil .sp{width:26px; height:26px; border-radius:50%; border:3px solid #D7DEE7;
             border-top-color:var(--steel); animation:vsp .8s linear infinite;}
@@ -93,7 +127,7 @@
 
   /* ===== شريط علوي ستيل + خط ألوان التروس ===== */
   .topbar{
-    position:sticky; top:0; z-index:31; background:var(--steel); color:#fff;
+    position:sticky; top:0; z-index:31; background:var(--steel); color:var(--on-chrome);
     padding:calc(12px + env(safe-area-inset-top)) 16px 13px;
     display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
@@ -107,13 +141,61 @@
     font-family:inherit; font-weight:700; font-size:13px; padding:9px 13px; border-radius:10px; cursor:pointer;}
   .logout:active{background:rgba(255,255,255,.16);}
 
+
+  /* ===== مودال الإعدادات ===== */
+  .set-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:70; display:flex;
+    align-items:center; justify-content:center; padding:18px;}
+  .set-bg.hidden{display:none;}
+  .set-card{background:var(--card); border-radius:18px; width:100%; max-width:380px;
+    padding:18px; box-shadow:0 22px 60px rgba(0,0,0,.35);}
+  .set-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .set-head h3{margin:0; font-family:'Cairo',sans-serif; font-size:17px; color:var(--ink);}
+  .set-x{background:none; border:none; font-size:24px; line-height:1; color:var(--faint); cursor:pointer;}
+  .set-lbl{font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:9px;}
+  .set-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px;}
+  .set-row2{display:grid; grid-template-columns:1fr 1fr; gap:7px;}
+
+  .set-o{display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px;
+    border:1.5px solid var(--line); border-radius:12px; background:var(--paper);
+    font-family:inherit; font-size:12.5px; font-weight:700; color:var(--ink); cursor:pointer;}
+  .set-o .i{font-size:18px; line-height:1;}
+  .set-o.on{border-color:var(--repairing); background:var(--repairing-bg); color:var(--repairing);}
+  .set-note{font-size:11.5px; color:var(--muted); line-height:1.7; margin:9px 0 0;}
+  /* ===== قايمة ⋮ في الهيدر ===== */
+  .kebab-wrap{position:relative; flex:none;}
+  .kebab-btn{
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#DCE6F0;
+    font-family:inherit; font-size:19px; line-height:1; font-weight:700;
+    width:40px; height:38px; border-radius:10px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .kebab-btn:active{background:rgba(255,255,255,.16);}
+  .kebab-menu{
+    position:absolute; top:calc(100% + 8px); inset-inline-end:0; z-index:60;
+    min-width:190px; background:var(--card); border:1px solid var(--line); border-radius:13px;
+    box-shadow:0 14px 38px rgba(16,24,40,.20); padding:6px; overflow:hidden;
+  }
+  .kebab-menu.hidden{display:none;}
+  .kebab-menu button{
+    display:block; width:100%; text-align:start; background:none; border:none;
+    font-family:inherit; font-size:14.5px; font-weight:600; color:var(--ink);
+    padding:12px 13px; border-radius:9px; cursor:pointer;
+  }
+  .kebab-menu button:active{background:var(--paper);}
+  .kebab-menu .sep{height:1px; background:var(--line); margin:5px 8px;}
+  .kebab-menu .danger{color:var(--red);}
+  /* درع بيقفل القايمة لو دوست بره */
+  .kebab-shield{position:fixed; inset:0; z-index:59; background:transparent;}
+  .kebab-shield.hidden{display:none;}
+
+
   /* ===== زر جهاز جديد (الأكشن البطل) ===== */
   .newbar{
     position:sticky; top:65px; z-index:30; background:var(--paper); padding:12px 16px 6px;
   }
   .newbtn{
     width:100%; border:none; border-radius:14px; padding:15px; cursor:pointer;
-    background:linear-gradient(135deg,var(--red),var(--red-dark)); color:#fff;
+    background:linear-gradient(135deg,var(--red),var(--red-dark)); color:var(--on-color);
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px;
     display:flex; align-items:center; justify-content:center; gap:9px;
     box-shadow:0 8px 20px rgba(232,50,30,.32); transition:transform .1s, box-shadow .15s;
@@ -127,17 +209,17 @@
     display:flex; gap:7px;
   }
   .tab{
-    flex:1; border:1px solid var(--line); background:#fff; border-radius:12px; padding:9px 6px; cursor:pointer;
+    flex:1; border:1px solid var(--line); background:var(--card); border-radius:12px; padding:9px 6px; cursor:pointer;
     font-family:'Tajawal',sans-serif; font-weight:700; font-size:12.5px; color:var(--muted);
     display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .15s; line-height:1.2;
   }
   .tab .cnt{font-family:var(--mono); font-weight:800; font-size:15px; color:var(--ink);}
   .tab.on{background:var(--steel); border-color:var(--steel); color:#C7D6E4;}
-  .tab.on .cnt{color:#fff;}
+  .tab.on .cnt{color:var(--on-color);}
 
   .searchbar{padding:4px 16px 8px;}
   .searchbar input{
-    width:100%; border:1px solid var(--line); background:#fff; border-radius:12px;
+    width:100%; border:1px solid var(--line); background:var(--card); border-radius:12px;
     padding:11px 14px 11px 42px; font-family:inherit; font-size:15px; color:var(--ink);
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236B7A8C' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3-3'/%3E%3C/svg%3E");
     background-repeat:no-repeat; background-position:left 14px center;
@@ -163,7 +245,7 @@
   .tk-sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
   .tk-sub .dot{opacity:.5; margin:0 5px;}
   .tk-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--faint);}
-  .tk-meta .chip{background:#F1F5F9; color:#52657A; border-radius:7px; padding:3px 8px; font-weight:600;}
+  .tk-meta .chip{background:var(--paper); color:#52657A; border-radius:7px; padding:3px 8px; font-weight:600;}
   .tk-meta .chip b{color:var(--ink);}
   .tk-actions{display:flex; gap:7px; margin-top:11px;}
   .act{flex:1; border:none; border-radius:10px; padding:9px 8px; cursor:pointer; font-family:'Tajawal',sans-serif;
@@ -171,16 +253,16 @@
   .act:active{transform:scale(.97);}
   .act-hand{background:var(--repairing-bg); color:var(--repairing);}
   .act-ret{background:var(--returned-bg); color:var(--returned);}
-  .act-view{background:#F1F5F9; color:#52657A; flex:0 0 auto;}
+  .act-view{background:var(--paper); color:#52657A; flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
   .empty{text-align:center; color:var(--muted); font-size:14px; padding:34px 16px;
-    background:#fff; border:1px dashed var(--line); border-radius:13px; line-height:1.9;}
+    background:var(--card); border:1px dashed var(--line); border-radius:13px; line-height:1.9;}
   .empty .big{font-size:30px; display:block; margin-bottom:8px; opacity:.85;}
 
   /* ===== توست ===== */
   .toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
-    background:var(--steel); color:#fff; font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
+    background:var(--steel); color:var(--on-chrome); font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
     box-shadow:0 12px 30px rgba(23,34,46,.3); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;}
   .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
 
@@ -191,52 +273,60 @@
     max-height:92vh; overflow-y:auto; transform:translateY(102%); transition:transform .3s cubic-bezier(.32,.72,0,1);
     box-shadow:0 -10px 40px rgba(15,23,34,.28); padding-bottom:calc(20px + env(safe-area-inset-bottom));}
   .sheet.on{transform:translateY(0);}
-  .sheet-head{position:sticky; top:0; background:var(--steel); color:#fff; padding:16px 18px 15px; border-radius:20px 20px 0 0;}
+  .sheet-head{position:sticky; top:0; background:var(--steel); color:var(--on-chrome); padding:16px 18px 15px; border-radius:20px 20px 0 0;}
   .sheet-head::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
     background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);}
   .grab{width:42px; height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:0 auto 12px;}
   .sh-row{display:flex; align-items:center; justify-content:space-between;}
   .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
-  .sh-x{background:rgba(255,255,255,.1); border:none; color:#fff; width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
+  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--on-color); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
   .sh-body{padding:16px;}
   .fld{margin-bottom:13px;}
   .fld label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;}
   .fld input, .fld textarea{width:100%; border:1px solid var(--line); border-radius:11px; padding:12px 13px;
-    font-family:inherit; font-size:15px; color:var(--ink); background:#fff;}
+    font-family:inherit; font-size:15px; color:var(--ink); background:var(--card);}
   .fld input:focus, .fld textarea:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.13);}
   .fld textarea{resize:none; min-height:60px;}
   .frow{display:flex; gap:11px;}
   .frow .fld{flex:1;}
-  .save{width:100%; margin-top:6px; background:var(--red); color:#fff; border:none; border-radius:12px; padding:15px;
+  .save{width:100%; margin-top:6px; background:var(--red); color:var(--on-color); border:none; border-radius:12px; padding:15px;
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 8px 20px rgba(232,50,30,.3);}
   .save:active{transform:translateY(1px);}
 
   @media (max-width:520px){ .grid{grid-template-columns:1fr;} .tab{font-size:11.5px;} }
   @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
 
-  .demo{position:fixed; inset-block-end:0; inset-inline:0; background:#0E1A26; color:#93B4D0; text-align:center; font:600 11px/1.7 var(--mono); padding:5px; z-index:5;}
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="who">
-    <div class="mark"><img src="dispatch-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:#fff;"></div>
+    <div class="mark"><img src="dispatch-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:var(--card);"></div>
     <div>
-      <div class="hi">مسؤول الحركة</div>
+      <div class="hi" data-i18n="dp.role">مسؤول الحركة</div>
       <div class="nm" id="dispName">كريم عادل</div>
     </div>
   </div>
-  <button onclick="refresh()" class="logout" style="margin-inline-end:7px;" title="تحديث">🔄</button>
-      <button onclick="doLogout()" class="logout" onclick="toast('ده عرض تصميم — الخروج بيشتغل في النظام')">خروج ⏻</button>
+  <div class="kebab-wrap">
+    <button class="kebab-btn" onclick="toggleKebab()" aria-label="قائمة">⋮</button>
+    <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
+    <div id="kebabMenu" class="kebab-menu hidden">
+      <button onclick="closeKebab(); refresh()" data-i18n="dp.refresh">🔄 تحديث</button>
+      <div class="sep"></div>
+      <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
+      <div class="sep"></div>
+      <button class="danger" onclick="kebabLogout()" data-i18n="rp.logout">تسجيل الخروج ⏻</button>
+    </div>
+  </div>
 </div>
 
 <div class="newbar">
-  <button class="newbtn" onclick="openIntake()"><span class="plus">＋</span> جهاز جديد</button>
+  <button class="newbtn" onclick="openIntake()"><span class="plus">＋</span> <span data-i18n="dp.newDevice">جهاز جديد</span></button>
 </div>
 
 <div class="tabs" id="tabs"></div>
-<div class="searchbar"><input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل..."></div>
+<div class="searchbar"><input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل..." data-i18n-ph="rp.searchPh"></div>
 <div class="wrap" id="app"></div>
 
 <!-- شيت إدخال جهاز -->
@@ -244,25 +334,24 @@
 <div class="sheet" id="sheet">
   <div class="sheet-head">
     <div class="grab"></div>
-    <div class="sh-row"><div class="sh-title">📥 استلام جهاز جديد</div><button class="sh-x" onclick="closeIntake()">×</button></div>
+    <div class="sh-row"><div class="sh-title" data-i18n="dp.intakeTitle">📥 استلام جهاز جديد</div><button class="sh-x" onclick="closeIntake()">×</button></div>
   </div>
   <div class="sh-body">
     <div class="frow">
-      <div class="fld"><label>نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..."></div>
-      <div class="fld"><label>الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
+      <div class="fld"><label data-i18n="dp.deviceType">نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..." data-i18n-ph="dp.deviceTypePh"></div>
+      <div class="fld"><label data-i18n="dp.model">الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
     </div>
-    <div class="fld"><label>اسم العميل</label><input id="f_cust" placeholder="اسم صاحب الجهاز"></div>
+    <div class="fld"><label data-i18n="dp.customerName">اسم العميل</label><input id="f_cust" placeholder="اسم صاحب الجهاز" data-i18n-ph="dp.customerNamePh"></div>
     <div class="frow">
-      <div class="fld"><label>تليفون العميل</label><input id="f_phone" inputmode="numeric" placeholder="010..." style="direction:ltr;text-align:right;"></div>
-      <div class="fld"><label>المحل (اختياري)</label><input id="f_shop" placeholder="لو الجهاز من محل"></div>
+      <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" inputmode="numeric" placeholder="010..." style="direction:ltr;text-align:right;"></div>
+      <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
     </div>
-    <div class="fld"><label>العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..."></textarea></div>
-    <button id="btnSave" class="save" onclick="saveIntake()">سجّل الجهاز في المحل</button>
+    <div class="fld"><label data-i18n="dp.issueLabel">العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." data-i18n-ph="dp.issuePh"></textarea></div>
+    <button id="btnSave" class="save" onclick="saveIntake()" data-i18n="dp.submit">سجّل الجهاز في المحل</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="demo">🎨 تصميم مبدئي — واجهة مسؤول الحركة</div>
 
 
 <div id="sysbar" class="sysbar" style="display:none;"></div>
@@ -276,14 +365,14 @@
       <h2 class="nt-t" id="ntTitle"></h2>
       <p class="nt-b" id="ntBody"></p>
     </div>
-    <button class="nt-ok" onclick="ntClose()">تمام، فهمت 👍</button>
+    <button class="nt-ok" onclick="ntClose()" data-i18n="rp.understood">تمام، فهمت 👍</button>
   </div>
 </div>
 
 <div id="veil">
-  <div class="mk"><img src="dispatch-icon.png" alt="مسؤول الحركة"></div>
+  <div class="mk"><img src="dispatch-icon.png" alt=t('dp.role')></div>
   <div class="sp"></div>
-  <div class="ms" id="veilMsg">جاري التحميل...</div>
+  <div class="ms" id="veilMsg" data-i18n="rp.loading">جاري التحميل...</div>
 </div>
 
 <script>
@@ -327,17 +416,17 @@ function showLoadError(msg){
   document.querySelectorAll('.errbar').forEach(e => e.remove());
   const b = document.createElement('div');
   b.className = 'errbar';
-  b.style.cssText = 'background:#FEE2E2;color:#B91C1C;text-align:center;font-weight:800;font-size:12.5px;padding:9px 12px;line-height:1.8;';
+  b.style.cssText = 'background:#FEE2E2;color:var(--red-dark);text-align:center;font-weight:800;font-size:12.5px;padding:9px 12px;line-height:1.8;';
   b.innerHTML = '⚠️ مشكلة في قراءة البيانات:<br><span style="font-family:monospace;font-weight:700;font-size:11.5px;">'
               + esc(msg) + '</span>';
   document.body.insertBefore(b, document.body.firstChild.nextSibling);
 }
 
 const ST = {
-  waiting:{label:'قيد الانتظار',c:'--waiting'}, diagnosing:{label:'جاري الكشف',c:'--diagnosing'},
-  repairing:{label:'جاري الصيانة',c:'--repairing'}, done:{label:'تم الصيانة',c:'--done'},
-  delivered:{label:'تم التسليم',c:'--delivered'}, rejected:{label:'تم الرفض',c:'--rejected'},
-  returned:{label:'المرتجعات',c:'--returned'},
+  waiting:{label:t('rp.stWaiting'),c:'--waiting'}, diagnosing:{label:t('rp.stDiagnosing'),c:'--diagnosing'},
+  repairing:{label:t('rp.stRepairing'),c:'--repairing'}, done:{label:t('rp.stDone'),c:'--done'},
+  delivered:{label:t('rp.stDelivered'),c:'--delivered'}, rejected:{label:t('rp.stRejected'),c:'--rejected'},
+  returned:{label:t('rp.stReturned'),c:'--returned'},
 };
 // "كل أجهزة المحل" = اللي لسه فعلاً في المحل.
 // النظام بيخزّن التسليم كحالة واحدة 'delivered'، والداشبورد بيقسمها
@@ -369,9 +458,9 @@ const _demo = [
 ];   // ← بيانات التصميم التجريبية، مش مستخدمة
 
 const TABS = [
-  {key:'mine',  label:'اللي سجّلتها',  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
-  {key:'shop',  label:'كل أجهزة المحل', filter:d => IN_SHOP.includes(d.status)},
-  {key:'out',   label:'المُسلَّمة',      filter:d => d.status==='delivered'},
+  {key:'mine',  label:t('dp.mine'),  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
+  {key:'shop',  label:t('dp.all'), filter:d => IN_SHOP.includes(d.status)},
+  {key:'out',   label:t('dp.delivered'),      filter:d => d.status==='delivered'},
 ];
 let activeTab = 'mine';
 
@@ -457,10 +546,9 @@ async function loadNotices(){
     // ===== وضع النظام =====
     const cfg = map['system-config'] || {};
     if(cfg.mode === 'beta'){
-      ntBar('🛠️ فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق', '#1E293B');
+      ntBar('🛠️ ' + t('sys.betaBanner'), '#1E293B');
       if(cfg.betaAnnId){
-        ntShow('🛠️', 'مرحباً بك في I Fix Team!',
-          'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.',
+        ntShow('🛠️', t('sys.betaTitle'), t('sys.betaBody'),
           'ifix_seen_ann_beta_' + cfg.betaAnnId);
       }
     } else if(cfg.mode === 'trial'){
@@ -468,11 +556,9 @@ async function loadNotices(){
       const left = cfg.trialStart
         ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
         : days;
-      ntBar('🎁 فترة مجانية — متبقّي ' + left + ' يوماً على الاشتراك', '#B45309');
+      ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
-        ntShow('🎁', 'بدأت فترتك المجانية',
-          'أنت الآن في الفترة المجانية (' + days + ' يوماً). متبقّي ' + left +
-          ' يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.',
+        ntShow('🎁', t('sys.trialTitle'), t('sys.trialBody', { d: days, n: left }),
           'ifix_seen_ann_trial_' + cfg.trialAnnId);
       }
     }
@@ -492,7 +578,7 @@ async function loadNotices(){
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0))   // الأقدم الأول
       .map(bc => ({
         icon:    bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢'),
-        title:   bc.title || 'إشعار',
+        title:   bc.title || t('rp.notice'),
         body:    bc.body || '',
         seenKey: 'ifix_seen_bc_' + bc.id
       }));
@@ -609,7 +695,7 @@ function showOffline(){
   if(document.querySelector('.offbar')) return;
   const b = document.createElement('div');
   b.className = 'offbar';
-  b.textContent = '📴 مفيش نت — بتشوف آخر نسخة محفوظة، والتعديل مش هيتحفظ';
+  b.textContent = t('rp.offlineBar');
   document.body.insertBefore(b, document.body.firstChild.nextSibling);
 }
 
@@ -674,8 +760,8 @@ function finish(){
   $('veil').classList.add('gone');
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
-    b.textContent = '🧪 بيئة تجريبية — STAGING';
-    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
+    b.textContent = t('app.stagingBar');
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }
 }
@@ -684,10 +770,21 @@ function finish(){
    الحفظ
    ============================================================ */
 const nowIso = () => new Date().toISOString();
-const mkNote = txt => ({ text:txt, at:nowIso(), by:ME, role:'مسؤول الحركة' });
+// الملاحظات المتولّدة من النظام بتتخزّن **مركّبة** (kind + args) مش نص
+// جاهز — عشان اللي بيقرا يشوفها بلغته هو، مش بلغة اللي عملها.
+// الـ text بيتحفظ برضو كاحتياطي: للملاحظات القديمة، وللشاشات اللي
+// مبتعرفش تفكّ التركيب (زي تقارير الإكسل).
+const mkNote = (txt, kind, args) => {
+  const n = { text:txt, at:nowIso(), by:ME, role:t('dp.role') };
+  if(kind){ n.kind = kind; n.args = args || {}; }
+  return n;
+};
+// نص الملاحظة وقت العرض: مركّبة → نترجمها، قديمة → نعرضها زي ما هي
+const noteText = n => (n && n.kind && window.I18N && I18N.has(n.kind))
+  ? t(n.kind, n.args || {}) : (n ? n.text : '');
 
 async function patch(id, p){
-  if(!navigator.onLine){ toast('مفيش نت — التعديل مش هيتحفظ 📴'); return false; }
+  if(!navigator.onLine){ toast(t('rp.offlineEdit')); return false; }
   const { error } = await sb.rpc('device_patch', { p_id:id, p_patch:p });
   if(error){ toast('فشل الحفظ: ' + esc(error.message || error)); return false; }
   return true;
@@ -696,10 +793,10 @@ async function patch(id, p){
 // طلب اعتماد: نفس شكل الكائن اللي الداشبورد بيقراه في لوحة الاعتمادات
 async function requestApproval(id, kind){
   const d = devices.find(x => x.id === id); if(!d) return;
-  if(d.pending){ toast('فيه طلب معلّق على الجهاز ده بالفعل ⏳'); return; }
+  if(d.pending){ toast(t('tp.pendingReq')); return; }
 
   const isRet = kind === 'return';
-  const label = isRet ? 'إرجاع' : 'تسليم';
+  const label = isRet ? t('rp.return') : t('rp.deliver');
   if(!confirm(`طلب ${label} «${d.type} ${d.model}» هيتبعت للمحاسب للاعتماد. تكمّل؟`)) return;
 
   const req = {
@@ -714,7 +811,7 @@ async function requestApproval(id, kind){
     decidedBy: null, decidedAt: null, reason: null
   };
   const notes = [...((d._raw && d._raw.activityNotes) || []),
-                 mkNote(`⏳ طلب ${label} — بانتظار اعتماد المحاسب`)];
+                 mkNote(t('note.requestPending', { label }), 'note.requestPending', { label })];
 
   if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
                          lastModifiedAt: nowIso(), lastModifiedBy: ME }))) return;
@@ -726,7 +823,9 @@ async function requestApproval(id, kind){
 }
 const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
 const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
-  return d.toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) + ' · ' + d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); };
+  // التاريخ يتبع اللغة المختارة — عربي مصري أو إنجليزي بريطاني
+  var loc = (function(){ try{ return I18N.getLang()==='en' ? 'en-GB' : 'ar-EG'; }catch(e){ return 'ar-EG'; } })();
+  return d.toLocaleDateString(loc,{day:'numeric',month:'short'}) + ' · ' + d.toLocaleTimeString(loc,{hour:'2-digit',minute:'2-digit'}); };
 
 function statusPill(st){ const s=ST[st]||{label:st,c:'--muted'}; return `<span class="tk-status" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${s.label}</span>`; }
 
@@ -735,21 +834,21 @@ function ticketHtml(d){
   const delivered = d.status==='delivered';
   // فيه طلب معلّق؟ نوضّحه ونقفل الأزرار — مينفعش طلبين على نفس الجهاز
   const pend = d.pending
-    ? `<div class="pend">⏳ ${d.pending.type==='return'?'طلب إرجاع':'طلب تسليم'} بانتظار اعتماد المحاسب
+    ? `<div class="pend">⏳ ${d.pending.type==='return'?t('tp.reqReturn'):t('tp.reqDeliver')} بانتظار اعتماد المحاسب
         <span style="font-weight:700;opacity:.8;">· ${esc(d.pending.requestedBy||'')}</span></div>`
     : '';
   const actions = d.pending
     ? ''
     : delivered
-    ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')">↩️ إرجاع</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button></div>`
-    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')">📦 تسليم</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button></div>`;
+    ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')" data-i18n="rp.returnIco">↩️ ${t('rp.return')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`
+    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
   return `<div class="ticket" style="--sp:var(${s.c});" onclick="showInfo('${d.id}')">
     <div class="tk-top"><span class="tk-no">${ticketNo(d.id)}</span>${statusPill(d.status)}</div>
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
     <div class="tk-sub">${esc(d.customer)}${d.shop?`<span class="dot">•</span>${esc(d.shop)}`:''}</div>
     <div class="tk-meta">
-      <span class="chip">سجّلها: <b>${esc(d.by===ME?'إنت':d.by)}</b></span>
-      ${d.tech?`<span class="chip">الفني: <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);">لسه من غير فني</span>`}
+      <span class="chip">${t('rp.byColon')} <b>${esc(d.by===ME?t('rp.you'):d.by)}</b></span>
+      ${d.tech?`<span class="chip">${t('rp.techColon')} <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);" data-i18n="tp.noTechYet">لسه من غير ${t('tp.roleTech')}</span>`}
       <span>· ${fmtDate(d.intake)}</span>
     </div>
     ${pend}
@@ -761,16 +860,16 @@ function ticketHtml(d){
 function showInfo(id){
   const d = devices.find(x => x.id === id); if(!d) return;
   const L = [
-    ['التذكرة', ticketNo(d.id)],
-    ['الجهاز', [d.type, d.model].filter(Boolean).join(' ')],
-    ['الحالة', (ST[d.status]||{}).label || d.status],
-    ['العميل', d.customer],
-    ['التليفون', d.phone],
-    ['المحل', d.shop],
-    ['العطل', d.issue],
-    ['الفني', d.tech || 'لسه من غير فني'],
-    ['سجّلها', d.by],
-    ['الاستلام', fmtDate(d.intake)]
+    [t('rp.ticket'), ticketNo(d.id)],
+    [t('rp.device'), [d.type, d.model].filter(Boolean).join(' ')],
+    [t('rp.status'), (ST[d.status]||{}).label || d.status],
+    [t('rp.customer'), d.customer],
+    [t('rp.phone'), d.phone],
+    [t('rp.shop'), d.shop],
+    [t('rp.issue'), d.issue],
+    [t('rp.tech'), d.tech || t('tp.noTechYet')],
+    [t('rp.by'), d.by],
+    [t('dp.intake'), fmtDate(d.intake)]
   ];
   alert(L.filter(r => r[1]).map(r => r[0] + ': ' + r[1]).join('\n'));
 }
@@ -787,10 +886,10 @@ function render(){
   const tab = TABS.find(t=>t.key===activeTab);
   const list = devices.filter(tab.filter).filter(match)
     .sort((a,b)=> new Date(b.intake) - new Date(a.intake));
-  const emptyMsg = q ? 'مفيش نتيجة للبحث ده'
-    : activeTab==='mine' ? 'لسه مسجّلتش أي جهاز — ابدأ بـ «جهاز جديد»'
-    : activeTab==='out'  ? 'مفيش أجهزة اتسلّمت في آخر شهر'
-    : 'مفيش أجهزة في المحل حالياً';
+  const emptyMsg = q ? t('rp.noResults')
+    : activeTab==='mine' ? t('dp.emptyMine')
+    : activeTab==='out'  ? t('dp.emptyDelivered')
+    : t('dp.emptyAll');
   $('app').innerHTML = list.length
     ? `<div class="grid">${list.map(ticketHtml).join('')}</div>`
     : `<div class="empty"><span class="big">${q?'🔍':(activeTab==='out'?'📦':'🗂️')}</span>${emptyMsg}</div>`;
@@ -803,12 +902,12 @@ let saving = false;
 async function saveIntake(){
   if(saving) return;
   const type=$('f_type').value.trim(), model=$('f_model').value.trim(), cust=$('f_cust').value.trim();
-  if(!type || !cust){ toast('محتاج على الأقل نوع الجهاز واسم العميل'); return; }
-  if(!navigator.onLine){ toast('مفيش نت — مش ينفع تسجّل جهاز دلوقتي 📴'); return; }
+  if(!type || !cust){ toast(t('dp.needFields')); return; }
+  if(!navigator.onLine){ toast(t('dp.offlineIntake')); return; }
 
   const btn = $('btnSave');
   saving = true;
-  if(btn){ btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
+  if(btn){ btn.disabled = true; btn.textContent = t('dp.submitting'); }
 
   // device_intake بتولّد الرقم والتوكن والتاريخ على السيرفر،
   // وبتحدد السعر صفر — الديسباتشر مايكتبش سعر خالص
@@ -823,7 +922,7 @@ async function saveIntake(){
   }});
 
   saving = false;
-  if(btn){ btn.disabled = false; btn.textContent = 'سجّل الجهاز في المحل'; }
+  if(btn){ btn.disabled = false; btn.textContent = t('dp.submit'); }
 
   if(error){ toast('فشل التسجيل: ' + esc(error.message || error)); return; }
 
@@ -831,7 +930,7 @@ async function saveIntake(){
   closeIntake();
   await loadDevices();
   activeTab='mine'; render();
-  toast('اتسجّل الجهاز في «قيد الانتظار» ✅');
+  toast(t('dp.logged'));
 }
 
 /* ===== توست ===== */
@@ -873,12 +972,138 @@ addEventListener('offline', () => { offline = true; showOffline(); });
 setTimeout(() => {
   const v = $('veil');
   if(v && !v.classList.contains('gone')){
-    veilFail('التحميل واخد وقت أطول من المعتاد.<br><a href="index.html">تسجيل الدخول تاني</a>');
+    veilFail('التحميل واخد وقت أطول من المعتاد.<br><a href="index.html" data-i18n="rp.loginAgain">تسجيل الدخول تاني</a>');
   }
 }, 15000);
 
 boot().catch(e => veilFail('خطأ: ' + esc(e && e.message ? e.message : e) +
-  '<br><br><a href="index.html">تسجيل الدخول تاني</a>'));
+  '<br><br><a href="index.html" data-i18n="rp.loginAgain">تسجيل الدخول تاني</a>'));
+</script>
+<script>
+// ============================================================
+// قايمة ⋮ في الهيدر
+// ------------------------------------------------------------
+// الخروج كان زرار مكشوف في الهيدر — سهل يتدوس بالغلط والفني بيفقد
+// شغله. دلوقتي بقى آخر بند في القايمة ومعاه تأكيد.
+// ============================================================
+function toggleKebab(){
+  var m = document.getElementById('kebabMenu');
+  var s = document.getElementById('kebabShield');
+  if(!m) return;
+  var open = m.classList.contains('hidden');
+  m.classList.toggle('hidden', !open);
+  if(s) s.classList.toggle('hidden', !open);
+}
+function closeKebab(){
+  var m = document.getElementById('kebabMenu');
+  var s = document.getElementById('kebabShield');
+  if(m) m.classList.add('hidden');
+  if(s) s.classList.add('hidden');
+}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') closeKebab();
+});
+function kebabLogout(){
+  closeKebab();
+  if(!confirm(t('rp.logoutConfirm'))) return;
+  doLogout();
+}
+</script>
+
+<div class="set-bg hidden" id="setBg" onclick="if(event.target===this) closeSettings()">
+  <div class="set-card">
+    <div class="set-head"><h3 data-i18n="rp.settings">⚙️ الإعدادات</h3><button class="set-x" onclick="closeSettings()">×</button></div>
+    <div class="set-lbl" data-i18n="rp.theme">🎨 المظهر</div>
+    <div class="set-row" id="setRow"></div>
+    <p class="set-note" id="setNote"></p>
+    <div class="set-lbl" style="margin-top:16px;" data-i18n="rp.lang">🌐 اللغة</div>
+    <div class="set-row2" id="setLang"></div>
+
+  </div>
+</div>
+<script>
+// ============================================================
+// الإعدادات — المظهر
+// ------------------------------------------------------------
+// نفس مفتاح الداشبورد (ifix-theme)، فاختيار الفني بيسري على أي
+// شاشة يفتحها في النظام.
+// التلقائي: فاتح من ٧ص لـ ٧م، وداكن بعد كده.
+// ============================================================
+var LANGS = [{k:'ar', i:'🇪🇬', n:'العربية', s:'RTL'}, {k:'en', i:'🇬🇧', n:'English', s:'LTR'}];
+function curLang(){ try{ return I18N.getLang(); }catch(e){ return 'ar'; } }
+function pickLang(l){
+  if(l === curLang()){ closeSettings(); return; }
+  try{ I18N.setLang(l); }catch(e){}   // بيحفظ ويعيد التحميل
+}
+
+var THEMES = [
+  { k:'light', i:'☀️', n:t('rp.themeLight') },
+  { k:'dark',  i:'🌙', n:t('rp.themeDark') },
+  { k:'auto',  i:'⏰', n:t('rp.themeAuto') },
+];
+function themeMode(){ try{ return localStorage.getItem('ifix-theme') || 'auto'; }catch(e){ return 'auto'; } }
+function isDarkNow(m){
+  if(m==='dark') return true;
+  if(m==='light') return false;
+  var h = new Date().getHours();
+  return h >= 19 || h < 7;
+}
+function applyTheme(){
+  var d = isDarkNow(themeMode());
+  document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  var mt = document.querySelector('meta[name="theme-color"]');
+  if(mt) mt.setAttribute('content', d ? '#0E1721' : '#1B2A3A');
+}
+function openSettings(){ closeKebab(); renderSettings(); document.getElementById('setBg').classList.remove('hidden'); }
+function closeSettings(){ var e=document.getElementById('setBg'); if(e) e.classList.add('hidden'); }
+function renderSettings(){
+  var cur = themeMode();
+  document.getElementById('setRow').innerHTML = THEMES.map(function(x){
+    return '<button class="set-o'+(x.k===cur?' on':'')+'" onclick="pickTheme(\''+x.k+'\')">'
+         + '<span class="i">'+x.i+'</span><span>'+x.n+'</span></button>';
+  }).join('');
+  var lg = curLang();
+  document.getElementById('setLang').innerHTML = LANGS.map(function(x){
+    return '<button class="set-o'+(x.k===lg?' on':'')+'" onclick="pickLang(\''+x.k+'\')">'
+         + '<span class="i">'+x.i+'</span><span>'+x.n+'</span>'
+         + '<span style="font-size:10.5px;font-weight:400;opacity:.7">'+x.s+'</span></button>';
+  }).join('');
+  document.getElementById('setNote').textContent = cur==='auto'
+    ? t('rp.themeAutoHint', { on: isDarkNow('auto') ? t('rp.themeDark') : t('rp.themeLight') })
+    : '';
+}
+function pickTheme(m){
+  try{ localStorage.setItem('ifix-theme', m); }catch(e){}
+  applyTheme(); renderSettings();
+}
+// في الوضع التلقائي الشاشة تتبدّل لوحدها لما الساعة تعدّي الحد
+setInterval(function(){ if(themeMode()==='auto') applyTheme(); }, 60000);
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSettings(); });
+</script>
+<script>
+/* الترجمة بتتطبق بعد ما كل السكريبتات تحمّل — والاتجاه بيتظبط من I18N */
+// ============================================================
+// الترجمة للمحتوى المتولّد
+// ------------------------------------------------------------
+// applyI18n بتشتغل مرة واحدة وقت التحميل، لكن معظم الواجهة هنا
+// بتتبني بعد كده من قوالب جافاسكريبت. فبنلفّ innerHTML: أي حقن
+// جديد بتتطبّق عليه الترجمة على طول.
+// ------------------------------------------------------------
+(function(){
+  var d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  if(!d || !d.set) return;
+  Object.defineProperty(Element.prototype, 'innerHTML', {
+    configurable: true, enumerable: d.enumerable, get: d.get,
+    set: function(v){
+      d.set.call(this, v);
+      try{ if(window.I18N && I18N.applyI18n) I18N.applyI18n(this); }catch(e){}
+    }
+  });
+})();
+
+document.addEventListener('DOMContentLoaded', function(){
+  try{ I18N.applyI18n(document); }catch(e){}
+});
 </script>
 </body>
 </html>
