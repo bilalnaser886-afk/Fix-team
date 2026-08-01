@@ -17,7 +17,7 @@
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>مسؤول الحركة — I Fix Team</title>
+<title data-i18n="dp.title">مسؤول الحركة — I Fix Team</title>
 <link rel="icon" href="dispatch-icon-192.png">
 <link rel="apple-touch-icon" href="dispatch-icon-192.png">
 <meta name="theme-color" content="#1B2A3A">
@@ -25,6 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="الحركة">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -152,6 +153,8 @@
   .set-x{background:none; border:none; font-size:24px; line-height:1; color:var(--faint); cursor:pointer;}
   .set-lbl{font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:9px;}
   .set-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px;}
+  .set-row2{display:grid; grid-template-columns:1fr 1fr; gap:7px;}
+
   .set-o{display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px;
     border:1.5px solid var(--line); border-radius:12px; background:var(--paper);
     font-family:inherit; font-size:12.5px; font-weight:700; color:var(--ink); cursor:pointer;}
@@ -302,7 +305,7 @@
   <div class="who">
     <div class="mark"><img src="dispatch-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:var(--card);"></div>
     <div>
-      <div class="hi">مسؤول الحركة</div>
+      <div class="hi" data-i18n="dp.role">مسؤول الحركة</div>
       <div class="nm" id="dispName">كريم عادل</div>
     </div>
   </div>
@@ -310,11 +313,11 @@
     <button class="kebab-btn" onclick="toggleKebab()" aria-label="قائمة">⋮</button>
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
     <div id="kebabMenu" class="kebab-menu hidden">
-      <button onclick="closeKebab(); refresh()">🔄 تحديث</button>
+      <button onclick="closeKebab(); refresh()" data-i18n="dp.refresh">🔄 تحديث</button>
       <div class="sep"></div>
-      <button onclick="openSettings()">⚙️ الإعدادات</button>
+      <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
-      <button class="danger" onclick="kebabLogout()">تسجيل الخروج ⏻</button>
+      <button class="danger" onclick="kebabLogout()" data-i18n="rp.logout">تسجيل الخروج ⏻</button>
     </div>
   </div>
 </div>
@@ -324,7 +327,7 @@
 </div>
 
 <div class="tabs" id="tabs"></div>
-<div class="searchbar"><input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل..."></div>
+<div class="searchbar"><input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل..." data-i18n-ph="rp.searchPh"></div>
 <div class="wrap" id="app"></div>
 
 <!-- شيت إدخال جهاز -->
@@ -332,25 +335,25 @@
 <div class="sheet" id="sheet">
   <div class="sheet-head">
     <div class="grab"></div>
-    <div class="sh-row"><div class="sh-title">📥 استلام جهاز جديد</div><button class="sh-x" onclick="closeIntake()">×</button></div>
+    <div class="sh-row"><div class="sh-title" data-i18n="dp.intakeTitle">📥 استلام جهاز جديد</div><button class="sh-x" onclick="closeIntake()">×</button></div>
   </div>
   <div class="sh-body">
     <div class="frow">
-      <div class="fld"><label>نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..."></div>
-      <div class="fld"><label>الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
+      <div class="fld"><label data-i18n="dp.deviceType">نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..." data-i18n-ph="dp.deviceTypePh"></div>
+      <div class="fld"><label data-i18n="dp.model">الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
     </div>
-    <div class="fld"><label>اسم العميل</label><input id="f_cust" placeholder="اسم صاحب الجهاز"></div>
+    <div class="fld"><label data-i18n="dp.customerName">اسم العميل</label><input id="f_cust" placeholder="اسم صاحب الجهاز" data-i18n-ph="dp.customerNamePh"></div>
     <div class="frow">
-      <div class="fld"><label>تليفون العميل</label><input id="f_phone" inputmode="numeric" placeholder="010..." style="direction:ltr;text-align:right;"></div>
-      <div class="fld"><label>المحل (اختياري)</label><input id="f_shop" placeholder="لو الجهاز من محل"></div>
+      <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" inputmode="numeric" placeholder="010..." style="direction:ltr;text-align:right;"></div>
+      <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
     </div>
-    <div class="fld"><label>العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..."></textarea></div>
-    <button id="btnSave" class="save" onclick="saveIntake()">سجّل الجهاز في المحل</button>
+    <div class="fld"><label data-i18n="dp.issueLabel">العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." data-i18n-ph="dp.issuePh"></textarea></div>
+    <button id="btnSave" class="save" onclick="saveIntake()" data-i18n="dp.submit">سجّل الجهاز في المحل</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="demo">🎨 تصميم مبدئي — واجهة مسؤول الحركة</div>
+<div class="demo" data-i18n="dp.mockBar">🎨 تصميم مبدئي — واجهة مسؤول الحركة</div>
 
 
 <div id="sysbar" class="sysbar" style="display:none;"></div>
@@ -364,14 +367,14 @@
       <h2 class="nt-t" id="ntTitle"></h2>
       <p class="nt-b" id="ntBody"></p>
     </div>
-    <button class="nt-ok" onclick="ntClose()">تمام، فهمت 👍</button>
+    <button class="nt-ok" onclick="ntClose()" data-i18n="rp.understood">تمام، فهمت 👍</button>
   </div>
 </div>
 
 <div id="veil">
-  <div class="mk"><img src="dispatch-icon.png" alt="مسؤول الحركة"></div>
+  <div class="mk"><img src="dispatch-icon.png" alt=t('dp.role')></div>
   <div class="sp"></div>
-  <div class="ms" id="veilMsg">جاري التحميل...</div>
+  <div class="ms" id="veilMsg" data-i18n="rp.loading">جاري التحميل...</div>
 </div>
 
 <script>
@@ -422,10 +425,10 @@ function showLoadError(msg){
 }
 
 const ST = {
-  waiting:{label:'قيد الانتظار',c:'--waiting'}, diagnosing:{label:'جاري الكشف',c:'--diagnosing'},
-  repairing:{label:'جاري الصيانة',c:'--repairing'}, done:{label:'تم الصيانة',c:'--done'},
-  delivered:{label:'تم التسليم',c:'--delivered'}, rejected:{label:'تم الرفض',c:'--rejected'},
-  returned:{label:'المرتجعات',c:'--returned'},
+  waiting:{label:t('rp.stWaiting'),c:'--waiting'}, diagnosing:{label:t('rp.stDiagnosing'),c:'--diagnosing'},
+  repairing:{label:t('rp.stRepairing'),c:'--repairing'}, done:{label:t('rp.stDone'),c:'--done'},
+  delivered:{label:t('rp.stDelivered'),c:'--delivered'}, rejected:{label:t('rp.stRejected'),c:'--rejected'},
+  returned:{label:t('rp.stReturned'),c:'--returned'},
 };
 // "كل أجهزة المحل" = اللي لسه فعلاً في المحل.
 // النظام بيخزّن التسليم كحالة واحدة 'delivered'، والداشبورد بيقسمها
@@ -457,9 +460,9 @@ const _demo = [
 ];   // ← بيانات التصميم التجريبية، مش مستخدمة
 
 const TABS = [
-  {key:'mine',  label:'اللي سجّلتها',  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
-  {key:'shop',  label:'كل أجهزة المحل', filter:d => IN_SHOP.includes(d.status)},
-  {key:'out',   label:'المُسلَّمة',      filter:d => d.status==='delivered'},
+  {key:'mine',  label:t('dp.mine'),  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
+  {key:'shop',  label:t('dp.all'), filter:d => IN_SHOP.includes(d.status)},
+  {key:'out',   label:t('dp.delivered'),      filter:d => d.status==='delivered'},
 ];
 let activeTab = 'mine';
 
@@ -580,7 +583,7 @@ async function loadNotices(){
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0))   // الأقدم الأول
       .map(bc => ({
         icon:    bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢'),
-        title:   bc.title || 'إشعار',
+        title:   bc.title || t('rp.notice'),
         body:    bc.body || '',
         seenKey: 'ifix_seen_bc_' + bc.id
       }));
@@ -697,7 +700,7 @@ function showOffline(){
   if(document.querySelector('.offbar')) return;
   const b = document.createElement('div');
   b.className = 'offbar';
-  b.textContent = '📴 مفيش نت — بتشوف آخر نسخة محفوظة، والتعديل مش هيتحفظ';
+  b.textContent = t('rp.offlineBar');
   document.body.insertBefore(b, document.body.firstChild.nextSibling);
 }
 
@@ -762,7 +765,7 @@ function finish(){
   $('veil').classList.add('gone');
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
-    b.textContent = '🧪 بيئة تجريبية — STAGING';
+    b.textContent = t('rp.staging');
     b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }
@@ -772,10 +775,10 @@ function finish(){
    الحفظ
    ============================================================ */
 const nowIso = () => new Date().toISOString();
-const mkNote = txt => ({ text:txt, at:nowIso(), by:ME, role:'مسؤول الحركة' });
+const mkNote = txt => ({ text:txt, at:nowIso(), by:ME, role:t('dp.role') });
 
 async function patch(id, p){
-  if(!navigator.onLine){ toast('مفيش نت — التعديل مش هيتحفظ 📴'); return false; }
+  if(!navigator.onLine){ toast(t('rp.offlineEdit')); return false; }
   const { error } = await sb.rpc('device_patch', { p_id:id, p_patch:p });
   if(error){ toast('فشل الحفظ: ' + esc(error.message || error)); return false; }
   return true;
@@ -784,10 +787,10 @@ async function patch(id, p){
 // طلب اعتماد: نفس شكل الكائن اللي الداشبورد بيقراه في لوحة الاعتمادات
 async function requestApproval(id, kind){
   const d = devices.find(x => x.id === id); if(!d) return;
-  if(d.pending){ toast('فيه طلب معلّق على الجهاز ده بالفعل ⏳'); return; }
+  if(d.pending){ toast(t('tp.pendingReq')); return; }
 
   const isRet = kind === 'return';
-  const label = isRet ? 'إرجاع' : 'تسليم';
+  const label = isRet ? t('rp.return') : t('rp.deliver');
   if(!confirm(`طلب ${label} «${d.type} ${d.model}» هيتبعت للمحاسب للاعتماد. تكمّل؟`)) return;
 
   const req = {
@@ -823,21 +826,21 @@ function ticketHtml(d){
   const delivered = d.status==='delivered';
   // فيه طلب معلّق؟ نوضّحه ونقفل الأزرار — مينفعش طلبين على نفس الجهاز
   const pend = d.pending
-    ? `<div class="pend">⏳ ${d.pending.type==='return'?'طلب إرجاع':'طلب تسليم'} بانتظار اعتماد المحاسب
+    ? `<div class="pend">⏳ ${d.pending.type==='return'?t('tp.reqReturn'):t('tp.reqDeliver')} بانتظار اعتماد المحاسب
         <span style="font-weight:700;opacity:.8;">· ${esc(d.pending.requestedBy||'')}</span></div>`
     : '';
   const actions = d.pending
     ? ''
     : delivered
-    ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')">↩️ إرجاع</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button></div>`
-    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')">📦 تسليم</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button></div>`;
+    ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')" data-i18n="rp.returnIco">↩️ ${t('rp.return')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`
+    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
   return `<div class="ticket" style="--sp:var(${s.c});" onclick="showInfo('${d.id}')">
     <div class="tk-top"><span class="tk-no">${ticketNo(d.id)}</span>${statusPill(d.status)}</div>
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
     <div class="tk-sub">${esc(d.customer)}${d.shop?`<span class="dot">•</span>${esc(d.shop)}`:''}</div>
     <div class="tk-meta">
-      <span class="chip">سجّلها: <b>${esc(d.by===ME?'إنت':d.by)}</b></span>
-      ${d.tech?`<span class="chip">الفني: <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);">لسه من غير فني</span>`}
+      <span class="chip">سجّلها: <b>${esc(d.by===ME?t('rp.you'):d.by)}</b></span>
+      ${d.tech?`<span class="chip">${t('rp.techColon')} <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);" data-i18n="tp.noTechYet">لسه من غير ${t('tp.roleTech')}</span>`}
       <span>· ${fmtDate(d.intake)}</span>
     </div>
     ${pend}
@@ -849,16 +852,16 @@ function ticketHtml(d){
 function showInfo(id){
   const d = devices.find(x => x.id === id); if(!d) return;
   const L = [
-    ['التذكرة', ticketNo(d.id)],
-    ['الجهاز', [d.type, d.model].filter(Boolean).join(' ')],
-    ['الحالة', (ST[d.status]||{}).label || d.status],
-    ['العميل', d.customer],
-    ['التليفون', d.phone],
-    ['المحل', d.shop],
-    ['العطل', d.issue],
-    ['الفني', d.tech || 'لسه من غير فني'],
-    ['سجّلها', d.by],
-    ['الاستلام', fmtDate(d.intake)]
+    [t('rp.ticket'), ticketNo(d.id)],
+    [t('rp.device'), [d.type, d.model].filter(Boolean).join(' ')],
+    [t('rp.status'), (ST[d.status]||{}).label || d.status],
+    [t('rp.customer'), d.customer],
+    [t('rp.phone'), d.phone],
+    [t('rp.shop'), d.shop],
+    [t('rp.issue'), d.issue],
+    [t('rp.tech'), d.tech || t('tp.noTechYet')],
+    [t('rp.by'), d.by],
+    [t('dp.intake'), fmtDate(d.intake)]
   ];
   alert(L.filter(r => r[1]).map(r => r[0] + ': ' + r[1]).join('\n'));
 }
@@ -875,10 +878,10 @@ function render(){
   const tab = TABS.find(t=>t.key===activeTab);
   const list = devices.filter(tab.filter).filter(match)
     .sort((a,b)=> new Date(b.intake) - new Date(a.intake));
-  const emptyMsg = q ? 'مفيش نتيجة للبحث ده'
-    : activeTab==='mine' ? 'لسه مسجّلتش أي جهاز — ابدأ بـ «جهاز جديد»'
-    : activeTab==='out'  ? 'مفيش أجهزة اتسلّمت في آخر شهر'
-    : 'مفيش أجهزة في المحل حالياً';
+  const emptyMsg = q ? t('rp.noResults')
+    : activeTab==='mine' ? t('dp.emptyMine')
+    : activeTab==='out'  ? t('dp.emptyDelivered')
+    : t('dp.emptyAll');
   $('app').innerHTML = list.length
     ? `<div class="grid">${list.map(ticketHtml).join('')}</div>`
     : `<div class="empty"><span class="big">${q?'🔍':(activeTab==='out'?'📦':'🗂️')}</span>${emptyMsg}</div>`;
@@ -891,12 +894,12 @@ let saving = false;
 async function saveIntake(){
   if(saving) return;
   const type=$('f_type').value.trim(), model=$('f_model').value.trim(), cust=$('f_cust').value.trim();
-  if(!type || !cust){ toast('محتاج على الأقل نوع الجهاز واسم العميل'); return; }
-  if(!navigator.onLine){ toast('مفيش نت — مش ينفع تسجّل جهاز دلوقتي 📴'); return; }
+  if(!type || !cust){ toast(t('dp.needFields')); return; }
+  if(!navigator.onLine){ toast(t('dp.offlineIntake')); return; }
 
   const btn = $('btnSave');
   saving = true;
-  if(btn){ btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
+  if(btn){ btn.disabled = true; btn.textContent = t('dp.submitting'); }
 
   // device_intake بتولّد الرقم والتوكن والتاريخ على السيرفر،
   // وبتحدد السعر صفر — الديسباتشر مايكتبش سعر خالص
@@ -911,7 +914,7 @@ async function saveIntake(){
   }});
 
   saving = false;
-  if(btn){ btn.disabled = false; btn.textContent = 'سجّل الجهاز في المحل'; }
+  if(btn){ btn.disabled = false; btn.textContent = t('dp.submit'); }
 
   if(error){ toast('فشل التسجيل: ' + esc(error.message || error)); return; }
 
@@ -919,7 +922,7 @@ async function saveIntake(){
   closeIntake();
   await loadDevices();
   activeTab='mine'; render();
-  toast('اتسجّل الجهاز في «قيد الانتظار» ✅');
+  toast(t('dp.logged'));
 }
 
 /* ===== توست ===== */
@@ -961,12 +964,12 @@ addEventListener('offline', () => { offline = true; showOffline(); });
 setTimeout(() => {
   const v = $('veil');
   if(v && !v.classList.contains('gone')){
-    veilFail('التحميل واخد وقت أطول من المعتاد.<br><a href="index.html">تسجيل الدخول تاني</a>');
+    veilFail('التحميل واخد وقت أطول من المعتاد.<br><a href="index.html" data-i18n="rp.loginAgain">تسجيل الدخول تاني</a>');
   }
 }, 15000);
 
 boot().catch(e => veilFail('خطأ: ' + esc(e && e.message ? e.message : e) +
-  '<br><br><a href="index.html">تسجيل الدخول تاني</a>'));
+  '<br><br><a href="index.html" data-i18n="rp.loginAgain">تسجيل الدخول تاني</a>'));
 </script>
 <script>
 // ============================================================
@@ -994,17 +997,20 @@ document.addEventListener('keydown', function(e){
 });
 function kebabLogout(){
   closeKebab();
-  if(!confirm('تسجيل الخروج من النظام؟')) return;
+  if(!confirm(t('rp.logoutConfirm'))) return;
   doLogout();
 }
 </script>
 
 <div class="set-bg hidden" id="setBg" onclick="if(event.target===this) closeSettings()">
   <div class="set-card">
-    <div class="set-head"><h3>⚙️ الإعدادات</h3><button class="set-x" onclick="closeSettings()">×</button></div>
-    <div class="set-lbl">🎨 المظهر</div>
+    <div class="set-head"><h3 data-i18n="rp.settings">⚙️ الإعدادات</h3><button class="set-x" onclick="closeSettings()">×</button></div>
+    <div class="set-lbl" data-i18n="rp.theme">🎨 المظهر</div>
     <div class="set-row" id="setRow"></div>
     <p class="set-note" id="setNote"></p>
+    <div class="set-lbl" style="margin-top:16px;" data-i18n="rp.lang">🌐 اللغة</div>
+    <div class="set-row2" id="setLang"></div>
+
   </div>
 </div>
 <script>
@@ -1015,10 +1021,17 @@ function kebabLogout(){
 // شاشة يفتحها في النظام.
 // التلقائي: فاتح من ٧ص لـ ٧م، وداكن بعد كده.
 // ============================================================
+var LANGS = [{k:'ar', i:'🇪🇬', n:'العربية', s:'RTL'}, {k:'en', i:'🇬🇧', n:'English', s:'LTR'}];
+function curLang(){ try{ return I18N.getLang(); }catch(e){ return 'ar'; } }
+function pickLang(l){
+  if(l === curLang()){ closeSettings(); return; }
+  try{ I18N.setLang(l); }catch(e){}   // بيحفظ ويعيد التحميل
+}
+
 var THEMES = [
-  { k:'light', i:'☀️', n:'فاتح' },
-  { k:'dark',  i:'🌙', n:'داكن' },
-  { k:'auto',  i:'⏰', n:'تلقائي' },
+  { k:'light', i:'☀️', n:t('rp.themeLight') },
+  { k:'dark',  i:'🌙', n:t('rp.themeDark') },
+  { k:'auto',  i:'⏰', n:t('rp.themeAuto') },
 ];
 function themeMode(){ try{ return localStorage.getItem('ifix-theme') || 'auto'; }catch(e){ return 'auto'; } }
 function isDarkNow(m){
@@ -1041,8 +1054,14 @@ function renderSettings(){
     return '<button class="set-o'+(x.k===cur?' on':'')+'" onclick="pickTheme(\''+x.k+'\')">'
          + '<span class="i">'+x.i+'</span><span>'+x.n+'</span></button>';
   }).join('');
+  var lg = curLang();
+  document.getElementById('setLang').innerHTML = LANGS.map(function(x){
+    return '<button class="set-o'+(x.k===lg?' on':'')+'" onclick="pickLang(\''+x.k+'\')">'
+         + '<span class="i">'+x.i+'</span><span>'+x.n+'</span>'
+         + '<span style="font-size:10.5px;font-weight:400;opacity:.7">'+x.s+'</span></button>';
+  }).join('');
   document.getElementById('setNote').textContent = cur==='auto'
-    ? ('فاتح من ٧ الصبح لـ ٧ بالليل، وداكن بعد كده. دلوقتي: ' + (isDarkNow('auto') ? 'داكن' : 'فاتح') + '.')
+    ? t('rp.themeAutoHint', { on: isDarkNow('auto') ? t('rp.themeDark') : t('rp.themeLight') })
     : '';
 }
 function pickTheme(m){
@@ -1052,6 +1071,12 @@ function pickTheme(m){
 // في الوضع التلقائي الشاشة تتبدّل لوحدها لما الساعة تعدّي الحد
 setInterval(function(){ if(themeMode()==='auto') applyTheme(); }, 60000);
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSettings(); });
+</script>
+<script>
+/* الترجمة بتتطبق بعد ما كل السكريبتات تحمّل — والاتجاه بيتظبط من I18N */
+document.addEventListener('DOMContentLoaded', function(){
+  try{ I18N.applyI18n(document); }catch(e){}
+});
 </script>
 </body>
 </html>
