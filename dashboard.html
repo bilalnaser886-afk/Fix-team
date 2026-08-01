@@ -9,17 +9,9 @@
 <meta name="theme-color" content="#101014">
 <link rel="manifest" href="manifest.json">
 <title>I Fix Team — نظام إدارة الصيانة</title>
-<link rel="icon" type="image/x-icon" href="favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="i18n.js"></script>
-<!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
-<script src="ai-invoice.js"></script>
+<!-- ⚠️ سكريبت الإقلاع لازم يفضل فوق وسوم الأيقونات. لو نزل تحتها،
+     المتصفح بيبدأ يحمّل أيقونة النظام قبل ما التحويل يحصل — والفني
+     يشوف لمحة أيقونة غلط قبل أيقونة صفحته. -->
 <script>
 // ============================================================
 // ستارة الإقلاع — لازم تشتغل قبل أي رسم
@@ -76,6 +68,11 @@
     document.documentElement.classList.add('app-booting');
     var last2 = localStorage.getItem('ifix-last-role');
     if(last2 === 'technician') document.documentElement.classList.add('pre-technician');
+    // الأدمن والمحاسب بيفضلوا على الداشبورد → لوجو النظام صح، نعرضه فوراً.
+    // الفني والديسباتشر (أو دور لسه مش معروف) → منعرضش حاجة، عشان
+    // ماتظهرش لمحة لوجو غلط قبل التحويل.
+    if(last2 === 'super_admin' || last2 === 'accountant')
+      document.documentElement.classList.add('bv-brand');
   }catch(e){}
   // شبكة أمان: لو حصل خطأ ومنعش شيل الستارة، ما نسيبش المستخدم مقفول
   setTimeout(function(){
@@ -83,6 +80,17 @@
   }, 6000);
 })();
 </script>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="i18n.js"></script>
+<!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
+<script src="ai-invoice.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -331,7 +339,12 @@
     align-items:center; justify-content:center; flex-direction:column; gap:14px;
     background:#F3F5F7;
   }
-  #bootVeil .bv-logo{width:72px; height:72px; border-radius:18px; overflow:hidden; box-shadow:0 6px 20px rgba(16,16,20,.12);}
+  /* اللوجو مخفي لحد ما نتأكد إن المستخدم هيفضل على الداشبورد.
+     visibility مش display — عشان المساحة تفضل محجوزة والسبينر ما ينطش.
+     من غير كده الفني والديسباتشر كانوا بيشوفوا لوجو النظام لحظة
+     قبل ما يتحوّلوا لصفحاتهم. */
+  #bootVeil .bv-logo{width:72px; height:72px; border-radius:18px; overflow:hidden; box-shadow:0 6px 20px rgba(16,16,20,.12); visibility:hidden;}
+  html.bv-brand #bootVeil .bv-logo{visibility:visible;}
   #bootVeil .bv-logo img{width:100%; height:100%; object-fit:cover; display:block;}
   #bootVeil .bv-spin{
     width:26px; height:26px; border-radius:50%;
@@ -1367,6 +1380,7 @@ function applyRoleVisibility(){
     localStorage.setItem('ifix-last-email', (currentUser.email || '').toLowerCase());
     const r = document.documentElement.classList;
     r.toggle('pre-technician', isTechnician());
+    r.add('bv-brand');   // وصلنا هنا يعني محاسب أو أدمن — اللوجو صح
     // ملحوظة: الفني والديسباتشر اتحوّلوا لصفحاتهم بـ return فوق،
     // فاللي بيوصل هنا محاسب أو أدمن — الستارة تتشال على طول.
     r.remove('app-booting');

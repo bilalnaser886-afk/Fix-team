@@ -166,6 +166,48 @@ const ADMIN_EMAILS_BY_ENV = {
 };
 const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
 const landingFor = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase()) ? 'admin.html' : 'dashboard.html';
+
+// ============================================================
+// تحويل حسب الدور — من هنا مباشرة، من غير ما نعدّي على الداشبورد
+// ------------------------------------------------------------
+// قبل كده كل الموظفين كانوا بيروحوا dashboard.html، وهو اللي بيحوّل
+// الفني والديسباتشر لصفحاتهم. النتيجة إن المستخدم كان يشوف لمحة من
+// أيقونة وواجهة النظام قبل ما يوصل صفحته.
+//
+// دلوقتي بنقرا الدور هنا (نفس منطق roleOf في الداشبورد) وبنروح على
+// طول. وبنحفظ الدور محلياً كمان — فحتى لو دخل الداشبورد بعدين،
+// التحويل السريع بتاعه هيشتغل من أول لحظة.
+//
+// أي فشل → بنرجع لسلوك زمان (dashboard.html). الدخول ممنوع يتعطّل
+// عشان استعلام إضافي.
+// ============================================================
+async function landingByRole(email){
+  const e = (email || '').toLowerCase();
+  if(ADMIN_EMAILS.includes(e)) return 'admin.html';
+  if(!ADMIN_EMAILS.length)     return 'dashboard.html';   // الإعداد لسه ماتعملش
+
+  let role = 'accountant';
+  try{
+    const q = sb.from('app_data').select('value').eq('key', 'user-roles').maybeSingle();
+    const res = await Promise.race([q, new Promise(r => setTimeout(() => r(null), 4000))]);
+    if(res && res.data && res.data.value){
+      const map = JSON.parse(res.data.value) || {};
+      const v = map[e];
+      const found = (typeof v === 'string') ? v : (v && v.role);
+      if(['super_admin','accountant','dispatcher','technician'].includes(found)) role = found;
+    }
+  }catch(err){ /* نكمّل بالافتراضي */ }
+
+  try{
+    localStorage.setItem('ifix-last-role', role);
+    localStorage.setItem('ifix-last-email', e);
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(err){}
+
+  if(role === 'technician') return 'my-devices.html';
+  if(role === 'dispatcher') return 'dispatch.html';
+  return 'dashboard.html';
+}
 if(APP_ENV === "staging"){
   addEventListener("DOMContentLoaded", function(){
     var b = document.createElement("div");
@@ -249,7 +291,7 @@ if(APP_ENV === "staging"){
             }
 
             if (active) {
-                window.location.href = landingFor(email);
+                window.location.href = await landingByRole(email);
             } else {
                 await sb.auth.signOut();
                 showRenewBox();
@@ -267,7 +309,7 @@ if(APP_ENV === "staging"){
     sb.auth.getSession().then(async ({ data: { session } }) => {
         if (!session) return;
         const active = await shopActive();
-        if (active) window.location.href = landingFor(session.user.email);
+        if (active) window.location.href = await landingByRole(session.user.email);
     });
 </script>
 </body>
