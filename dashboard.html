@@ -1988,7 +1988,8 @@ async function serverWatermark(){
 }
 
 // بيجيب صفوف بالـ keyset. لو اتبعت since بيجيب المتغيّر بس.
-async function fetchRows(since){
+// onPage بتتنادى بعد كل صفحة — عشان نقدر نعرض قبل ما الكل يخلص.
+async function fetchRows(since, onPage){
   const PAGE = 1000, out = [];
   let lastId = '', guard = 0;
   while(guard++ < 1000){
@@ -2001,8 +2002,15 @@ async function fetchRows(since){
     if(!data || !data.length) break;
     out.push(...data);
     lastId = data[data.length-1].id;
+    if(onPage) onPage(out);
   }
   return out;
+}
+
+// شريط تقدّم خفيف تحت الهيدر أثناء التحميل الأول
+function loadProgress(n){
+  const el = document.getElementById('saveIndicator');
+  if(el) el.textContent = n ? ('جاري التحميل... ' + n.toLocaleString('en-EG')) : '';
 }
 
 function sortDevices(){
@@ -2040,7 +2048,25 @@ async function loadDevices(opts){
     } else {
       // 🐢 الطريق الكامل: أول مرة، أو الكاش فاضي، أو عدّى ٢٤ ساعة
       const wm = await serverWatermark();
-      const rows = await fetchRows(null);
+
+      // ✅ عرض تدريجي: بنرسم الشاشة بعد أول ألف جهاز وبنكمّل في الخلفية.
+      // التحميل لسه بياخد نفس الوقت، بس المستخدم بيشوف الشاشة في ثانية
+      // بدل ما يقعد قدام صفحة فاضية ١٥ ثانية.
+      // بنرسم كل ٨٠٠ مللي على الأكتر عشان الرسم ما ياكلش وقت الجلب.
+      let painted = 0, lastPaint = 0;
+      const rows = await fetchRows(null, (sofar) => {
+        const now = performance.now();
+        if(painted && (now - lastPaint) < 800) return;
+        painted = sofar.length; lastPaint = now;
+        devices = sofar.map(r => r.data);
+        sortDevices();
+        devicesLoaded = true;
+        loadProgress(sofar.length);
+        render();
+        try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
+      });
+      loadProgress(0);
+
       if(rows.length){
         devices = rows.map(r => r.data);
       } else {
