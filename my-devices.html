@@ -451,7 +451,37 @@ async function loadDevices(){
       showLoadError(loadError);
     }
   }
-  // أسماء الفنيين للتحويل: من الأجهزة اللي الفني شايفها
+  await loadTechNames();
+}
+
+// ============================================================
+// أسماء الفنيين للتحويل
+// ------------------------------------------------------------
+// ⚠️ مش ممكن نبنيها من devices — الفني بيقرا أجهزته هو بس، فكل
+// الأسماء اللي فيها اسمه، والقائمة بتطلع فاضية. ده أثر جانبي
+// مباشر لقفل devices_data.
+//
+// tech_names() دالة على السيرفر بترجّع أسماء الفنيين اللي اشتغلوا
+// على أي جهاز. أسماء بس — مفيش أجهزة ولا عملاء ولا أسعار، والفني
+// شايف الأسماء دي على أجهزته أصلاً.
+//
+// لو الدالة مش منشورة، بنرجع للأسماء اللي في أجهزته عشان الشاشة
+// ما تقفش — بس القائمة هتبقى ناقصة.
+// ============================================================
+async function loadTechNames(){
+  try{
+    const { data, error } = await sb.rpc('tech_names');
+    if(error) throw error;
+    OTHER_TECHS = (data || [])
+      .map(r => (typeof r === 'string' ? r : (r && r.tech_names) || ''))
+      .map(n => String(n).trim())
+      .filter(n => n && n !== ME)
+      .sort((a,b) => a.localeCompare(b,'ar'));
+    if(OTHER_TECHS.length) return;
+  }catch(e){
+    console.warn('tech_names مش متاحة:', e && e.message ? e.message : e);
+  }
+  // احتياطي: الأسماء اللي على أجهزته
   OTHER_TECHS = [...new Set(devices.map(d => d.tech).filter(Boolean))]
     .filter(n => n !== ME).sort((a,b) => a.localeCompare(b,'ar'));
 }
@@ -711,7 +741,7 @@ function renderSheet(){
         <div class="hand-body ${handOn?'on':''}" id="hbody">
           <div class="hb-h">اختار الفني</div>
           <select class="tsel" onchange="handTarget=this.value;syncOk()">
-            <option value="">— اختار فني —</option>
+            <option value="">${techs.length ? '— اختار فني —' : '— مفيش فنيين تانيين —'}</option>
             ${techs.map(n=>`<option value="${esc(n)}" ${n===handTarget?'selected':''}>${esc(n)}</option>`).join('')}
           </select>
           <div class="hb-h" style="margin-top:15px;">نوع التحويل</div>
