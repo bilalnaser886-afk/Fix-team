@@ -770,7 +770,18 @@ function finish(){
    الحفظ
    ============================================================ */
 const nowIso = () => new Date().toISOString();
-const mkNote = txt => ({ text:txt, at:nowIso(), by:ME, role:t('dp.role') });
+// الملاحظات المتولّدة من النظام بتتخزّن **مركّبة** (kind + args) مش نص
+// جاهز — عشان اللي بيقرا يشوفها بلغته هو، مش بلغة اللي عملها.
+// الـ text بيتحفظ برضو كاحتياطي: للملاحظات القديمة، وللشاشات اللي
+// مبتعرفش تفكّ التركيب (زي تقارير الإكسل).
+const mkNote = (txt, kind, args) => {
+  const n = { text:txt, at:nowIso(), by:ME, role:t('dp.role') };
+  if(kind){ n.kind = kind; n.args = args || {}; }
+  return n;
+};
+// نص الملاحظة وقت العرض: مركّبة → نترجمها، قديمة → نعرضها زي ما هي
+const noteText = n => (n && n.kind && window.I18N && I18N.has(n.kind))
+  ? t(n.kind, n.args || {}) : (n ? n.text : '');
 
 async function patch(id, p){
   if(!navigator.onLine){ toast(t('rp.offlineEdit')); return false; }
@@ -800,7 +811,7 @@ async function requestApproval(id, kind){
     decidedBy: null, decidedAt: null, reason: null
   };
   const notes = [...((d._raw && d._raw.activityNotes) || []),
-                 mkNote(`⏳ طلب ${label} — بانتظار اعتماد المحاسب`)];
+                 mkNote(t('note.requestPending', { label }), 'note.requestPending', { label })];
 
   if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
                          lastModifiedAt: nowIso(), lastModifiedBy: ME }))) return;

@@ -832,7 +832,18 @@ function finish(disp){
    الحفظ — كله عبر device_patch
    ============================================================ */
 const nowIso = () => new Date().toISOString();
-const mkNote = txt => ({ text:txt, at:nowIso(), by:ME, role:t('tp.roleTech') });
+// الملاحظات المتولّدة من النظام بتتخزّن **مركّبة** (kind + args) مش نص
+// جاهز — عشان اللي بيقرا يشوفها بلغته هو، مش بلغة اللي عملها.
+// الـ text بيتحفظ برضو كاحتياطي: للملاحظات القديمة، وللشاشات اللي
+// مبتعرفش تفكّ التركيب (زي تقارير الإكسل).
+const mkNote = (txt, kind, args) => {
+  const n = { text:txt, at:nowIso(), by:ME, role:t('tp.roleTech') };
+  if(kind){ n.kind = kind; n.args = args || {}; }
+  return n;
+};
+// نص الملاحظة وقت العرض: مركّبة → نترجمها، قديمة → نعرضها زي ما هي
+const noteText = n => (n && n.kind && window.I18N && I18N.has(n.kind))
+  ? t(n.kind, n.args || {}) : (n ? n.text : '');
 
 // بترجّع true لو الحفظ نجح
 async function save(id, patch){
@@ -915,7 +926,8 @@ async function setStatus(id, st){
   const hist = [...((d._raw && d._raw.statusHistory) || []),
                 { status:st, date:nowIso(), by:ME }];
   const lbl  = (ST[st] || {}).label || st;
-  const note = mkNote(`تغيير ${t('rp.status')}: ${(ST[d.status]||{}).label || d.status} → ${lbl}`);
+  const _from = (ST[d.status]||{}).label || d.status;
+  const note = mkNote(t('note.statusChange', { from:_from, to:lbl }), 'note.statusChange', { from:_from, to:lbl });
   if(!(await save(id, {
         status:st, statusHistory:hist,
         activityNotes: notesForSave(d, note),
@@ -938,7 +950,7 @@ async function setStatus(id, st){
 async function reportProblem(id){
   const d = devices.find(x=>x.id===id); if(!d) return;
   const txt = (prompt(t('tp.problemPh'))||'').trim(); if(!txt) return;
-  const note = mkNote('⚠️ فيه مشكلة: ' + txt);
+  const note = mkNote(t('note.problem', { txt }), 'note.problem', { txt });
   const all  = notesForSave(d, note);
   if(!(await save(id, { activityNotes:all, lastModifiedAt:nowIso(), lastModifiedBy:ME }))) return;
   if(d._raw) d._raw.activityNotes = all;
@@ -986,7 +998,7 @@ function renderSheet(){
         ${notes.length ? notes.map(n=>`
           <div class="note">
             <div class="av">${esc((n.by||'؟').slice(0,1))}</div>
-            <div><div>${esc(n.text)}</div><div class="meta">${esc(n.by)} · ${fmtDate(n.at)}</div></div>
+            <div><div>${esc(noteText(n))}</div><div class="meta">${esc(n.by)} · ${fmtDate(n.at)}</div></div>
           </div>`).join('') : `<div style="color:var(--faint);font-size:13px;" data-i18n="tp.noNotes">لسه مفيش ملاحظات — اكتب أول واحدة.</div>`}
         <div class="note-in">
           <textarea id="noteTxt" placeholder="اكتب ملاحظة عن حالة الجهاز أو الكشف..." data-i18n-ph="tp.notePh"></textarea>
@@ -1038,9 +1050,9 @@ async function doHandoff(){
   const d=devices.find(x=>x.id===sheetId); if(!d||!handMode||!handTarget) return;
 
   const full  = handMode === 'full';
-  const txt   = full ? `🔄 ${t('rp.deliver')} ${t('rp.device')} بالكامل من ${d.tech || '—'} إلى ${handTarget}`
-                     : `🤝 إضافة ${t('tp.handAssist')}: ${handTarget}`;
-  const note  = mkNote(txt);
+  const _kind = full ? 'note.handoffFull' : 'note.handoffAssist';
+  const _args = { from: d.tech || '—', to: handTarget };
+  const note  = mkNote(t(_kind, _args), _kind, _args);
   const patch = { activityNotes: notesForSave(d, note), lastModifiedAt: nowIso(), lastModifiedBy: ME };
 
   if(full){
