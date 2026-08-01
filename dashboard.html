@@ -141,6 +141,17 @@
     font-family:inherit; color:var(--ink);
   }
   .menu-dropdown button:hover{background:#F1F5F9;}
+  /* قايمة اختيار الفني — شكلها زي حقول الإدخال بالظبط عشان
+     الواجهة ما تبانش متفككة بعد التحويل من input لـ select */
+  .tech-select{
+    width:100%; font-size:15px; font-family:inherit; color:var(--ink);
+    border:1.5px solid #E3E4E8; border-radius:11px; padding:11px 12px;
+    background:var(--surface); appearance:none; -webkit-appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,#94A3B8 50%),linear-gradient(135deg,#94A3B8 50%,transparent 50%);
+    background-position:calc(0% + 14px) calc(50% + 2px), calc(0% + 19px) calc(50% + 2px);
+    background-size:5px 5px, 5px 5px; background-repeat:no-repeat;
+  }
+  .tech-select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(8,145,168,.14);}
   .brand{display:flex; align-items:center; gap:10px; min-width:0; flex:0 1 auto;}
   .brand .logo{
     width:36px;height:36px;aspect-ratio:1/1;flex:0 0 36px;border-radius:10px;background:var(--accent);
@@ -1125,6 +1136,29 @@
     <div class="modal-head"><h2 data-i18n="lock.edit">تعديل رمز قفل الجهاز</h2><button class="close-btn" onclick="closeEditLock()">×</button></div>
     <div id="editLockHost"></div>
     <button class="btn-primary" style="box-shadow:none;margin-top:8px;" data-i18n="lock.save" onclick="saveEditedLock()">حفظ رمز القفل</button>
+  </div>
+</div>
+
+<!-- إضافة فني جديد — بيتحفظ كمعلّق لحد ما الأدمن يعمله إيميل -->
+<div id="addTechOverlay" class="overlay hidden" style="z-index:62;">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-head">
+      <h2 data-i18n="tech.addTitle">إضافة فني جديد</h2>
+      <button class="close-btn" onclick="closeAddTech()">×</button>
+    </div>
+    <div style="padding:6px 20px 22px;">
+      <p style="font-size:12.5px;color:#64748B;line-height:1.8;margin:0 0 12px;" data-i18n="tech.addHint">
+        الفني هيتضاف للقايمة على طول، وهيفضل موقوف لحد ما الأدمن يعمله إيميل وحساب دخول.
+      </p>
+      <label class="field" style="display:block;">
+        <span data-i18n="tech.nameLabel">اسم الفني</span>
+        <input id="addTechName" type="text" autocomplete="off"
+               onkeydown="if(event.key==='Enter') saveNewTech(); if(event.key==='Escape') closeAddTech();" />
+      </label>
+      <div id="addTechErr" style="color:#DC2626;font-size:12.5px;min-height:18px;margin-bottom:6px;"></div>
+      <button id="addTechSave" class="btn-primary" style="box-shadow:none;width:100%;"
+              data-i18n="tech.addSave" onclick="saveNewTech()">إضافة</button>
+    </div>
   </div>
 </div>
 
@@ -3185,9 +3219,64 @@ function closeDetail(){
   pointsBoxOpen = false;
   refreshOpenOverlays();   // يعكس أي تغيير في الحالة على الجرد المفتوح ورا التفاصيل فوراً
 }
-function technicianOptions(){
-  const names = [...new Set(devices.map(d => d.technician).filter(Boolean))];
-  return names.map(n => `<option value="${esc(n)}"></option>`).join('');
+// ============================================================
+// أسماء الفنيين — مصدر واحد للحقيقة
+// ------------------------------------------------------------
+// مصدرين بس، مفيش تالت:
+//   ١) الفنيين اللي الأدمن عملهم حسابات (userRoles، role=technician)
+//   ٢) فنيين معلّقين: اتضافوا من الشاشة دي ولسه مستنيين الأدمن
+//      يعملهم إيميل عشان يبقى ليهم حساب
+//
+// الأسماء المكتوبة بإيد على أجهزة قديمة مابقتش مصدر — الحقل بقى
+// اختيار مقفول عشان مايحصلش أخطاء إملائية ولا تكرار. بس بنعرض
+// الاسم القديم في القايمة لو الجهاز عليه اسم مش في المصدرين، عشان
+// مايضيعش من غير ما حد ياخد باله.
+// ============================================================
+const PENDING_TECHS_KEY = 'pending-technicians';
+let pendingTechs = [];   // [{ name, addedBy, addedAt }]
+
+async function loadPendingTechs(){
+  try{
+    const r = await window.storage.get(PENDING_TECHS_KEY);
+    pendingTechs = (r && r.value) ? (JSON.parse(r.value) || []) : [];
+  }catch(e){ pendingTechs = []; }
+}
+async function savePendingTechs(){
+  await window.storage.set(PENDING_TECHS_KEY, JSON.stringify(pendingTechs));
+}
+
+// فنيين ليهم حسابات
+function accountTechNames(){
+  return Object.keys(userRoles)
+    .map(e => roleEntry(e))
+    .filter(x => x && x.role === 'technician' && x.techName)
+    .map(x => x.techName.trim())
+    .filter(Boolean);
+}
+// كل الأسماء المتاحة للاختيار: { name, pending }
+function allTechNames(){
+  const acc = accountTechNames();
+  const accSet = new Set(acc);
+  const pend = pendingTechs.map(x => (x.name||'').trim())
+                           .filter(n => n && !accSet.has(n));   // اتعمله حساب؟ يبقى مش معلّق
+  return [...new Set(acc)].sort((a,b) => a.localeCompare(b,'ar')).map(n => ({ name:n, pending:false }))
+    .concat([...new Set(pend)].sort((a,b) => a.localeCompare(b,'ar')).map(n => ({ name:n, pending:true })));
+}
+
+// بيبني قايمة اختيار مقفولة. current بيتضاف لو مش في القايمة (اسم قديم).
+function techSelectHtml(current, handler, opts){
+  const cur = (current || '').trim();
+  const list = allTechNames();
+  const known = list.some(x => x.name === cur);
+  const rows = list.map(x =>
+    `<option value="${esc(x.name)}"${x.name===cur?' selected':''}>${esc(x.name)}${x.pending ? ' ⏳' : ''}</option>`).join('');
+  const legacy = (cur && !known)
+    ? `<option value="${esc(cur)}" selected>${esc(cur)} (${t('tech.legacy')})</option>` : '';
+  return `<select class="tech-select"${opts&&opts.id?` id="${opts.id}"`:''} onchange="${handler}">
+      <option value=""${cur?'':' selected'}>— ${t('tech.none')} —</option>
+      ${legacy}${rows}
+      <option value="__ADD_TECH__">➕ ${t('tech.addNew')}</option>
+    </select>`;
 }
 function accountantOptions(){
   const names = [...new Set(devices.map(d => d.registeredBy).filter(Boolean))];
@@ -3302,14 +3391,13 @@ function renderDetail(){
     <div class="tech-row">
       <label class="field">
         <span>${t('det.technician')}</span>
-        <input id="techInput" list="technicianList" value="${esc(d.technician||'')}" placeholder="${t('det.technicianPh')}" onblur="assignTechnician(this.value)" />
+        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput' })}
       </label>
       <label class="field">
         <span>${t('det.accountant')}</span>
         <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}" onblur="editField('registeredBy', this.value)" />
       </label>
     </div>
-    <datalist id="technicianList">${technicianOptions()}</datalist>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
@@ -3332,7 +3420,7 @@ function renderDetail(){
         ${d.technician ? `
         <div class="tech-row">
           <label class="field"><span>🤝 ${t('det.assistTech')}</span>
-            <input list="technicianList" value="${esc(d.assistTechnician||'')}" placeholder="${t('det.assistTechPh')}" onblur="editField('assistTechnician', this.value)" />
+            ${techSelectHtml(d.assistTechnician, 'onTechPick(this, \'assistTechnician\')')}
           </label>
           <label class="field"><span>${t('det.assistPercent')}</span>
             <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)" onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
@@ -3541,6 +3629,77 @@ async function setWholesale(val){
   renderDetail();
   render();
   await persist();
+}
+
+// المستخدم اختار من القايمة. لو اختار "إضافة فني جديد" بنفتح المودال
+// وبنرجّع الاختيار لمكانه — عشان لو ألغى، الحقل ما يفضلش على قيمة وهمية.
+let _techPickField = 'technician';
+let _techPickPrev  = '';
+function onTechPick(sel, field){
+  if(sel.value === '__ADD_TECH__'){
+    _techPickField = field;
+    _techPickPrev  = (openDevice() && openDevice()[field]) || '';
+    sel.value = _techPickPrev;
+    openAddTech();
+    return;
+  }
+  if(field === 'technician') assignTechnician(sel.value);
+  else editField(field, sel.value);
+}
+
+function openDevice(){ return devices.find(d => d.id === selectedId) || null; }
+
+function openAddTech(){
+  const ov = document.getElementById('addTechOverlay');
+  const inp = document.getElementById('addTechName');
+  const err = document.getElementById('addTechErr');
+  if(!ov) return;
+  inp.value = ''; err.textContent = '';
+  ov.classList.remove('hidden');
+  setTimeout(() => inp.focus(), 50);
+}
+function closeAddTech(){
+  const ov = document.getElementById('addTechOverlay');
+  if(ov) ov.classList.add('hidden');
+}
+
+async function saveNewTech(){
+  const inp = document.getElementById('addTechName');
+  const err = document.getElementById('addTechErr');
+  const btn = document.getElementById('addTechSave');
+  const name = (inp.value || '').trim().replace(/\s+/g, ' ');
+
+  if(!name){ err.textContent = t('tech.errEmpty'); return; }
+  if(name.length < 2){ err.textContent = t('tech.errShort'); return; }
+
+  // موجود قبل كده؟ منضيفوش تاني — بس نختاره
+  const exists = allTechNames().find(x => x.name.toLowerCase() === name.toLowerCase());
+  if(exists){
+    closeAddTech();
+    await applyTechChoice(exists.name);
+    showError(t('tech.already'));
+    setTimeout(() => showError(''), 2500);
+    return;
+  }
+
+  btn.disabled = true;
+  try{
+    pendingTechs.push({ name, addedBy: currentUser.name || '', addedAt: new Date().toISOString() });
+    await savePendingTechs();
+    closeAddTech();
+    await applyTechChoice(name);
+  }catch(e){
+    // فشل الحفظ؟ نشيله من الذاكرة عشان القايمة ما تكدبش على المستخدم
+    pendingTechs = pendingTechs.filter(x => x.name !== name);
+    err.textContent = t('tech.errSave') + ' ' + ((e && e.message) || e);
+  }finally{ btn.disabled = false; }
+}
+
+// بيحط الاسم في الخانة اللي المستخدم كان واقف عليها
+async function applyTechChoice(name){
+  if(_techPickField === 'technician') await assignTechnician(name);
+  else await editField(_techPickField, name);
+  renderDetail();
 }
 
 async function assignTechnician(value){
@@ -6913,7 +7072,7 @@ requireAccess().then(ok => {
   }catch(e){}
   // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
   // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
-  loadUserRoles().then(loadFeatureFlags).then(loadAudit)
+  loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
     .then(applyRoleVisibility);
   injectAdminMenu();

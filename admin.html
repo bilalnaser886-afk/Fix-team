@@ -108,6 +108,7 @@ const storage = {
 };
 
 // ===== الحالة =====
+const PENDING_TECHS_KEY='pending-technicians';
 const SYSTEM_CONFIG_KEY='system-config', ROLES_KEY='user-roles', FLAGS_KEY='feature-flags',
       AUDIT_KEY='audit-log', BROADCAST_KEY='broadcast';
 let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
@@ -137,6 +138,28 @@ function toast(msg, ok){
 
 async function saveConfig(){ await storage.set(SYSTEM_CONFIG_KEY, JSON.stringify(systemConfig)); }
 async function saveRoles(){ await storage.set(ROLES_KEY, JSON.stringify(userRoles)); }
+
+// فنيين اتضافوا من شاشة الصيانة ولسه مستنيين إيميل وحساب
+let pendingTechs = [];
+async function loadPendingTechs(){
+  try{
+    const r = await storage.get(PENDING_TECHS_KEY);
+    pendingTechs = (r && r.value) ? (JSON.parse(r.value) || []) : [];
+  }catch(e){ pendingTechs = []; }
+}
+async function savePendingTechs(){ await storage.set(PENDING_TECHS_KEY, JSON.stringify(pendingTechs)); }
+
+// الاسم ده اتعمله حساب فعلاً؟ لو أيوه مايبقاش معلّق
+function techHasAccount(name){
+  const n = (name||'').trim().toLowerCase();
+  return Object.values(userRoles).some(rl => {
+    const en = normRole(rl);
+    return en.role === 'technician' && (en.techName||'').trim().toLowerCase() === n;
+  });
+}
+function livePendingTechs(){
+  return pendingTechs.filter(x => x && x.name && !techHasAccount(x.name));
+}
 async function saveFlags(){ await storage.set(FLAGS_KEY, JSON.stringify(featureFlags)); }
 async function addAudit(action){
   try{
@@ -152,6 +175,7 @@ async function loadAll(){
   try{ const r = await storage.get(ROLES_KEY); if(r&&r.value) userRoles = JSON.parse(r.value)||{}; }catch(e){}
   try{ const r = await storage.get(FLAGS_KEY); if(r&&r.value) featureFlags = JSON.parse(r.value)||{}; }catch(e){}
   try{ const r = await storage.get(AUDIT_KEY); if(r&&r.value) auditLog = JSON.parse(r.value)||[]; }catch(e){}
+  await loadPendingTechs();
   let changed = false;
   for(const f of KNOWN_FLAGS){
     if(!featureFlags[f.key]){ featureFlags[f.key] = { is_enabled:false, description:f.desc, updated_at:new Date().toISOString() }; changed = true; }
@@ -244,6 +268,24 @@ function render(){
           : `<div style="color:#94A3B8;margin-top:6px;">${t('adm.noRoles')}</div>`}
       </div>
       <button class="mini" onclick="addRole()">➕ ${t('adm.addRole')}</button>
+
+      ${(() => {
+        const pend = livePendingTechs();
+        if(!pend.length) return '';
+        return `<div style="margin-top:16px;padding-top:14px;border-top:1px dashed #CBD5E1;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px;">⏳ فنيين مستنيين حساب</div>
+          <p class="hint" style="margin-top:0;">اتضافوا من شاشة الصيانة وشغالين على أجهزة، بس لسه مالهمش إيميل يدخلوا بيه.</p>
+          ${pend.map(x => `<div class="row">
+            <span style="font-size:12.5px;">${esc(x.name)}
+              <span style="color:#94A3B8;font-size:11px;">— ${esc(x.addedBy||'')} · ${new Date(x.addedAt).toLocaleDateString('ar-EG')}</span>
+            </span>
+            <span style="display:flex;gap:6px;">
+              <button class="mini" onclick="grantTechAccount('${esc(x.name).replace(/'/g,"\\'")}')">✉️ اعمله حساب</button>
+              <button class="mini" style="color:#DC2626;" onclick="dropPendingTech('${esc(x.name).replace(/'/g,"\\'")}')">${t('adm.delete')}</button>
+            </span>
+          </div>`).join('')}
+        </div>`;
+      })()}
     </div>
 
     <div class="sec">
@@ -339,6 +381,35 @@ async function addRole(){
   }
   catch(err){ toast('فشل الحفظ: ' + (err.message||err), false); }
 }
+// بيربط فني معلّق بإيميل — نفس نتيجة addRole بالظبط، بس الاسم متعبّى مسبقاً
+async function grantTechAccount(name){
+  const em = prompt('إيميل الفني "' + name + '":');
+  if(em === null) return;
+  const e = (em || '').trim().toLowerCase();
+  if(!e || !e.includes('@')){ toast(t('adm.badEmail'), false); return; }
+  if(userRoles[e] && !confirm('الإيميل ده عليه صلاحية بالفعل. تستبدلها؟')) return;
+
+  try{
+    userRoles[e] = { role:'technician', techName:name };
+    await saveRoles();
+    // اتعمله حساب → يخرج من قايمة المعلّقين
+    pendingTechs = pendingTechs.filter(x => (x.name||'').trim() !== name.trim());
+    await savePendingTechs();
+    await addAudit('عمل حساب فني لـ: ' + name + ' (' + e + ')');
+    render(); toast('اتعمل الحساب ✅');
+  }catch(err){ toast('فشل الحفظ: ' + (err.message||err), false); }
+}
+
+async function dropPendingTech(name){
+  if(!confirm('تشيل الفني "' + name + '" من قايمة الانتظار؟\nالأجهزة المكتوب عليها اسمه مش هتتأثر.')) return;
+  try{
+    pendingTechs = pendingTechs.filter(x => (x.name||'').trim() !== name.trim());
+    await savePendingTechs();
+    await addAudit('شال فني معلّق: ' + name);
+    render(); toast('اتشال');
+  }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
+}
+
 async function removeRole(em){
   if(!confirm(`تشيل صلاحية "${em}"؟`)) return;
   try{ delete userRoles[(em||'').toLowerCase()]; await saveRoles(); await addAudit('شال صلاحية: '+em); render(); toast('تم الحذف'); }
