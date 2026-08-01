@@ -1592,7 +1592,7 @@ async function requireAccess(){
   // مفيش نت؟ لو فيه كاش وجلسة سابقة → ندخل وضع الأوفلاين
   if(!isOnline()){
     const cachedUser = localStorage.getItem('ifix_user');
-    if(cachedUser && localStorage.getItem(DEVICES_CACHE_KEY)){
+    if(cachedUser && localStorage.getItem(HAS_CACHE_FLAG)){
       try{ currentUser = JSON.parse(cachedUser); }catch(e){}
       enterOfflineMode();
       return true;
@@ -1821,11 +1821,79 @@ function withTimeout(promise, ms, label){
 
 const isOnline = () => (typeof navigator === 'undefined') || navigator.onLine !== false;
 
-function writeCache(){
-  try{ localStorage.setItem(DEVICES_CACHE_KEY, JSON.stringify(devices)); }catch(e){}
+// ============================================================
+// الكاش المحلي — IndexedDB بدل localStorage
+// ------------------------------------------------------------
+// localStorage سقفه ٥ ميجا، وداتا ١٩ ألف جهاز حوالي ١٨ ميجا.
+// يعني setItem كان بيرمي QuotaExceededError في كل مرة، والـ catch
+// الفاضي كان بيبلعه — فالأوفلاين كان مكسور من غير ما حد ياخد باله.
+// IndexedDB مفيهاش السقف ده، وبتخزّن الكائنات زي ما هي من غير
+// تحويل لنص، فهي أسرع كمان.
+// ============================================================
+const IDB_NAME = 'ifix_db', IDB_STORE = 'kv';
+const HAS_CACHE_FLAG = 'ifix_has_cache';   // علامة صغيرة في localStorage عشان الفحص السريع
+let _idbConn = null;
+
+function idbOpen(){
+  if(_idbConn) return _idbConn;
+  _idbConn = new Promise((res, rej) => {
+    const r = indexedDB.open(IDB_NAME, 1);
+    r.onupgradeneeded = () => { if(!r.result.objectStoreNames.contains(IDB_STORE)) r.result.createObjectStore(IDB_STORE); };
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+  return _idbConn;
 }
-function readCache(){
-  try{ return JSON.parse(localStorage.getItem(DEVICES_CACHE_KEY) || '[]'); }catch(e){ return []; }
+async function idbSet(key, val){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => res(true);
+    tx.onerror    = () => rej(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const q = tx.objectStore(IDB_STORE).get(key);
+    q.onsuccess = () => res(q.result);
+    q.onerror   = () => rej(q.error);
+  });
+}
+
+// الكتابة مؤجّلة: المزامنة اللحظية بتنادي writeCache مع كل تعديل من أي موظف.
+// من غير التأجيل ده كنا هنكتب ١٨ ميجا على القرص مع كل ضغطة زرار من أي حد.
+let _cacheTimer = null;
+function writeCache(){
+  try{ localStorage.setItem(HAS_CACHE_FLAG, '1'); }catch(e){}
+  clearTimeout(_cacheTimer);
+  const snap = devices;
+  _cacheTimer = setTimeout(() => {
+    idbSet('devices', snap).catch(e => console.error('فشل حفظ الكاش:', e));
+  }, 1500);
+}
+// نسخة فورية — بنستخدمها قبل ما الصفحة تتقفل
+function flushCache(){
+  clearTimeout(_cacheTimer);
+  return idbSet('devices', devices).catch(() => {});
+}
+window.addEventListener('pagehide', flushCache);
+
+async function readCache(){
+  try{
+    const v = await idbGet('devices');
+    if(Array.isArray(v) && v.length) return v;
+    // ترحيل لمرة واحدة من الكاش القديم لو كان لسه فيه حاجة
+    const old = localStorage.getItem(DEVICES_CACHE_KEY);
+    if(old){
+      const arr = JSON.parse(old);
+      try{ localStorage.removeItem(DEVICES_CACHE_KEY); }catch(e){}
+      if(Array.isArray(arr) && arr.length){ await idbSet('devices', arr); return arr; }
+    }
+  }catch(e){ console.error('فشل قراءة الكاش:', e); }
+  return [];
 }
 function snapshotSynced(){
   lastSynced = {};
@@ -1885,74 +1953,116 @@ function exitOfflineMode(){
 // آخر سبب فشل — بيظهر في الشريط عشان المستخدم يعرف المشكلة الحقيقية
 let lastLoadError = '';
 
-async function loadDevices(){
+// ============================================================
+// تحميل الأجهزة — مزامنة تزايدية
+// ------------------------------------------------------------
+// الفكرة: بدل ما نجيب الـ ١٩ ألف جهاز كل مرة (١٤ ثانية)، بنجيبهم
+// مرة واحدة بس. بعد كده بنسأل السيرفر "إيه اللي اتعدّل من آخر مرة؟"
+// وبنجيب ده بس — عادةً كام صف، يعني أقل من ثانية.
+//
+// العلامة اللي بنعتمد عليها هي عمود updated_at، وبناخد قيمتها من
+// السيرفر نفسه مش من ساعة الجهاز — عشان لو ساعة الكمبيوتر غلط
+// مانفوّتش تعديلات.
+//
+// الحذف: العلامة دي مبتشوفش الصفوف المحذوفة (مفيش صف يتعدّل).
+// عشان كده بنعمل مزامنة كاملة كل ٢٤ ساعة، وكمان في أي وقت لو
+// المستخدم دوس "مزامنة كاملة". والحذف اللي بيحصل والصفحة مفتوحة
+// بتمسكه المزامنة اللحظية أصلاً.
+// ============================================================
+const FULL_SYNC_EVERY_MS = 24*60*60*1000;
+
+// مزامنة كاملة يدوية — للحالات اللي فيها حذف من جهاز تاني
+async function forceFullSync(){
+  showError('جاري المزامنة الكاملة...');
+  await loadDevices({ full:true });
+  showError('');
+}
+window.forceFullSync = forceFullSync;
+
+// آخر updated_at موجودة على السيرفر — دي علامتنا
+async function serverWatermark(){
+  const { data, error } = await sb.from('devices_data')
+    .select('updated_at').order('updated_at', { ascending:false }).limit(1);
+  if(error) throw error;
+  return (data && data[0] && data[0].updated_at) || null;
+}
+
+// بيجيب صفوف بالـ keyset. لو اتبعت since بيجيب المتغيّر بس.
+async function fetchRows(since){
+  const PAGE = 1000, out = [];
+  let lastId = '', guard = 0;
+  while(guard++ < 1000){
+    let q = sb.from('devices_data').select('id,data')
+              .order('id', { ascending:true }).limit(PAGE);
+    if(since)  q = q.gt('updated_at', since);
+    if(lastId) q = q.gt('id', lastId);
+    const { data, error } = await q;
+    if(error) throw error;
+    if(!data || !data.length) break;
+    out.push(...data);
+    lastId = data[data.length-1].id;
+  }
+  return out;
+}
+
+function sortDevices(){
+  const ts = new Map();
+  for(const d of devices) ts.set(d, Date.parse(d.intakeDate) || 0);
+  devices.sort((a,b) => ts.get(b) - ts.get(a));
+}
+
+async function loadDevices(opts){
+  const forceFull = !!(opts && opts.full);
   lastLoadError = '';
   try{
-    // نجيب العدد الكلي الأول، وبعدين نجيب كل الصفحات بالتوازي (٨ في نفس الوقت) بدل واحدة ورا التانية.
-    // ده بيقلّل وقت التحميل جداً — من ٢٠ طلب متتالي لكام موجة بس.
-    const PAGE = 1000;
-    let allRows = [];
-    const { count, error: cErr } = await sb.from('devices_data').select('id', { count: 'exact', head: true });
-    if(cErr) throw cErr;
-    const total = count || 0;
-    if(total > 0){
-      const pages = Math.ceil(total / PAGE);
-      const chunks = new Array(pages);
-      let next = 0;
-      let failed = null;
-      const worker = async () => {
-        while(next < pages){
-          const p = next++;
-          try{
-            const { data, error } = await sb.from('devices_data').select('id,data').range(p*PAGE, p*PAGE + PAGE - 1);
-            if(error) throw error;
-            chunks[p] = data || [];
-          }catch(err){
-            // ⚠️ صفحة فشلت؟ منرميش الباقي. الأول كان بيرمي كل حاجة
-            // ويرجع لكاش قديم — فالمستخدم يشوف أجهزة أقل بكتير
-            // من غير ما يعرف إن التحميل ناقص.
-            failed = failed || err;
-            chunks[p] = [];
-            console.error('فشل تحميل صفحة', p, err);
-          }
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(8, pages) }, worker));
-      allRows = chunks.flat();
+    const meta = (await idbGet('sync_meta')) || {};
+    const cached = forceFull ? [] : await readCache();
+    const stale  = !meta.lastFullSync || (Date.now() - meta.lastFullSync) > FULL_SYNC_EVERY_MS;
+    const canDelta = !forceFull && cached.length && meta.watermark && !stale;
 
-      // نجح جزئياً؟ نعرض اللي وصل ونوضّح إن فيه ناقص
-      if(failed && allRows.length){
-        lastLoadError = 'تحميل ناقص: وصل ' + allRows.length + ' من ' + total +
-                        ' جهاز — ' + (failed.message || failed);
-      } else if(failed){
-        throw failed;
+    if(canDelta){
+      // ✅ الطريق السريع: الكاش على الشاشة فوراً، وبعدين المتغيّر بس
+      devices = cached;
+      sortDevices();
+      devicesLoaded = true;
+      render();
+
+      const changed = await fetchRows(meta.watermark);
+      if(changed.length){
+        const byId = new Map(devices.map(d => [d.id, d]));
+        for(const r of changed) byId.set(r.id, r.data);
+        devices = Array.from(byId.values());
+        sortDevices();
       }
-    }
-
-    if(allRows.length){
-      devices = allRows.map(r => r.data);
+      meta.watermark = (await serverWatermark()) || meta.watermark;
+      await idbSet('sync_meta', meta);
+      console.log('مزامنة تزايدية:', changed.length, 'جهاز اتغيّر');
     } else {
-      // الترحيل التلقائي من البنية القديمة (الكتلة الواحدة) — مرة واحدة بس
-      let old = null;
-      try{ old = await window.storage.get(STORAGE_KEY); }catch(e){}
-      devices = old ? JSON.parse(old.value) : [];
-      if(devices.length){
-        await sb.from('devices_data').upsert(
-          devices.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
-        );
+      // 🐢 الطريق الكامل: أول مرة، أو الكاش فاضي، أو عدّى ٢٤ ساعة
+      const wm = await serverWatermark();
+      const rows = await fetchRows(null);
+      if(rows.length){
+        devices = rows.map(r => r.data);
+      } else {
+        let old = null;
+        try{ old = await window.storage.get(STORAGE_KEY); }catch(e){}
+        devices = old ? JSON.parse(old.value) : [];
+        if(devices.length){
+          await sb.from('devices_data').upsert(
+            devices.map(d => ({ id:d.id, data:d, updated_at:new Date().toISOString() }))
+          );
+        }
       }
+      sortDevices();
+      await idbSet('sync_meta', { watermark: wm, lastFullSync: Date.now() });
+      console.log('مزامنة كاملة:', devices.length, 'جهاز');
     }
-    devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
     exitOfflineMode();
   }catch(e){
-    // ⚠️ مش كل فشل معناه "مفيش نت". ممكن يكون صلاحيات، أو حصة،
-    // أو حجب من الشبكة. بنسجّل السبب ونعرضه بدل ما نخمّن.
     const msg = (e && e.message) ? e.message : String(e);
     console.error('فشل تحميل الأجهزة:', e);
-    devices = readCache();
-    lastLoadError = navigator.onLine
-      ? ('تعذّر الوصول للسيرفر: ' + msg)
-      : '';
+    if(!devices.length) devices = await readCache();
+    lastLoadError = navigator.onLine ? ('تعذّر الوصول للسيرفر: ' + msg) : '';
     enterOfflineMode();
   }
   snapshotSynced();
@@ -3346,6 +3456,7 @@ async function purgeAllData(){
     try{ await sb.from('app_data').delete().eq('key', STORAGE_KEY); }catch(e){}
     try{ await window.storage.set(STORAGE_KEY, JSON.stringify([])); }catch(e){}
     devices = []; lastSynced = {}; writeCache();
+    try{ await idbSet('sync_meta', {}); }catch(e){}   // نصفّر العلامة عشان أول تحميل جاي يبقى كامل
     importing = false; hideImportProgress(); setSaving(false);
     return true;
   }catch(e){
