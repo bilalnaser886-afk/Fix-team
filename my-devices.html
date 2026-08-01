@@ -38,10 +38,20 @@
     display:flex; align-items:center; justify-content:center; padding:18px;
   }
   .nt-ov.hide{display:none;}
+  /* ⚠️ max-height + overflow ضروريين: منشور طويل من غيرهم
+     بيخلي زرار "فهمت" يخرج برّه الشاشة والمستخدم يتحبس. */
   .nt-card{
     background:#fff; border-radius:18px; max-width:400px; width:100%;
-    padding:26px 22px; text-align:center; box-shadow:0 20px 50px rgba(16,22,32,.28);
+    max-height:88vh; display:flex; flex-direction:column;
+    padding:22px 20px 18px; text-align:center; position:relative;
+    box-shadow:0 20px 50px rgba(16,22,32,.28);
   }
+  .nt-x{
+    position:absolute; top:10px; inset-inline-start:10px;
+    border:none; background:#F1F5F9; color:#64748B; width:32px; height:32px;
+    border-radius:50%; font-size:19px; line-height:1; cursor:pointer; flex:0 0 auto;
+  }
+  .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
   .nt-ic{font-size:44px; line-height:1;}
   .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
   .nt-b{color:#475569; line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
@@ -311,9 +321,12 @@
 <!-- إشعار النظام (بيتا / تجربة / إشعار من الأدمن) -->
 <div id="ntOv" class="nt-ov hide">
   <div class="nt-card">
-    <div class="nt-ic" id="ntIcon">📢</div>
-    <h2 class="nt-t" id="ntTitle"></h2>
-    <p class="nt-b" id="ntBody"></p>
+    <button class="nt-x" onclick="ntClose()" aria-label="قفل">×</button>
+    <div class="nt-scroll">
+      <div class="nt-ic" id="ntIcon">📢</div>
+      <h2 class="nt-t" id="ntTitle"></h2>
+      <p class="nt-b" id="ntBody"></p>
+    </div>
     <button class="nt-ok" onclick="ntClose()">تمام، فهمت 👍</button>
   </div>
 </div>
@@ -532,6 +545,19 @@ function ntClose(){
   const ov = $('ntOv'); if(ov) ov.classList.add('hide');
 }
 
+// مخارج إضافية: Escape أو ضغطة على الخلفية.
+// لو حصل أي خلل في التنسيق، المستخدم مايتحبسش.
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    const ov = $('ntOv');
+    if(ov && !ov.classList.contains('hide')) ntClose();
+  }
+});
+document.addEventListener('click', e => {
+  const ov = $('ntOv');
+  if(ov && e.target === ov) ntClose();
+});
+
 function ntBar(text, bg){
   const b = $('sysbar'); if(!b) return;
   b.textContent = text;
@@ -573,8 +599,11 @@ async function loadNotices(){
     }
 
     // ===== إشعار الأدمن =====
+    // المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه
+    // داخل أول مرة. الـ id هو وقت الإرسال، فبنحسب عمره منه.
     const bc = map['broadcast'];
-    if(bc && bc.id){
+    const bcAge = bc && bc.id ? (Date.now() - Number(bc.id)) : Infinity;
+    if(bc && bc.id && bcAge < 14 * 86400000){
       const aud = bc.audience || 'all';
       if(aud === 'all' || aud === 'technician'){
         const ic = bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢');
