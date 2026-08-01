@@ -1524,8 +1524,17 @@ function bcIsForMe(bc){
   return myRole() === aud;
 }
 
+// المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه داخل أول مرة.
+// الـ id هو وقت الإرسال، فبنحسب عمره منه من غير أي تعديل على البيانات.
+const BC_MAX_AGE_MS = 14 * 86400000;
+function bcIsFresh(bc){
+  const t = Number(bc && bc.id) || 0;
+  return t > 0 && (Date.now() - t) < BC_MAX_AGE_MS;
+}
+
 function showBroadcastIfUnseen(){
   if(!currentBroadcast || !currentBroadcast.id) return;
+  if(!bcIsFresh(currentBroadcast)) return;
   if(!bcIsForMe(currentBroadcast)) return;
   if(localStorage.getItem('ifix_seen_bc_' + currentBroadcast.id)) return;
   const t = currentBroadcast.type;
