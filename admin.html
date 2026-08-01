@@ -365,7 +365,11 @@ async function sendBroadcast(){
   try{
     // audience: 'all' أو دور واحد. الصفحات بتقارنه بدور المستخدم
     // وبتتجاهل الإشعار لو مش ليه.
-    await storage.set(BROADCAST_KEY, JSON.stringify({ id:Date.now(), title, body, type, audience }));
+    // ⚠️ مفتاح مستقل لكل جمهور — قبل كده كلهم كانوا في مفتاح واحد،
+    // فمنشور للفنيين كان بيمسح منشور المحاسبين اللي قبله.
+    // 'all' بيفضل في المفتاح القديم عشان المنشورات الموجودة ماتضيعش.
+    const bcKey = audience === 'all' ? BROADCAST_KEY : (BROADCAST_KEY + ':' + audience);
+    await storage.set(bcKey, JSON.stringify({ id:Date.now(), title, body, type, audience }));
     await addAudit(`بعت إشعار (${who}): ` + (title||body).slice(0,60));
     document.getElementById('bcTitle').value=''; document.getElementById('bcBody').value='';
     toast(`اتبعت لـ ${who} ✅`);

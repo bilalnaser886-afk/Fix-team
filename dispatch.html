@@ -393,6 +393,7 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
    شاف الإشعار على الداشبورد مايتكررش هنا.
    ============================================================ */
 let ntSeenKey = '';
+let ntQueue   = [];   // منشورات مستنية العرض (عام + دور)
 
 function ntShow(icon, title, body, seenKey){
   if(seenKey && localStorage.getItem(seenKey)) return;
@@ -407,6 +408,19 @@ function ntClose(){
   if(ntSeenKey){ try{ localStorage.setItem(ntSeenKey, '1'); }catch(e){} }
   ntSeenKey = '';
   const ov = $('ntOv'); if(ov) ov.classList.add('hide');
+  // فيه منشور تاني؟ نوريه بعد لحظة عشان الإغلاق يبان
+  if(ntQueue.length) setTimeout(ntNext, 350);
+}
+
+// بيعرض أول منشور مستحق في الطابور
+function ntNext(){
+  while(ntQueue.length){
+    const it = ntQueue.shift();
+    if(!it) continue;
+    if(localStorage.getItem(it.seenKey)) continue;
+    ntShow(it.icon, it.title, it.body, it.seenKey);
+    return;
+  }
 }
 
 // مخارج إضافية: Escape أو ضغطة على الخلفية.
@@ -433,7 +447,8 @@ async function loadNotices(){
   if(!navigator.onLine) return;
   try{
     const { data, error } = await sb.from('app_data')
-      .select('key,value').in('key', ['system-config','broadcast']);
+      .select('key,value')
+      .in('key', ['system-config','feature-flags','broadcast','broadcast:dispatcher']);
     if(error) throw error;
 
     const map = {};
@@ -462,18 +477,29 @@ async function loadNotices(){
       }
     }
 
-    // ===== إشعار الأدمن =====
-    // المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه
-    // داخل أول مرة. الـ id هو وقت الإرسال، فبنحسب عمره منه.
-    const bc = map['broadcast'];
-    const bcAge = bc && bc.id ? (Date.now() - Number(bc.id)) : Infinity;
-    if(bc && bc.id && bcAge < 14 * 86400000){
-      const aud = bc.audience || 'all';
-      if(aud === 'all' || aud === 'dispatcher'){
-        const ic = bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢');
-        ntShow(ic, bc.title || 'إشعار', bc.body || '', 'ifix_seen_bc_' + bc.id);
-      }
-    }
+    // ===== إشعارات الأدمن =====
+    // مفتاح الميزة مقفول → مفيش إشعارات خالص
+    const flags = map['feature-flags'] || {};
+    if(flags.live_broadcasts && flags.live_broadcasts.is_enabled === false) return;
+
+    // المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه داخل
+    // أول مرة. الـ id هو وقت الإرسال، فبنحسب عمره منه.
+    const MAX_AGE = 14 * 86400000;
+    ntQueue = ['broadcast', 'broadcast:dispatcher']
+      .map(k => map[k])
+      .filter(bc => bc && bc.id && (Date.now() - Number(bc.id)) < MAX_AGE)
+      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'dispatcher'; })
+      .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0))   // الأقدم الأول
+      .map(bc => ({
+        icon:    bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢'),
+        title:   bc.title || 'إشعار',
+        body:    bc.body || '',
+        seenKey: 'ifix_seen_bc_' + bc.id
+      }));
+
+    // لو فيه إشعار وضع معروض خلاص، الطابور هيطلع بعده من ntClose
+    const ovNt = $('ntOv');
+    if(ovNt && ovNt.classList.contains('hide')) ntNext();
   }catch(e){
     console.warn('تعذّر قراءة إشعارات النظام:', e && e.message ? e.message : e);
   }

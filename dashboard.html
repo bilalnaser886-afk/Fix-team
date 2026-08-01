@@ -1510,11 +1510,43 @@ function openAdmin(){
 // ===== الإشعارات اللحظية للمستخدمين =====
 const BROADCAST_KEY = 'broadcast';
 let currentBroadcast = null;
+let bcQueue = [];          // منشورات مستنية العرض (عام + دور)
+
+// مفتاح مستقل لكل جمهور، فمنشور لدور مايمسحش منشور دور تاني.
+// المستخدم بيشوف اتنين بالكتير: آخر منشور عام + آخر منشور لدوره.
+function myBroadcastKeys(){
+  const r = myRole();
+  return (r && r !== 'super_admin') ? [BROADCAST_KEY, BROADCAST_KEY + ':' + r] : [BROADCAST_KEY];
+}
+
 async function loadBroadcast(){
+  // مفتاح الميزة مقفول → مفيش إشعارات خالص
+  if(typeof isFeatureEnabled === 'function' && !isFeatureEnabled('live_broadcasts')) return;
   try{
-    const r = await window.storage.get(BROADCAST_KEY);
-    if(r && r.value){ currentBroadcast = JSON.parse(r.value); showBroadcastIfUnseen(); }
+    const rows = await Promise.all(myBroadcastKeys().map(k =>
+      window.storage.get(k).catch(() => null)));
+    bcQueue = rows
+      .filter(r => r && r.value)
+      .map(r => { try{ return JSON.parse(r.value); }catch(e){ return null; } })
+      .filter(Boolean)
+      .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0));   // الأقدم الأول
+    showNextBroadcast();
   }catch(e){}
+}
+
+// بيعرض أول منشور مستحق في الطابور. لما المستخدم يقفله،
+// اللي بعده بيظهر — فمنشور الفنيين والمنشور العام يوصلوا الاتنين.
+function showNextBroadcast(){
+  while(bcQueue.length){
+    const bc = bcQueue.shift();
+    if(!bc || !bc.id) continue;
+    if(!bcIsFresh(bc)) continue;
+    if(!bcIsForMe(bc)) continue;
+    if(localStorage.getItem('ifix_seen_bc_' + bc.id)) continue;
+    currentBroadcast = bc;
+    showBroadcastIfUnseen();
+    return;
+  }
 }
 // الإشعار موجّه لدور معيّن؟ نتجاهله لو مش لينا.
 // الإشعارات القديمة من غير audience بتعتبر للكل — توافق للخلف.
@@ -1549,6 +1581,9 @@ function showBroadcastIfUnseen(){
 function dismissBroadcast(){
   if(currentBroadcast && currentBroadcast.id){ try{ localStorage.setItem('ifix_seen_bc_'+currentBroadcast.id,'1'); }catch(e){} }
   document.getElementById('broadcastOverlay').classList.add('hidden');
+  currentBroadcast = null;
+  // فيه منشور تاني مستني؟ نوريه بعد لحظة عشان الإغلاق يبان
+  if(bcQueue.length) setTimeout(showNextBroadcast, 350);
 }
 function renderAdmin(){ /* اللوحة اتنقلت لـ admin.html */ }
 
@@ -1671,8 +1706,15 @@ function startRealtimeSync(){
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, (payload) => {
         const row = payload.new;
         if(!row) return;
-        if(row.key === BROADCAST_KEY){
-          try{ currentBroadcast = JSON.parse(row.value); showBroadcastIfUnseen(); }catch(e){}
+        // أي مفتاح منشورات — العام أو بتاع الدور
+        if(row.key === BROADCAST_KEY || row.key.indexOf(BROADCAST_KEY + ':') === 0){
+          if(typeof isFeatureEnabled === 'function' && !isFeatureEnabled('live_broadcasts')) return;
+          if(myBroadcastKeys().indexOf(row.key) === -1) return;   // مش لينا
+          try{
+            const bc = JSON.parse(row.value);
+            if(currentBroadcast){ bcQueue.push(bc); }   // فيه واحد معروض → للطابور
+            else { currentBroadcast = bc; showBroadcastIfUnseen(); }
+          }catch(e){}
           return;
         }
         if(row.key !== LEDGER_KEY) return;
@@ -1812,7 +1854,7 @@ function pendingCount(){
 function updateOfflineBar(){
   let bar = document.getElementById('offlineBar');
   const n = pendingCount();
-  const show = offlineMode || n > 0;
+  const show = offlineMode || n > 0 || (typeof lastLoadError !== 'undefined' && !!lastLoadError);
   if(!show){ if(bar) bar.remove(); return; }
   if(!bar){
     bar = document.createElement('div');
@@ -1820,6 +1862,13 @@ function updateOfflineBar(){
     bar.className = 'offline-bar';
     document.body.appendChild(bar);
   }
+  // فيه سبب فشل محدد؟ نعرضه — أنفع بكتير من "مفيش نت" لما النت شغال
+  if(typeof lastLoadError !== 'undefined' && lastLoadError){
+    bar.textContent = '⚠️ ' + lastLoadError;
+    bar.style.background = '#B91C1C';
+    return;
+  }
+  bar.style.background = '';
   bar.textContent = offlineMode
     ? `📴 شغال أوفلاين — التعديلات محفوظة على الجهاز${n ? ` (${n} في انتظار الرفع)` : ''} وهتترفع أول ما النت يرجع`
     : `🔄 جاري رفع ${n} تعديل معلّق...`;
@@ -1833,7 +1882,11 @@ function exitOfflineMode(){
   updateOfflineBar();
 }
 
+// آخر سبب فشل — بيظهر في الشريط عشان المستخدم يعرف المشكلة الحقيقية
+let lastLoadError = '';
+
 async function loadDevices(){
+  lastLoadError = '';
   try{
     // نجيب العدد الكلي الأول، وبعدين نجيب كل الصفحات بالتوازي (٨ في نفس الوقت) بدل واحدة ورا التانية.
     // ده بيقلّل وقت التحميل جداً — من ٢٠ طلب متتالي لكام موجة بس.
@@ -1846,16 +1899,34 @@ async function loadDevices(){
       const pages = Math.ceil(total / PAGE);
       const chunks = new Array(pages);
       let next = 0;
+      let failed = null;
       const worker = async () => {
         while(next < pages){
           const p = next++;
-          const { data, error } = await sb.from('devices_data').select('id,data').range(p*PAGE, p*PAGE + PAGE - 1);
-          if(error) throw error;
-          chunks[p] = data || [];
+          try{
+            const { data, error } = await sb.from('devices_data').select('id,data').range(p*PAGE, p*PAGE + PAGE - 1);
+            if(error) throw error;
+            chunks[p] = data || [];
+          }catch(err){
+            // ⚠️ صفحة فشلت؟ منرميش الباقي. الأول كان بيرمي كل حاجة
+            // ويرجع لكاش قديم — فالمستخدم يشوف أجهزة أقل بكتير
+            // من غير ما يعرف إن التحميل ناقص.
+            failed = failed || err;
+            chunks[p] = [];
+            console.error('فشل تحميل صفحة', p, err);
+          }
         }
       };
       await Promise.all(Array.from({ length: Math.min(8, pages) }, worker));
       allRows = chunks.flat();
+
+      // نجح جزئياً؟ نعرض اللي وصل ونوضّح إن فيه ناقص
+      if(failed && allRows.length){
+        lastLoadError = 'تحميل ناقص: وصل ' + allRows.length + ' من ' + total +
+                        ' جهاز — ' + (failed.message || failed);
+      } else if(failed){
+        throw failed;
+      }
     }
 
     if(allRows.length){
@@ -1874,8 +1945,14 @@ async function loadDevices(){
     devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
     exitOfflineMode();
   }catch(e){
-    // مفيش نت أو السيرفر مش متاح → نشتغل من الكاش المحلي
+    // ⚠️ مش كل فشل معناه "مفيش نت". ممكن يكون صلاحيات، أو حصة،
+    // أو حجب من الشبكة. بنسجّل السبب ونعرضه بدل ما نخمّن.
+    const msg = (e && e.message) ? e.message : String(e);
+    console.error('فشل تحميل الأجهزة:', e);
     devices = readCache();
+    lastLoadError = navigator.onLine
+      ? ('تعذّر الوصول للسيرفر: ' + msg)
+      : '';
     enterOfflineMode();
   }
   snapshotSynced();
