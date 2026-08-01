@@ -1634,7 +1634,19 @@ async function requireAccess(){
   return true;
 }
 
+// بنمسح كاش الأجهزة عند الخروج. قبل كده الكاش كان بيفشل دايماً (سقف
+// الـ ٥ ميجا) فمكانش بيفرق — دلوقتي بقى شغال فعلاً، ولو فني تاني دخل
+// على نفس الجهاز كان هيشوف أجهزة اللي قبله لحد ما المزامنة تصلّحها.
+async function clearDeviceCache(){
+  try{ localStorage.removeItem(HAS_CACHE_FLAG); }catch(e){}
+  try{ localStorage.removeItem(DEVICES_CACHE_KEY); }catch(e){}
+  clearTimeout(_cacheTimer);
+  await idbSafe(idbSet('devices', []), false, 3000);
+  await idbSafe(idbSet('sync_meta', {}), false, 3000);
+}
+
 async function logout(){
+  await clearDeviceCache();
   await sb.auth.signOut();
   // مش بنمسح ifix-last-role — الدور مربوط بالإيميل، فحساب تاني على
   // نفس الجهاز مش هيتأثر بيه. مسحه كان بيرجّع لمحة لوجو النظام في
@@ -1833,16 +1845,34 @@ const isOnline = () => (typeof navigator === 'undefined') || navigator.onLine !=
 const IDB_NAME = 'ifix_db', IDB_STORE = 'kv';
 const HAS_CACHE_FLAG = 'ifix_has_cache';   // علامة صغيرة في localStorage عشان الفحص السريع
 let _idbConn = null;
+let _idbDead = false;   // اتعطّلت؟ نبطّل نحاول ونشتغل من غير كاش
 
+// ⚠️ Safari على iOS ساعات بيعلّق في indexedDB.open() من غير ما يرمي خطأ.
+// من غير المهلة دي الكود كان بيستنى للأبد والشاشة تفضل "جارٍ التحميل".
 function idbOpen(){
+  if(_idbDead) return Promise.reject(new Error('IndexedDB مش متاحة'));
   if(_idbConn) return _idbConn;
   _idbConn = new Promise((res, rej) => {
-    const r = indexedDB.open(IDB_NAME, 1);
-    r.onupgradeneeded = () => { if(!r.result.objectStoreNames.contains(IDB_STORE)) r.result.createObjectStore(IDB_STORE); };
-    r.onsuccess = () => res(r.result);
-    r.onerror   = () => rej(r.error);
+    let done = false;
+    const fail = (why) => { if(done) return; done = true; _idbDead = true; _idbConn = null; rej(new Error(why)); };
+    const timer = setTimeout(() => fail('IndexedDB اتأخرت في الفتح'), 4000);
+    try{
+      const r = indexedDB.open(IDB_NAME, 1);
+      r.onupgradeneeded = () => { if(!r.result.objectStoreNames.contains(IDB_STORE)) r.result.createObjectStore(IDB_STORE); };
+      r.onsuccess = () => { if(done) return; done = true; clearTimeout(timer); res(r.result); };
+      r.onerror   = () => { clearTimeout(timer); fail('فشل فتح IndexedDB'); };
+      r.onblocked = () => { clearTimeout(timer); fail('IndexedDB متقفلة من تاب تاني'); };
+    }catch(e){ clearTimeout(timer); fail(String(e)); }
   });
   return _idbConn;
+}
+
+// أي عملية على الكاش ممنوع تعطّل الشاشة — بترجع قيمة افتراضية بدل ما تعلّق
+function idbSafe(promise, fallback, ms){
+  return Promise.race([
+    promise.catch(e => { console.warn('الكاش:', e && e.message); return fallback; }),
+    new Promise(r => setTimeout(() => r(fallback), ms || 4000)),
+  ]);
 }
 async function idbSet(key, val){
   const db = await idbOpen();
@@ -1871,7 +1901,7 @@ function writeCache(){
   clearTimeout(_cacheTimer);
   const snap = devices;
   _cacheTimer = setTimeout(() => {
-    idbSet('devices', snap).catch(e => console.error('فشل حفظ الكاش:', e));
+    idbSafe(idbSet('devices', snap), false, 8000);
   }, 1500);
 }
 // نسخة فورية — بنستخدمها قبل ما الصفحة تتقفل
@@ -1890,7 +1920,7 @@ async function readCache(){
     if(old){
       const arr = JSON.parse(old);
       try{ localStorage.removeItem(DEVICES_CACHE_KEY); }catch(e){}
-      if(Array.isArray(arr) && arr.length){ await idbSet('devices', arr); return arr; }
+      if(Array.isArray(arr) && arr.length){ await idbSafe(idbSet('devices', arr), false, 5000); return arr; }
     }
   }catch(e){ console.error('فشل قراءة الكاش:', e); }
   return [];
@@ -1981,8 +2011,9 @@ window.forceFullSync = forceFullSync;
 
 // آخر updated_at موجودة على السيرفر — دي علامتنا
 async function serverWatermark(){
-  const { data, error } = await sb.from('devices_data')
-    .select('updated_at').order('updated_at', { ascending:false }).limit(1);
+  const { data, error } = await withTimeout(
+    sb.from('devices_data').select('updated_at').order('updated_at', { ascending:false }).limit(1),
+    20000, 'قراءة علامة المزامنة');
   if(error) throw error;
   return (data && data[0] && data[0].updated_at) || null;
 }
@@ -1997,7 +2028,7 @@ async function fetchRows(since, onPage){
               .order('id', { ascending:true }).limit(PAGE);
     if(since)  q = q.gt('updated_at', since);
     if(lastId) q = q.gt('id', lastId);
-    const { data, error } = await q;
+    const { data, error } = await withTimeout(q, 30000, 'تحميل صفحة أجهزة');
     if(error) throw error;
     if(!data || !data.length) break;
     out.push(...data);
@@ -2023,8 +2054,8 @@ async function loadDevices(opts){
   const forceFull = !!(opts && opts.full);
   lastLoadError = '';
   try{
-    const meta = (await idbGet('sync_meta')) || {};
-    const cached = forceFull ? [] : await readCache();
+    const meta = (await idbSafe(idbGet('sync_meta'), null)) || {};
+    const cached = forceFull ? [] : await idbSafe(readCache(), []);
     const stale  = !meta.lastFullSync || (Date.now() - meta.lastFullSync) > FULL_SYNC_EVERY_MS;
     const canDelta = !forceFull && cached.length && meta.watermark && !stale;
 
@@ -2043,7 +2074,7 @@ async function loadDevices(opts){
         sortDevices();
       }
       meta.watermark = (await serverWatermark()) || meta.watermark;
-      await idbSet('sync_meta', meta);
+      await idbSafe(idbSet('sync_meta', meta), false, 5000);
       console.log('مزامنة تزايدية:', changed.length, 'جهاز اتغيّر');
     } else {
       // 🐢 الطريق الكامل: أول مرة، أو الكاش فاضي، أو عدّى ٢٤ ساعة
@@ -2080,14 +2111,14 @@ async function loadDevices(opts){
         }
       }
       sortDevices();
-      await idbSet('sync_meta', { watermark: wm, lastFullSync: Date.now() });
+      await idbSafe(idbSet('sync_meta', { watermark: wm, lastFullSync: Date.now() }), false, 5000);
       console.log('مزامنة كاملة:', devices.length, 'جهاز');
     }
     exitOfflineMode();
   }catch(e){
     const msg = (e && e.message) ? e.message : String(e);
     console.error('فشل تحميل الأجهزة:', e);
-    if(!devices.length) devices = await readCache();
+    if(!devices.length) devices = await idbSafe(readCache(), []);
     lastLoadError = navigator.onLine ? ('تعذّر الوصول للسيرفر: ' + msg) : '';
     enterOfflineMode();
   }
@@ -3482,7 +3513,7 @@ async function purgeAllData(){
     try{ await sb.from('app_data').delete().eq('key', STORAGE_KEY); }catch(e){}
     try{ await window.storage.set(STORAGE_KEY, JSON.stringify([])); }catch(e){}
     devices = []; lastSynced = {}; writeCache();
-    try{ await idbSet('sync_meta', {}); }catch(e){}   // نصفّر العلامة عشان أول تحميل جاي يبقى كامل
+    await idbSafe(idbSet('sync_meta', {}), false, 5000);   // نصفّر العلامة عشان أول تحميل جاي يبقى كامل
     importing = false; hideImportProgress(); setSaving(false);
     return true;
   }catch(e){
