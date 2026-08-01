@@ -152,6 +152,24 @@
     background-size:5px 5px, 5px 5px; background-repeat:no-repeat;
   }
   .tech-select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(8,145,168,.14);}
+
+  /* ===== الإعدادات ===== */
+  .set-group{margin-top:14px;}
+  .set-label{font-weight:700; font-size:14px; margin-bottom:10px; color:var(--ink);}
+  .set-hint{font-size:12px; color:var(--muted); line-height:1.7; margin:9px 0 0;}
+  .set-choices{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .set-opt{
+    display:flex; flex-direction:column; align-items:center; gap:5px;
+    padding:13px 8px; border:1.5px solid #E3E4E8; border-radius:12px;
+    background:var(--surface); cursor:pointer; font-family:inherit;
+    font-size:13.5px; font-weight:600; color:var(--ink);
+    transition:border-color .15s, background .15s;
+  }
+  .set-opt:hover{border-color:#CBD5E1;}
+  .set-opt .ico{font-size:19px; line-height:1;}
+  .set-opt .sub{font-size:11px; font-weight:400; color:var(--muted);}
+  .set-opt.active{border-color:var(--accent); background:rgba(8,145,168,.07);}
+  .set-opt.active .sub{color:var(--accent);}
   .brand{display:flex; align-items:center; gap:10px; min-width:0; flex:0 1 auto;}
   .brand .logo{
     width:36px;height:36px;aspect-ratio:1/1;flex:0 0 36px;border-radius:10px;background:var(--accent);
@@ -936,6 +954,7 @@
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
+    <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
     <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
     </div>
   </div>
@@ -1136,6 +1155,25 @@
     <div class="modal-head"><h2 data-i18n="lock.edit">تعديل رمز قفل الجهاز</h2><button class="close-btn" onclick="closeEditLock()">×</button></div>
     <div id="editLockHost"></div>
     <button class="btn-primary" style="box-shadow:none;margin-top:8px;" data-i18n="lock.save" onclick="saveEditedLock()">حفظ رمز القفل</button>
+  </div>
+</div>
+
+<!-- الإعدادات: اللغة (والمظهر لما يتعمل) -->
+<div id="settingsOverlay" class="overlay hidden" style="z-index:64;">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h2 data-i18n="set.title">⚙️ الإعدادات</h2>
+      <button class="close-btn" onclick="closeSettings()">×</button>
+    </div>
+    <div style="padding:4px 20px 24px;">
+
+      <div class="set-group">
+        <div class="set-label" data-i18n="set.langSection">🌐 اللغة والاتجاه</div>
+        <div class="set-choices" id="setLangChoices"></div>
+        <p class="set-hint" data-i18n="set.langHint">تغيير اللغة بيعيد تحميل الصفحة عشان كل الشاشات تتبني باللغة الجديدة.</p>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -4002,6 +4040,61 @@ function renderTimeline(){
     ${itemsHtml}
   `;
 }
+
+// ============================================================
+// الإعدادات
+// ------------------------------------------------------------
+// زرار اللغة كان واقف لوحده في الهيدر. اتنقل هنا عشان الهيدر يفضل
+// نضيف، وعشان يبقى فيه مكان واحد لأي إعداد جاي (المظهر مثلاً).
+//
+// اللغة نفسها بيتولاها I18N — بيحفظ الاختيار في localStorage (عام
+// وللمستخدم الحالي كمان) وبيعيد تحميل الصفحة عشان كل الشاشات تتبني
+// باللغة الجديدة. إحنا هنا بنعرض الاختيار بس.
+// ============================================================
+const SET_LANGS = [
+  { code:'ar', label:'العربية', sub:'RTL', ico:'🇪🇬' },
+  { code:'en', label:'English', sub:'LTR', ico:'🇬🇧' },
+];
+
+function openSettings(){
+  const ov = document.getElementById('settingsOverlay');
+  if(!ov) return;
+  const md = document.getElementById('menuDropdown');
+  if(md) md.classList.add('hidden');   // نقفل قايمة ⋮ الأول
+  renderSettings();
+  ov.classList.remove('hidden');
+}
+function closeSettings(){
+  const ov = document.getElementById('settingsOverlay');
+  if(ov) ov.classList.add('hidden');
+}
+
+function renderSettings(){
+  const host = document.getElementById('setLangChoices');
+  if(!host) return;
+  let cur = 'ar';
+  try{ cur = I18N.getLang(); }catch(e){}
+  host.innerHTML = SET_LANGS.map(l => `
+    <button type="button" class="set-opt${l.code===cur?' active':''}" onclick="pickLang('${l.code}')">
+      <span class="ico">${l.ico}</span>
+      <span>${l.label}</span>
+      <span class="sub">${l.sub}</span>
+    </button>`).join('');
+}
+
+function pickLang(code){
+  let cur = 'ar';
+  try{ cur = I18N.getLang(); }catch(e){}
+  if(code === cur){ closeSettings(); return; }
+  try{ I18N.setLang(code); }catch(e){}   // بيحفظ ويعيد التحميل
+}
+
+// إغلاق بـ Escape — زي باقي النوافذ
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape') return;
+  const ov = document.getElementById('settingsOverlay');
+  if(ov && !ov.classList.contains('hidden')) closeSettings();
+});
 
 function toggleMenu(){
   document.getElementById('menuDropdown').classList.toggle('hidden');
@@ -7068,7 +7161,8 @@ requireAccess().then(ok => {
   // تعدد اللغات: نضبط الاتجاه ونركّب زر تبديل اللغة
   try{
     I18N.applyI18n(document);
-    I18N.mountLangToggle(document.querySelector('.topbar-actions'));
+    // زرار اللغة المستقل اتشال من الهيدر — بقى جوه ⚙️ الإعدادات في قايمة ⋮.
+    // I18N.mountLangToggle() لسه موجودة في i18n.js عشان الصفحات التانية.
   }catch(e){}
   // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
   // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
