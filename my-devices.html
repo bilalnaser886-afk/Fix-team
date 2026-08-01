@@ -822,7 +822,7 @@ function finish(disp){
   $('veil').classList.add('gone');
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
-    b.textContent = t('rp.staging');
+    b.textContent = t('app.stagingBar');
     b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }

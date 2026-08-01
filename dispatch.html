@@ -322,7 +322,7 @@
 </div>
 
 <div class="newbar">
-  <button class="newbtn" onclick="openIntake()"><span class="plus">＋</span> جهاز جديد</button>
+  <button class="newbtn" onclick="openIntake()"><span class="plus">＋</span> <span data-i18n="dp.newDevice">جهاز جديد</span></button>
 </div>
 
 <div class="tabs" id="tabs"></div>
@@ -760,7 +760,7 @@ function finish(){
   $('veil').classList.add('gone');
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
-    b.textContent = t('rp.staging');
+    b.textContent = t('app.stagingBar');
     b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }
@@ -836,7 +836,7 @@ function ticketHtml(d){
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
     <div class="tk-sub">${esc(d.customer)}${d.shop?`<span class="dot">•</span>${esc(d.shop)}`:''}</div>
     <div class="tk-meta">
-      <span class="chip">سجّلها: <b>${esc(d.by===ME?t('rp.you'):d.by)}</b></span>
+      <span class="chip">${t('rp.byColon')} <b>${esc(d.by===ME?t('rp.you'):d.by)}</b></span>
       ${d.tech?`<span class="chip">${t('rp.techColon')} <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);" data-i18n="tp.noTechYet">لسه من غير ${t('tp.roleTech')}</span>`}
       <span>· ${fmtDate(d.intake)}</span>
     </div>

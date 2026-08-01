@@ -291,7 +291,7 @@ const sb = supabase.createClient(_envCfg.url, _envCfg.key);
 if(APP_ENV === "staging"){
   addEventListener("DOMContentLoaded", function(){
     var b = document.createElement("div");
-    b.textContent = "🧪 بيئة تجريبية — STAGING";
+    b.textContent = (window.I18N && I18N.has("app.stagingBar")) ? I18N.t("app.stagingBar") : "🧪 بيئة تجريبية — STAGING";
     b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
     document.body.appendChild(b);
   });
