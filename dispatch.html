@@ -2,6 +2,20 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح الداشبورد (ifix-theme) عشان
+   الاختيار يسري على كل شاشات النظام. من غير ده فيه ومضة بيضا. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    var mt = document.querySelector('meta[name="theme-color"]');
+    if(mt) mt.setAttribute('content', d ? '#0E1721' : '#1B2A3A');
+  }catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>مسؤول الحركة — I Fix Team</title>
 <link rel="icon" href="dispatch-icon-192.png">
@@ -33,8 +47,25 @@
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
+  /* ===== الوضع الداكن ===== */
+  /* الهيدر أصلاً بلون --steel، فالوضع الداكن بيمد نفس اللون على
+     الشاشة كلها بدل ما يخترع لون جديد. */
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
+    --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
+    --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
+    --red:#F87171; --red-dark:#FCA5A5; --blue:#7C8FFF; --gold:#E3B85C;
+    --waiting:#E0A15C;    --waiting-bg:rgba(224,161,92,.15);
+    --diagnosing:#A78BFA; --diagnosing-bg:rgba(167,139,250,.15);
+    --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
+    --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
+    --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
+  }
+
+
   /* ===== شريط وضع النظام + الإشعارات ===== */
-  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:#fff;}
+  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--card);}
   .nt-ov{
     position:fixed; inset:0; z-index:9500; background:rgba(16,22,32,.5);
     display:flex; align-items:center; justify-content:center; padding:18px;
@@ -43,23 +74,23 @@
   /* ⚠️ max-height + overflow ضروريين: منشور طويل من غيرهم
      بيخلي زرار "فهمت" يخرج برّه الشاشة والمستخدم يتحبس. */
   .nt-card{
-    background:#fff; border-radius:18px; max-width:400px; width:100%;
+    background:var(--card); border-radius:18px; max-width:400px; width:100%;
     max-height:88vh; display:flex; flex-direction:column;
     padding:22px 20px 18px; text-align:center; position:relative;
     box-shadow:0 20px 50px rgba(16,22,32,.28);
   }
   .nt-x{
     position:absolute; top:10px; inset-inline-start:10px;
-    border:none; background:#F1F5F9; color:#64748B; width:32px; height:32px;
+    border:none; background:var(--paper); color:var(--muted); width:32px; height:32px;
     border-radius:50%; font-size:19px; line-height:1; cursor:pointer; flex:0 0 auto;
   }
   .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
   .nt-ic{font-size:44px; line-height:1;}
   .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
-  .nt-b{color:#475569; line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
+  .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:#16233A; color:var(--card); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -69,7 +100,7 @@
   /* اللوجو المخصص لصفحة الحركة — بيتحمّل مع الصفحة نفسها
      فمفيش لحظة يظهر فيها لوجو تاني */
   #veil .mk{width:96px; height:96px; border-radius:22px; overflow:hidden;
-            box-shadow:0 8px 26px rgba(16,22,32,.14); background:#fff;}
+            box-shadow:0 8px 26px rgba(16,22,32,.14); background:var(--card);}
   #veil .mk img{width:100%; height:100%; object-fit:contain; display:block;}
   #veil .sp{width:26px; height:26px; border-radius:50%; border:3px solid #D7DEE7;
             border-top-color:var(--steel); animation:vsp .8s linear infinite;}
@@ -93,7 +124,7 @@
 
   /* ===== شريط علوي ستيل + خط ألوان التروس ===== */
   .topbar{
-    position:sticky; top:0; z-index:31; background:var(--steel); color:#fff;
+    position:sticky; top:0; z-index:31; background:var(--steel); color:var(--card);
     padding:calc(12px + env(safe-area-inset-top)) 16px 13px;
     display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
@@ -107,6 +138,24 @@
     font-family:inherit; font-weight:700; font-size:13px; padding:9px 13px; border-radius:10px; cursor:pointer;}
   .logout:active{background:rgba(255,255,255,.16);}
 
+
+  /* ===== مودال الإعدادات ===== */
+  .set-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:70; display:flex;
+    align-items:center; justify-content:center; padding:18px;}
+  .set-bg.hidden{display:none;}
+  .set-card{background:var(--card); border-radius:18px; width:100%; max-width:380px;
+    padding:18px; box-shadow:0 22px 60px rgba(0,0,0,.35);}
+  .set-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .set-head h3{margin:0; font-family:'Cairo',sans-serif; font-size:17px; color:var(--ink);}
+  .set-x{background:none; border:none; font-size:24px; line-height:1; color:var(--faint); cursor:pointer;}
+  .set-lbl{font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:9px;}
+  .set-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px;}
+  .set-o{display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px;
+    border:1.5px solid var(--line); border-radius:12px; background:var(--paper);
+    font-family:inherit; font-size:12.5px; font-weight:700; color:var(--ink); cursor:pointer;}
+  .set-o .i{font-size:18px; line-height:1;}
+  .set-o.on{border-color:var(--repairing); background:var(--repairing-bg); color:var(--repairing);}
+  .set-note{font-size:11.5px; color:var(--muted); line-height:1.7; margin:9px 0 0;}
   /* ===== قايمة ⋮ في الهيدر ===== */
   .kebab-wrap{position:relative; flex:none;}
   .kebab-btn{
@@ -118,18 +167,18 @@
   .kebab-btn:active{background:rgba(255,255,255,.16);}
   .kebab-menu{
     position:absolute; top:calc(100% + 8px); inset-inline-end:0; z-index:60;
-    min-width:190px; background:#fff; border:1px solid #E2E8F0; border-radius:13px;
+    min-width:190px; background:var(--card); border:1px solid var(--line); border-radius:13px;
     box-shadow:0 14px 38px rgba(16,24,40,.20); padding:6px; overflow:hidden;
   }
   .kebab-menu.hidden{display:none;}
   .kebab-menu button{
     display:block; width:100%; text-align:start; background:none; border:none;
-    font-family:inherit; font-size:14.5px; font-weight:600; color:#1A2332;
+    font-family:inherit; font-size:14.5px; font-weight:600; color:var(--ink);
     padding:12px 13px; border-radius:9px; cursor:pointer;
   }
-  .kebab-menu button:active{background:#F1F5F9;}
-  .kebab-menu .sep{height:1px; background:#E2E8F0; margin:5px 8px;}
-  .kebab-menu .danger{color:#DC2626;}
+  .kebab-menu button:active{background:var(--paper);}
+  .kebab-menu .sep{height:1px; background:var(--line); margin:5px 8px;}
+  .kebab-menu .danger{color:var(--red);}
   /* درع بيقفل القايمة لو دوست بره */
   .kebab-shield{position:fixed; inset:0; z-index:59; background:transparent;}
   .kebab-shield.hidden{display:none;}
@@ -141,7 +190,7 @@
   }
   .newbtn{
     width:100%; border:none; border-radius:14px; padding:15px; cursor:pointer;
-    background:linear-gradient(135deg,var(--red),var(--red-dark)); color:#fff;
+    background:linear-gradient(135deg,var(--red),var(--red-dark)); color:var(--card);
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px;
     display:flex; align-items:center; justify-content:center; gap:9px;
     box-shadow:0 8px 20px rgba(232,50,30,.32); transition:transform .1s, box-shadow .15s;
@@ -155,17 +204,17 @@
     display:flex; gap:7px;
   }
   .tab{
-    flex:1; border:1px solid var(--line); background:#fff; border-radius:12px; padding:9px 6px; cursor:pointer;
+    flex:1; border:1px solid var(--line); background:var(--card); border-radius:12px; padding:9px 6px; cursor:pointer;
     font-family:'Tajawal',sans-serif; font-weight:700; font-size:12.5px; color:var(--muted);
     display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .15s; line-height:1.2;
   }
   .tab .cnt{font-family:var(--mono); font-weight:800; font-size:15px; color:var(--ink);}
   .tab.on{background:var(--steel); border-color:var(--steel); color:#C7D6E4;}
-  .tab.on .cnt{color:#fff;}
+  .tab.on .cnt{color:var(--card);}
 
   .searchbar{padding:4px 16px 8px;}
   .searchbar input{
-    width:100%; border:1px solid var(--line); background:#fff; border-radius:12px;
+    width:100%; border:1px solid var(--line); background:var(--card); border-radius:12px;
     padding:11px 14px 11px 42px; font-family:inherit; font-size:15px; color:var(--ink);
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236B7A8C' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3-3'/%3E%3C/svg%3E");
     background-repeat:no-repeat; background-position:left 14px center;
@@ -191,7 +240,7 @@
   .tk-sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
   .tk-sub .dot{opacity:.5; margin:0 5px;}
   .tk-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--faint);}
-  .tk-meta .chip{background:#F1F5F9; color:#52657A; border-radius:7px; padding:3px 8px; font-weight:600;}
+  .tk-meta .chip{background:var(--paper); color:#52657A; border-radius:7px; padding:3px 8px; font-weight:600;}
   .tk-meta .chip b{color:var(--ink);}
   .tk-actions{display:flex; gap:7px; margin-top:11px;}
   .act{flex:1; border:none; border-radius:10px; padding:9px 8px; cursor:pointer; font-family:'Tajawal',sans-serif;
@@ -199,16 +248,16 @@
   .act:active{transform:scale(.97);}
   .act-hand{background:var(--repairing-bg); color:var(--repairing);}
   .act-ret{background:var(--returned-bg); color:var(--returned);}
-  .act-view{background:#F1F5F9; color:#52657A; flex:0 0 auto;}
+  .act-view{background:var(--paper); color:#52657A; flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
   .empty{text-align:center; color:var(--muted); font-size:14px; padding:34px 16px;
-    background:#fff; border:1px dashed var(--line); border-radius:13px; line-height:1.9;}
+    background:var(--card); border:1px dashed var(--line); border-radius:13px; line-height:1.9;}
   .empty .big{font-size:30px; display:block; margin-bottom:8px; opacity:.85;}
 
   /* ===== توست ===== */
   .toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
-    background:var(--steel); color:#fff; font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
+    background:var(--steel); color:var(--card); font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
     box-shadow:0 12px 30px rgba(23,34,46,.3); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;}
   .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
 
@@ -219,23 +268,23 @@
     max-height:92vh; overflow-y:auto; transform:translateY(102%); transition:transform .3s cubic-bezier(.32,.72,0,1);
     box-shadow:0 -10px 40px rgba(15,23,34,.28); padding-bottom:calc(20px + env(safe-area-inset-bottom));}
   .sheet.on{transform:translateY(0);}
-  .sheet-head{position:sticky; top:0; background:var(--steel); color:#fff; padding:16px 18px 15px; border-radius:20px 20px 0 0;}
+  .sheet-head{position:sticky; top:0; background:var(--steel); color:var(--card); padding:16px 18px 15px; border-radius:20px 20px 0 0;}
   .sheet-head::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
     background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);}
   .grab{width:42px; height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:0 auto 12px;}
   .sh-row{display:flex; align-items:center; justify-content:space-between;}
   .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
-  .sh-x{background:rgba(255,255,255,.1); border:none; color:#fff; width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
+  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--card); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
   .sh-body{padding:16px;}
   .fld{margin-bottom:13px;}
   .fld label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;}
   .fld input, .fld textarea{width:100%; border:1px solid var(--line); border-radius:11px; padding:12px 13px;
-    font-family:inherit; font-size:15px; color:var(--ink); background:#fff;}
+    font-family:inherit; font-size:15px; color:var(--ink); background:var(--card);}
   .fld input:focus, .fld textarea:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.13);}
   .fld textarea{resize:none; min-height:60px;}
   .frow{display:flex; gap:11px;}
   .frow .fld{flex:1;}
-  .save{width:100%; margin-top:6px; background:var(--red); color:#fff; border:none; border-radius:12px; padding:15px;
+  .save{width:100%; margin-top:6px; background:var(--red); color:var(--card); border:none; border-radius:12px; padding:15px;
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 8px 20px rgba(232,50,30,.3);}
   .save:active{transform:translateY(1px);}
 
@@ -249,7 +298,7 @@
 
 <div class="topbar">
   <div class="who">
-    <div class="mark"><img src="dispatch-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:#fff;"></div>
+    <div class="mark"><img src="dispatch-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:var(--card);"></div>
     <div>
       <div class="hi">مسؤول الحركة</div>
       <div class="nm" id="dispName">كريم عادل</div>
@@ -260,6 +309,8 @@
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="closeKebab(); refresh()">🔄 تحديث</button>
+      <div class="sep"></div>
+      <button onclick="openSettings()">⚙️ الإعدادات</button>
       <div class="sep"></div>
       <button class="danger" onclick="kebabLogout()">تسجيل الخروج ⏻</button>
     </div>
@@ -362,7 +413,7 @@ function showLoadError(msg){
   document.querySelectorAll('.errbar').forEach(e => e.remove());
   const b = document.createElement('div');
   b.className = 'errbar';
-  b.style.cssText = 'background:#FEE2E2;color:#B91C1C;text-align:center;font-weight:800;font-size:12.5px;padding:9px 12px;line-height:1.8;';
+  b.style.cssText = 'background:#FEE2E2;color:var(--red-dark);text-align:center;font-weight:800;font-size:12.5px;padding:9px 12px;line-height:1.8;';
   b.innerHTML = '⚠️ مشكلة في قراءة البيانات:<br><span style="font-family:monospace;font-weight:700;font-size:11.5px;">'
               + esc(msg) + '</span>';
   document.body.insertBefore(b, document.body.firstChild.nextSibling);
@@ -503,7 +554,7 @@ async function loadNotices(){
       const left = cfg.trialStart
         ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
         : days;
-      ntBar('🎁 فترة مجانية — متبقّي ' + left + ' يوماً على الاشتراك', '#B45309');
+      ntBar('🎁 فترة مجانية — متبقّي ' + left + ' يوماً على الاشتراك', 'var(--waiting)');
       if(cfg.trialAnnId){
         ntShow('🎁', 'بدأت فترتك المجانية',
           'أنت الآن في الفترة المجانية (' + days + ' يوماً). متبقّي ' + left +
@@ -710,7 +761,7 @@ function finish(){
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
     b.textContent = '🧪 بيئة تجريبية — STAGING';
-    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--card);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }
 }
@@ -944,6 +995,61 @@ function kebabLogout(){
   if(!confirm('تسجيل الخروج من النظام؟')) return;
   doLogout();
 }
+</script>
+
+<div class="set-bg hidden" id="setBg" onclick="if(event.target===this) closeSettings()">
+  <div class="set-card">
+    <div class="set-head"><h3>⚙️ الإعدادات</h3><button class="set-x" onclick="closeSettings()">×</button></div>
+    <div class="set-lbl">🎨 المظهر</div>
+    <div class="set-row" id="setRow"></div>
+    <p class="set-note" id="setNote"></p>
+  </div>
+</div>
+<script>
+// ============================================================
+// الإعدادات — المظهر
+// ------------------------------------------------------------
+// نفس مفتاح الداشبورد (ifix-theme)، فاختيار الفني بيسري على أي
+// شاشة يفتحها في النظام.
+// التلقائي: فاتح من ٧ص لـ ٧م، وداكن بعد كده.
+// ============================================================
+var THEMES = [
+  { k:'light', i:'☀️', n:'فاتح' },
+  { k:'dark',  i:'🌙', n:'داكن' },
+  { k:'auto',  i:'⏰', n:'تلقائي' },
+];
+function themeMode(){ try{ return localStorage.getItem('ifix-theme') || 'auto'; }catch(e){ return 'auto'; } }
+function isDarkNow(m){
+  if(m==='dark') return true;
+  if(m==='light') return false;
+  var h = new Date().getHours();
+  return h >= 19 || h < 7;
+}
+function applyTheme(){
+  var d = isDarkNow(themeMode());
+  document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  var mt = document.querySelector('meta[name="theme-color"]');
+  if(mt) mt.setAttribute('content', d ? '#0E1721' : '#1B2A3A');
+}
+function openSettings(){ closeKebab(); renderSettings(); document.getElementById('setBg').classList.remove('hidden'); }
+function closeSettings(){ var e=document.getElementById('setBg'); if(e) e.classList.add('hidden'); }
+function renderSettings(){
+  var cur = themeMode();
+  document.getElementById('setRow').innerHTML = THEMES.map(function(x){
+    return '<button class="set-o'+(x.k===cur?' on':'')+'" onclick="pickTheme(\''+x.k+'\')">'
+         + '<span class="i">'+x.i+'</span><span>'+x.n+'</span></button>';
+  }).join('');
+  document.getElementById('setNote').textContent = cur==='auto'
+    ? ('فاتح من ٧ الصبح لـ ٧ بالليل، وداكن بعد كده. دلوقتي: ' + (isDarkNow('auto') ? 'داكن' : 'فاتح') + '.')
+    : '';
+}
+function pickTheme(m){
+  try{ localStorage.setItem('ifix-theme', m); }catch(e){}
+  applyTheme(); renderSettings();
+}
+// في الوضع التلقائي الشاشة تتبدّل لوحدها لما الساعة تعدّي الحد
+setInterval(function(){ if(themeMode()==='auto') applyTheme(); }, 60000);
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSettings(); });
 </script>
 </body>
 </html>

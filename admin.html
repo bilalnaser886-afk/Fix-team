@@ -2,6 +2,17 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح باقي الشاشات */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  }catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>لوحة الأدمن — I Fix Team</title>
 <link rel="icon" href="favicon32.png">
@@ -10,40 +21,52 @@
 <script src="i18n.js"></script>
 <style>
   *{box-sizing:border-box;}
-  :root{ --ink:#101014; --muted:#64748B; --line:#EEF0F3; }
-  body{ font-family:'Tajawal',sans-serif; margin:0; background:#F1F5F9; color:var(--ink);
+  :root{
+    --ink:#101014; --muted:#64748B; --line:#EEF0F3;
+    --paper:#F1F5F9; --card:#FFFFFF; --faint:#94A3B8; --ink-2:#475569;
+    --danger:#DC2626; --danger-bg:#FEF2F2; --success:#16A34A; --info:#2563EB; --warn:#B45309;
+  }
+
+  /* ===== الوضع الداكن ===== */
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --ink:#E9EFF5; --muted:#92A6B8; --line:#2F4356;
+    --paper:#131E29; --card:#1B2A3A; --faint:#71879B; --ink-2:#C3D2DF;
+    --danger:#F87171; --danger-bg:rgba(248,113,113,.15); --success:#4ADE80; --info:#60A5FA; --warn:#FBBF24;
+  }
+  body{ font-family:'Tajawal',sans-serif; margin:0; background:var(--paper); color:var(--ink);
     padding-bottom:60px; -webkit-tap-highlight-color:transparent; }
-  .topbar{ background:#0F172A; color:#fff; padding:calc(14px + env(safe-area-inset-top)) 18px 14px; }
+  .topbar{ background:#0F172A; color:var(--card); padding:calc(14px + env(safe-area-inset-top)) 18px 14px; }
   .topbar h1{ font-family:'Cairo',sans-serif; font-size:19px; margin:0; }
   .topbar .sub{ font-size:12px; opacity:.7; margin-top:2px; }
   .topbar .who{ font-size:12px; opacity:.85; margin-top:8px; }
   .wrap{ max-width:640px; margin:0 auto; padding:16px; }
-  .sec{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;
+  .sec{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;
     box-shadow:0 2px 10px rgba(16,16,20,.04); }
   .sec-title{ font-weight:800; font-size:15px; margin-bottom:4px; }
   .hint{ font-size:12.5px; color:var(--muted); margin:0 0 12px; line-height:1.7; }
   button{ font-family:inherit; cursor:pointer; touch-action:manipulation; }
-  .btn{ width:100%; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:800; color:#fff;
-    background:#2563EB; }
-  .btn.warn{ background:#B45309; }
-  .btn.danger{ background:#fff; color:#DC2626; border:1px solid #FCA5A5; }
-  .btn.ghost{ background:#fff; color:#334155; border:1px solid #E2E8F0; }
-  .mini{ background:#fff; border:1px solid #E2E8F0; border-radius:8px; padding:8px 12px; font-size:13px;
+  .btn{ width:100%; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:800; color:var(--card);
+    background:var(--info); }
+  .btn.warn{ background:var(--warn); }
+  .btn.danger{ background:var(--card); color:var(--danger); border:1px solid #FCA5A5; }
+  .btn.ghost{ background:var(--card); color:#334155; border:1px solid var(--line); }
+  .mini{ background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px;
     font-weight:700; color:#334155; min-height:40px; }
-  .mini.on{ background:#DCFCE7; color:#16A34A; border-color:#86EFAC; }
+  .mini.on{ background:#DCFCE7; color:var(--success); border-color:#86EFAC; }
   .row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:9px 0; border-bottom:1px solid #F8FAFC; }
+    padding:9px 0; border-bottom:1px solid var(--paper); }
   .badge{ display:inline-block; border-radius:8px; padding:4px 10px; font-size:12.5px; font-weight:800; }
-  input, textarea, select{ width:100%; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px;
+  input, textarea, select{ width:100%; border:1px solid var(--line); border-radius:8px; padding:10px 12px;
     font-size:14px; font-family:inherit; margin-bottom:9px; }
-  .mode-box{ background:#F1F5F9; border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+  .mode-box{ background:var(--paper); border-radius:10px; padding:12px 14px; margin-bottom:14px; }
   .log{ max-height:230px; overflow:auto; }
-  .log-item{ border-bottom:1px solid #F1F5F9; padding:7px 0; font-size:12.5px; line-height:1.6; }
-  .log-meta{ color:#94A3B8; font-size:11px; }
+  .log-item{ border-bottom:1px solid var(--paper); padding:7px 0; font-size:12.5px; line-height:1.6; }
+  .log-meta{ color:var(--faint); font-size:11px; }
   .loading{ text-align:center; padding:50px 20px; color:var(--muted); }
-  .lang-toggle{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:#fff;
+  .lang-toggle{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:var(--card);
     border-radius:9px; min-height:36px; padding:0 12px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
-  .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:#fff; text-align:center;
+  .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:var(--card); text-align:center;
     font-weight:800; font-size:14px; padding:13px; }
 </style>
 </head>
@@ -78,7 +101,7 @@ if(APP_ENV === "staging"){
   addEventListener("DOMContentLoaded", function(){
     var b = document.createElement("div");
     b.textContent = "🧪 بيئة تجريبية — STAGING";
-    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
+    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:var(--warn);color:var(--card);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
     document.body.appendChild(b);
   });
 }
@@ -130,7 +153,7 @@ function isFeatureEnabled(key){ const f = featureFlags[key]; return !!(f && f.is
 
 function toast(msg, ok){
   const t = document.createElement('div');
-  t.className = 'toast'; t.style.background = ok===false ? '#DC2626' : '#16A34A';
+  t.className = 'toast'; t.style.background = ok===false ? 'var(--danger)' : 'var(--success)';
   t.textContent = msg; t.onclick = () => t.remove();
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 5000);
@@ -194,7 +217,7 @@ function render(){
       <div class="mode-box">
         <div style="font-size:13px;color:var(--muted);">${t('adm.currentMode')}</div>
         <div style="font-weight:800;font-size:17px;margin-top:2px;">${modeLabel}</div>
-        ${m==='trial' ? `<div style="font-size:13px;color:#B45309;margin-top:4px;">${t('adm.daysLeft',{n:left})}</div>` : ''}
+        ${m==='trial' ? `<div style="font-size:13px;color:var(--warn);margin-top:4px;">${t('adm.daysLeft',{n:left})}</div>` : ''}
       </div>
       <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ ${t('adm.openDashboard')}</button>
     </div>
@@ -203,7 +226,7 @@ function render(){
       <div class="sec-title">🛠️ ${t('adm.betaSection')}</div>
       <p class="hint">${t('adm.betaHint')}</p>
       ${m==='beta'
-        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● ${t('adm.betaOn')}</div>
+        ? `<div class="badge" style="background:#DCFCE7;color:var(--success);margin-bottom:9px;">● ${t('adm.betaOn')}</div>
            <button class="btn danger" onclick="setMode('cancelBeta')">🛑 ${t('adm.betaCancel')}</button>`
         : `<button class="btn" onclick="setMode('beta')">${t('adm.betaEnable')}</button>`}
     </div>
@@ -212,7 +235,7 @@ function render(){
       <div class="sec-title">🎁 ${t('adm.trialSection')}</div>
       <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||30)})}</p>
       ${m==='trial'
-        ? `<div class="badge" style="background:#DCFCE7;color:#16A34A;margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
+        ? `<div class="badge" style="background:#DCFCE7;color:var(--success);margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
            <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
         : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
       <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||30})</button></div>
@@ -245,7 +268,7 @@ function render(){
         return `<div class="row">
           <div style="flex:1;">
             <div style="font-size:13.5px;font-weight:700;">${esc(f.desc)}</div>
-            <div style="font-size:11px;color:#94A3B8;font-family:monospace;">${esc(f.key)}</div>
+            <div style="font-size:11px;color:var(--faint);font-family:monospace;">${esc(f.key)}</div>
           </div>
           <button class="mini ${on?'on':''}" style="min-width:92px;" onclick="toggleFlag('${f.key}')">${on ? '● '+t('adm.flagOn') : '○ '+t('adm.flagOff')}</button>
         </div>`;
@@ -255,7 +278,7 @@ function render(){
     <div class="sec">
       <div class="sec-title">👥 ${t('adm.rolesSection')}</div>
       <p class="hint">${t('adm.rolesHint')}</p>
-      <div style="font-size:12.5px;color:#475569;line-height:1.9;margin-bottom:10px;">
+      <div style="font-size:12.5px;color:var(--ink-2);line-height:1.9;margin-bottom:10px;">
         ${t('adm.envAdmins')} (${APP_ENV==='production'?t('adm.envProd'):t('adm.envStaging')}):
         <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b>
         ${Object.keys(userRoles).length
@@ -263,9 +286,9 @@ function render(){
               const en = normRole(rl);
               return `<div class="row">
               <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${esc(roleLabel(en.role))}${en.techName ? ' (' + esc(en.techName) + ')' : ''}</span>
-              <button class="mini" style="color:#DC2626;" onclick="removeRole('${esc(em)}')">${t('adm.delete')}</button>
+              <button class="mini" style="color:var(--danger);" onclick="removeRole('${esc(em)}')">${t('adm.delete')}</button>
             </div>`;}).join('')
-          : `<div style="color:#94A3B8;margin-top:6px;">${t('adm.noRoles')}</div>`}
+          : `<div style="color:var(--faint);margin-top:6px;">${t('adm.noRoles')}</div>`}
       </div>
       <button class="mini" onclick="addRole()">➕ ${t('adm.addRole')}</button>
 
@@ -277,11 +300,11 @@ function render(){
           <p class="hint" style="margin-top:0;">اتضافوا من شاشة الصيانة وشغالين على أجهزة، بس لسه مالهمش إيميل يدخلوا بيه.</p>
           ${pend.map(x => `<div class="row">
             <span style="font-size:12.5px;">${esc(x.name)}
-              <span style="color:#94A3B8;font-size:11px;">— ${esc(x.addedBy||'')} · ${new Date(x.addedAt).toLocaleDateString('ar-EG')}</span>
+              <span style="color:var(--faint);font-size:11px;">— ${esc(x.addedBy||'')} · ${new Date(x.addedAt).toLocaleDateString('ar-EG')}</span>
             </span>
             <span style="display:flex;gap:6px;">
               <button class="mini" onclick="grantTechAccount('${esc(x.name).replace(/'/g,"\\'")}')">✉️ اعمله حساب</button>
-              <button class="mini" style="color:#DC2626;" onclick="dropPendingTech('${esc(x.name).replace(/'/g,"\\'")}')">${t('adm.delete')}</button>
+              <button class="mini" style="color:var(--danger);" onclick="dropPendingTech('${esc(x.name).replace(/'/g,"\\'")}')">${t('adm.delete')}</button>
             </span>
           </div>`).join('')}
         </div>`;
@@ -294,7 +317,7 @@ function render(){
       ${auditLog.length
         ? `<div class="log">${auditLog.slice(0,50).map(a => `<div class="log-item">${esc(a.action)}
              <div class="log-meta">${new Date(a.at).toLocaleString('ar-EG')} — ${esc(a.by)}</div></div>`).join('')}</div>`
-        : `<div style="color:#94A3B8;font-size:12.5px;">${t('adm.noAudit')}</div>`}
+        : `<div style="color:var(--faint);font-size:12.5px;">${t('adm.noAudit')}</div>`}
     </div>
 
     <div class="sec">
