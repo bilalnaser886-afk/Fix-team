@@ -33,6 +33,7 @@
      التوقيع: تذكرة صيانة — شريط حالة ملوّن على حافة الكارت + رقم تذكرة
      ============================================================ */
   :root{
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#475569;
     --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
@@ -50,10 +51,11 @@
      الشاشة كلها بدل ما يخترع لون جديد. */
   html[data-theme="dark"]{
     color-scheme:dark;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --ink-2:#C3D2DF;
     --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
     --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
     --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
-    --red:#F87171; --red-dark:#FCA5A5; --blue:#7C8FFF; --gold:#E3B85C;
+    --red:#F0554A; --red-dark:#D13B2E; --blue:#7C8FFF; --gold:#E3B85C;
     --waiting:#E0A15C;    --waiting-bg:rgba(224,161,92,.15);
     --diagnosing:#A78BFA; --diagnosing-bg:rgba(167,139,250,.15);
     --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
@@ -63,7 +65,7 @@
 
 
   /* ===== شريط وضع النظام + الإشعارات ===== */
-  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--card);}
+  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--on-color);}
   .nt-ov{
     position:fixed; inset:0; z-index:9500; background:rgba(16,22,32,.5);
     display:flex; align-items:center; justify-content:center; padding:18px;
@@ -88,7 +90,7 @@
   .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:var(--card); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:#16233A; color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -118,7 +120,7 @@
 
   /* ===== شريط علوي ستيل + خط ألوان التروس ===== */
   .topbar{
-    position:sticky; top:0; z-index:30; background:var(--steel); color:var(--card);
+    position:sticky; top:0; z-index:30; background:var(--steel); color:var(--on-chrome);
     padding:calc(12px + env(safe-area-inset-top)) 16px 13px;
     display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
@@ -249,7 +251,7 @@
   .tk-issue .w{flex:none; opacity:.7;}
   .tk-lock{
     display:inline-flex; align-items:center; gap:6px; margin-top:9px;
-    font-size:12px; color:#334155; background:var(--paper); border-radius:8px; padding:4px 9px;
+    font-size:12px; color:var(--ink-2); background:var(--paper); border-radius:8px; padding:4px 9px;
   }
   .tk-lock b{font-family:var(--mono); font-weight:700; letter-spacing:1px;}
   .tk-lock img{width:34px; height:34px; border-radius:6px; border:1px solid var(--line); object-fit:cover;}
@@ -287,7 +289,7 @@
   /* ===== توست ===== */
   .toast{
     position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
-    background:var(--steel); color:var(--card); font-weight:700; font-size:13.5px;
+    background:var(--steel); color:var(--on-chrome); font-weight:700; font-size:13.5px;
     padding:12px 18px; border-radius:12px; box-shadow:0 12px 30px rgba(23,34,46,.3);
     opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;
   }
@@ -305,7 +307,7 @@
   }
   .sheet.on{transform:translateY(0);}
   .sheet-head{
-    position:sticky; top:0; background:var(--steel); color:var(--card); padding:16px 18px 15px;
+    position:sticky; top:0; background:var(--steel); color:var(--on-chrome); padding:16px 18px 15px;
     border-radius:20px 20px 0 0;
   }
   .sheet-head::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
@@ -314,7 +316,7 @@
   .sh-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
   .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
   .sh-no{font-family:var(--mono); font-size:12px; color:#9DB0C4; margin-top:2px;}
-  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--card); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer; flex:none;}
+  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--on-color); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer; flex:none;}
   .sh-body{padding:16px 16px 8px;}
   .panel{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:15px 16px; margin-bottom:13px;}
   .panel-h{font-family:'Cairo',sans-serif; font-weight:800; font-size:13.5px; color:var(--ink); margin:0 0 11px; display:flex; align-items:center; gap:7px;}
@@ -333,7 +335,7 @@
     font-size:14px; resize:none; min-height:44px; color:var(--ink);
   }
   .note-in textarea:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.13);}
-  .note-add{flex:none; align-self:stretch; background:var(--steel); color:var(--card); border:none; border-radius:11px; padding:0 16px; font-family:inherit; font-weight:800; font-size:13px; cursor:pointer;}
+  .note-add{flex:none; align-self:stretch; background:var(--steel); color:var(--on-chrome); border:none; border-radius:11px; padding:0 16px; font-family:inherit; font-weight:800; font-size:13px; cursor:pointer;}
 
   /* مفتاح التحويل */
   .hand-sw{display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;}
@@ -353,7 +355,7 @@
   .mode .mt{font-family:'Cairo',sans-serif; font-weight:800; font-size:13px; margin-top:4px;}
   .mode .md{font-size:10.5px; color:var(--muted); margin-top:3px; line-height:1.5;}
   .mode.sel{border-color:var(--repairing); background:var(--repairing-bg);}
-  .hb-ok{width:100%; margin-top:14px; background:var(--red); color:var(--card); border:none; border-radius:12px; padding:13px; font-family:'Cairo',sans-serif; font-weight:800; font-size:15px; cursor:pointer; box-shadow:0 6px 16px rgba(232,50,30,.28);}
+  .hb-ok{width:100%; margin-top:14px; background:var(--red); color:var(--on-color); border:none; border-radius:12px; padding:13px; font-family:'Cairo',sans-serif; font-weight:800; font-size:15px; cursor:pointer; box-shadow:0 6px 16px rgba(232,50,30,.28);}
   .hb-ok:disabled{background:var(--line); box-shadow:none; cursor:not-allowed;}
 
   @media (max-width:520px){ .grid{grid-template-columns:1fr;} }
@@ -823,7 +825,7 @@ function finish(disp){
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
     b.textContent = '🧪 بيئة تجريبية — STAGING';
-    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--card);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }
 }

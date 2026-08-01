@@ -22,21 +22,27 @@
 <style>
   *{box-sizing:border-box;}
   :root{
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#334155;
     --ink:#101014; --muted:#64748B; --line:#EEF0F3;
     --paper:#F1F5F9; --card:#FFFFFF; --faint:#94A3B8; --ink-2:#475569;
-    --danger:#DC2626; --danger-bg:#FEF2F2; --success:#16A34A; --info:#2563EB; --warn:#B45309;
+    --danger:#DC2626; --danger-bg:#FEF2F2; --danger-border:#FCA5A5;
+    --success:#16A34A; --success-bg:#DCFCE7; --success-border:#86EFAC;
+    --info:#2563EB; --warn:#B45309;
   }
 
   /* ===== الوضع الداكن ===== */
   html[data-theme="dark"]{
     color-scheme:dark;
+    --on-chrome:#E9EFF5; --on-color:#0E1721;
     --ink:#E9EFF5; --muted:#92A6B8; --line:#2F4356;
     --paper:#131E29; --card:#1B2A3A; --faint:#71879B; --ink-2:#C3D2DF;
-    --danger:#F87171; --danger-bg:rgba(248,113,113,.15); --success:#4ADE80; --info:#60A5FA; --warn:#FBBF24;
+    --danger:#F87171; --danger-bg:rgba(248,113,113,.15); --danger-border:rgba(248,113,113,.45);
+    --success:#4ADE80; --success-bg:rgba(74,222,128,.15); --success-border:rgba(74,222,128,.45);
+    --info:#3B82F6; --warn:#F0A81E;
   }
   body{ font-family:'Tajawal',sans-serif; margin:0; background:var(--paper); color:var(--ink);
     padding-bottom:60px; -webkit-tap-highlight-color:transparent; }
-  .topbar{ background:#0F172A; color:var(--card); padding:calc(14px + env(safe-area-inset-top)) 18px 14px; }
+  .topbar{ background:#0F172A; color:var(--on-chrome); padding:calc(14px + env(safe-area-inset-top)) 18px 14px; }
   .topbar h1{ font-family:'Cairo',sans-serif; font-size:19px; margin:0; }
   .topbar .sub{ font-size:12px; opacity:.7; margin-top:2px; }
   .topbar .who{ font-size:12px; opacity:.85; margin-top:8px; }
@@ -46,14 +52,14 @@
   .sec-title{ font-weight:800; font-size:15px; margin-bottom:4px; }
   .hint{ font-size:12.5px; color:var(--muted); margin:0 0 12px; line-height:1.7; }
   button{ font-family:inherit; cursor:pointer; touch-action:manipulation; }
-  .btn{ width:100%; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:800; color:var(--card);
+  .btn{ width:100%; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:800; color:var(--on-color);
     background:var(--info); }
   .btn.warn{ background:var(--warn); }
-  .btn.danger{ background:var(--card); color:var(--danger); border:1px solid #FCA5A5; }
-  .btn.ghost{ background:var(--card); color:#334155; border:1px solid var(--line); }
+  .btn.danger{ background:var(--card); color:var(--danger); border:1px solid var(--danger-border); }
+  .btn.ghost{ background:var(--card); color:var(--ink-2); border:1px solid var(--line); }
   .mini{ background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px;
-    font-weight:700; color:#334155; min-height:40px; }
-  .mini.on{ background:#DCFCE7; color:var(--success); border-color:#86EFAC; }
+    font-weight:700; color:var(--ink-2); min-height:40px; }
+  .mini.on{ background:var(--success-bg); color:var(--success); border-color:var(--success-border); }
   .row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
     padding:9px 0; border-bottom:1px solid var(--paper); }
   .badge{ display:inline-block; border-radius:8px; padding:4px 10px; font-size:12.5px; font-weight:800; }
@@ -64,9 +70,9 @@
   .log-item{ border-bottom:1px solid var(--paper); padding:7px 0; font-size:12.5px; line-height:1.6; }
   .log-meta{ color:var(--faint); font-size:11px; }
   .loading{ text-align:center; padding:50px 20px; color:var(--muted); }
-  .lang-toggle{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:var(--card);
+  .lang-toggle{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); color:var(--on-color);
     border-radius:9px; min-height:36px; padding:0 12px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
-  .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:var(--card); text-align:center;
+  .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:var(--on-color); text-align:center;
     font-weight:800; font-size:14px; padding:13px; }
 </style>
 </head>
@@ -101,7 +107,7 @@ if(APP_ENV === "staging"){
   addEventListener("DOMContentLoaded", function(){
     var b = document.createElement("div");
     b.textContent = "🧪 بيئة تجريبية — STAGING";
-    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:var(--warn);color:var(--card);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
+    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:var(--warn);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
     document.body.appendChild(b);
   });
 }
@@ -226,7 +232,7 @@ function render(){
       <div class="sec-title">🛠️ ${t('adm.betaSection')}</div>
       <p class="hint">${t('adm.betaHint')}</p>
       ${m==='beta'
-        ? `<div class="badge" style="background:#DCFCE7;color:var(--success);margin-bottom:9px;">● ${t('adm.betaOn')}</div>
+        ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.betaOn')}</div>
            <button class="btn danger" onclick="setMode('cancelBeta')">🛑 ${t('adm.betaCancel')}</button>`
         : `<button class="btn" onclick="setMode('beta')">${t('adm.betaEnable')}</button>`}
     </div>
@@ -235,7 +241,7 @@ function render(){
       <div class="sec-title">🎁 ${t('adm.trialSection')}</div>
       <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||30)})}</p>
       ${m==='trial'
-        ? `<div class="badge" style="background:#DCFCE7;color:var(--success);margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
+        ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
            <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
         : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
       <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||30})</button></div>

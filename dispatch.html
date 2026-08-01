@@ -33,6 +33,7 @@
      نفس لغة تصميم الفني: ستيل + خط التروس + تذاكر بشريط حالة.
      ============================================================ */
   :root{
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#475569;
     --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
@@ -52,10 +53,11 @@
      الشاشة كلها بدل ما يخترع لون جديد. */
   html[data-theme="dark"]{
     color-scheme:dark;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --ink-2:#C3D2DF;
     --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
     --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
     --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
-    --red:#F87171; --red-dark:#FCA5A5; --blue:#7C8FFF; --gold:#E3B85C;
+    --red:#F0554A; --red-dark:#D13B2E; --blue:#7C8FFF; --gold:#E3B85C;
     --waiting:#E0A15C;    --waiting-bg:rgba(224,161,92,.15);
     --diagnosing:#A78BFA; --diagnosing-bg:rgba(167,139,250,.15);
     --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
@@ -65,7 +67,7 @@
 
 
   /* ===== شريط وضع النظام + الإشعارات ===== */
-  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--card);}
+  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--on-color);}
   .nt-ov{
     position:fixed; inset:0; z-index:9500; background:rgba(16,22,32,.5);
     display:flex; align-items:center; justify-content:center; padding:18px;
@@ -90,7 +92,7 @@
   .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:var(--card); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:#16233A; color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -124,7 +126,7 @@
 
   /* ===== شريط علوي ستيل + خط ألوان التروس ===== */
   .topbar{
-    position:sticky; top:0; z-index:31; background:var(--steel); color:var(--card);
+    position:sticky; top:0; z-index:31; background:var(--steel); color:var(--on-chrome);
     padding:calc(12px + env(safe-area-inset-top)) 16px 13px;
     display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
@@ -190,7 +192,7 @@
   }
   .newbtn{
     width:100%; border:none; border-radius:14px; padding:15px; cursor:pointer;
-    background:linear-gradient(135deg,var(--red),var(--red-dark)); color:var(--card);
+    background:linear-gradient(135deg,var(--red),var(--red-dark)); color:var(--on-color);
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px;
     display:flex; align-items:center; justify-content:center; gap:9px;
     box-shadow:0 8px 20px rgba(232,50,30,.32); transition:transform .1s, box-shadow .15s;
@@ -210,7 +212,7 @@
   }
   .tab .cnt{font-family:var(--mono); font-weight:800; font-size:15px; color:var(--ink);}
   .tab.on{background:var(--steel); border-color:var(--steel); color:#C7D6E4;}
-  .tab.on .cnt{color:var(--card);}
+  .tab.on .cnt{color:var(--on-color);}
 
   .searchbar{padding:4px 16px 8px;}
   .searchbar input{
@@ -257,7 +259,7 @@
 
   /* ===== توست ===== */
   .toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
-    background:var(--steel); color:var(--card); font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
+    background:var(--steel); color:var(--on-chrome); font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
     box-shadow:0 12px 30px rgba(23,34,46,.3); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;}
   .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
 
@@ -268,13 +270,13 @@
     max-height:92vh; overflow-y:auto; transform:translateY(102%); transition:transform .3s cubic-bezier(.32,.72,0,1);
     box-shadow:0 -10px 40px rgba(15,23,34,.28); padding-bottom:calc(20px + env(safe-area-inset-bottom));}
   .sheet.on{transform:translateY(0);}
-  .sheet-head{position:sticky; top:0; background:var(--steel); color:var(--card); padding:16px 18px 15px; border-radius:20px 20px 0 0;}
+  .sheet-head{position:sticky; top:0; background:var(--steel); color:var(--on-chrome); padding:16px 18px 15px; border-radius:20px 20px 0 0;}
   .sheet-head::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
     background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);}
   .grab{width:42px; height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:0 auto 12px;}
   .sh-row{display:flex; align-items:center; justify-content:space-between;}
   .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
-  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--card); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
+  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--on-color); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
   .sh-body{padding:16px;}
   .fld{margin-bottom:13px;}
   .fld label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;}
@@ -284,7 +286,7 @@
   .fld textarea{resize:none; min-height:60px;}
   .frow{display:flex; gap:11px;}
   .frow .fld{flex:1;}
-  .save{width:100%; margin-top:6px; background:var(--red); color:var(--card); border:none; border-radius:12px; padding:15px;
+  .save{width:100%; margin-top:6px; background:var(--red); color:var(--on-color); border:none; border-radius:12px; padding:15px;
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 8px 20px rgba(232,50,30,.3);}
   .save:active{transform:translateY(1px);}
 
@@ -761,7 +763,7 @@ function finish(){
   if(APP_ENV === 'staging'){
     const b = document.createElement('div');
     b.textContent = '🧪 بيئة تجريبية — STAGING';
-    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--card);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
     document.body.appendChild(b);
   }
 }
