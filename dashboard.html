@@ -5230,6 +5230,8 @@ function addLedgerDebit(d, price){
     amount: price,
     deviceId: d.id,
     deviceLabel: `${d.deviceType||''} ${d.model||''} — ${d.customerName||''}`.trim(),
+    // بنحفظ العطل مع القيد — عشان كشف الحساب يفضل صح حتى لو الجهاز اتمسح
+    issue: (d.reportedIssue || '').trim(),
     date: new Date().toISOString(),
     by: currentUser.name
   }, ...ledger];
@@ -5612,6 +5614,16 @@ function stmtDescHtml(e){
   return `📱 ${esc(e.deviceLabel||'جهاز')}` + (e.prevShop ? `<br><small style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</small>` : '');
 }
 
+// عطل الجهاز في كشف الحساب.
+// القيود الجديدة بتحفظه جواها. القديمة بنجيبه من الجهاز نفسه.
+// الحركات اللي مش أجهزة (دفعة/خصم/رصيد افتتاحي) مالهاش عطل.
+function stmtIssue(e){
+  if(e.type !== 'debit') return '';
+  if(e.issue) return e.issue;
+  const d = devices.find(x => x.id === e.deviceId);
+  return (d && d.reportedIssue) ? String(d.reportedIssue).trim() : '';
+}
+
 function shopStatementRows(shop){
   const entries = ledger.filter(e => (e.shop||'بدون محل') === shop)
     .slice().sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -5642,7 +5654,8 @@ async function exportShopExcel(shop){
 
   // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
   const head = ws.getRow(4);
-  head.values = ['التاريخ','البيان','عليه (آجل)','له (دفعات)','بواسطة'];
+  // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
+  head.values = ['التاريخ','البيان','العطل','عليه (آجل)','له (دفعات)'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -5656,29 +5669,31 @@ async function exportShopExcel(shop){
     const r = ws.addRow([
       new Date(e.date).toLocaleString('ar-EG'),
       stmtDesc(e),
+      stmtIssue(e),
       isDebitLike(e) ? (e.amount||0) : null,
-      !isDebitLike(e) ? (e.amount||0) : null,
-      e.by || ''
+      !isDebitLike(e) ? (e.amount||0) : null
     ]);
     r.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { vertical:'middle', wrapText:true }; });
-    r.getCell(3).numFmt = money; r.getCell(4).numFmt = money;
-    r.getCell(3).alignment = { horizontal:'center', vertical:'middle' };
+    // ⚙️ أعمدة الفلوس اتزحلقت من 3ؔ4 لـ 4ؔ5 بعد ما العطل اتحط في 3
+    r.getCell(4).numFmt = money; r.getCell(5).numFmt = money;
     r.getCell(4).alignment = { horizontal:'center', vertical:'middle' };
+    r.getCell(5).alignment = { horizontal:'center', vertical:'middle' };
   });
 
   ws.addRow([]);
-  [['','إجمالي الآجل', debit, null], ['','إجمالي المدفوع/الخصم', null, credit], ['','المتبقي على المحل', balance, null]]
+  // عمود فاضي زيادة (العطل) قبل خانات الفلوس
+  [['','إجمالي الآجل','', debit, null], ['','إجمالي المدفوع/الخصم','', null, credit], ['','المتبقي على المحل','', balance, null]]
     .forEach((t, i) => {
       const r = ws.addRow(t);
       r.getCell(2).font = { bold:true };
-      r.getCell(3).numFmt = money; r.getCell(4).numFmt = money;
+      r.getCell(4).numFmt = money; r.getCell(5).numFmt = money;
       r.eachCell({ includeEmpty:true }, cell => {
         cell.border = border;
         cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: i===2 ? 'FFFDE68A' : 'FFF1F5F9'} };
       });
     });
 
-  [22,50,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [22,42,30,16,16].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -5690,13 +5705,17 @@ async function exportShopExcel(shop){
 
 function exportShopPdf(shop){
   const { entries, debit, credit, balance } = shopStatementRows(shop);
-  const rowsHtml = entries.map((e,i) => `
+  const rowsHtml = entries.map((e,i) => {
+    const issue = stmtIssue(e);
+    return `
     <tr style="background:${i%2 ? '#F8FAFC' : '#fff'};">
       <td>${new Date(e.date).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
+      <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
       <td style="color:#B45309; font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
       <td style="color:#16A34A; font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
@@ -5716,6 +5735,8 @@ function exportShopPdf(shop){
     th{background:#101014; color:#fff; padding:11px 8px; font-size:13px;}
     td{padding:10px 8px; border-bottom:1px solid #E5E7EB; text-align:center;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
+    /* الجدول بقى خمسة أعمدة — الأفقي بيدي مساحة أريح للعطل */
+    @page{ size:A4 landscape; margin:10mm; }
     @media print{ body{padding:12px;} }
   </style></head><body>
     <div class="head">
@@ -5728,8 +5749,8 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:26%;">التاريخ</th><th style="width:48%;">البيان</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
-      ${rowsHtml || '<tr><td colspan="4">مفيش حركات متسجلة</td></tr>'}
+      <tr><th style="width:20%;">التاريخ</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
     <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
