@@ -368,7 +368,6 @@
   .flash{background:var(--done-bg); border:1px solid #BBE6C8; color:var(--done); font-weight:700; font-size:13px; border-radius:11px; padding:11px 14px; margin:0 0 15px; display:flex; align-items:center; gap:8px;}
 
   /* شارة عرض تجريبي */
-  .demo{position:fixed; inset-block-end:0; inset-inline:0; background:#0E1A26; color:#93B4D0; text-align:center; font:600 11px/1.7 var(--mono); padding:5px; z-index:5;}
 </style>
 </head>
 <body>
@@ -403,7 +402,6 @@
 <div class="sheet" id="sheet"></div>
 
 <div class="toast" id="toast"></div>
-<div class="demo" data-i18n="tp.mockBar">🎨 نموذج تصميم — أجهزتي (الفني)</div>
 
 
 <div id="sysbar" class="sysbar" style="display:none;"></div>
@@ -683,10 +681,9 @@ async function loadNotices(){
     // ===== وضع النظام =====
     const cfg = map['system-config'] || {};
     if(cfg.mode === 'beta'){
-      ntBar('🛠️ فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق', '#1E293B');
+      ntBar('🛠️ ' + t('sys.betaBanner'), '#1E293B');
       if(cfg.betaAnnId){
-        ntShow('🛠️', 'مرحباً بك في I Fix Team!',
-          'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.',
+        ntShow('🛠️', t('sys.betaTitle'), t('sys.betaBody'),
           'ifix_seen_ann_beta_' + cfg.betaAnnId);
       }
     } else if(cfg.mode === 'trial'){
@@ -694,11 +691,9 @@ async function loadNotices(){
       const left = cfg.trialStart
         ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
         : days;
-      ntBar('🎁 فترة مجانية — متبقّي ' + left + ' يوماً على الاشتراك', 'var(--waiting)');
+      ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
-        ntShow('🎁', 'بدأت فترتك المجانية',
-          'أنت الآن في الفترة المجانية (' + days + ' يوماً). متبقّي ' + left +
-          ' يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.',
+        ntShow('🎁', t('sys.trialTitle'), t('sys.trialBody', { d: days, n: left }),
           'ifix_seen_ann_trial_' + cfg.trialAnnId);
       }
     }
@@ -858,7 +853,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
 const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
-  return d.toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) + ' · ' + d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); };
+  // التاريخ يتبع اللغة المختارة — عربي مصري أو إنجليزي بريطاني
+  var loc = (function(){ try{ return I18N.getLang()==='en' ? 'en-GB' : 'ar-EG'; }catch(e){ return 'ar-EG'; } })();
+  return d.toLocaleDateString(loc,{day:'numeric',month:'short'}) + ' · ' + d.toLocaleTimeString(loc,{hour:'2-digit',minute:'2-digit'}); };
 let flash = '';
 
 function statusPill(st){
@@ -999,7 +996,7 @@ function renderSheet(){
 
       <div class="panel">
         <div class="hand-sw" onclick="toggleHand()">
-          <div class="lbl">🔄 تحويل / مشاركة الجهاز<small data-i18n="tp.handoffHint">سلّم الجهاز لفني تاني أو خليه يساعدك فيه</small></div>
+          <div class="lbl"><span data-i18n="tp.handoff">🔄 تحويل / مشاركة الجهاز</span><small data-i18n="tp.handoffHint">سلّم الجهاز لفني تاني أو خليه يساعدك فيه</small></div>
           <div class="sw ${handOn?'on':''}" id="hsw"></div>
         </div>
         <div class="hand-body ${handOn?'on':''}" id="hbody">
@@ -1227,6 +1224,25 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSett
 </script>
 <script>
 /* الترجمة بتتطبق بعد ما كل السكريبتات تحمّل — والاتجاه بيتظبط من I18N */
+// ============================================================
+// الترجمة للمحتوى المتولّد
+// ------------------------------------------------------------
+// applyI18n بتشتغل مرة واحدة وقت التحميل، لكن معظم الواجهة هنا
+// بتتبني بعد كده من قوالب جافاسكريبت. فبنلفّ innerHTML: أي حقن
+// جديد بتتطبّق عليه الترجمة على طول.
+// ------------------------------------------------------------
+(function(){
+  var d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  if(!d || !d.set) return;
+  Object.defineProperty(Element.prototype, 'innerHTML', {
+    configurable: true, enumerable: d.enumerable, get: d.get,
+    set: function(v){
+      d.set.call(this, v);
+      try{ if(window.I18N && I18N.applyI18n) I18N.applyI18n(this); }catch(e){}
+    }
+  });
+})();
+
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
 });
