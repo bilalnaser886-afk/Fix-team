@@ -1888,45 +1888,50 @@ let lastLoadError = '';
 async function loadDevices(){
   lastLoadError = '';
   try{
-    // نجيب العدد الكلي الأول، وبعدين نجيب كل الصفحات بالتوازي (٨ في نفس الوقت) بدل واحدة ورا التانية.
-    // ده بيقلّل وقت التحميل جداً — من ٢٠ طلب متتالي لكام موجة بس.
+    // ✅ keyset pagination بدل OFFSET.
+    // القديم كان بيقول للسيرفر "ابدأ من الصف رقم ١٧٠٠٠" — والسيرفر مبيعرفش
+    // ينط، فبيعد من الأول ويرمي كل اللي قبله. كل صفحة كانت أبطأ من اللي قبلها
+    // لحد ما آخر صفحتين يعدّوا الـ statement_timeout وبيتقتلوا.
+    // دلوقتي بنقول "هات اللي الـ id بتاعه أكبر من آخر واحد جبته" — ده بيمشي
+    // على فهرس المفتاح الأساسي مباشرة، فكل الصفحات نفس السرعة.
+    //
+    // وكمان شِلنا استعلام العدّ (count: exact) اللي كان بياخد ٣ ثواني لوحده،
+    // وشِلنا التوازي (٨ طلبات مرة واحدة) اللي كان بيعمل طابور على السيرفر.
     const PAGE = 1000;
     let allRows = [];
-    const { count, error: cErr } = await sb.from('devices_data').select('id', { count: 'exact', head: true });
-    if(cErr) throw cErr;
-    const total = count || 0;
-    if(total > 0){
-      const pages = Math.ceil(total / PAGE);
-      const chunks = new Array(pages);
-      let next = 0;
-      let failed = null;
-      const worker = async () => {
-        while(next < pages){
-          const p = next++;
-          try{
-            const { data, error } = await sb.from('devices_data').select('id,data').range(p*PAGE, p*PAGE + PAGE - 1);
-            if(error) throw error;
-            chunks[p] = data || [];
-          }catch(err){
-            // ⚠️ صفحة فشلت؟ منرميش الباقي. الأول كان بيرمي كل حاجة
-            // ويرجع لكاش قديم — فالمستخدم يشوف أجهزة أقل بكتير
-            // من غير ما يعرف إن التحميل ناقص.
-            failed = failed || err;
-            chunks[p] = [];
-            console.error('فشل تحميل صفحة', p, err);
-          }
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(8, pages) }, worker));
-      allRows = chunks.flat();
+    let lastId = '';      // المؤشر — آخر id اتجاب
+    let guard = 0;        // حماية من لوب لا نهائي
+    let failed = null;
 
-      // نجح جزئياً؟ نعرض اللي وصل ونوضّح إن فيه ناقص
-      if(failed && allRows.length){
-        lastLoadError = 'تحميل ناقص: وصل ' + allRows.length + ' من ' + total +
-                        ' جهاز — ' + (failed.message || failed);
-      } else if(failed){
-        throw failed;
+    try{
+      while(guard++ < 1000){
+        let q = sb.from('devices_data')
+                  .select('id,data')
+                  .order('id', { ascending: true })
+                  .limit(PAGE);
+        if(lastId) q = q.gt('id', lastId);
+
+        const { data, error } = await q;
+        if(error) throw error;
+
+        // بنكسر على الفاضي بس — مش على (length < PAGE) — عشان لو إعداد
+        // db-max-rows في المشروع أقل من ١٠٠٠ مانخسرش صفوف بالغلط
+        if(!data || !data.length) break;
+
+        allRows.push(...data);
+        lastId = data[data.length - 1].id;
       }
+    }catch(err){
+      // صفحة فشلت؟ منرميش اللي وصل. نعرضه ونوضّح إن فيه ناقص.
+      failed = err;
+      console.error('فشل تحميل صفحة عند المؤشر', lastId, err);
+    }
+
+    if(failed && allRows.length){
+      lastLoadError = 'تحميل ناقص: وصل ' + allRows.length +
+                      ' جهاز — ' + (failed.message || failed);
+    } else if(failed){
+      throw failed;
     }
 
     if(allRows.length){
@@ -1942,7 +1947,11 @@ async function loadDevices(){
         );
       }
     }
-    devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
+    // بنحسب الـ timestamp مرة واحدة لكل جهاز بدل ما نبني Date جوه المقارنة.
+    // القديم كان بيعمل ~٥٦٦ ألف كائن Date عشان يرتّب ١٩ ألف جهاز.
+    const ts = new Map();
+    for(const d of devices) ts.set(d, Date.parse(d.intakeDate) || 0);
+    devices.sort((a,b) => ts.get(b) - ts.get(a));
     exitOfflineMode();
   }catch(e){
     // ⚠️ مش كل فشل معناه "مفيش نت". ممكن يكون صلاحيات، أو حصة،
