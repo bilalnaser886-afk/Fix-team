@@ -20,6 +20,69 @@
 <script src="i18n.js"></script>
 <!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
 <script src="ai-invoice.js"></script>
+<script>
+// ============================================================
+// ستارة الإقلاع — لازم تشتغل قبل أي رسم
+// ------------------------------------------------------------
+// الأدوار بتتقرا من Supabase (غير متزامن). قبل كده الواجهة كانت بترسم
+// شكل المحاسب الافتراضي، فالفني كان يشوف لمحة من واجهة مش بتاعته.
+// بنخفي كل حاجة، وبنشيل الستارة أول ما نعرف الدور.
+//
+// وعشان الفني ما يشوفش ستارة كل مرة، بنفضّل آخر دور معروف من التخزين
+// المحلي ونطبّق كلاسه فوراً — فالبوابة بتبان من أول لحظة.
+// ============================================================
+(function(){
+  // ============================================================
+  // تحويل مبكّر — قبل أي رسم
+  // ------------------------------------------------------------
+  // الديسباتشر والفني ليهم صفحات مستقلة. من غير التحويل ده، الداشبورد
+  // بيرسم لوجو النظام لحد ما الأدوار توصل من السيرفر، وبعدين يحوّل —
+  // فالمستخدم يشوف لوجوين في تانيتين.
+  //
+  // بنعتمد على آخر دور معروف من التخزين المحلي. لو اتغيّر، الصفحة
+  // اللي هيروحها هتفحص الدور الحقيقي وترجّعه — والعلامة تحت بتمنع
+  // اللف اللانهائي.
+  // ============================================================
+  // الدور محفوظ ومعاه صاحبه. لو نفس الشخص رجع ← تحويل فوري من غير
+  // لمحة. لو حساب تاني دخل من نفس الجهاز ← الإيميل مش هيطابق
+  // والتحويل مش هيحصل. فمش محتاجين نمسح الدور عند كل خروج.
+  //
+  // بندوّر على الإيميل جوه توكن الجلسة المخزّن — أسرع بكتير من
+  // انتظار Supabase يرجّع الجلسة، وإحنا هنا قبل أي رسم.
+  try{
+    var last    = localStorage.getItem('ifix-last-role');
+    var lastEm  = (localStorage.getItem('ifix-last-email') || '').toLowerCase();
+    var bounced = sessionStorage.getItem('ifix-bounced');
+
+    var sameUser = false;
+    if(lastEm){
+      for(var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && k.indexOf('-auth-token') !== -1){
+          var v = localStorage.getItem(k) || '';
+          if(v.toLowerCase().indexOf(lastEm) !== -1){ sameUser = true; break; }
+        }
+      }
+    }
+
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician')){
+      sessionStorage.setItem('ifix-bounced', '1');
+      location.replace(last === 'dispatcher' ? 'dispatch.html' : 'my-devices.html');
+      return;
+    }
+  }catch(e){}
+
+  try{
+    document.documentElement.classList.add('app-booting');
+    var last2 = localStorage.getItem('ifix-last-role');
+    if(last2 === 'technician') document.documentElement.classList.add('pre-technician');
+  }catch(e){}
+  // شبكة أمان: لو حصل خطأ ومنعش شيل الستارة، ما نسيبش المستخدم مقفول
+  setTimeout(function(){
+    try{ document.documentElement.classList.remove('app-booting'); }catch(e){}
+  }, 6000);
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -145,6 +208,247 @@
   /* شارة "بانتظار الموافقة" على الكروت + بانر في التفاصيل */
   .pending-appr-chip{margin-top:6px; font-size:11.5px; font-weight:800; color:#B45309; background:#FEF3C7; border:1px solid #FDE68A; border-radius:7px; padding:4px 8px; display:inline-block; line-height:1.5;}
   .pending-appr-banner{font-size:13.5px; font-weight:800; color:#92400E; background:#FEF3C7; border:1px solid #FCD34D; border-radius:10px; padding:11px 13px; margin:0 0 12px; line-height:1.7;}
+  /* ===== بوابة الفني "أجهزتي" (الخطوة ٤) ===== */
+  .tp-section{margin-bottom:18px;}
+  .tp-section-head{font-family:'Cairo',sans-serif; font-weight:900; font-size:15px; color:var(--ink); margin:6px 2px 12px; display:flex; align-items:center; gap:8px;}
+  .tp-section-head .tp-count{background:#EEF2F7; color:#475569; font-family:'Tajawal',sans-serif; font-weight:800; font-size:12px; border-radius:11px; padding:2px 9px;}
+  .tp-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:12px;}
+  .tp-card{background:#fff; border:1px solid #EEF0F3; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(16,16,20,.04); cursor:pointer; transition:transform .12s, box-shadow .12s; text-align:right;}
+  .tp-card:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(16,16,20,.10);}
+  .tp-card-title{font-weight:800; font-size:15px; color:var(--ink); line-height:1.4;}
+  .tp-card-sub{font-size:13px; color:#64748B; margin-top:3px;}
+  .tp-card-issue{font-size:12.5px; color:#475569; background:#F8FAFC; border:1px solid #EEF0F3; border-radius:8px; padding:6px 9px; margin-top:8px; line-height:1.6;}
+  .tp-status-tag{display:inline-block; margin-top:8px;}
+  .tp-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .tp-btn{border:none; border-radius:9px; padding:9px 12px; font-family:'Tajawal',sans-serif; font-weight:800; font-size:13px; cursor:pointer; transition:filter .12s;}
+  .tp-btn:hover{filter:brightness(.96);}
+  .tp-work{background:var(--repairing-bg); color:var(--repairing);}
+  .tp-done{background:var(--done-bg); color:var(--done);}
+  .tp-problem{background:#FEF3C7; color:#B45309;}
+  /* إخفاء بنود القوائم المالية عن اللي مش بيشوف فلوس (فني/مسؤول حركة) */
+  .no-money .money-menu-item{display:none !important;}
+  /* بند "أجهزتي" للفني بس */
+  body:not(.role-technician) .tech-only-menu{display:none !important;}
+
+  /* ============================================================
+     شريط البحث الرئيسي
+     ------------------------------------------------------------
+     بيدوّر في كل الأجهزة مهما كانت حالتها — يعني بيوصل لأجهزة
+     مش ظاهرة في اللوحة (المسلّمة والمرفوضة). عشان كده مكانه فوق
+     الأعمدة مباشرةً: هو المدخل الوحيد للأرشيف.
+     ============================================================ */
+  .gs-wrap{position:relative; margin:0 0 18px;}
+  .gs-box{
+    display:flex; align-items:center; gap:10px; background:var(--surface);
+    border:1px solid #E2E8F0; border-radius:14px; padding:0 14px;
+    box-shadow:0 2px 10px rgba(16,16,20,.05); transition:border-color .15s, box-shadow .15s;
+  }
+  .gs-box:focus-within{border-color:var(--accent); box-shadow:0 3px 16px rgba(8,145,168,.13);}
+  .gs-box .ic{font-size:17px; opacity:.5; flex:0 0 auto;}
+  .gs-box input{
+    flex:1 1 auto; border:none; outline:none; background:transparent; padding:15px 0;
+    font-family:'Tajawal',sans-serif; font-size:15px; color:var(--ink); min-width:0;
+  }
+  .gs-clear{
+    border:none; background:#F1F5F9; color:#64748B; width:26px; height:26px;
+    border-radius:50%; font-size:16px; line-height:1; cursor:pointer; flex:0 0 auto; display:none;
+  }
+  .gs-wrap.has-q .gs-clear{display:block;}
+  .gs-panel{
+    position:absolute; top:calc(100% + 8px); inset-inline:0; z-index:60;
+    background:var(--surface); border:1px solid #E2E8F0; border-radius:14px;
+    box-shadow:0 14px 40px rgba(16,16,20,.16); overflow:hidden; display:none;
+  }
+  .gs-wrap.open .gs-panel{display:block;}
+  .gs-head{
+    padding:9px 14px; font-size:12px; font-weight:800; color:#64748B;
+    background:#F8FAFC; border-bottom:1px solid #EEF0F3;
+  }
+  .gs-list{max-height:min(58vh,420px); overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .gs-item{
+    display:flex; align-items:center; gap:11px; width:100%; text-align:start;
+    padding:11px 14px; border:none; background:none; cursor:pointer;
+    border-bottom:1px solid #F3F5F7; font-family:'Tajawal',sans-serif;
+  }
+  .gs-item:last-child{border-bottom:none;}
+  .gs-item:hover, .gs-item:focus-visible{background:#F8FAFC; outline:none;}
+  .gs-ref{
+    font-family:monospace; font-size:11.5px; font-weight:700; color:#64748B;
+    background:#F1F5F9; border-radius:6px; padding:3px 7px; flex:0 0 auto;
+  }
+  .gs-main{flex:1 1 auto; min-width:0;}
+  .gs-t{font-weight:800; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .gs-s{font-size:12.5px; color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;}
+  .gs-tag{font-size:11px; font-weight:800; border-radius:7px; padding:3px 8px; flex:0 0 auto;}
+  .gs-empty{padding:24px 14px; text-align:center; color:#94A3B8; font-size:14px;}
+  .gs-more{padding:9px 14px; text-align:center; font-size:12.5px; color:#64748B; background:#F8FAFC;}
+
+  /* ===== صفحة الجرد المستقلة ===== */
+  .iv-head{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:14px 0 16px; border-bottom:1px solid #EEF0F3; margin-bottom:16px;
+  }
+  .iv-back{
+    border:1px solid #E2E8F0; background:#fff; border-radius:10px; padding:9px 14px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; color:#475569; cursor:pointer;
+  }
+  .iv-back:hover{background:#F8FAFC;}
+  .iv-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; color:var(--ink); margin:0;}
+  .iv-count{background:#EEF2F7; color:#475569; font-weight:800; font-size:12.5px; border-radius:11px; padding:3px 10px;}
+  .iv-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #EEF0F3; border-radius:12px; background:#fff;}
+  .iv-table{width:100%; border-collapse:collapse; min-width:760px;}
+  .iv-table th{
+    background:#F8FAFC; color:#475569; font-family:'Tajawal',sans-serif; font-weight:800;
+    font-size:12.5px; text-align:start; padding:11px 13px; border-bottom:1px solid #EEF0F3; white-space:nowrap;
+  }
+  .iv-table td{padding:12px 13px; border-bottom:1px solid #F3F5F7; font-size:13.5px; color:var(--ink); vertical-align:middle;}
+  .iv-table tr:last-child td{border-bottom:none;}
+  .iv-table tbody tr{cursor:pointer;}
+  .iv-table tbody tr:hover{background:#F8FAFC;}
+  .iv-ref{font-family:monospace; font-size:12px; font-weight:700; color:#64748B;}
+  .iv-dev{font-weight:800;}
+  .iv-sub{font-size:12px; color:#94A3B8; margin-top:2px;}
+  .iv-issue{max-width:230px; color:#475569; font-size:12.5px; line-height:1.6;}
+  .iv-price{font-weight:800; white-space:nowrap;}
+  .iv-act{
+    border:1px solid #E2E8F0; background:#fff; border-radius:8px; padding:6px 11px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; color:var(--accent); cursor:pointer; white-space:nowrap;
+  }
+
+  /* ===== ستارة الإقلاع =====
+     الأدوار بتتحمّل من السيرفر (غير متزامن)، فقبل ما نعرف الدور بنخفي
+     الواجهة كلها. من غير ده الفني كان يشوف واجهة المحاسب لحظة قبل
+     ما بوابته تتفتح. الستارة بتتشال أول ما الدور يتحدد. */
+  html.app-booting .topbar,
+  html.app-booting #board,
+  html.app-booting #approvalsHost{visibility:hidden !important;}
+  html.app-booting #bootVeil{display:flex !important;}
+  /* آخر دور معروف = فني → نخفي أدوات المحاسب من قبل ما الأدوار تتحمّل */
+  html.pre-technician #backupWrap,
+  html.pre-technician .topbar-actions > .btn-primary{display:none !important;}
+  #bootVeil{
+    display:none; position:fixed; inset:0; z-index:99999;
+    align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    background:#F3F5F7;
+  }
+  #bootVeil .bv-logo{width:72px; height:72px; border-radius:18px; overflow:hidden; box-shadow:0 6px 20px rgba(16,16,20,.12);}
+  #bootVeil .bv-logo img{width:100%; height:100%; object-fit:cover; display:block;}
+  #bootVeil .bv-spin{
+    width:26px; height:26px; border-radius:50%;
+    border:3px solid #E2E8F0; border-top-color:var(--accent);
+    animation:bvsp .8s linear infinite;
+  }
+  @keyframes bvsp{to{transform:rotate(360deg);}}
+
+  /* ===== عزل واجهة الفني: مايشوفش غير "أجهزتي" =====
+     display:none مش visibility:hidden — الفرق مهم: visibility بتخلي العنصر
+     ياخد مساحته وتبان من ورا الأوفرلاي الشفاف وقت السكرول. display:none
+     بتشيله من التخطيط خالص فمستحيل يبان. */
+  body.role-technician > .topbar,
+  body.role-technician > #board,
+  body.role-technician > #approvalsHost,
+  body.role-technician > #detailOverlay,
+  body.role-technician > #addOverlay,
+  body.role-technician > #columnOverlay,
+  body.role-technician > #summariesOverlay,
+  body.role-technician > #analyticsOverlay,
+  body.role-technician > #techEvalOverlay,
+  body.role-technician > #accountsOverlay,
+  body.role-technician > #broadcastOverlay,
+  body.role-technician > #importChoiceOverlay{display:none !important;}
+  /* البوابة بقت هي الصفحة: خلفية معتمة بالكامل بدل الشفافة */
+  body.role-technician #techPortalOverlay{background:#F3F5F7 !important; z-index:20;}
+  /* منع السكرول المزدوج (الصفحة ورا الأوفرلاي) */
+  body.role-technician{overflow:hidden;}
+  /* في المنيو: "أجهزتي" وتسجيل الخروج بس — وده بيشيل كمان أي بند
+     بيتحقن لاحقاً من ai-invoice.js (فواتير المشتريات / مخزن قطع الغيار) */
+  body.role-technician #menuDropdown > button:not(.tech-only-menu):not(.logout-menu-item){display:none !important;}
+  /* البوابة هي كل الواجهة — مفيش زرار قفل */
+  body.role-technician #techPortalClose{display:none !important;}
+
+  /* ===== مودال الفني المبسّط ===== */
+  #techViewOverlay .modal{width:100%; max-width:520px;}
+  .tv-row{display:flex; gap:10px; padding:9px 0; border-bottom:1px solid #F1F5F9; font-size:14px;}
+  .tv-row:last-child{border-bottom:none;}
+  .tv-k{color:var(--muted); font-weight:700; min-width:106px; flex:0 0 auto;}
+  .tv-v{color:var(--ink); font-weight:800; line-height:1.6;}
+  .tv-issue{background:#F8FAFC; border:1px solid #EEF0F3; border-radius:10px; padding:10px 12px;
+            font-size:13.5px; color:#334155; line-height:1.7; margin-top:6px;}
+  .tv-block{margin-top:18px;}
+  .tv-block-head{font-family:'Cairo',sans-serif; font-weight:900; font-size:14.5px; color:var(--ink); margin-bottom:9px;}
+  .tv-note{width:100%; min-height:82px; border:1px solid #E2E8F0; border-radius:10px; padding:10px 12px;
+           font-family:'Tajawal',sans-serif; font-size:14px; resize:vertical; box-sizing:border-box;}
+  .tv-hist{margin-top:10px; max-height:210px; overflow-y:auto;}
+  .tv-hist-item{background:#F8FAFC; border:1px solid #EEF0F3; border-radius:9px; padding:8px 10px;
+                margin-bottom:6px; font-size:13px; line-height:1.7; color:#334155;}
+  .tv-hist-meta{color:#94A3B8; font-size:11.5px; margin-top:3px;}
+  .tv-toggle{display:flex; align-items:center; justify-content:space-between; gap:10px; background:#F8FAFC;
+             border:1px solid #E2E8F0; border-radius:11px; padding:11px 13px; cursor:pointer;}
+  .tv-toggle-label{font-weight:800; font-size:14px; color:var(--ink);}
+  .tv-sw{width:44px; height:25px; border-radius:99px; background:#CBD5E1; position:relative; flex:0 0 auto; transition:background .16s;}
+  .tv-sw::after{content:''; position:absolute; top:3px; inset-inline-start:3px; width:19px; height:19px;
+                border-radius:50%; background:#fff; transition:inset-inline-start .16s;}
+  .tv-sw.on{background:var(--accent);}
+  .tv-sw.on::after{inset-inline-start:22px;}
+  .tv-hand{margin-top:12px; padding:13px; border:1px solid #E2E8F0; border-radius:11px; background:#fff;}
+  .tv-sel{width:100%; border:1px solid #E2E8F0; border-radius:10px; padding:11px 12px;
+          font-family:'Tajawal',sans-serif; font-size:14px; background:#fff; box-sizing:border-box;}
+  .tv-mode{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .tv-mode-btn{flex:1 1 145px; border:2px solid #E2E8F0; background:#fff; border-radius:10px; padding:11px 10px;
+               font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer; color:#475569;}
+  .tv-mode-btn.sel{border-color:var(--accent); background:#E8F6F8; color:var(--accent-dark);}
+  .tv-ok{width:100%; margin-top:12px; border:none; border-radius:11px; padding:13px; background:var(--accent);
+         color:#fff; font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;}
+  .tv-ok:disabled{background:#CBD5E1; cursor:not-allowed;}
+  /* ===== هيدر بوابة الفني ===== */
+  .tp-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 20px; background:#fff; border-bottom:1px solid #EEF0F3;
+    position:sticky; top:0; z-index:5;
+  }
+  .tp-head-mid{
+    flex:1 1 auto; min-width:0; text-align:center;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:15px; color:var(--ink);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .tp-head-mid small{display:block; font-family:'Tajawal',sans-serif; font-weight:700; font-size:11.5px; color:#94A3B8; margin-top:1px;}
+  .tp-head-side{display:flex; align-items:center; gap:7px; flex:0 0 auto;}
+  .tp-hbtn{
+    border:1px solid #E2E8F0; background:#fff; border-radius:9px; padding:8px 11px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; cursor:pointer; color:#475569;
+  }
+  .tp-hbtn.out{color:#DC2626; border-color:#FECACA;}
+  /* زرار اللغة اللي I18N بيحقنه — نوحّد شكله مع باقي الأزرار */
+  .tp-head-side .lang-toggle, .tp-head-side button{font-family:'Tajawal',sans-serif;}
+  /* حالة التحميل */
+  .tp-load{display:flex; align-items:center; justify-content:center; gap:10px; padding:40px 0; color:#94A3B8; font-size:14px; font-weight:700;}
+  .tp-load .bv-spin{width:20px; height:20px;}
+
+  .tv-lock{background:#FFFBEB; border:1px solid #FDE68A; border-radius:11px; padding:12px 13px; margin-top:6px;}
+  .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:#0F172A; letter-spacing:1px;}
+  .tv-code-hidden{font-family:monospace; font-weight:800; font-size:19px; color:#94A3B8; letter-spacing:3px;}
+  .tv-eye{border:1px solid #E2E8F0; background:#fff; border-radius:9px; padding:8px 12px;
+          font-family:'Tajawal',sans-serif; font-weight:800; font-size:13px; cursor:pointer; color:#475569;}
+  .tv-lock-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .tp-flash{background:#EAF6EE; border:1px solid #A7D8B8; color:#15803D; border-radius:10px;
+            padding:11px 13px; margin:0 0 14px; font-size:13.5px; font-weight:800; line-height:1.7;}
+  /* قسم الاعتمادات — بيظهر للمحاسب/الأدمن فوق الأعمدة لما يكون فيه طلبات معلّقة، وبيختفي تماماً عند صفر */
+  #approvalsHost:empty{display:none;}
+  .appr-panel{background:#fff; border:1px solid #FCD34D; border-radius:16px; margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px rgba(180,120,20,.10);}
+  .appr-panel-head{display:flex; align-items:center; gap:8px; font-family:'Cairo',sans-serif; font-weight:900; font-size:15px; color:#92400E; margin-bottom:12px;}
+  .appr-count{background:#DC2626; color:#fff; font-family:'Tajawal',sans-serif; font-weight:800; font-size:12px; min-width:22px; height:22px; border-radius:11px; display:inline-flex; align-items:center; justify-content:center; padding:0 6px;}
+  .appr-row{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:#FFFBEB; border:1px solid #FDE68A; border-radius:12px; padding:11px 13px; margin-bottom:8px;}
+  .appr-row:last-child{margin-bottom:0;}
+  .appr-row-info{flex:1; min-width:180px;}
+  .appr-row-dev{font-weight:800; font-size:14px; color:var(--ink); line-height:1.45;}
+  .appr-row-meta{font-size:12px; color:#78716C; margin-top:3px; line-height:1.5;}
+  .appr-row-kind{display:inline-block; font-size:11px; font-weight:800; border-radius:6px; padding:2px 7px; margin-inline-end:6px; vertical-align:middle;}
+  .appr-row-actions{display:flex; gap:8px; flex:none;}
+  .appr-btn-yes,.appr-btn-no{border:none; border-radius:9px; padding:9px 16px; font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer; transition:background .12s;}
+  .appr-btn-yes{background:#16A34A; color:#fff;}
+  .appr-btn-yes:hover{background:#15803D;}
+  .appr-btn-no{background:#fff; color:#DC2626; border:1px solid #FCA5A5;}
+  .appr-btn-no:hover{background:#FEF2F2;}
   .card-tech{font-size:11px; color:#475569; margin-top:6px; display:flex; align-items:center; gap:4px;}
   .card-tech::before{content:"🔧"; font-size:10px;}
   .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
@@ -168,7 +472,9 @@
   body.modal-open{ position:fixed; left:0; right:0; width:100%; overflow:hidden; }
   /* تمرير سلس جوه الشاشات ومنع تسريب التمرير للخلفية */
   .overlay, .modal{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
-  /* التفاصيل لازم تظهر فوق شاشات الجرد/الملخص (اللي z-index بتاعها 30) عشان تفضل الجرد مفتوحة وراها */
+  /* التفاصيل لازم تظهر فوق شاشات الجرد/الملخص/التقييم (z-index 30)
+     عشان الشاشة اللي ورا تفضل مفتوحة — فلما تقفل التفاصيل ترجع
+     خطوة واحدة بس، مش للواجهة الرئيسية. */
   #detailOverlay{ z-index:50; }
   #timelineOverlay{ z-index:60; }
   /* ===== أقسام الحسابات (مفتوحة/مدفوعة) + علامة الدورة الجديدة ===== */
@@ -562,6 +868,12 @@
 </head>
 <body>
 
+<!-- ستارة الإقلاع: بتغطي الواجهة لحد ما الدور يتحدد -->
+<div id="bootVeil">
+  <div class="bv-logo"><img src="icon-192.png" alt=""></div>
+  <div class="bv-spin"></div>
+</div>
+
 <div class="topbar">
   <div class="brand">
     <div class="logo"><img src="icon-192.png" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;"></div>
@@ -595,17 +907,32 @@
   <div class="menu-wrap">
     <button class="menu-btn" onclick="toggleMenu()">⋮</button>
     <div id="menuDropdown" class="menu-dropdown hidden">
-    <button data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
-    <button data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
-    <button data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
-    <button data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
-    <button data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
+    <button class="tech-only-menu" data-i18n="menu.myDevices" onclick="openTechPortal()">📱 أجهزتي</button>
+    <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
+    <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
+    <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
+    <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:#DC2626;">تسجيل الخروج</button>
     </div>
   </div>
 </div>
 
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
+<div id="approvalsHost"></div>
+<!-- البحث الرئيسي: بيشوف كل الأجهزة، حتى اللي خرجت من اللوحة -->
+<div class="gs-wrap" id="gsWrap">
+  <div class="gs-box">
+    <span class="ic">🔍</span>
+    <input id="gsInput" type="search" autocomplete="off"
+           data-i18n-ph="search.global.ph"
+           placeholder="دوّر على عميل، محل، جهاز، أو رقم تليفون..."
+           oninput="gsType(this.value)" onfocus="gsType(this.value)">
+    <button class="gs-clear" onclick="gsClear()" aria-label="مسح البحث">×</button>
+  </div>
+  <div class="gs-panel" id="gsPanel"></div>
+</div>
+
 <div id="board" class="board"><div class="loading" data-i18n="app.loading">جارٍ التحميل...</div></div>
 
 <!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
@@ -713,7 +1040,7 @@
       </div>
       <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
       <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
-      <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
+      <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه، و٠ يعني ببلاش</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
         <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;" data-i18n="add.payType">طريقة الدفع</span>
         <div class="pay-choice">
@@ -738,6 +1065,40 @@
 <!-- Detail modal -->
 <div id="detailOverlay" class="overlay hidden">
   <div class="modal" id="detailModal"></div>
+</div>
+
+<!-- Technician portal (أجهزتي) -->
+<div id="techPortalOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="tp-head">
+      <div class="tp-head-side">
+        <button id="techPortalClose" class="close-btn" onclick="closeTechPortal()">×</button>
+        <span id="tpLangHost"></span>
+      </div>
+      <div class="tp-head-mid">
+        <span id="techPortalTitle" data-i18n="tp.title">📱 أجهزتي</span>
+        <small id="tpWho"></small>
+      </div>
+      <div class="tp-head-side">
+        <button class="tp-hbtn out" onclick="logout()" data-i18n="menu.logout">تسجيل الخروج</button>
+      </div>
+    </div>
+    <div style="padding:0 20px;">
+      <div class="modal-search"><input id="techSearch" oninput="renderTechPortal()" data-i18n-ph="tp.searchPh" placeholder="ابحث في الأجهزة..." /></div>
+    </div>
+    <div id="techPortalBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- مودال الفني المبسّط: بيانات الجهاز + ملاحظات + تحويل لفني تاني. مفيش أي فلوس. -->
+<div id="techViewOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="tvTitle">📱</h2>
+      <button class="close-btn" onclick="closeTechDevice()">×</button>
+    </div>
+    <div id="techViewBody" style="padding:16px 20px 28px;"></div>
+  </div>
 </div>
 
 <!-- Timeline (time differences) modal -->
@@ -987,6 +1348,38 @@ function applyRoleVisibility(){
     document.body.classList.toggle('no-money', !canSeeMoney());
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
+  // ============================================================
+  // التوجيه لصفحات مستقلة
+  // ------------------------------------------------------------
+  // الفني والديسباتشر ممنوعين من قراءة devices_data على مستوى
+  // قاعدة البيانات، فالداشبورد هيوريهم صفر أجهزة. صفحاتهم بتقرا
+  // من views مخصصة، فلازم يتحوّلوا عليها.
+  //
+  // replace مش href — عشان زرار الرجوع مايرجّعهمش لصفحة فاضية.
+  // ============================================================
+  if(isTechnician()){ location.replace('my-devices.html'); return; }
+  if(isDispatcher()){ location.replace('dispatch.html');   return; }
+
+  // الدور اتحدد → نحفظه ونحدّث الكلاسات
+  try{
+    localStorage.setItem('ifix-last-role', myRole());
+    localStorage.setItem('ifix-last-email', (currentUser.email || '').toLowerCase());
+    localStorage.setItem('ifix-last-email', (currentUser.email || '').toLowerCase());
+    const r = document.documentElement.classList;
+    r.toggle('pre-technician', isTechnician());
+    // ملحوظة: الفني والديسباتشر اتحوّلوا لصفحاتهم بـ return فوق،
+    // فاللي بيوصل هنا محاسب أو أدمن — الستارة تتشال على طول.
+    r.remove('app-booting');
+  }catch(e){}
+
+  // زرار اللغة جوه هيدر البوابة
+  try{
+    const lh = document.getElementById('tpLangHost');
+    if(lh && !lh.dataset.mounted && window.I18N && I18N.mountLangToggle){
+      I18N.mountLangToggle(lh);
+      lh.dataset.mounted = '1';
+    }
+  }catch(e){}
 }
 
 // ============================================================
@@ -1123,8 +1516,17 @@ async function loadBroadcast(){
     if(r && r.value){ currentBroadcast = JSON.parse(r.value); showBroadcastIfUnseen(); }
   }catch(e){}
 }
+// الإشعار موجّه لدور معيّن؟ نتجاهله لو مش لينا.
+// الإشعارات القديمة من غير audience بتعتبر للكل — توافق للخلف.
+function bcIsForMe(bc){
+  const aud = (bc && bc.audience) || 'all';
+  if(aud === 'all') return true;
+  return myRole() === aud;
+}
+
 function showBroadcastIfUnseen(){
   if(!currentBroadcast || !currentBroadcast.id) return;
+  if(!bcIsForMe(currentBroadcast)) return;
   if(localStorage.getItem('ifix_seen_bc_' + currentBroadcast.id)) return;
   const t = currentBroadcast.type;
   document.getElementById('bcIcon').textContent = t==='warning' ? '⚠️' : (t==='success' ? '✅' : '📢');
@@ -1190,6 +1592,10 @@ async function requireAccess(){
 
 async function logout(){
   await sb.auth.signOut();
+  // مش بنمسح ifix-last-role — الدور مربوط بالإيميل، فحساب تاني على
+  // نفس الجهاز مش هيتأثر بيه. مسحه كان بيرجّع لمحة لوجو النظام في
+  // كل دخول من غير أي فايدة.
+  try{ sessionStorage.removeItem('ifix-bounced'); }catch(e){}
   window.location.href = 'index.html';
 }
 
@@ -1464,8 +1870,11 @@ async function loadDevices(){
     enterOfflineMode();
   }
   snapshotSynced();
+  devicesLoaded = true;   // خلاص عندنا بيانات — البوابة تقدر تعرض
   writeCache();
   render();
+  // لو البوابة مفتوحة وكانت بتوري "جاري التحميل"، تتحدّث دلوقتي
+  try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
 }
 
 async function persist(){
@@ -1874,14 +2283,26 @@ function hideImportProgress(){
 
 function render(){
   renderBoard();
+  renderApprovalsPanel();
   if(currentColumn) renderColumn(true);
   refreshOpenOverlays();
+}
+
+// لوحة الاعتمادات بتترسم في حاويتها فوق الأعمدة (بترجع فاضية لو مفيش طلبات أو المستخدم مش canApprove)
+function renderApprovalsPanel(){
+  const host = document.getElementById('approvalsHost');
+  if(host) host.innerHTML = approvalsPanelHtml();
 }
 
 // يحدّث صفحة الجرد المفتوحة في الخلفية لحظياً (مع الحفاظ على مكان السكرول)
 function refreshOpenOverlays(){
   const el = document.getElementById('summariesOverlay');
   if(el && !el.classList.contains('hidden')) renderSummaries();
+  const tp = document.getElementById('techPortalOverlay');
+  if(tp && !tp.classList.contains('hidden')) renderTechPortal();
+  // تقييم الفنيين كمان — التفاصيل بتفتح فوقه ولازم يعكس أي تغيير
+  const te = document.getElementById('techEvalOverlay');
+  if(te && !te.classList.contains('hidden')) renderTechEval();
 }
 
 function renderBoard(){
@@ -1897,6 +2318,92 @@ function renderBoard(){
     </button>`;
   }).join('');
 }
+
+// ============================================================
+// البحث الرئيسي
+// ------------------------------------------------------------
+// بيستخدم matchesSearch نفسها اللي بتشتغل في باقي الشاشات — فالمعايير
+// موحّدة: اسم العميل والمحل والتليفون والسيريال والموديل والعطل
+// والفني ورقم التذكرة.
+//
+// الفرق الوحيد: ده بيدوّر في *كل* الأجهزة من غير أي فلتر حالة،
+// فبيوصّلك لأجهزة مسلّمة أو مرفوضة مش ظاهرة في اللوحة.
+// ============================================================
+const GS_LIMIT = 40;   // سقف النتائج المعروضة — عندك آلاف الأجهزة
+
+function gsClose(){
+  const w = document.getElementById('gsWrap');
+  if(w) w.classList.remove('open');
+}
+
+function gsClear(){
+  const i = document.getElementById('gsInput');
+  if(i){ i.value = ''; i.focus(); }
+  gsType('');
+}
+
+function gsOpen(id){
+  gsClose();
+  const i = document.getElementById('gsInput');
+  if(i) i.blur();
+  openDetail(id);
+}
+
+function gsType(q){
+  const wrap  = document.getElementById('gsWrap');
+  const panel = document.getElementById('gsPanel');
+  if(!wrap || !panel) return;
+
+  const query = String(q || '').trim();
+  wrap.classList.toggle('has-q', query.length > 0);
+
+  if(query.length < 2){
+    wrap.classList.remove('open');
+    panel.innerHTML = '';
+    return;
+  }
+
+  const hits = devices.filter(d => matchesSearch(d, query));
+  wrap.classList.add('open');
+
+  if(hits.length === 0){
+    panel.innerHTML = `<div class="gs-empty">${t('search.global.none')}</div>`;
+    return;
+  }
+
+  // الأحدث الأول — الأقرب للذاكرة
+  const sorted = [...hits].sort((a,b) =>
+    new Date(b.intakeDate || 0) - new Date(a.intakeDate || 0));
+  const shown = sorted.slice(0, GS_LIMIT);
+
+  panel.innerHTML = `
+    <div class="gs-head">${t('search.global.count', { n: hits.length })}</div>
+    <div class="gs-list">
+      ${shown.map(d => {
+        const st  = statusInfo(effStatus(d));
+        const dev = [d.deviceType, d.model].filter(Boolean).join(' ') || '—';
+        const sub = [d.customerName, d.shopName, d.customerPhone].filter(Boolean).join(' · ');
+        return `<button class="gs-item" onclick="gsOpen('${d.id}')">
+          <span class="gs-ref">${esc(devRef(d))}</span>
+          <span class="gs-main">
+            <span class="gs-t">${esc(dev)}</span>
+            <span class="gs-s">${esc(sub) || '—'}</span>
+          </span>
+          <span class="gs-tag" style="background:${accentBg(st.varname)};color:${accent(st.varname)}">${esc(stLabel(st))}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    ${hits.length > GS_LIMIT
+      ? `<div class="gs-more">${t('search.global.more', { n: hits.length - GS_LIMIT })}</div>`
+      : ''}`;
+}
+
+// قفل القائمة عند الضغط برّه أو Escape
+document.addEventListener('click', e => {
+  const w = document.getElementById('gsWrap');
+  if(w && !w.contains(e.target)) gsClose();
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape') gsClose(); });
 
 function matchesSearch(d, q){
   if(!q) return true;
@@ -2026,7 +2533,7 @@ function cardHtml(d, s){
     </div>
     ${d.reportedIssue ? `<div class="card-issue">${esc(d.reportedIssue)}</div>` : ''}
     ${d.technician ? `<div class="card-tech">${esc(d.technician)}</div>` : ''}
-    ${d.agreedPrice ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
+    ${isPriced(d) ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
   </div>`;
@@ -2034,8 +2541,8 @@ function cardHtml(d, s){
 
 function paymentBadge(d){
   if(d.paymentStatus === 'paid') return `<span class="pay-badge" style="background:var(--paid-bg);color:var(--paid)">✓ ${t('ui.settled')}</span>`;
-  const price = parseInt(d.agreedPrice) || 0;
-  if(price > 0) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notCollected')}</span>`;
+  // الصفر سعر محدد — يبقى "لسه ماتحصّلش" مش "لسه ماتسعّرش"
+  if(isPriced(d)) return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notCollected')}</span>`;
   return `<span class="pay-badge" style="background:var(--unpaid-bg);color:var(--unpaid)">⏳ ${t('ui.notPriced')}</span>`;
 }
 
@@ -2044,8 +2551,8 @@ function paymentBadge(d){
 async function markPaid(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
-  const price = parseInt(d.agreedPrice) || 0;
-  if(price <= 0){ alert(t('msg.needPriceFirst')); return; }
+  // الصفر ينفع يتأكد دفعه — الجهاز اتسلّم واتحاسب، والمبلغ صفر.
+  if(!isPriced(d)){ alert(t('msg.needPriceFirst')); return; }
   const labelKey = d.status === 'delivered' ? 'hist.paidDelivered' : 'hist.paidCash';
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
@@ -2224,11 +2731,13 @@ function lockDisplayHtml(d){
 }
 
 // تشغيل النمط خطوة بخطوة (حوالي 300ms لكل نقطة)
-function replayPattern(seqStr){
+function replayPattern(seqStr, boxId, imgId){
   const seq = String(seqStr||'').split('-').map(n => parseInt(n)).filter(n => n>=1 && n<=9);
   if(seq.length < 2) return;
-  const box = document.getElementById('patReplayBox');
-  const img = document.getElementById('lockPatImg');
+  // boxId/imgId اختياريين — عشان مودال الفني يستخدم حاوياته الخاصة
+  // من غير ما يتعارض مع نفس المعرّفات في مودال التفاصيل الإداري
+  const box = document.getElementById(boxId || 'patReplayBox');
+  const img = document.getElementById(imgId || 'lockPatImg');
   if(!box) return;
   box.style.display = 'block';
   if(img) img.style.display = 'none';
@@ -2238,13 +2747,13 @@ function replayPattern(seqStr){
   for(let r=0;r<3;r++) for(let c=0;c<3;c++) pts.push({ n:r*3+c+1, x:g*c+g/2, y:g*r+g/2 });
 
   box.innerHTML = `<svg id="patReplaySvg" width="${S}" height="${S}" style="border:1px solid #E2E8F0;border-radius:12px;background:#fff;">
-    <polyline id="patReplayLine" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points=""/>
-    ${pts.map(p=>`<circle id="rp${p.n}" cx="${p.x}" cy="${p.y}" r="6" fill="#CBD5E1"/>`).join('')}
+    <polyline class="pat-line" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points=""/>
+    ${pts.map(p=>`<circle class="pat-dot" data-n="${p.n}" cx="${p.x}" cy="${p.y}" r="6" fill="#CBD5E1"/>`).join('')}
   </svg>
-  <div id="patReplayStep" style="text-align:center;font-size:12px;color:#64748B;margin-top:4px;"></div>`;
+  <div class="pat-step" style="text-align:center;font-size:12px;color:#64748B;margin-top:4px;"></div>`;
 
-  const line = document.getElementById('patReplayLine');
-  const stepLbl = document.getElementById('patReplayStep');
+  const line = box.querySelector('.pat-line');
+  const stepLbl = box.querySelector('.pat-step');
   let i = 0;
   const timer = setInterval(() => {
     if(i >= seq.length){
@@ -2256,7 +2765,7 @@ function replayPattern(seqStr){
       return;
     }
     const p = pts[seq[i]-1];
-    const dot = document.getElementById('rp'+seq[i]);
+    const dot = box.querySelector('.pat-dot[data-n="'+seq[i]+'"]');
     if(dot){ dot.setAttribute('fill','#2563EB'); dot.setAttribute('r','9'); }
     const cur = line.getAttribute('points');
     line.setAttribute('points', (cur ? cur + ' ' : '') + p.x + ',' + p.y);
@@ -2390,6 +2899,8 @@ function togglePointsBox(){
 }
 
 function openDetail(id){
+  // الفني مايشوفش المودال الإداري (أسعار/أرباح/حذف) — يتحوّل للمبسّط
+  if(isTechnician()){ openTechDevice(id); return; }
   selectedId = id;
   trackResponses = {};
   pointsBoxOpen = false;
@@ -2430,7 +2941,7 @@ function renderDetail(){
   const pills = ACTION_STATUSES.map(st => {
     if(st.key === 'delivered'){
       const active = d.status==='delivered';
-      const priced = (parseInt(d.agreedPrice)||0) > 0;
+      const priced = isPriced(d);
       const hint = !priced
         ? 'تم التسليم — هيفضل "بانتظار الدفع" لحد ما تحدد السعر'
         : (d.paymentType==='deferred'
@@ -2468,7 +2979,7 @@ function renderDetail(){
     </div>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
-    ${(parseInt(d.agreedPrice)||0) > 0 && d.priceConfirmation && d.priceConfirmation.requested ? `
+    ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
           <div class="approval-pending">${t('det.priceWaiting')}</div>
@@ -2479,7 +2990,7 @@ function renderDetail(){
         `}
       </div>
     ` : ''}
-    ${(parseInt(d.agreedPrice)||0) > 0 ? `<div style="margin-bottom:12px;">
+    ${isPriced(d) ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:#64748B; display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
       <div class="pay-choice">
         <button type="button" class="pay-btn" style="border-color:#16A34A;${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:#16A34A;background:#fff;'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
@@ -2815,6 +3326,90 @@ async function requestApproval(type, newStatus, paymentChoice){
   await persist();
 }
 
+// ============================================================
+// قسم الاعتمادات (الخطوة ٣) — المحاسب/الأدمن بيقبلوا أو يرفضوا طلبات مسؤول الحركة
+// ============================================================
+// كل الأجهزة اللي عليها طلب معلّق دلوقتي
+function pendingApprovals(){
+  return devices.filter(d => d.pendingApproval && d.pendingApproval.status === 'pending');
+}
+
+// اسم نوع الطلب المختصر (تسليم / إرجاع)
+function apprKindLabel(type){ return type === 'return' ? t('appr.kindReturn') : t('appr.kindHandover'); }
+
+// ملاحظة نشاط لقرار الاعتماد — بتتكتب في سجل نشاط الجهاز بالشكل: [نص - وقت - مين - دوره]
+function approvalActivityNote(req, decision){
+  const verb = decision === 'approved' ? t('appr.logApproved') : t('appr.logRejected');
+  let text = verb + ' ' + apprKindLabel(req.type);
+  if(decision === 'rejected' && req.reason) text += ' — ' + req.reason;
+  if(req.requestedBy) text += ' (' + t('appr.logReqBy') + ' ' + req.requestedBy + ')';
+  return { text, at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+}
+
+// HTML لوحة الاعتمادات — للي canApprove() بس، وبتختفي تماماً لو مفيش طلبات
+function approvalsPanelHtml(){
+  if(!canApprove()) return '';
+  const list = pendingApprovals();
+  if(list.length === 0) return '';
+  const rows = list.map(d => {
+    const req = d.pendingApproval;
+    const kindStyle = req.type === 'return' ? 'background:#F5EEFC;color:#9333EA;' : 'background:#EAF1F8;color:#2B6CB0;';
+    return `<div class="appr-row">
+      <div class="appr-row-info">
+        <div class="appr-row-dev"><span class="appr-row-kind" style="${kindStyle}">${apprKindLabel(req.type)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-meta">${t('appr.logReqBy')} ${esc(req.requestedBy||'')} · ${new Date(req.requestedAt).toLocaleString(getLocale())}</div>
+      </div>
+      <div class="appr-row-actions">
+        <button class="appr-btn-yes" onclick="approveRequest('${d.id}')">✓ ${t('appr.accept')}</button>
+        <button class="appr-btn-no" onclick="rejectRequest('${d.id}')">✕ ${t('appr.reject')}</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="appr-panel">
+    <div class="appr-panel-head">🔔 ${t('appr.panelTitle')} <span class="appr-count">${list.length}</span></div>
+    ${rows}
+  </div>`;
+}
+
+// قبول الطلب: القرار يتسجّل في السجل، الطلب يتشال، والتغيير يتنفذ فعلياً بنفس منطق changeStatus
+async function approveRequest(deviceId){
+  if(!canApprove()){ showError(t('appr.noPermission')); return; }
+  const d = devices.find(x => x.id === deviceId);
+  if(!d || !d.pendingApproval || d.pendingApproval.status !== 'pending') return;
+  const req = d.pendingApproval;
+  // نفس حارس changeStatus: مينفعش نسلّم جهاز طالع من "قيد الانتظار" من غير فني
+  if(req.payload.status === 'delivered' && d.status === 'waiting' && !d.technician){
+    showError(t('msg.needTech')); return;
+  }
+  const decided = { ...req, status:'approved', decidedBy: currentUser.name, decidedAt: new Date().toISOString(), reason: null };
+  // نشيل الطلب المعلّق ونكتب القرار في السجل — قبل تنفيذ التغيير
+  devices = devices.map(x => x.id === deviceId
+    ? { ...x, pendingApproval: null, activityNotes: [...(x.activityNotes||[]), approvalActivityNote(decided, 'approved')] }
+    : x);
+  // ننفّذ التغيير المطلوب بنفس منطق changeStatus (المصدر الوحيد للانتقالات).
+  // المحاسب مش dispatcher، فمفيش اعتراض تاني — بيتنفذ فوراً وبيحفظ ويزامن صفحة المتابعة.
+  const prevSel = selectedId;
+  selectedId = deviceId;
+  await changeStatus(req.payload.status, req.payload.paymentChoice);
+  selectedId = prevSel;
+  render();
+}
+
+// رفض الطلب: يتلغى، السبب يتسجّل في السجل، والحالة تفضل زي ما هي
+async function rejectRequest(deviceId){
+  if(!canApprove()){ showError(t('appr.noPermission')); return; }
+  const d = devices.find(x => x.id === deviceId);
+  if(!d || !d.pendingApproval || d.pendingApproval.status !== 'pending') return;
+  const reason = (prompt(t('appr.rejectReasonPrompt')) || '').trim();
+  const decided = { ...d.pendingApproval, status:'rejected', decidedBy: currentUser.name, decidedAt: new Date().toISOString(), reason };
+  devices = devices.map(x => x.id === deviceId
+    ? { ...x, pendingApproval: null, activityNotes: [...(x.activityNotes||[]), approvalActivityNote(decided, 'rejected')],
+        lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+  render();
+  await persist();
+}
+
 async function changeStatus(newStatus, paymentChoice){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
@@ -2835,8 +3430,12 @@ async function changeStatus(newStatus, paymentChoice){
   let extra = {};
 
   if(newStatus === 'delivered'){
-    const price = parseInt(d.agreedPrice) || 0;
-    if(price > 0 && d.paymentType === 'deferred'){
+    const price  = parseInt(d.agreedPrice) || 0;
+    // ⚠️ الفرق بين "متسعّر بصفر" و"لسه ماتسعّرش":
+    //   الأول قرار (الصيانة ببلاش) → يعدي على مسار الدفع العادي
+    //   التاني نقص بيانات → يفضل "بانتظار الدفع"
+    const hasPrice = isPriced(d);
+    if(hasPrice && d.paymentType === 'deferred'){
       // آجل: يتقيّد على حساب المحل (لو ماتقيّدش قبل كده) ويعتبر متسوّى
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
@@ -2847,8 +3446,8 @@ async function changeStatus(newStatus, paymentChoice){
       } else {
         historyKey = 'hist.deliveredDeferredPrev'; historyVars = { shop };
       }
-    } else if(price > 0){
-      // فوري: مستني "تأكيد الدفع"
+    } else if(hasPrice){
+      // فوري: مستني "تأكيد الدفع" — والصفر منهم
       newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
       historyKey = isPaidDevice(d) ? 'hist.deliveredPaidCash' : 'hist.deliveredPending';
     } else {
@@ -2998,6 +3597,7 @@ document.addEventListener('click', (e) => {
 });
 
 function openSummaries(){
+  invView = null;   // نفتح على القائمة دايماً، مش على آخر عرض
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   clearSearchBox('invSearch');
@@ -3090,6 +3690,418 @@ function dayCardHtml(d){
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
     ${lock}
   </div>`;
+}
+
+// ============================================================
+// بوابة الفني "أجهزتي" (الخطوة ٤)
+// بتعرض أجهزة الفني المسنّدة له + أجهزة بيشارك فيها كمساعد — من غير أي فلوس نهائياً.
+// بتفتح للفني تلقائياً، وأي مدير يقدر يفتح بوابة فني معيّن من صفحة التقييم.
+// الربط: myTechName() (أو اسم ممرّر) ↔ حقل technician / assistTechnician على الجهاز.
+// ============================================================
+// الأجهزة خلصت تحميل ولا لأ — عشان ما نوريش "مفيش أجهزة" والبيانات لسه جايّة
+let devicesLoaded = false;
+
+// الفني: الستارة تفضل لحد ما الأدوار *و* الأجهزة يبقوا جاهزين
+function revealAfterDevices(){
+  if(!devicesLoaded) return;
+  renderTechPortal();
+  try{ document.documentElement.classList.remove('app-booting'); }catch(e){}
+}
+
+let techPortalName = '';           // اسم الفني اللي البوابة مفتوحة عليه
+let techPortalAutoOpened = false;  // فتح تلقائي مرة واحدة بس
+
+// الحالات "النشطة" في البوابة: الشغل الجاري بس.
+// "تم الصيانة" و"تم التسليم" و"تم الرفض" و"المرتجعات" مخفيين تماماً عن الفني —
+// بمجرد ما يدوس "تم الإصلاح" الجهاز يخرج من قائمته (وبيظهر تنبيه إنه اتحرك).
+const TP_ACTIVE = ['waiting','diagnosing','repairing'];
+
+function openTechPortal(name){
+  const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
+  techPortalName = (name || myTechName() || '').trim();
+  clearSearchBox('techSearch');
+  renderTechPortal();
+  document.getElementById('techPortalOverlay').classList.remove('hidden');
+}
+// الفني مايقدرش يقفل البوابة — دي واجهته الوحيدة
+function closeTechPortal(){
+  if(isTechnician()) return;
+  document.getElementById('techPortalOverlay').classList.add('hidden');
+}
+
+// تنبيه صغير جوه البوابة (بيختفي لوحده) — بيستخدم لما جهاز يخرج من القائمة
+let tpFlashMsg = '';
+function tpFlash(msg){
+  tpFlashMsg = msg;
+  renderTechPortal();
+  setTimeout(() => { if(tpFlashMsg === msg){ tpFlashMsg = ''; renderTechPortal(); } }, 4500);
+}
+
+// كارت جهاز في البوابة — من غير أي سعر/فلوس. canAct = يظهر أزرار تغيير الحالة
+function techCardHtml(d, canAct){
+  const s = statusInfo(d.status);
+  const badge = d.status === 'returned'
+    ? `<span class="status-tag tp-status-tag" style="background:#FEE2E2;color:#DC2626;font-weight:800;">🔁 ${t('ui.returnedBadge')}</span>`
+    : `<span class="status-tag tp-status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
+  const lock = (d.lockType==='text' && d.lockText)
+    ? `<div style="margin-top:6px;font-size:12.5px;">🔒 <span style="font-family:monospace;font-weight:800;">${esc(d.lockText)}</span></div>`
+    : ((d.lockType==='pattern'||d.lockType==='image') && d.lockImage)
+      ? `<div style="margin-top:6px;display:flex;align-items:center;gap:6px;"><span style="font-size:12.5px;">🔒</span><img src="${d.lockImage}" style="width:40px;height:40px;border-radius:6px;border:1px solid #E2E8F0;object-fit:cover;"></div>`
+      : '';
+  const actions = !canAct ? '' : `<div class="tp-actions">
+    ${d.status!=='repairing' ? `<button class="tp-btn tp-work" onclick="event.stopPropagation(); techSetStatus('${d.id}','repairing')">🔧 ${t('tp.working')}</button>` : ''}
+    ${d.status!=='done' ? `<button class="tp-btn tp-done" onclick="event.stopPropagation(); techSetStatus('${d.id}','done')">✅ ${t('tp.fixed')}</button>` : ''}
+    <button class="tp-btn tp-problem" onclick="event.stopPropagation(); techReportProblem('${d.id}')">⚠️ ${t('tp.problem')}</button>
+  </div>`;
+  return `<div class="tp-card" onclick="openTechDevice('${d.id}')">
+    <div class="tp-card-title">📱 ${esc(d.deviceType)} ${esc(d.model)}</div>
+    <div class="tp-card-sub">${d.shopName ? esc(d.shopName)+' — ' : ''}${esc(d.customerName)}</div>
+    ${d.reportedIssue ? `<div class="tp-card-issue">🛠️ ${esc(d.reportedIssue)}</div>` : ''}
+    ${badge}
+    ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
+    ${lock}
+    ${actions}
+  </div>`;
+}
+
+function renderTechPortal(){
+  const name = techPortalName;
+  const titleEl = document.getElementById('techPortalTitle');
+  if(titleEl){
+    const own = !!(name && myTechName() && name === myTechName().trim());
+    titleEl.textContent = (own || !name) ? t('tp.title') : t('tp.titleOf', { name });
+  }
+  const body = document.getElementById('techPortalBody');
+  if(!body) return;
+  if(!name){ body.innerHTML = `<div class="empty-col">${t('tp.noName')}</div>`; return; }
+
+  // اسم الفني في نص الهيدر
+  const who = document.getElementById('tpWho');
+  if(who) who.textContent = name;
+
+  // لسه بنحمّل؟ نوري دوّارة مش "مفيش أجهزة" — الفرق بين "مفيش شغل"
+  // و"لسه بنجيب الشغل" مهم للفني
+  if(!devicesLoaded){
+    body.innerHTML = `<div class="tp-load"><span class="bv-spin"></span><span>${t('tp.loading')}</span></div>`;
+    return;
+  }
+
+  const q = (document.getElementById('techSearch')?.value || '').trim();
+  const sMatch = (d) => !q || matchesSearch(d, q);
+  const mine   = devices.filter(d => d.technician && d.technician.includes(name) && TP_ACTIVE.includes(d.status) && sMatch(d));
+  const assist = devices.filter(d => d.assistTechnician && d.assistTechnician.includes(name) && TP_ACTIVE.includes(d.status) && sMatch(d));
+
+  const mineHtml = mine.length
+    ? `<div class="tp-grid">${mine.map(d => techCardHtml(d, true)).join('')}</div>`
+    : `<div class="empty-col">${q ? t('tp.noMatch') : t('tp.empty')}</div>`;
+  // قسم المساعدة: عرض فقط — الفني الأساسي هو اللي بيحرّك الحالة
+  const assistHtml = assist.length
+    ? `<div class="tp-grid">${assist.map(d => techCardHtml(d, false)).join('')}</div>`
+    : `<div class="empty-col">${q ? t('tp.noMatch') : t('tp.emptyAssist')}</div>`;
+
+  body.innerHTML = `
+    ${tpFlashMsg ? `<div class="tp-flash">✅ ${esc(tpFlashMsg)}</div>` : ''}
+    <div class="tp-section">
+      <div class="tp-section-head">🔧 ${t('tp.sectionMine')} <span class="tp-count">${mine.length}</span></div>
+      ${mineHtml}
+    </div>
+    <div class="tp-section">
+      <div class="tp-section-head">🤝 ${t('tp.sectionAssist')} <span class="tp-count">${assist.length}</span></div>
+      ${assistHtml}
+    </div>`;
+}
+
+// تغيير حالة سريع من البوابة — بيستخدم نفس منطق changeStatus (مصدر واحد للانتقالات)
+async function techSetStatus(deviceId, newStatus){
+  const d = devices.find(x => x.id === deviceId);
+  if(!d || d.status === newStatus) return;
+  const prevSel = selectedId;
+  selectedId = deviceId;
+  await changeStatus(newStatus);
+  selectedId = prevSel;
+  // لو الحالة الجديدة مش من الحالات النشطة، الجهاز هيخرج من القائمة —
+  // لازم نوضّح ده للفني عشان مايفتكرش إنه ضاع
+  const after = devices.find(x => x.id === deviceId);
+  if(after && !TP_ACTIVE.includes(after.status)){
+    if(document.getElementById('techViewOverlay') &&
+       !document.getElementById('techViewOverlay').classList.contains('hidden') && tvId === deviceId){
+      closeTechDevice();
+    }
+    tpFlash(t('tp.movedOut', { name: (after.deviceType||'') + ' ' + (after.model||'') }));
+  } else {
+    renderTechPortal();
+    if(tvId === deviceId) renderTechDevice();
+  }
+}
+
+// "واجهتني مشكلة" — بيسجّل ملاحظة في سجل نشاط الجهاز من غير ما يغيّر الحالة
+async function techReportProblem(deviceId){
+  const d = devices.find(x => x.id === deviceId);
+  if(!d) return;
+  const desc = (prompt(t('tp.problemPrompt')) || '').trim();
+  if(!desc) return;
+  const note = { text: '⚠️ ' + t('tp.problemNote') + ': ' + desc, at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+  devices = devices.map(x => x.id === deviceId
+    ? { ...x, activityNotes:[...(x.activityNotes||[]), note], lastModifiedAt:new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+  renderTechPortal();
+  render();
+  await persist();
+}
+
+// ============================================================
+// مودال الفني المبسّط
+// بيانات الجهاز الأساسية + ملاحظات الفني + تحويل/مشاركة مع فني تاني.
+// مفيش أسعار، ولا أرباح، ولا تكلفة قطع، ولا حذف، ولا أي بند محاسبي.
+// ============================================================
+// تاريخ آمن: formatDateTime بترجّع NaN لو الحقل فاضي
+function tvDate(iso){
+  if(!iso) return '—';
+  const dt = new Date(iso);
+  return isNaN(dt.getTime()) ? '—' : formatDateTime(iso);
+}
+
+let tvId = '';          // الجهاز المفتوح
+let tvHandOn = false;   // مفتاح "تحويل/مشاركة"
+let tvMode = '';        // 'assist' = فني مساعد | 'full' = تسليم كامل
+let tvTarget = '';      // الفني المختار — محفوظ في الحالة مش في الـ DOM
+
+function openTechDevice(id){
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  tvId = id; tvHandOn = false; tvMode = ''; tvCodeShown = false; tvTarget = '';
+  renderTechDevice();
+  document.getElementById('techViewOverlay').classList.remove('hidden');
+}
+function closeTechDevice(){
+  tvId = ''; tvHandOn = false; tvMode = '';
+  const ov = document.getElementById('techViewOverlay');
+  if(ov) ov.classList.add('hidden');
+}
+
+// أسماء الفنيين المتاحين: من الأدوار المسجلة + من الأجهزة، من غير الفني الحالي
+function tvTechChoices(exclude){
+  const ex = (exclude || '').trim();
+  const fromRoles = Object.keys(userRoles)
+    .map(e => roleEntry(e))
+    .filter(x => x && x.role === 'technician' && x.techName)
+    .map(x => x.techName.trim());
+  const fromDevices = devices.map(d => (d.technician || '').trim()).filter(Boolean);
+  return [...new Set([...fromRoles, ...fromDevices])]
+    .filter(n => n && n !== ex)
+    .sort((a,b) => a.localeCompare(b, 'ar'));
+}
+
+function tvHandHtml(d){
+  if(!tvHandOn) return '';
+  const opts = tvTechChoices(d.technician);
+  return `<div class="tv-hand">
+    <div class="tv-block-head" style="font-size:13.5px;">${t('tv.pickTech')}</div>
+    <select id="tvTech" class="tv-sel" onchange="tvPick(this.value)">
+      <option value="">${t('tv.pickTechPh')}</option>
+      ${opts.map(n => `<option value="${esc(n)}" ${n === tvTarget ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+    </select>
+    ${opts.length ? '' : `<div class="tv-hist-meta" style="margin-top:7px;">${t('tv.noTechs')}</div>`}
+    <div class="tv-block-head" style="font-size:13.5px;margin-top:14px;">${t('tv.modeHead')}</div>
+    <div class="tv-mode">
+      <button class="tv-mode-btn ${tvMode==='assist'?'sel':''}" onclick="tvSetMode('assist')">🤝 ${t('tv.modeAssist')}</button>
+      <button class="tv-mode-btn ${tvMode==='full'?'sel':''}" onclick="tvSetMode('full')">🔄 ${t('tv.modeFull')}</button>
+    </div>
+    <div class="tv-hist-meta" style="margin-top:8px;line-height:1.8;">
+      ${tvMode==='assist' ? t('tv.hintAssist') : tvMode==='full' ? t('tv.hintFull') : t('tv.hintPick')}
+    </div>
+    <button id="tvOk" class="tv-ok" onclick="tvDoHandoff()" ${(tvMode && tvTarget) ? '' : 'disabled'}>${t('tv.confirm')}</button>
+  </div>`;
+}
+
+// تحديث جزء التحويل لوحده — عشان مسوّدة الملاحظة ما تضيعش
+function renderTvHand(){
+  const d = devices.find(x => x.id === tvId); if(!d) return;
+  const wrap = document.getElementById('tvHandWrap');
+  if(wrap) wrap.innerHTML = tvHandHtml(d);
+  const sw = document.getElementById('tvSw');
+  if(sw) sw.classList.toggle('on', tvHandOn);
+}
+// ⚠️ الاختيار بيتحفظ في الحالة، والقائمة مابتتعادش بناؤها عند التغيير.
+// إعادة بناء الـ <select> جوه onchange كانت بتلغي الاختيار وتقفل القائمة
+// على الموبايل — نفس مصيدة إعادة الرسم أثناء الكتابة.
+function tvPick(v){
+  tvTarget = v;
+  // نحدّث زرار التأكيد بس (بيتفعل لما يكون فيه فني + نوع تولية)
+  const btn = document.getElementById('tvOk');
+  if(btn) btn.disabled = !(tvTarget && tvMode);
+}
+function tvToggleHand(){
+  tvHandOn = !tvHandOn;
+  if(!tvHandOn){ tvMode = ''; tvTarget = ''; }
+  renderTvHand();
+}
+// تغيير نوع التولية بيعيد بناء جزء التحويل — الاختيار محفوظ في tvTarget
+// فبيرجع مكانه عبر خاصية selected
+function tvSetMode(m){ tvMode = m; renderTvHand(); }
+
+// رمز القفل للفني — مخفي بشكل افتراضي وبيتعرض بزرار.
+// الفني محتاج الرمز يفتح الجهاز، لكن مايتعرضش على الشاشة من غير قصد.
+let tvCodeShown = false;
+function tvToggleCode(){
+  tvCodeShown = !tvCodeShown;
+  const d = devices.find(x => x.id === tvId); if(!d) return;
+  const w = document.getElementById('tvLockWrap');
+  if(w) w.innerHTML = tvLockHtml(d);
+}
+
+function tvLockHtml(d){
+  if(!d.lockType) return `<div class="tv-hist-meta">🔓 ${t('lock.none')}</div>`;
+
+  if(d.lockType === 'text' && d.lockText){
+    return `<div class="tv-lock"><div class="tv-lock-row">
+      <span style="font-size:13px;color:#92400E;font-weight:800;">🔒 ${t('ui.lockCode')}</span>
+      ${tvCodeShown
+        ? `<span class="tv-code">${esc(d.lockText)}</span>`
+        : `<span class="tv-code-hidden">${'\u2022'.repeat(Math.max(4, String(d.lockText).length))}</span>`}
+      <button class="tv-eye" onclick="tvToggleCode()">${tvCodeShown ? '🙈 ' + t('tv.hideCode') : '👁️ ' + t('tv.showCode')}</button>
+    </div></div>`;
+  }
+
+  if(d.lockType === 'pattern' && d.lockImage){
+    return `<div class="tv-lock">
+      <div style="font-size:13px;color:#92400E;font-weight:800;margin-bottom:8px;">🔒 ${t('tv.lockPattern')}</div>
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <img id="tvPatImg" src="${d.lockImage}" onclick="viewLockImage('${d.id}')"
+             style="width:130px;height:130px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;background:#fff;">
+        <div id="tvPatBox" style="display:none;"></div>
+      </div>
+      ${d.lockPattern
+        ? `<button class="tv-eye" style="margin-top:9px;" onclick="replayPattern('${esc(d.lockPattern)}','tvPatBox','tvPatImg')">▶️ ${t('lock.replay')}</button>`
+        : ''}
+    </div>`;
+  }
+
+  if(d.lockType === 'image' && d.lockImage){
+    return `<div class="tv-lock">
+      <div style="font-size:13px;color:#92400E;font-weight:800;margin-bottom:8px;">🔒 ${t('ui.lockImage')}</div>
+      <img src="${d.lockImage}" onclick="viewLockImage('${d.id}')"
+           style="max-width:160px;border:1px solid #E2E8F0;border-radius:12px;cursor:pointer;background:#fff;">
+    </div>`;
+  }
+
+  return `<div class="tv-hist-meta">🔓 ${t('lock.none')}</div>`;
+}
+
+function renderTechDevice(){
+  const d = devices.find(x => x.id === tvId);
+  const body = document.getElementById('techViewBody');
+  if(!d || !body) return;
+
+  const ttl = document.getElementById('tvTitle');
+  if(ttl) ttl.textContent = '📱 ' + [d.deviceType, d.model].filter(Boolean).join(' ');
+
+  const notes = [...(d.activityNotes || [])].reverse().slice(0, 20);
+  const s = statusInfo(d.status);
+
+  body.innerHTML = `
+    <div>
+      <div class="tv-row"><span class="tv-k">${t('tv.device')}</span>
+        <span class="tv-v">${esc([d.deviceType, d.model].filter(Boolean).join(' ')) || '—'}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.customer')}</span>
+        <span class="tv-v">${esc(d.customerName) || '—'}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.shop')}</span>
+        <span class="tv-v">${esc(d.shopName) || '—'}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.intake')}</span>
+        <span class="tv-v">${esc(tvDate(d.intakeDate))}</span></div>
+      <div class="tv-row"><span class="tv-k">${t('tv.status')}</span>
+        <span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span></div>
+      ${d.assistTechnician ? `<div class="tv-row"><span class="tv-k">${t('tv.assist')}</span>
+        <span class="tv-v">🤝 ${esc(d.assistTechnician)}</span></div>` : ''}
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-block-head">🛠️ ${t('tv.issue')}</div>
+      <div class="tv-issue">${d.reportedIssue ? esc(d.reportedIssue) : '—'}</div>
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-block-head">🔐 ${t('tv.lockHead')}</div>
+      <div id="tvLockWrap">${tvLockHtml(d)}</div>
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-block-head">📝 ${t('tv.notesHead')}</div>
+      <textarea id="tvNote" class="tv-note" placeholder="${t('tv.notesPh')}"></textarea>
+      <button class="tv-ok" onclick="tvSubmitNote()">${t('tv.notesSave')}</button>
+      ${notes.length ? `<div class="tv-hist">${notes.map(n => `<div class="tv-hist-item">
+        ${esc(n.text)}
+        <div class="tv-hist-meta">${esc(n.by || '')}${n.role ? ' — ' + esc(n.role) : ''} · ${esc(tvDate(n.at))}</div>
+      </div>`).join('')}</div>` : ''}
+    </div>
+
+    <div class="tv-block">
+      <div class="tv-toggle" onclick="tvToggleHand()">
+        <span class="tv-toggle-label">🔀 ${t('tv.handHead')}</span>
+        <span id="tvSw" class="tv-sw ${tvHandOn?'on':''}"></span>
+      </div>
+      <div id="tvHandWrap">${tvHandHtml(d)}</div>
+    </div>`;
+}
+
+// حفظ ملاحظة — بتتزاد على سجل الأنشطة زي أي ملاحظة تانية
+async function tvSubmitNote(){
+  const ta = document.getElementById('tvNote');
+  if(!ta) return;
+  const text = (ta.value || '').trim();
+  if(!text) return;
+  const note = { text, at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+  devices = devices.map(x => x.id === tvId
+    ? { ...x, activityNotes:[...(x.activityNotes||[]), note], lastModifiedAt:new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+  ta.value = '';
+  renderTechDevice();
+  render();
+  await persist();
+}
+
+// التحويل: مساعد (الأساسي فاضل زي ما هو) أو تسليم كامل (نقل المسؤولية)
+async function tvDoHandoff(){
+  const d = devices.find(x => x.id === tvId);
+  if(!d) return;
+  const target = (tvTarget || document.getElementById('tvTech')?.value || '').trim();
+  if(!target){ showError(t('tv.errNoTech')); return; }
+  if(!tvMode){ showError(t('tv.errNoMode')); return; }
+  showError('');
+
+  const from = (d.technician || '').trim();
+  let patchObj, noteText;
+
+  if(tvMode === 'assist'){
+    patchObj = { assistTechnician: target };
+    noteText = '🤝 ' + t('tv.logAssist', { name: target });
+  } else {
+    patchObj = { technician: target };
+    // لو المستلم كان هو المساعد، مبقاش مساعد — بقى الأساسي
+    if((d.assistTechnician || '').trim() === target) patchObj.assistTechnician = '';
+    noteText = '🔄 ' + t('tv.logFull', { from: from || '—', to: target });
+  }
+
+  const note = { text: noteText, at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+  devices = devices.map(x => x.id === tvId
+    ? { ...x, ...patchObj, activityNotes:[...(x.activityNotes||[]), note],
+        lastModifiedAt:new Date().toISOString(), lastModifiedBy: currentUser.name }
+    : x);
+
+  const full = tvMode === 'full';
+  render();
+  await persist();
+
+  if(full){
+    // الجهاز مبقاش تحت مسؤوليته — نقفل ونطلّعه من القائمة
+    closeTechDevice();
+    tpFlash(t('tv.doneFull', { to: target }));
+  } else {
+    tvHandOn = false; tvMode = ''; tvTarget = '';
+    renderTechDevice();
+    renderTechPortal();
+    tpFlash(t('tv.doneAssist', { to: target }));
+  }
 }
 
 function renderEmployeeView(query){
@@ -3573,14 +4585,36 @@ async function renderLabelImage(d, sz, qrDataUrl){
 }
 
 // بيحاول يطبع صامت عبر الوكيل المحلي (لو على نفس الكمبيوتر)؛ بيرجّع true لو نجح
-async function trySilentPrintLocal(image, sz, ref){
+// الوكيل شغال على نفس الجهاز؟
+// /health بيرد فوراً، فمهلة قصيرة تكفي. ولو الوكيل مش موجود
+// الاتصال بيفشل فوراً أصلاً.
+async function printAgentAlive(){
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 1200);   // لو مش على نفس الجهاز، الاتصال بيفشل فوراً أصلاً
+  const timer = setTimeout(() => ctrl.abort(), 1200);
+  try{
+    const res = await fetch(PRINT_AGENT_URL + '/health', { signal: ctrl.signal });
+    clearTimeout(timer);
+    return res.ok;
+  }catch(e){
+    clearTimeout(timer);
+    return false;
+  }
+}
+
+async function trySilentPrintLocal(image, sz, ref, jobId){
+  // ⚠️ الفحص الأول مهم: من غيره كنّا بنبعت أمر الطباعة
+  // ونقطع الاتصال بعد 1.2 ثانية — والوكيل يكمّل طباعة،
+  // وإحنا نفتكر إنه فشل ونبعت الأمر تاني عبر السحابة = ليبلين.
+  if(!(await printAgentAlive())) return false;
+
+  // الوكيل موجود — نديه وقته. الطباعة الحرارية بتاخد ثواني.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 60000);
   try{
     const res = await fetch(PRINT_AGENT_URL + '/print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, widthMm: sz.w, heightMm: sz.h, ref }),
+      body: JSON.stringify({ image, widthMm: sz.w, heightMm: sz.h, ref, jobId }),
       signal: ctrl.signal
     });
     clearTimeout(timer);
@@ -3595,12 +4629,12 @@ async function trySilentPrintLocal(image, sz, ref){
 
 // بيبعت أمر طباعة عبر قاعدة البيانات — بيشتغل من أي جهاز (موبايل، تابلت، كمبيوتر تاني)
 // لأن الوكيل بيراقب القاعدة نفسها، مش لازم يكون على نفس الجهاز اللي بتدوس منه
-async function trySilentPrintCloud(image, sz, ref){
-  const jobId = 'pj_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+async function trySilentPrintCloud(image, sz, ref, jobId){
+  jobId = jobId || ('pj_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
   const key = 'print-job:' + jobId;
   try{
     const { error } = await sb.from('app_data').upsert({
-      key, value: JSON.stringify({ image, widthMm: sz.w, heightMm: sz.h, ref, status: 'pending', createdAt: Date.now() }),
+      key, value: JSON.stringify({ image, widthMm: sz.w, heightMm: sz.h, ref, jobId, status: 'pending', createdAt: Date.now() }),
       updated_at: new Date().toISOString()
     });
     if(error) throw error;
@@ -3626,10 +4660,13 @@ async function trySilentPrintCloud(image, sz, ref){
 async function trySilentPrint(d, sz, qrDataUrl){
   const image = await renderLabelImage(d, sz, qrDataUrl);
   const ref = devRef(d);
+  // رقم واحد للمحاولتين — لو المحلية طبعت والرد ضاع، الوكيل
+  // بيعرف من الرقم إن الأمر السحابي نفس الليبل ويتجاهله. طبقة تانية.
+  const jobId = 'lb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   // أول محاولة: الوكيل على نفس الجهاز (أسرع بكتير لو موجود)
-  if(await trySilentPrintLocal(image, sz, ref)) return true;
-  // تاني محاولة: عبر السحابة — بتشتغل من أي جهاز (الموبايل مثلاً) حتى لو بعيد عن الطابعة
-  return await trySilentPrintCloud(image, sz, ref);
+  if(await trySilentPrintLocal(image, sz, ref, jobId)) return true;
+  // تاني محاولة: عبر السحابة — من أي جهاز حتى لو بعيد عن الطابعة
+  return await trySilentPrintCloud(image, sz, ref, jobId);
 }
 
 async function printLabel(){
@@ -3979,10 +5016,23 @@ async function waShop(shop){
 // ============================================================
 // السعر بالأرقام الصحيحة + طريقة الدفع (فوري/آجل)
 // ============================================================
+// الخانة فاضية = لسه ماتسعّرش (بترجّع '').
+// فيها رقم — والصفر منهم — = اتسعّر (بترجّع الرقم كنص).
+// الفرق ده مهم: "الصيانة ببلاش" قرار، و"لسه ماحددناش" نقص بيانات.
 const intPrice = v => {
-  const n = Math.round(Number(enDigits(v).replace(/[^\d.]/g,'')));
-  return (isFinite(n) && n > 0) ? String(n) : '';
+  const raw = enDigits(String(v ?? '')).replace(/[^\d.]/g, '');
+  if(raw === '') return '';
+  const n = Math.round(Number(raw));
+  return (isFinite(n) && n >= 0) ? String(n) : '';
 };
+
+// هل الجهاز اتسعّر؟ الصفر أيوة، الفاضي لأ.
+function isPriced(d){
+  if(!d) return false;
+  const v = d.agreedPrice;
+  if(v === null || v === undefined || v === '') return false;
+  return isFinite(Number(v));
+}
 
 let addPayType = 'cash';
 let addIsWholesale = false;
@@ -3999,7 +5049,8 @@ function setAddWholesale(val){
 function togglePayTypeVisibility(){
   const wrap = document.getElementById('payTypeWrap');
   if(!wrap) return;
-  const has = !!intPrice(document.getElementById('f_agreedPrice').value);
+  // '' = فاضي (نخفي)، '0' = سعر (نظهر). لاحظ إن '0' نص غير فاضي.
+  const has = intPrice(document.getElementById('f_agreedPrice').value) !== '';
   wrap.style.display = has ? 'block' : 'none';
   if(!has) setAddPayType('cash');
 }
@@ -4023,7 +5074,8 @@ async function editPayType(t){
   let note = null; let noteKey = null; let noteVars = null;
 
   if(t === 'deferred'){
-    if(price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    // الآجل بيتقيّد على حساب المحل، وقيد بصفر مالوش معنى محاسبي
+    if(!isPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
     extra.billedShop = shop;
@@ -4068,7 +5120,7 @@ async function editPrice(value){
   let histEntry = null;
 
   // لو السعر اتغيّر فعلياً والجهاز لسه ما اتسلّمش، نطلب تأكيد العميل من جديد
-  if(price && price !== d.agreedPrice && d.status !== 'delivered'){
+  if(price !== '' && price !== d.agreedPrice && d.status !== 'delivered'){
     extra.priceConfirmation = { requested: true, requestedAt: new Date().toISOString() };
     resetTrackResponse(d.trackToken, 'price');
   }
@@ -4178,6 +5230,8 @@ function addLedgerDebit(d, price){
     amount: price,
     deviceId: d.id,
     deviceLabel: `${d.deviceType||''} ${d.model||''} — ${d.customerName||''}`.trim(),
+    // بنحفظ العطل مع القيد — عشان كشف الحساب يفضل صح حتى لو الجهاز اتمسح
+    issue: (d.reportedIssue || '').trim(),
     date: new Date().toISOString(),
     by: currentUser.name
   }, ...ledger];
@@ -4560,6 +5614,16 @@ function stmtDescHtml(e){
   return `📱 ${esc(e.deviceLabel||'جهاز')}` + (e.prevShop ? `<br><small style="color:#B45309;">منقول من حساب "${esc(e.prevShop)}"</small>` : '');
 }
 
+// عطل الجهاز في كشف الحساب.
+// القيود الجديدة بتحفظه جواها. القديمة بنجيبه من الجهاز نفسه.
+// الحركات اللي مش أجهزة (دفعة/خصم/رصيد افتتاحي) مالهاش عطل.
+function stmtIssue(e){
+  if(e.type !== 'debit') return '';
+  if(e.issue) return e.issue;
+  const d = devices.find(x => x.id === e.deviceId);
+  return (d && d.reportedIssue) ? String(d.reportedIssue).trim() : '';
+}
+
 function shopStatementRows(shop){
   const entries = ledger.filter(e => (e.shop||'بدون محل') === shop)
     .slice().sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -4590,7 +5654,8 @@ async function exportShopExcel(shop){
 
   // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
   const head = ws.getRow(4);
-  head.values = ['التاريخ','البيان','عليه (آجل)','له (دفعات)','بواسطة'];
+  // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
+  head.values = ['التاريخ','البيان','العطل','عليه (آجل)','له (دفعات)'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -4604,29 +5669,31 @@ async function exportShopExcel(shop){
     const r = ws.addRow([
       new Date(e.date).toLocaleString('ar-EG'),
       stmtDesc(e),
+      stmtIssue(e),
       isDebitLike(e) ? (e.amount||0) : null,
-      !isDebitLike(e) ? (e.amount||0) : null,
-      e.by || ''
+      !isDebitLike(e) ? (e.amount||0) : null
     ]);
     r.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { vertical:'middle', wrapText:true }; });
-    r.getCell(3).numFmt = money; r.getCell(4).numFmt = money;
-    r.getCell(3).alignment = { horizontal:'center', vertical:'middle' };
+    // ⚙️ أعمدة الفلوس اتزحلقت من 3ؔ4 لـ 4ؔ5 بعد ما العطل اتحط في 3
+    r.getCell(4).numFmt = money; r.getCell(5).numFmt = money;
     r.getCell(4).alignment = { horizontal:'center', vertical:'middle' };
+    r.getCell(5).alignment = { horizontal:'center', vertical:'middle' };
   });
 
   ws.addRow([]);
-  [['','إجمالي الآجل', debit, null], ['','إجمالي المدفوع/الخصم', null, credit], ['','المتبقي على المحل', balance, null]]
+  // عمود فاضي زيادة (العطل) قبل خانات الفلوس
+  [['','إجمالي الآجل','', debit, null], ['','إجمالي المدفوع/الخصم','', null, credit], ['','المتبقي على المحل','', balance, null]]
     .forEach((t, i) => {
       const r = ws.addRow(t);
       r.getCell(2).font = { bold:true };
-      r.getCell(3).numFmt = money; r.getCell(4).numFmt = money;
+      r.getCell(4).numFmt = money; r.getCell(5).numFmt = money;
       r.eachCell({ includeEmpty:true }, cell => {
         cell.border = border;
         cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: i===2 ? 'FFFDE68A' : 'FFF1F5F9'} };
       });
     });
 
-  [22,50,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [22,42,30,16,16].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -4638,13 +5705,17 @@ async function exportShopExcel(shop){
 
 function exportShopPdf(shop){
   const { entries, debit, credit, balance } = shopStatementRows(shop);
-  const rowsHtml = entries.map((e,i) => `
+  const rowsHtml = entries.map((e,i) => {
+    const issue = stmtIssue(e);
+    return `
     <tr style="background:${i%2 ? '#F8FAFC' : '#fff'};">
       <td>${new Date(e.date).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
+      <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
       <td style="color:#B45309; font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
       <td style="color:#16A34A; font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
@@ -4664,6 +5735,8 @@ function exportShopPdf(shop){
     th{background:#101014; color:#fff; padding:11px 8px; font-size:13px;}
     td{padding:10px 8px; border-bottom:1px solid #E5E7EB; text-align:center;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
+    /* الجدول بقى خمسة أعمدة — الأفقي بيدي مساحة أريح للعطل */
+    @page{ size:A4 landscape; margin:10mm; }
     @media print{ body{padding:12px;} }
   </style></head><body>
     <div class="head">
@@ -4676,8 +5749,8 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:26%;">التاريخ</th><th style="width:48%;">البيان</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
-      ${rowsHtml || '<tr><td colspan="4">مفيش حركات متسجلة</td></tr>'}
+      <tr><th style="width:20%;">التاريخ</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
     <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
@@ -4743,13 +5816,101 @@ function stuckDevices(){
     .sort((a,b) => b.days - a.days);
 }
 
-let invOpenCard = null;
+let invOpenCard = null;   // مهجور: الكروت بقت تفتح صفحة مستقلة (invView)
 let invLists = {};
-let invOpenTech = null;
+let invOpenTech = null;   // مهجور: نفس السبب
 let invTechLists = {};
-function toggleInvCard(key){
-  invOpenCard = (invOpenCard === key) ? null : key;
+// ============================================================
+// صفحة الجرد المستقلة
+// ------------------------------------------------------------
+// الأكورديون كان بيحشر جدول جوه شبكة كروت — على الموبايل الجدول
+// بيتقصّ، وعلى الشاشة الكبيرة الكروت بتتزحلق. الصفحة المستقلة
+// بتدي الجدول عرض الشاشة كامل.
+//
+// invView = { kind:'card'|'tech', key, title } أو null للقائمة.
+// ============================================================
+let invView = null;
+
+function openInvView(kind, key){
+  invView = { kind, key };
+  invOpenCard = null; invOpenTech = null;   // نقفل أي أكورديون فاتح
   renderSummaries();
+  const sc = document.getElementById('summariesOverlay');
+  if(sc) sc.scrollTop = 0;
+}
+
+function closeInvView(){
+  invView = null;
+  renderSummaries();
+}
+
+// الأجهزة والعنوان بتاع العرض الحالي
+function invViewData(){
+  if(!invView) return null;
+  if(invView.kind === 'tech'){
+    return {
+      title: '🔧 ' + invView.key,
+      list:  invTechLists[invView.key] || []
+    };
+  }
+  const labels = {
+    received:       t('inv.received'),
+    delivered_paid: t('inv.deliveredPaid'),
+    progress:       t('inv.inProgress'),
+    stuck:          t('inv.stuckCard', { d: STUCK_DAYS })
+  };
+  return {
+    title: labels[invView.key] || invView.key,
+    list:  invLists[invView.key] || []
+  };
+}
+
+function invViewHtml(){
+  const data = invViewData();
+  if(!data) return '';
+
+  const rows = data.list.length === 0
+    ? `<tr><td colspan="7" style="text-align:center;padding:34px;color:#94A3B8;">${t('inv.emptyCard')}</td></tr>`
+    : data.list.map(d => {
+        const st  = statusInfo(effStatus(d));
+        const dev = [d.deviceType, d.model].filter(Boolean).join(' ') || '—';
+        return `<tr onclick="openDetail('${d.id}')">
+          <td class="iv-ref">${esc(devRef(d))}</td>
+          <td>
+            <div class="iv-dev">${esc(dev)}</div>
+            ${d.serialNumber ? `<div class="iv-sub">${esc(d.serialNumber)}</div>` : ''}
+          </td>
+          <td>
+            <div style="font-weight:700;">${esc(d.customerName) || '—'}</div>
+            ${d.shopName ? `<div class="iv-sub">${esc(d.shopName)}</div>` : ''}
+          </td>
+          <td class="iv-issue">${esc(d.reportedIssue) || '—'}</td>
+          <td><span class="status-tag" style="background:${accentBg(st.varname)};color:${accent(st.varname)}">${esc(stLabel(st))}</span></td>
+          <td class="iv-price money-only">${isPriced(d) ? esc(d.agreedPrice) + ' ' + t('acc.egp') : '—'}</td>
+          <td>${esc(formatDateTime(d.intakeDate))}</td>
+        </tr>`;
+      }).join('');
+
+  return `
+    <div class="iv-head">
+      <button class="iv-back" onclick="closeInvView()">⬅️ ${t('inv.backToList')}</button>
+      <h3 class="iv-title">${esc(data.title)}</h3>
+      <span class="iv-count">${data.list.length}</span>
+    </div>
+    <div class="iv-scroll">
+      <table class="iv-table">
+        <thead><tr>
+          <th>${t('inv.col.ref')}</th>
+          <th>${t('inv.col.device')}</th>
+          <th>${t('inv.col.customer')}</th>
+          <th>${t('inv.col.issue')}</th>
+          <th>${t('inv.col.status')}</th>
+          <th class="money-only">${t('inv.col.price')}</th>
+          <th>${t('inv.col.date')}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function renderSummaries(){
@@ -4778,10 +5939,10 @@ function renderSummaries(){
     stuck: stuck.map(x => x.d),
   };
   const card = (key, num, color, label) => `
-    <div class="inv-card ${invOpenCard===key ? 'open' : ''}" onclick="toggleInvCard('${key}')" title="${t('inv.tapToView')}">
+    <div class="inv-card" onclick="openInvView('card','${key}')" title="${t('inv.tapToView')}">
       <div class="inv-card-num" style="color:${color};">${num}</div>
       <div class="inv-card-label">${label}</div>
-      <div class="inv-card-more">${invOpenCard===key ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
+      <div class="inv-card-more">${t('inv.showDevices')} ←</div>
     </div>`;
   const cards = `
     <div class="inv-cards">
@@ -4790,17 +5951,13 @@ function renderSummaries(){
       ${card('progress', inProgress.length, '#B45309', t('inv.inProgress'))}
       ${card('stuck', stuck.length, '#DC2626', `⚠️ ${t('inv.stuckCard',{d:STUCK_DAYS})}`)}
     </div>
-    ${invOpenCard ? `<div class="inv-open-list">
-      ${(invLists[invOpenCard] || []).length === 0
-        ? `<div class="empty-col">${t('inv.emptyCard')}</div>`
-        : (invLists[invOpenCard] || []).map(d => dayCardHtml(d)).join('')}
-    </div>` : ''}`;
+`;   // الأجهزة بقت تتعرض في صفحة مستقلة — شوف invViewHtml()
 
   const stuckHtml = stuck.length === 0
     ? `<div class="empty-col">${t('inv.noStuck')}</div>`
     : stuck.map(({d, days}) => {
         const st = statusInfo(d.status);
-        return `<div class="stuck-item" onclick="closeSummaries(); openDetail('${d.id}')">
+        return `<div class="stuck-item" onclick="openDetail('${d.id}')">
           <div>
             <div style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)} — ${esc(d.customerName)}</div>
             <div style="font-size:13px;color:#64748B;">${d.shopName ? esc(d.shopName)+' — ' : ''}${t('inv.stuckIn')} "<b style="color:${accent(st.varname)}">${esc(stLabel(st))}</b>"</div>
@@ -4837,22 +5994,23 @@ function renderSummaries(){
         ${techNames.map(techName => {
           const late = withTech[techName].filter(d => daysSince(lastChangeOf(d)) >= STUCK_DAYS).length;
           const safe = esc(techName).replace(/'/g, "\\'");
-          return `<div class="inv-card ${invOpenTech===techName ? 'open' : ''}" onclick="toggleInvTech('${safe}')" title="${t('inv.techTapToView')}">
+          return `<div class="inv-card" onclick="openInvView('tech','${safe}')" title="${t('inv.techTapToView')}">
             <div class="inv-card-num" style="color:#0891A8;">${withTech[techName].length}</div>
             <div class="inv-card-label">🔧 ${esc(techName)}</div>
             ${late ? `<div style="font-size:11.5px;color:#DC2626;font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
-            <div class="inv-card-more">${invOpenTech===techName ? t('inv.hide')+' ▲' : t('inv.showDevices')+' ▼'}</div>
+            <div class="inv-card-more">${t('inv.showDevices')} ←</div>
           </div>`;
         }).join('')}
-      </div>
-      ${invOpenTech && withTech[invOpenTech] ? `<div class="inv-open-list">
-        ${withTech[invOpenTech].map(d => dayCardHtml(d)).join('')}
-      </div>` : ''}`;
+      </div>`;
 
   // نحافظ على مكان السكرول وقت التحديث اللحظي عشان الصفحة ماتنطّش لفوق
   const _sumScroller = document.getElementById('summariesOverlay');
   const _sumY = _sumScroller ? _sumScroller.scrollTop : 0;
-  document.getElementById('summariesBody').innerHTML = `
+  // عرض مفتوح؟ نوري الجدول لوحده. فلتر الفترة بيفضل ظاهر عشان
+  // المستخدم يقدر يغيّر المدى وهو جوه العرض.
+  document.getElementById('summariesBody').innerHTML = invView
+    ? `${filterBar}${invViewHtml()}`
+    : `
     ${filterBar}
     ${searchHtml}
     ${cards}
@@ -4860,11 +6018,6 @@ function renderSummaries(){
     ${techCards}
   `;
   if(_sumScroller) _sumScroller.scrollTop = _sumY;
-}
-
-function toggleInvTech(name){
-  invOpenTech = (invOpenTech === name) ? null : name;
-  renderSummaries();
 }
 
 // ============================================================
@@ -5105,16 +6258,33 @@ function renderAnalytics(){
     </div>`;
 
   // ===== كبار العملاء =====
+  // ⚠️ تمريرة أولى: خريطة اسم ← تليفون.
+  // العميل ساعات بيتسجّل من غير تليفون في تذكرة وبتليفون في تانية.
+  // من غير الخريطة دي كان بينقسم لصفّين: واحد بالاسم من غير زرار
+  // واتس، وواحد بالتليفون. ودي كانت سبب إن أغلب الصفوف من غير زرار.
+  const nameToPhone = {};
+  devices.forEach(d => {
+    const nm = (d.customerName || '').trim();
+    const ph = waPhone(d.customerPhone || '');
+    if(nm && ph && !nameToPhone[nm]) nameToPhone[nm] = d.customerPhone;
+  });
+
   const byCustomer = {};
   devices.forEach(d => {
     if(!inAnRange(d.intakeDate)) return;
-    const phone = waPhone(d.customerPhone || '');
-    const key = phone || ('name:' + (d.customerName || '').trim());
+    const nm       = (d.customerName || '').trim();
+    // تليفون الجهاز نفسه، وإلا أي تليفون اتسجّل لنفس الاسم
+    const rawPhone = d.customerPhone || nameToPhone[nm] || '';
+    const phone    = waPhone(rawPhone);
+    const key      = phone || ('name:' + nm);
     if(!key || key === 'name:') return;
-    byCustomer[key] = byCustomer[key] || { name: d.customerName || '', phone: d.customerPhone || '', shop: d.shopName || '', count: 0, paid: 0 };
+    byCustomer[key] = byCustomer[key] || { name: nm, phone: rawPhone, shop: d.shopName || '', count: 0, paid: 0 };
     byCustomer[key].count++;
     if(d.paymentStatus === 'paid' && d.paymentType !== 'deferred') byCustomer[key].paid += (parseInt(d.agreedPrice) || 0);
-    if(d.customerName) byCustomer[key].name = d.customerName;
+    if(nm) byCustomer[key].name = nm;
+    // لو تليفون ظهر في تذكرة أحدث، نكمّل بيه الصف
+    if(!byCustomer[key].phone && rawPhone) byCustomer[key].phone = rawPhone;
+    if(!byCustomer[key].shop && d.shopName) byCustomer[key].shop = d.shopName;
   });
   const topCustomers = Object.values(byCustomer).sort((a,b) => b.count - a.count).slice(0, 10);
 
@@ -5268,12 +6438,8 @@ function renderTechEval(){
   const scoredDevices = new Set();
   Object.values(contrib).forEach(list => list.forEach(x => scoredDevices.add(x.d.id)));
 
-  const cards = `
-    <div class="inv-cards">
-      <div class="inv-card"><div class="inv-card-num" style="color:#7C3AED;">${totalPoints}</div><div class="inv-card-label">${t('te.totalPoints')}</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#2563EB;">${scoredDevices.size}</div><div class="inv-card-label">${t('te.scoredDevices')}</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:#16A34A;">${teRows.length}</div><div class="inv-card-label">${t('te.techsActive')}</div></div>
-    </div>`;
+  // الكروت التلاتة اتشالت — أرقامها موجودة في الجدول نفسه،
+  // والجدول بقى أول حاجة في الشاشة.
 
   // تنبيهات توضح ليه ممكن رقم يبان ناقص
   let notes = '';
@@ -5292,7 +6458,8 @@ function renderTechEval(){
         <tr><th>${t('te.colTech')}</th><th>⭐ ${t('te.colPoints')}</th><th>${t('te.colDone')}</th><th>${t('te.colAvg')}</th><th>${t('te.colReturns')}</th><th>${t('te.colRate')}</th></tr>
         ${teRows.map((r, i) => `
           <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="${t('te.tapForDetails')}">
-            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:#94A3B8;font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span></td>
+            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:#94A3B8;font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span>
+              <button onclick="event.stopPropagation(); openTechPortal('${esc(r.t).replace(/'/g,"\\'")}')" title="${t('tp.openTech')}" style="margin-inline-start:6px;border:1px solid #DDD6FE;background:#F5F3FF;color:#7C3AED;border-radius:7px;padding:3px 8px;font-size:12px;cursor:pointer;">📱</button></td>
             <td style="font-weight:900; color:#7C3AED; font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
             <td style="font-weight:800; color:#16A34A;">${r.count}</td>
             <td>${avgFmt(r.avg)}</td>
@@ -5305,7 +6472,7 @@ function renderTechEval(){
               ${r.items.length === 0
                 ? `<div style="color:#94A3B8; font-size:13px; padding:6px;">${t('te.noPoints')}</div>`
                 : r.items.slice().sort((a,b) => b.share - a.share).map(x => `
-                  <div class="te-item" onclick="event.stopPropagation(); closeTechEval(); openDetail('${x.d.id}')">
+                  <div class="te-item" onclick="event.stopPropagation(); openDetail('${x.d.id}')">
                     <div>
                       <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
                       <div style="font-size:12px; color:#94A3B8;">
@@ -5321,7 +6488,6 @@ function renderTechEval(){
 
   document.getElementById('techEvalBody').innerHTML = `
     ${filterBar}
-    ${cards}
     ${notes}
     <div class="inv-section-title">⭐ ${t('ui.techRanking')}</div>
     ${table}
@@ -5477,7 +6643,11 @@ requireAccess().then(ok => {
     I18N.applyI18n(document);
     I18N.mountLangToggle(document.querySelector('.topbar-actions'));
   }catch(e){}
-  loadUserRoles().then(loadFeatureFlags).then(loadAudit).then(applyRoleVisibility);
+  // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
+  // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
+  loadUserRoles().then(loadFeatureFlags).then(loadAudit)
+    .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
+    .then(applyRoleVisibility);
   injectAdminMenu();
   loadBroadcast();
   loadDevices();

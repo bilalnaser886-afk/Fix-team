@@ -2,15 +2,23 @@
 // الوظيفة: تخزين ملفات النظام على الجهاز عشان يفتح ويشتغل من غير نت
 //
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده في APP_SHELL تحت،
-//    وزوّد رقم الإصدار (v3 → v4). تعديل ملف موجود مش محتاج تزويد الرقم —
+//    وزوّد رقم الإصدار (v4 → v5). تعديل ملف موجود مش محتاج تزويد الرقم —
 //    ملفات الكود بتتقرا من النت الأول (شوف قسم fetch).
-const CACHE_NAME = 'ifixteam-v3';
+const CACHE_NAME = 'ifixteam-v9';
 
 const APP_SHELL = [
   './',
   'index.html',
   'dashboard.html',
   'track.html',
+  'my-devices.html',
+  'dispatch.html',
+  'dispatch-icon.png',
+  'dispatch-icon-192.png',
+  'dispatch-icon-512.png',
+  'tech-icon.png',
+  'tech-icon-192.png',
+  'tech-icon-512.png',
   'admin.html',
   'checkout.html',
   'manifest.json',

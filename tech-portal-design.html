@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>أجهزتي — تصميم مقترح</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     I Fix Team — واجهة الفني (نموذج تصميم)
+     التوقيع: تذكرة صيانة — شريط حالة ملوّن على حافة الكارت + رقم تذكرة
+     ============================================================ */
+  :root{
+    --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
+    --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
+    --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
+    --red:#E8321E; --red-dark:#C22513; --blue:#2B1DE8; --gold:#BE8A1C;
+    --waiting:#B5651D; --waiting-bg:#FBF2E9;
+    --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
+    --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
+    --done:#15803D; --done-bg:#EAF6EE;
+    --returned:#9333EA; --returned-bg:#F5EEFC;
+    --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;}
+  body{
+    font-family:'Tajawal','Segoe UI',sans-serif; color:var(--ink);
+    background:
+      radial-gradient(circle at 1px 1px, rgba(27,42,58,.05) 1px, transparent 1.4px) 0 0/22px 22px,
+      var(--paper);
+    min-height:100vh; padding-bottom:40px;
+  }
+
+  /* ===== شريط علوي ستيل + خط ألوان التروس ===== */
+  .topbar{
+    position:sticky; top:0; z-index:30; background:var(--steel); color:#fff;
+    padding:calc(12px + env(safe-area-inset-top)) 16px 13px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .topbar::after{
+    content:''; position:absolute; inset:auto 0 0 0; height:3px;
+    background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);
+  }
+  .who{display:flex; align-items:center; gap:11px; min-width:0;}
+  .who .mark{
+    width:40px; height:40px; border-radius:11px; flex:none;
+    background:linear-gradient(135deg,#22344a,#33506b);
+    display:grid; place-items:center; font-size:20px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+  }
+  .who .txt{min-width:0;}
+  .who .hi{font-size:12px; color:#9DB0C4; line-height:1.2;}
+  .who .nm{font-family:'Cairo',sans-serif; font-weight:800; font-size:16.5px; line-height:1.25;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .logout{
+    flex:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+    color:#DCE6F0; font-family:inherit; font-weight:700; font-size:13px;
+    padding:9px 13px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:6px;
+  }
+  .logout:active{background:rgba(255,255,255,.16);}
+
+  /* ===== بحث ثابت ===== */
+  .searchbar{
+    position:sticky; top:64px; z-index:20; background:var(--paper);
+    padding:12px 16px 8px;
+  }
+  .searchbar input{
+    width:100%; border:1px solid var(--line); background:#fff; border-radius:12px;
+    padding:12px 14px 12px 42px; font-family:inherit; font-size:15px; color:var(--ink);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236B7A8C' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3-3'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:left 14px center;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .searchbar input:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.14);}
+
+  .wrap{padding:6px 16px 0;}
+
+  /* ===== رأس قسم ===== */
+  .sec{margin-bottom:22px;}
+  .sec-head{display:flex; align-items:center; gap:9px; margin:4px 2px 13px;}
+  .sec-head .ic{font-size:17px;}
+  .sec-head h2{font-family:'Cairo',sans-serif; font-weight:900; font-size:15.5px; margin:0; color:var(--ink);}
+  .sec-head .n{
+    font-family:var(--mono); font-size:12px; font-weight:700; color:var(--muted);
+    background:#fff; border:1px solid var(--line); border-radius:20px; padding:2px 10px;
+  }
+  .sec-head .rule{flex:1; height:1px; background:var(--line);}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:13px;}
+
+  /* ===== تذكرة الصيانة (التوقيع) ===== */
+  .ticket{
+    position:relative; background:var(--card); border:1px solid var(--line);
+    border-inline-start:4px solid var(--sp,#CBD5E1); border-radius:13px;
+    padding:13px 15px 14px; cursor:pointer;
+    transition:transform .13s, box-shadow .13s, border-color .13s;
+    box-shadow:0 1px 2px rgba(23,34,46,.04);
+    animation:tkin .32s ease both;
+  }
+  .ticket:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(23,34,46,.10);}
+  .ticket:active{transform:translateY(0);}
+  @keyframes tkin{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+
+  .tk-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px;}
+  .tk-no{font-family:var(--mono); font-size:11.5px; letter-spacing:.5px; color:var(--faint); font-weight:600;}
+  .tk-status{
+    font-size:11.5px; font-weight:800; padding:3px 10px; border-radius:20px; white-space:nowrap;
+    background:var(--st-bg,#EEF1F3); color:var(--st,#64748B);
+  }
+  .tk-title{font-family:'Cairo',sans-serif; font-weight:800; font-size:16px; line-height:1.35; color:var(--ink);}
+  .tk-sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .tk-sub .dot{opacity:.5; margin:0 5px;}
+  .tk-issue{
+    display:flex; gap:7px; align-items:flex-start;
+    font-size:12.5px; color:#495a6b; line-height:1.55;
+    background:#F7F9FB; border:1px solid #EEF2F6; border-radius:9px; padding:8px 10px; margin-top:9px;
+  }
+  .tk-issue .w{flex:none; opacity:.7;}
+  .tk-lock{
+    display:inline-flex; align-items:center; gap:6px; margin-top:9px;
+    font-size:12px; color:#334155; background:#F1F5F9; border-radius:8px; padding:4px 9px;
+  }
+  .tk-lock b{font-family:var(--mono); font-weight:700; letter-spacing:1px;}
+  .tk-lock img{width:34px; height:34px; border-radius:6px; border:1px solid var(--line); object-fit:cover;}
+
+  .tk-actions{display:flex; gap:7px; flex-wrap:wrap; margin-top:12px;}
+  .act{
+    flex:1 1 auto; border:none; border-radius:10px; padding:10px 8px; cursor:pointer;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; white-space:nowrap;
+    display:inline-flex; align-items:center; justify-content:center; gap:5px; transition:filter .12s, transform .1s;
+  }
+  .act:active{transform:scale(.97);}
+  .act-work{background:var(--repairing-bg); color:var(--repairing);}
+  .act-done{background:var(--done-bg); color:var(--done);}
+  .act-prob{background:#FEF3C7; color:#B45309; flex:0 0 auto;}
+  .act:hover{filter:brightness(.97);}
+
+  /* بطاقة المساعدة: أهدأ + بدون أزرار */
+  .ticket.assist{background:#FBFCFD;}
+  .assist-tag{
+    display:inline-flex; align-items:center; gap:5px; margin-top:10px;
+    font-size:11.5px; font-weight:700; color:#7C3AED; background:var(--returned-bg);
+    border-radius:8px; padding:5px 9px;
+  }
+
+  /* ===== حالة فاضية / تحميل ===== */
+  .empty{
+    text-align:center; color:var(--muted); font-size:14px; padding:34px 16px;
+    background:#fff; border:1px dashed var(--line); border-radius:13px; line-height:1.9;
+  }
+  .empty .big{font-size:30px; display:block; margin-bottom:8px; opacity:.85;}
+  .load{display:flex; align-items:center; justify-content:center; gap:10px; color:var(--muted); padding:34px; font-size:14px;}
+  .spin{width:20px; height:20px; border-radius:50%; border:2.5px solid #E2E8F0; border-top-color:var(--repairing); animation:sp .8s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+
+  /* ===== توست ===== */
+  .toast{
+    position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
+    background:var(--steel); color:#fff; font-weight:700; font-size:13.5px;
+    padding:12px 18px; border-radius:12px; box-shadow:0 12px 30px rgba(23,34,46,.3);
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;
+  }
+  .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast b{color:#8BE0A8;}
+
+  /* ===== شيت تفاصيل التذكرة ===== */
+  .sheet-bg{position:fixed; inset:0; background:rgba(15,23,34,.5); opacity:0; pointer-events:none; transition:opacity .25s; z-index:60;}
+  .sheet-bg.on{opacity:1; pointer-events:auto;}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:61; background:var(--paper);
+    border-radius:20px 20px 0 0; max-height:92vh; overflow-y:auto;
+    transform:translateY(102%); transition:transform .3s cubic-bezier(.32,.72,0,1);
+    box-shadow:0 -10px 40px rgba(15,23,34,.28); padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  }
+  .sheet.on{transform:translateY(0);}
+  .sheet-head{
+    position:sticky; top:0; background:var(--steel); color:#fff; padding:16px 18px 15px;
+    border-radius:20px 20px 0 0;
+  }
+  .sheet-head::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
+    background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);}
+  .grab{width:42px; height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:0 auto 12px;}
+  .sh-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
+  .sh-no{font-family:var(--mono); font-size:12px; color:#9DB0C4; margin-top:2px;}
+  .sh-x{background:rgba(255,255,255,.1); border:none; color:#fff; width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer; flex:none;}
+  .sh-body{padding:16px 16px 8px;}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:14px; padding:15px 16px; margin-bottom:13px;}
+  .panel-h{font-family:'Cairo',sans-serif; font-weight:800; font-size:13.5px; color:var(--ink); margin:0 0 11px; display:flex; align-items:center; gap:7px;}
+  .info{display:grid; grid-template-columns:auto 1fr; gap:9px 14px; font-size:13.5px;}
+  .info .k{color:var(--muted); white-space:nowrap;}
+  .info .v{color:var(--ink); font-weight:600; text-align:start;}
+  .info .v.issue{font-weight:500; line-height:1.6;}
+
+  .note{display:flex; gap:9px; padding:9px 0; border-bottom:1px solid #F1F5F9; font-size:13px; line-height:1.6;}
+  .note:last-of-type{border-bottom:none;}
+  .note .av{flex:none; width:28px; height:28px; border-radius:8px; background:var(--repairing-bg); color:var(--repairing); display:grid; place-items:center; font-size:12px; font-weight:800;}
+  .note .meta{color:var(--faint); font-size:11px; margin-top:2px;}
+  .note-in{display:flex; gap:8px; margin-top:11px;}
+  .note-in textarea{
+    flex:1; border:1px solid var(--line); border-radius:11px; padding:10px 12px; font-family:inherit;
+    font-size:14px; resize:none; min-height:44px; color:var(--ink);
+  }
+  .note-in textarea:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.13);}
+  .note-add{flex:none; align-self:stretch; background:var(--steel); color:#fff; border:none; border-radius:11px; padding:0 16px; font-family:inherit; font-weight:800; font-size:13px; cursor:pointer;}
+
+  /* مفتاح التحويل */
+  .hand-sw{display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;}
+  .hand-sw .lbl{font-family:'Cairo',sans-serif; font-weight:800; font-size:13.5px;}
+  .hand-sw .lbl small{display:block; font-family:'Tajawal'; font-weight:500; font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .sw{width:48px; height:28px; border-radius:20px; background:#D3DBE3; position:relative; flex:none; transition:background .2s;}
+  .sw::after{content:''; position:absolute; top:3px; inset-inline-start:3px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:inset-inline-start .2s;}
+  .sw.on{background:var(--repairing);}
+  .sw.on::after{inset-inline-start:23px;}
+  .hand-body{margin-top:14px; display:none;}
+  .hand-body.on{display:block; animation:tkin .25s ease both;}
+  .hb-h{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px;}
+  select.tsel{width:100%; border:1px solid var(--line); border-radius:11px; padding:11px 12px; font-family:inherit; font-size:14.5px; background:#fff; color:var(--ink);}
+  .modes{display:flex; gap:9px; margin-top:14px;}
+  .mode{flex:1; border:1.5px solid var(--line); background:#fff; border-radius:12px; padding:13px 10px; cursor:pointer; text-align:center; transition:border-color .15s, background .15s;}
+  .mode .mi{font-size:19px;}
+  .mode .mt{font-family:'Cairo',sans-serif; font-weight:800; font-size:13px; margin-top:4px;}
+  .mode .md{font-size:10.5px; color:var(--muted); margin-top:3px; line-height:1.5;}
+  .mode.sel{border-color:var(--repairing); background:var(--repairing-bg);}
+  .hb-ok{width:100%; margin-top:14px; background:var(--red); color:#fff; border:none; border-radius:12px; padding:13px; font-family:'Cairo',sans-serif; font-weight:800; font-size:15px; cursor:pointer; box-shadow:0 6px 16px rgba(232,50,30,.28);}
+  .hb-ok:disabled{background:#CBD5E1; box-shadow:none; cursor:not-allowed;}
+
+  @media (max-width:520px){ .grid{grid-template-columns:1fr;} }
+  @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
+
+  /* شريط تنبيه أعلى القائمة (جهاز خرج) */
+  .flash{background:var(--done-bg); border:1px solid #BBE6C8; color:var(--done); font-weight:700; font-size:13px; border-radius:11px; padding:11px 14px; margin:0 0 15px; display:flex; align-items:center; gap:8px;}
+
+  /* شارة عرض تجريبي */
+  .demo{position:fixed; inset-block-end:0; inset-inline:0; background:#0E1A26; color:#93B4D0; text-align:center; font:600 11px/1.7 var(--mono); padding:5px; z-index:5;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="who">
+    <div class="mark">🔧</div>
+    <div class="txt">
+      <div class="hi">أهلاً بيك 👋</div>
+      <div class="nm" id="techName">محمد صلاح</div>
+    </div>
+  </div>
+  <button class="logout" onclick="toast('ده عرض تصميم — الخروج بيشتغل في النظام')">خروج ⏻</button>
+</div>
+
+<div class="searchbar">
+  <input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل...">
+</div>
+
+<div class="wrap" id="app"></div>
+
+<!-- شيت التفاصيل -->
+<div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+
+<div class="toast" id="toast"></div>
+<div class="demo">🎨 نموذج تصميم — أجهزتي (الفني)</div>
+
+<script>
+/* ============================================================
+   بيانات تجريبية — نفس شكل بيانات النظام
+   ============================================================ */
+const ST = {
+  waiting:   {label:'قيد الانتظار', c:'--waiting'},
+  diagnosing:{label:'جاري الكشف',  c:'--diagnosing'},
+  repairing: {label:'جاري الصيانة', c:'--repairing'},
+  done:      {label:'تم الصيانة',   c:'--done'},
+  returned:  {label:'المرتجعات',    c:'--returned'},
+};
+const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
+const ME = 'محمد صلاح';
+const OTHER_TECHS = ['أحمد فتحي','كريم منير','مصطفى العدل'];
+
+let devices = [
+  {id:'dev_1739451220781', type:'iPhone', model:'13 Pro', customer:'كريم فؤاد', phone:'01001234567', shop:'محل الأمانة', issue:'الشاشة مكسورة والتاتش مش شغال في النص', status:'repairing', tech:ME, intake:'2026-07-29T10:20:00', lockText:'1234',
+    notes:[{by:'محمد صلاح', role:'فني', at:'2026-07-29T11:05:00', text:'فتحت الجهاز، الشاشة محتاجة تغيير كامل. طلبت القطعة.'}]},
+  {id:'dev_1739447700114', type:'Samsung', model:'Galaxy A54', customer:'داليا مصطفى', phone:'01122223344', shop:'', issue:'بيسخّن وبيفصل لوحده بعد شوية', status:'diagnosing', tech:ME, intake:'2026-07-29T09:40:00', notes:[]},
+  {id:'dev_1739438890552', type:'Xiaomi', model:'Redmi Note 12', customer:'عمرو السيد', phone:'01234567890', shop:'محل النور', issue:'مش بيشحن خالص لا سلك ولا واير', status:'waiting', tech:ME, intake:'2026-07-29T08:15:00', notes:[]},
+  {id:'dev_1739430011922', type:'Oppo', model:'Reno 8', customer:'هبة كمال', phone:'01555667788', shop:'', issue:'الكاميرا الخلفية مموّشة وبتعلّق', status:'repairing', tech:ME, intake:'2026-07-28T16:30:00', lockText:'', notes:[]},
+  // مساعدة (فني أساسي أحمد)
+  {id:'dev_1739422200347', type:'iPhone', model:'11', customer:'سامح جابر', shop:'محل الصفوة', issue:'تغيير سماعة أذن + مايك', status:'diagnosing', tech:'أحمد فتحي', assist:ME, assistPct:'30', intake:'2026-07-29T12:00:00', notes:[]},
+  {id:'dev_1739410090880', type:'Realme', model:'C55', customer:'نورا حسن', shop:'', issue:'السوفت وير معلّق على اللوجو', status:'repairing', tech:'أحمد فتحي', assist:ME, assistPct:'25', intake:'2026-07-28T14:10:00', notes:[]},
+];
+
+/* ============================================================ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
+const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
+  return d.toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) + ' · ' + d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); };
+let flash = '';
+
+function statusPill(st){
+  const s = ST[st] || {label:st,c:'--muted'};
+  return `<span class="tk-status" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${s.label}</span>`;
+}
+
+function ticketHtml(d, canAct){
+  const s = ST[d.status] || {c:'--muted'};
+  const lock = d.lockText
+    ? `<div class="tk-lock">🔒 <b>${esc(d.lockText)}</b></div>` : '';
+  const actions = !canAct ? `<div class="assist-tag">🤝 إنت مساعد فيه — الفني الأساسي: ${esc(d.tech)}</div>` : `
+    <div class="tk-actions">
+      ${d.status!=='repairing' ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')">🔧 جاري العمل</button>` : ''}
+      ${d.status!=='done' ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')">✅ تم الإصلاح</button>` : ''}
+      <button class="act act-prob" onclick="event.stopPropagation();reportProblem('${d.id}')">⚠️ مشكلة</button>
+    </div>`;
+  return `<div class="ticket ${canAct?'':'assist'}" style="--sp:var(${s.c});" onclick="openSheet('${d.id}')">
+    <div class="tk-top">
+      <span class="tk-no">${ticketNo(d.id)}</span>
+      ${statusPill(d.status)}
+    </div>
+    <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
+    <div class="tk-sub">${esc(d.customer)}${d.shop?`<span class="dot">•</span>${esc(d.shop)}`:''}</div>
+    ${d.issue?`<div class="tk-issue"><span class="w">🛠️</span><span>${esc(d.issue)}</span></div>`:''}
+    ${lock}
+    ${actions}
+  </div>`;
+}
+
+function render(){
+  const q = ($('q').value||'').trim();
+  const match = d => !q || [d.type,d.model,d.customer,d.shop,d.issue,ticketNo(d.id)].some(v => v && String(v).includes(q));
+  const mine   = devices.filter(d => d.tech===ME   && ACTIVE.includes(d.status) && match(d));
+  const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
+
+  const cards = (list,canAct) => list.length
+    ? `<div class="grid">${list.map(d=>ticketHtml(d,canAct)).join('')}</div>`
+    : `<div class="empty"><span class="big">${q?'🔍':'✨'}</span>${q?'مفيش نتيجة للبحث ده':(canAct?'مفيش أجهزة في شغلك دلوقتي':'مش بتشارك في صيانة أي جهاز حالياً')}</div>`;
+
+  $('app').innerHTML = `
+    ${flash?`<div class="flash">✅ ${esc(flash)}</div>`:''}
+    <div class="sec">
+      <div class="sec-head"><span class="ic">🔧</span><h2>شغلي دلوقتي</h2><span class="n">${mine.length}</span><span class="rule"></span></div>
+      ${cards(mine,true)}
+    </div>
+    <div class="sec">
+      <div class="sec-head"><span class="ic">🤝</span><h2>بشارك في صيانتها</h2><span class="n">${assist.length}</span><span class="rule"></span></div>
+      ${cards(assist,false)}
+    </div>`;
+}
+
+/* ===== أكشنز ===== */
+function setStatus(id, st){
+  const d = devices.find(x=>x.id===id); if(!d || d.status===st) return;
+  d.status = st;
+  if(!ACTIVE.includes(st)){
+    if(sheetId===id) closeSheet();
+    flash = `${d.type} ${d.model} اتنقل لـ «تم الصيانة» وخرج من قائمتك`;
+    render();
+    setTimeout(()=>{ flash=''; render(); }, 4500);
+  } else { render(); if(sheetId===id) renderSheet(); }
+  toast(st==='repairing'?'بدأت الشغل على الجهاز 🔧':'تمام ✅');
+}
+function reportProblem(id){
+  const d = devices.find(x=>x.id===id); if(!d) return;
+  const txt = (prompt('اكتب المشكلة اللي واجهتك:')||'').trim(); if(!txt) return;
+  d.notes = d.notes||[]; d.notes.push({by:ME,role:'فني',at:new Date().toISOString(),text:'⚠️ فيه مشكلة: '+txt});
+  if(sheetId===id) renderSheet();
+  toast('اتسجّلت المشكلة، الإدارة هتشوفها ⚠️');
+}
+
+/* ===== شيت التفاصيل ===== */
+let sheetId='', handOn=false, handMode='', handTarget='';
+function openSheet(id){ sheetId=id; handOn=false; handMode=''; handTarget=''; renderSheet(); $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); }
+function closeSheet(){ sheetId=''; $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
+
+function renderSheet(){
+  const d = devices.find(x=>x.id===sheetId); if(!d) return;
+  const s = ST[d.status]||{c:'--muted'};
+  const notes = (d.notes||[]).slice().reverse();
+  const techs = [...OTHER_TECHS].filter(n=>n!==d.tech);
+  $('sheet').innerHTML = `
+    <div class="sheet-head" style="border-inline-start:5px solid var(${s.c});">
+      <div class="grab"></div>
+      <div class="sh-row">
+        <div>
+          <div class="sh-title">${esc(d.type)} ${esc(d.model)}</div>
+          <div class="sh-no">${ticketNo(d.id)} · ${statusPillPlain(d.status)}</div>
+        </div>
+        <button class="sh-x" onclick="closeSheet()">×</button>
+      </div>
+    </div>
+    <div class="sh-body">
+      <div class="panel">
+        <div class="panel-h">📋 بيانات الجهاز</div>
+        <div class="info">
+          <span class="k">العميل</span><span class="v">${esc(d.customer)||'—'}</span>
+          <span class="k">التليفون</span><span class="v" style="font-family:var(--mono);direction:ltr;text-align:start;">${esc(d.phone)||'—'}</span>
+          <span class="k">المحل</span><span class="v">${esc(d.shop)||'—'}</span>
+          <span class="k">تاريخ الاستلام</span><span class="v">${fmtDate(d.intake)}</span>
+          ${d.lockText?`<span class="k">رمز القفل</span><span class="v" style="font-family:var(--mono);letter-spacing:2px;">${esc(d.lockText)}</span>`:''}
+          <span class="k">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">📝 ملاحظات الفني</div>
+        ${notes.length ? notes.map(n=>`
+          <div class="note">
+            <div class="av">${esc((n.by||'؟').slice(0,1))}</div>
+            <div><div>${esc(n.text)}</div><div class="meta">${esc(n.by)} · ${fmtDate(n.at)}</div></div>
+          </div>`).join('') : `<div style="color:var(--faint);font-size:13px;">لسه مفيش ملاحظات — اكتب أول واحدة.</div>`}
+        <div class="note-in">
+          <textarea id="noteTxt" placeholder="اكتب ملاحظة عن حالة الجهاز أو الكشف..."></textarea>
+          <button class="note-add" onclick="addNote()">ضيف</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hand-sw" onclick="toggleHand()">
+          <div class="lbl">🔄 تحويل / مشاركة الجهاز<small>سلّم الجهاز لفني تاني أو خليه يساعدك فيه</small></div>
+          <div class="sw ${handOn?'on':''}" id="hsw"></div>
+        </div>
+        <div class="hand-body ${handOn?'on':''}" id="hbody">
+          <div class="hb-h">اختار الفني</div>
+          <select class="tsel" onchange="handTarget=this.value;syncOk()">
+            <option value="">— اختار فني —</option>
+            ${techs.map(n=>`<option value="${esc(n)}" ${n===handTarget?'selected':''}>${esc(n)}</option>`).join('')}
+          </select>
+          <div class="hb-h" style="margin-top:15px;">نوع التحويل</div>
+          <div class="modes">
+            <div class="mode ${handMode==='assist'?'sel':''}" onclick="handMode='assist';renderSheetKeepNote()">
+              <div class="mi">🤝</div><div class="mt">فني مساعد</div><div class="md">إنت تفضل المسؤول الأساسي</div>
+            </div>
+            <div class="mode ${handMode==='full'?'sel':''}" onclick="handMode='full';renderSheetKeepNote()">
+              <div class="mi">🔄</div><div class="mt">تسليم كامل</div><div class="md">المسؤولية تتنقل بالكامل</div>
+            </div>
+          </div>
+          <button class="hb-ok" id="hok" ${(handMode&&handTarget)?'':'disabled'} onclick="doHandoff()">تأكيد التحويل</button>
+        </div>
+      </div>
+    </div>`;
+}
+function statusPillPlain(st){ const s=ST[st]||{label:st}; return s.label; }
+function toggleHand(){ handOn=!handOn; $('hsw').classList.toggle('on',handOn); $('hbody').classList.toggle('on',handOn); }
+function syncOk(){ const ok=$('hok'); if(ok) ok.disabled = !(handMode&&handTarget); }
+// إعادة رسم مع الحفاظ على مسودة الملاحظة
+function renderSheetKeepNote(){ const t=$('noteTxt')?$('noteTxt').value:''; renderSheet(); if($('noteTxt')) $('noteTxt').value=t; syncOk(); }
+function addNote(){
+  const d=devices.find(x=>x.id===sheetId); if(!d) return;
+  const t=($('noteTxt').value||'').trim(); if(!t) return;
+  d.notes=d.notes||[]; d.notes.push({by:ME,role:'فني',at:new Date().toISOString(),text:t});
+  renderSheet(); toast('اتسجّلت الملاحظة 📝');
+}
+function doHandoff(){
+  const d=devices.find(x=>x.id===sheetId); if(!d||!handMode||!handTarget) return;
+  if(handMode==='assist'){ d.assist=handTarget; toast(`${handTarget} بقى فني مساعد على الجهاز 🤝`); render(); renderSheetKeepNote(); }
+  else { d.tech=handTarget; toast(`الجهاز اتسلّم بالكامل لـ ${handTarget} 🔄`); closeSheet(); render(); }
+}
+
+/* ===== توست ===== */
+let toastT;
+function toast(msg){ const el=$('toast'); el.innerHTML=msg; el.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('on'),2600); }
+
+render();
+</script>
+</body>
+</html>

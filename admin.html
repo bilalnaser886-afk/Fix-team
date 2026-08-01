@@ -199,6 +199,12 @@ function render(){
       <p class="hint">${t('adm.bcHint')}</p>
       <input id="bcTitle" placeholder="${t('adm.bcTitlePh')}" />
       <textarea id="bcBody" rows="2" placeholder="${t('adm.bcBodyPh')}"></textarea>
+      <select id="bcAudience">
+        <option value="all">📢 للكل</option>
+        <option value="accountant">💼 المحاسبين بس</option>
+        <option value="technician">🔧 الفنيين بس</option>
+        <option value="dispatcher">🚦 مسؤولي الحركة بس</option>
+      </select>
       <select id="bcType">
         <option value="info">📢 ${t('adm.bcInfo')}</option>
         <option value="warning">⚠️ ${t('adm.bcWarn')}</option>
@@ -338,17 +344,31 @@ async function removeRole(em){
   try{ delete userRoles[(em||'').toLowerCase()]; await saveRoles(); await addAudit('شال صلاحية: '+em); render(); toast('تم الحذف'); }
   catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
+// أسماء الجمهور — للتأكيد وسجل العمليات
+const BC_AUDIENCE = {
+  all:        'كل المستخدمين',
+  accountant: 'المحاسبين بس',
+  technician: 'الفنيين بس',
+  dispatcher: 'مسؤولي الحركة بس'
+};
+
 async function sendBroadcast(){
-  const title = (document.getElementById('bcTitle').value||'').trim();
-  const body  = (document.getElementById('bcBody').value||'').trim();
-  const type  = document.getElementById('bcType').value || 'info';
+  const title    = (document.getElementById('bcTitle').value||'').trim();
+  const body     = (document.getElementById('bcBody').value||'').trim();
+  const type     = document.getElementById('bcType').value || 'info';
+  const audience = document.getElementById('bcAudience').value || 'all';
   if(!title && !body){ toast('اكتب عنوان أو نص الإشعار', false); return; }
-  if(!confirm('تبعت الإشعار ده لكل المستخدمين دلوقتي؟')) return;
+
+  const who = BC_AUDIENCE[audience] || 'كل المستخدمين';
+  if(!confirm(`تبعت الإشعار ده لـ ${who} دلوقتي؟`)) return;
+
   try{
-    await storage.set(BROADCAST_KEY, JSON.stringify({ id:Date.now(), title, body, type }));
-    await addAudit('بعت إشعار: ' + (title||body).slice(0,60));
+    // audience: 'all' أو دور واحد. الصفحات بتقارنه بدور المستخدم
+    // وبتتجاهل الإشعار لو مش ليه.
+    await storage.set(BROADCAST_KEY, JSON.stringify({ id:Date.now(), title, body, type, audience }));
+    await addAudit(`بعت إشعار (${who}): ` + (title||body).slice(0,60));
     document.getElementById('bcTitle').value=''; document.getElementById('bcBody').value='';
-    toast('اتبعت للكل ✅');
+    toast(`اتبعت لـ ${who} ✅`);
   }catch(e){ toast('فشل الإرسال: ' + (e.message||e), false); }
 }
 async function doLogout(){
