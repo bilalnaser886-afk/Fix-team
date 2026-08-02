@@ -2,6 +2,22 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>
+/* المظهر قبل أي رسم. صفحة الدخول عامة — لو مفيش تفضيل محفوظ
+   بنتبع إعداد جهاز المستخدم بدل ما نفرض حاجة. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme'), d;
+    if(m === 'dark') d = true;
+    else if(m === 'light') d = false;
+    else if(m === 'auto'){ var h = new Date().getHours(); d = (h >= 19 || h < 7); }
+    else d = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    var mt = document.querySelector('meta[name="theme-color"]');
+    if(mt) mt.setAttribute('content', d ? '#131E29' : '#F2F2F1');
+  }catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -25,6 +41,26 @@
     --gold:#BE8A1C;       /* ذهبي الترس */
     --ink:#101014;        /* أسود الموبايل */
     --paper:#F2F2F1;      /* رمادي الخلفية */
+    --card:rgba(255,255,255,.72); --card-bd:rgba(255,255,255,.9);
+    --sub:#6B7280; --field:#fff; --field-bd:#E3E4E8;
+    /* صندوق تجديد الاشتراك — بيظهر لما الاشتراك يخلص */
+    --renew-bg:#FFF8EC; --renew-bd:#EACB84; --renew-ink:#9A6A0C;
+    --wallet-bg:#FFFFFF; --wallet-bd:#BE8A1C;
+    --btn-off:#D2D4DA; --btn-off-ink:#6B7280;
+    --on-red:#FFFFFF;
+  }
+
+  /* ===== الوضع الداكن ===== */
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --red:#F0554A; --red-dark:#D13B2E; --blue:#8B9BFF; --gold:#E3B85C;
+    --ink:#E9EFF5; --paper:#131E29;
+    --card:rgba(27,42,58,.88); --card-bd:rgba(255,255,255,.10);
+    --sub:#92A6B8; --field:#22323F; --field-bd:#2F4356;
+    --renew-bg:rgba(234,203,132,.13); --renew-bd:rgba(234,203,132,.38); --renew-ink:#F0CE84;
+    --wallet-bg:rgba(255,255,255,.06); --wallet-bd:#C9A24E;
+    --btn-off:#2F4356; --btn-off-ink:#92A6B8;
+    --on-red:#FFFFFF;
   }
   *{box-sizing:border-box;}
   body{
@@ -47,9 +83,9 @@
   }
   .card{
     position:relative; width:100%;
-    background:rgba(255,255,255,.72);
+    background:var(--card);
     backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
-    border:1px solid rgba(255,255,255,.9);
+    border:1px solid var(--card-bd);
     border-radius:18px; padding:88px 26px 26px;   /* مساحة فوق عشان اللوجو الداخل جواها */
     box-shadow:0 18px 50px rgba(16,16,20,.14);
   }
@@ -64,16 +100,16 @@
     font-family:'Cairo',sans-serif; font-weight:900; font-size:22px;
     margin:0 0 2px; text-align:center; color:var(--ink); letter-spacing:.3px;
   }
-  .sub{text-align:center; font-size:13px; color:#6B7280; margin:0 0 18px;}
+  .sub{text-align:center; font-size:13px; color:var(--sub); margin:0 0 18px;}
 
   #loginError{color:var(--red-dark); font-size:13.5px; min-height:20px; text-align:center; font-weight:500;}
 
   .field{display:block; margin-bottom:12px;}
-  .field span{display:block; font-size:13px; color:#4B5563; margin-bottom:6px; font-weight:500;}
+  .field span{display:block; font-size:13px; color:var(--sub); margin-bottom:6px; font-weight:500;}
   input{
     font-size:16px;
-    width:100%; border:1.5px solid #E3E4E8; border-radius:11px; padding:12px 14px;
-    font-size:15px; font-family:inherit; color:var(--ink); background:#fff;
+    width:100%; border:1.5px solid var(--field-bd); border-radius:11px; padding:12px 14px;
+    font-size:15px; font-family:inherit; color:var(--ink); background:var(--field);
     transition:border-color .15s, box-shadow .15s;
   }
   input:focus{outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(43,29,232,.14);}
@@ -87,17 +123,17 @@
   }
   button.login:hover{background:var(--red-dark);}
   button.login:active{transform:translateY(1px);}
-  button.login:disabled{background:#D2D4DA; box-shadow:none; cursor:wait;}
+  button.login:disabled{background:var(--btn-off); color:var(--btn-off-ink); box-shadow:none; cursor:wait;}
   button.login:focus-visible{outline:3px solid rgba(43,29,232,.4); outline-offset:2px;}
 
   .renew-box{
-    display:none; background:#FFF8EC; border:1px solid #EACb84; border-radius:12px;
+    display:none; background:var(--renew-bg); border:1px solid var(--renew-bd); border-radius:12px;
     padding:14px; font-size:13.5px; line-height:1.9; margin-top:14px;
     direction:ltr; text-align:left;
   }
-  .renew-box b{color:#9A6A0C;}
+  .renew-box b{color:var(--renew-ink);}
   .wallet{
-    direction:ltr; display:inline-block; background:#fff; border:1.5px dashed #BE8A1C;
+    direction:ltr; display:inline-block; background:var(--wallet-bg); border:1.5px dashed var(--wallet-bd);
     border-radius:6px; padding:3px 10px; font-weight:bold; font-family:monospace;
   }
 
