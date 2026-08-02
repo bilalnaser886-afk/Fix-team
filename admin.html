@@ -424,7 +424,7 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher','technician'] }
+    forRoles:['dispatcher'] }   // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 

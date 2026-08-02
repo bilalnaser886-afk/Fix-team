@@ -161,6 +161,43 @@
   .set-o .i{font-size:18px; line-height:1;}
   .set-o.on{border-color:var(--repairing); background:var(--repairing-bg); color:var(--repairing);}
   .set-note{font-size:11.5px; color:var(--muted); line-height:1.7; margin:9px 0 0;}
+
+  /* ============================================================
+     الكلاسات اللي بيتوقعها ai-invoice.js من الصفحة المضيفة
+     ------------------------------------------------------------
+     الموديول بيحقن ستايله الخاص، بس بيسيب الأساسيات دي للصفحة —
+     في الداشبورد موجودة، وهنا مكنتش. من غيرها الشاشة بتفتح
+     (الكلاس hidden بيتشال) بس بتفضل position:static فالـ z-index
+     بتتهمل تماماً وبتتحط جوه المحتوى بدل ما تغطيه.
+
+     منقولة من dashboard.html بالحرف عشان الشكل يبقى واحد.
+     أسماء المتغيّرات معمولة تحت لأن الديسباتشر بيسمّيها بأسماء تانية.
+     ============================================================ */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
+    align-items:center; justify-content:center; z-index:30; padding:16px;
+  }
+  .overlay.hidden{display:none;}
+  .summaries-page{background:var(--paper); min-height:100vh; width:100%;}
+  .modal-head{position:sticky; top:0; z-index:101; background:var(--card); padding:6px 0 6px; margin-bottom:8px;}
+  .modal-search{position:sticky; top:var(--head-h, 0px); z-index:100; background:var(--card); padding:8px 0 10px; margin-bottom:2px;}
+  .close-btn{
+    background:none; border:none; font-size:22px; color:var(--faint); cursor:pointer; line-height:1;
+    min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  }
+  .inv-section-title{font-family:'Cairo',sans-serif; font-size:17px; font-weight:800; margin:22px 0 10px; color:var(--ink);}
+  .empty-col{font-size:11px; color:var(--faint); text-align:center; padding:24px 0;}
+
+  /* الموديول بيقرا متغيّرات الداشبورد — بنعملها هنا أسماء مرادفة
+     عشان يشتغل بألوان الديسباتشر بدل ما يطلع بلون ناقص */
+  :root{
+    --surface:var(--card); --surface-2:var(--paper); --surface-3:var(--paper);
+    --bg:var(--paper); --border:var(--line); --border-strong:var(--line);
+    --muted-2:var(--faint); --ink-2:var(--muted); --accent:var(--repairing);
+    --on-accent:var(--on-color); --danger:var(--red); --success:var(--done);
+    --warn:var(--waiting); --info:var(--repairing);
+  }
   /* ===== قايمة ⋮ في الهيدر ===== */
   .kebab-wrap{position:relative; flex:none;}
   .kebab-btn{
