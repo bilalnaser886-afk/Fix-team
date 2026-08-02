@@ -325,6 +325,9 @@
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="closeKebab(); refresh()" data-i18n="dp.refresh">🔄 تحديث</button>
       <div class="sep"></div>
+      <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
+      <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
+      <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
       <button class="danger" onclick="kebabLogout()" data-i18n="rp.logout">تسجيل الخروج ⏻</button>
@@ -747,6 +750,25 @@ async function boot(){
 
   if(role !== 'dispatcher'){ location.replace('dashboard.html'); return; }
 
+  // ============================================================
+  // صلاحية الفواتير والمخزن
+  // ------------------------------------------------------------
+  // بنسأل السيرفر (has_cap) مش خريطة الأدوار المحلية — عشان مصدر
+  // القرار يبقى واحد. لو الأدمن قفلها، الرد بيتغيّر فوراً.
+  //
+  // ودي إخفاء للواجهة بس. القفل الحقيقي في سياسات RLS وفي الـ
+  // Edge Function — يعني حتى لو حد لعب في الكود من المتصفح، مش هيعدّي.
+  // ============================================================
+  try{
+    const { data } = await sb.rpc('has_cap', { p_cap: 'purchases' });
+    CAN_PURCHASES = (data === true);
+  }catch(e){ CAN_PURCHASES = false; }   // مشكلة في الشبكة؟ الافتراضي مقفول
+
+  if(CAN_PURCHASES){
+    loadPurchasesModule();
+    document.querySelectorAll('.cap-purchases').forEach(el => el.style.display = '');
+  }
+
   // الاسم: من ملف الحساب، وإلا الجزء الأول من الإيميل
   ME = MY_EMAIL.split('@')[0];
   try{
@@ -923,6 +945,30 @@ function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classLis
 // ولا أخطاء إملائية في الأسماء.
 // ============================================================
 let userRoles = {};
+let CAN_PURCHASES = false;
+
+// الموديول بيتحمّل عند الحاجة بس — مايتنزّلش على جهاز ديسباتشر
+// مقفولة عليه الميزة أصلاً
+function loadPurchasesModule(){
+  // اتكتب للداشبورد وبيقرا منها devices و selectedId مباشرة.
+  // عندنا الأجهزة بشكل تاني (adapt بتحوّلها)، فبنوصّله بالسجل الخام.
+  window.PURCHASES_CONFIG = {
+    devicesFn:      () => devices.map(d => d._raw).filter(Boolean),
+    openDeviceIdFn: () => sheetId || null,
+    meNameFn:       () => ME,
+    flagFn:         () => CAN_PURCHASES === true
+  };
+  const sc = document.createElement('script');
+  sc.src = 'ai-invoice.js';
+  sc.onerror = () => console.error('فشل تحميل ai-invoice.js');
+  document.body.appendChild(sc);
+}
+function openCap(api){
+  closeKebab();
+  const m = window[api];
+  if(m && typeof m.open === 'function') m.open();
+  else toast(t('dp.capLoading'));
+}
 let pendingTechs = [];
 
 async function loadTechNames(){
