@@ -60,6 +60,20 @@
   .mini{ background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px;
     font-weight:700; color:var(--ink-2); min-height:40px; }
   .mini.on{ background:var(--success-bg); color:var(--success); border-color:var(--success-border); }
+  /* صف الصلاحية — مزاح لجوه شوية عشان يبان تابع للمستخدم فوقه */
+  .cap-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin:0 0 8px; padding:9px 11px; margin-inline-start:14px;
+    background:var(--paper); border:1px solid var(--line); border-radius:10px;
+  }
+  .cap-name{font-size:12.5px; font-weight:700; color:var(--ink);}
+  .cap-hint{font-size:11px; color:var(--muted); line-height:1.6; margin-top:2px;}
+  .cap-btn{
+    flex:none; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    padding:7px 12px; border-radius:8px; white-space:nowrap;
+    background:var(--card); border:1.5px solid var(--line); color:var(--muted);
+  }
+  .cap-btn.on{background:var(--success-bg); border-color:var(--success-border); color:var(--success);}
   .row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
     padding:9px 0; border-bottom:1px solid var(--paper); }
   .badge{ display:inline-block; border-radius:8px; padding:4px 10px; font-size:12.5px; font-weight:800; }
@@ -173,7 +187,8 @@ let pendingTechs = [];
 async function loadPendingTechs(){
   try{
     const r = await storage.get(PENDING_TECHS_KEY);
-    pendingTechs = (r && r.value) ? (JSON.parse(r.value) || []) : [];
+    const _p = (r && r.value) ? JSON.parse(r.value) : null;
+    pendingTechs = Array.isArray(_p) ? _p : [];   // لو الداتا اتخزّنت بشكل غلط منقعش
   }catch(e){ pendingTechs = []; }
 }
 async function savePendingTechs(){ await storage.set(PENDING_TECHS_KEY, JSON.stringify(pendingTechs)); }
@@ -293,7 +308,18 @@ function render(){
               return `<div class="row">
               <span style="font-family:monospace;font-size:12px;">${esc(em)} — ${esc(roleLabel(en.role))}${en.techName ? ' (' + esc(en.techName) + ')' : ''}</span>
               <button class="mini" style="color:var(--danger);" onclick="removeRole('${esc(em)}')">${t('adm.delete')}</button>
-            </div>`;}).join('')
+            </div>
+            ${CAPS.filter(c => c.forRoles.includes(en.role)).map(c => `
+              <div class="cap-row">
+                <div>
+                  <div class="cap-name">${c.icon} ${esc(c.label)}</div>
+                  <div class="cap-hint">${esc(c.hint)}</div>
+                </div>
+                <button class="cap-btn ${hasCap(en,c.key)?'on':''}"
+                        onclick="toggleCap('${esc(em).replace(/'/g,"\\'")}','${c.key}')">
+                  ${hasCap(en,c.key) ? '● مفتوحة' : '○ مقفولة'}
+                </button>
+              </div>`).join('')}`;}).join('')
           : `<div style="color:var(--faint);margin-top:6px;">${t('adm.noRoles')}</div>`}
       </div>
       <button class="mini" onclick="addRole()">➕ ${t('adm.addRole')}</button>
@@ -377,9 +403,42 @@ function roleLabel(r){ const k = ROLE_LABEL_KEYS[r]; try{ return k ? t(k) : r; }
 
 // بيقرا الشكلين: النص القديم "super_admin" والكائن الجديد {role, techName}
 function normRole(v){
-  if(typeof v === 'string') return { role: v, techName: '' };
-  if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '' };
-  return { role: 'accountant', techName: '' };
+  if(typeof v === 'string') return { role: v, techName: '', caps: [] };
+  if(v && typeof v === 'object') return {
+    role: v.role || 'accountant',
+    techName: v.techName || '',
+    caps: Array.isArray(v.caps) ? v.caps : []      // الصلاحيات الإضافية
+  };
+  return { role: 'accountant', techName: '', caps: [] };
+}
+
+// ============================================================
+// الصلاحيات الإضافية
+// ------------------------------------------------------------
+// الأدمن والمحاسب عندهم كل حاجة ضمنياً (نفس منطق has_cap في
+// قاعدة البيانات). الصلاحيات دي بتتمنح للأدوار التانية بس.
+//
+// مهم: نفس الاسم بالظبط اللي السيرفر بيدوّر عليه — لو اتغيّر
+// هنا لازم يتغيّر في 01-capabilities.sql وفي الـ Edge Function.
+// ============================================================
+const CAPS = [
+  { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
+    hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
+    forRoles:['dispatcher'] }   // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+];
+function hasCap(en, cap){ return (en.caps || []).includes(cap); }
+
+async function toggleCap(em, cap){
+  const en = normRole(userRoles[em]);
+  const on = hasCap(en, cap);
+  const caps = on ? en.caps.filter(c => c !== cap) : en.caps.concat([cap]);
+  try{
+    userRoles[em] = { role: en.role, techName: en.techName, caps };
+    await saveRoles();
+    await addAudit((on ? 'قفل' : 'فتح') + ' صلاحية ' + cap + ' لـ ' + em);
+    render();
+    toast(on ? 'اتقفلت 🔒' : 'اتفتحت ✅');
+  }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
 
 async function addRole(){
@@ -403,7 +462,12 @@ async function addRole(){
   }
 
   try{
-    userRoles[e] = techName ? { role, techName } : { role };
+    // بنحافظ على الصلاحيات الموجودة — تعديل الدور مش المفروض يمسحها
+    const prevCaps = normRole(userRoles[e]).caps;
+    userRoles[e] = Object.assign(
+      techName ? { role, techName } : { role },
+      prevCaps.length ? { caps: prevCaps } : {}
+    );
     await saveRoles();
     await addAudit('ظبط صلاحية ' + roleLabel(role) + ' لـ: ' + e + (techName ? ' (' + techName + ')' : ''));
     render(); toast('تمت الإضافة ✅');
@@ -419,7 +483,9 @@ async function grantTechAccount(name){
   if(userRoles[e] && !confirm('الإيميل ده عليه صلاحية بالفعل. تستبدلها؟')) return;
 
   try{
-    userRoles[e] = { role:'technician', techName:name };
+    const prevCaps = normRole(userRoles[e]).caps;   // نفس السبب: مانمسحش صلاحيات موجودة
+    userRoles[e] = Object.assign({ role:'technician', techName:name },
+                                 prevCaps.length ? { caps: prevCaps } : {});
     await saveRoles();
     // اتعمله حساب → يخرج من قايمة المعلّقين
     pendingTechs = pendingTechs.filter(x => (x.name||'').trim() !== name.trim());

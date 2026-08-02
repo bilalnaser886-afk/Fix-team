@@ -161,6 +161,43 @@
   .set-o .i{font-size:18px; line-height:1;}
   .set-o.on{border-color:var(--repairing); background:var(--repairing-bg); color:var(--repairing);}
   .set-note{font-size:11.5px; color:var(--muted); line-height:1.7; margin:9px 0 0;}
+
+  /* ============================================================
+     الكلاسات اللي بيتوقعها ai-invoice.js من الصفحة المضيفة
+     ------------------------------------------------------------
+     الموديول بيحقن ستايله الخاص، بس بيسيب الأساسيات دي للصفحة —
+     في الداشبورد موجودة، وهنا مكنتش. من غيرها الشاشة بتفتح
+     (الكلاس hidden بيتشال) بس بتفضل position:static فالـ z-index
+     بتتهمل تماماً وبتتحط جوه المحتوى بدل ما تغطيه.
+
+     منقولة من dashboard.html بالحرف عشان الشكل يبقى واحد.
+     أسماء المتغيّرات معمولة تحت لأن الديسباتشر بيسمّيها بأسماء تانية.
+     ============================================================ */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
+    align-items:center; justify-content:center; z-index:30; padding:16px;
+  }
+  .overlay.hidden{display:none;}
+  .summaries-page{background:var(--paper); min-height:100vh; width:100%;}
+  .modal-head{position:sticky; top:0; z-index:101; background:var(--card); padding:6px 0 6px; margin-bottom:8px;}
+  .modal-search{position:sticky; top:var(--head-h, 0px); z-index:100; background:var(--card); padding:8px 0 10px; margin-bottom:2px;}
+  .close-btn{
+    background:none; border:none; font-size:22px; color:var(--faint); cursor:pointer; line-height:1;
+    min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  }
+  .inv-section-title{font-family:'Cairo',sans-serif; font-size:17px; font-weight:800; margin:22px 0 10px; color:var(--ink);}
+  .empty-col{font-size:11px; color:var(--faint); text-align:center; padding:24px 0;}
+
+  /* الموديول بيقرا متغيّرات الداشبورد — بنعملها هنا أسماء مرادفة
+     عشان يشتغل بألوان الديسباتشر بدل ما يطلع بلون ناقص */
+  :root{
+    --surface:var(--card); --surface-2:var(--paper); --surface-3:var(--paper);
+    --bg:var(--paper); --border:var(--line); --border-strong:var(--line);
+    --muted-2:var(--faint); --ink-2:var(--muted); --accent:var(--repairing);
+    --on-accent:var(--on-color); --danger:var(--red); --success:var(--done);
+    --warn:var(--waiting); --info:var(--repairing);
+  }
   /* ===== قايمة ⋮ في الهيدر ===== */
   .kebab-wrap{position:relative; flex:none;}
   .kebab-btn{
@@ -281,6 +318,17 @@
   .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
   .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--on-color); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
   .sh-body{padding:16px;}
+  /* قايمة الفني — نفس شكل باقي الحقول عشان النموذج ما يبانش متفكك */
+  .tech-select{
+    width:100%; font-family:inherit; font-size:15px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:11px;
+    padding:11px 12px; appearance:none; -webkit-appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+    background-position:calc(0% + 14px) calc(50% + 2px), calc(0% + 19px) calc(50% + 2px);
+    background-size:5px 5px,5px 5px; background-repeat:no-repeat;
+  }
+  .tech-select:focus{outline:none; border-color:var(--repairing);}
+  .fld-hint{font-size:12px; color:var(--muted); line-height:1.7; margin-top:6px;}
   .fld{margin-bottom:13px;}
   .fld label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;}
   .fld input, .fld textarea{width:100%; border:1px solid var(--line); border-radius:11px; padding:12px 13px;
@@ -314,6 +362,9 @@
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="closeKebab(); refresh()" data-i18n="dp.refresh">🔄 تحديث</button>
       <div class="sep"></div>
+      <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
+      <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
+      <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
       <button class="danger" onclick="kebabLogout()" data-i18n="rp.logout">تسجيل الخروج ⏻</button>
@@ -346,6 +397,9 @@
       <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" inputmode="numeric" placeholder="010..." style="direction:ltr;text-align:right;"></div>
       <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
     </div>
+    <div class="fld"><label data-i18n="rp.tech">الفني</label>
+      <select id="f_tech" class="tech-select"></select>
+      <div id="f_techHint" class="fld-hint" style="display:none;"></div></div>
     <div class="fld"><label data-i18n="dp.issueLabel">العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." data-i18n-ph="dp.issuePh"></textarea></div>
     <button id="btnSave" class="save" onclick="saveIntake()" data-i18n="dp.submit">سجّل الجهاز في المحل</button>
   </div>
@@ -725,12 +779,32 @@ async function boot(){
   try{
     const { data:row } = await sb.from('app_data').select('value').eq('key','user-roles').maybeSingle();
     const roles = (row && row.value) ? JSON.parse(row.value) : {};
+    userRoles = roles;                       // محتاجينها لقايمة الفنيين
     const ent = roles[MY_EMAIL];
     if(typeof ent === 'string') role = ent;
     else if(ent && typeof ent === 'object') role = ent.role || 'accountant';
   }catch(e){}
 
   if(role !== 'dispatcher'){ location.replace('dashboard.html'); return; }
+
+  // ============================================================
+  // صلاحية الفواتير والمخزن
+  // ------------------------------------------------------------
+  // بنسأل السيرفر (has_cap) مش خريطة الأدوار المحلية — عشان مصدر
+  // القرار يبقى واحد. لو الأدمن قفلها، الرد بيتغيّر فوراً.
+  //
+  // ودي إخفاء للواجهة بس. القفل الحقيقي في سياسات RLS وفي الـ
+  // Edge Function — يعني حتى لو حد لعب في الكود من المتصفح، مش هيعدّي.
+  // ============================================================
+  try{
+    const { data } = await sb.rpc('has_cap', { p_cap: 'purchases' });
+    CAN_PURCHASES = (data === true);
+  }catch(e){ CAN_PURCHASES = false; }   // مشكلة في الشبكة؟ الافتراضي مقفول
+
+  if(CAN_PURCHASES){
+    loadPurchasesModule();
+    document.querySelectorAll('.cap-purchases').forEach(el => el.style.display = '');
+  }
 
   // الاسم: من ملف الحساب، وإلا الجزء الأول من الإيميل
   ME = MY_EMAIL.split('@')[0];
@@ -748,6 +822,7 @@ async function boot(){
     localStorage.setItem('ifix-last-email', MY_EMAIL);
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
+  loadTechNames();          // مش await — القايمة تتعبّى في الخلفية
   await loadDevices();
   finish();
 }
@@ -898,6 +973,80 @@ function render(){
 /* ===== إدخال جهاز ===== */
 function openIntake(){ $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); setTimeout(()=>$('f_type').focus(),300); }
 function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
+// ============================================================
+// أسماء الفنيين — نفس مصدر الداشبورد بالظبط
+// ------------------------------------------------------------
+//   ١) فنيين ليهم حسابات (user-roles، role=technician)
+//   ٢) فنيين معلّقين (pending-technicians) لسه مستنيين إيميل
+// الحقل اختيار مقفول — مفيش كتابة حرة عشان مايحصلش تكرار
+// ولا أخطاء إملائية في الأسماء.
+// ============================================================
+let userRoles = {};
+let CAN_PURCHASES = false;
+
+// الموديول بيتحمّل عند الحاجة بس — مايتنزّلش على جهاز ديسباتشر
+// مقفولة عليه الميزة أصلاً
+function loadPurchasesModule(){
+  // اتكتب للداشبورد وبيقرا منها devices و selectedId مباشرة.
+  // عندنا الأجهزة بشكل تاني (adapt بتحوّلها)، فبنوصّله بالسجل الخام.
+  window.PURCHASES_CONFIG = {
+    devicesFn:      () => devices.map(d => d._raw).filter(Boolean),
+    openDeviceIdFn: () => sheetId || null,
+    meNameFn:       () => ME,
+    flagFn:         () => CAN_PURCHASES === true
+  };
+  const sc = document.createElement('script');
+  sc.src = 'ai-invoice.js';
+  sc.onerror = () => console.error('فشل تحميل ai-invoice.js');
+  document.body.appendChild(sc);
+}
+function openCap(api){
+  closeKebab();
+  const m = window[api];
+  if(m && typeof m.open === 'function') m.open();
+  else toast(t('dp.capLoading'));
+}
+let pendingTechs = [];
+
+async function loadTechNames(){
+  try{
+    const { data } = await sb.from('app_data').select('value')
+      .eq('key','pending-technicians').maybeSingle();
+    pendingTechs = (data && data.value) ? (JSON.parse(data.value) || []) : [];
+  }catch(e){ pendingTechs = []; }
+  renderTechSelect();
+}
+
+function accountTechNames(){
+  return Object.values(userRoles)
+    .map(v => (typeof v === 'string') ? null : v)
+    .filter(v => v && v.role === 'technician' && v.techName)
+    .map(v => String(v.techName).trim()).filter(Boolean);
+}
+function allTechNames(){
+  const acc = [...new Set(accountTechNames())].sort((a,b)=>a.localeCompare(b,'ar'));
+  const accSet = new Set(acc);
+  const pend = [...new Set(pendingTechs.map(x => (x.name||'').trim())
+                 .filter(n => n && !accSet.has(n)))].sort((a,b)=>a.localeCompare(b,'ar'));
+  return acc.map(n=>({name:n,pending:false})).concat(pend.map(n=>({name:n,pending:true})));
+}
+
+function renderTechSelect(){
+  const sel = $('f_tech'); if(!sel) return;
+  const cur  = sel.value;
+  const list = allTechNames();
+  sel.innerHTML = '<option value="">— ' + t('tp.pickTechPh').replace(/^—\s*|\s*—$/g,'') + ' —</option>'
+    + list.map(x => '<option value="'+esc(x.name)+'">'+esc(x.name)+(x.pending?' ⏳':'')+'</option>').join('');
+  if(cur) sel.value = cur;
+
+  // مفيش فنيين خالص؟ نوضّح للديسباتشر يعمل إيه بدل قايمة فاضية صامتة
+  const hint = $('f_techHint');
+  if(hint){
+    hint.textContent = list.length ? '' : t('dp.noTechsHint');
+    hint.style.display = list.length ? 'none' : 'block';
+  }
+}
+
 let saving = false;
 async function saveIntake(){
   if(saving) return;
@@ -918,6 +1067,7 @@ async function saveIntake(){
     customerPhone: $('f_phone').value.trim(),
     shopName:      $('f_shop').value.trim(),
     reportedIssue: $('f_issue').value.trim(),
+    technician:    ($('f_tech') ? $('f_tech').value : ''),
     registeredBy:  ME
   }});
 
@@ -927,6 +1077,7 @@ async function saveIntake(){
   if(error){ toast('فشل التسجيل: ' + esc(error.message || error)); return; }
 
   ['f_type','f_model','f_cust','f_phone','f_shop','f_issue'].forEach(id=>$(id).value='');
+  if($('f_tech')) $('f_tech').value = '';
   closeIntake();
   await loadDevices();
   activeTab='mine'; render();

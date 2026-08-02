@@ -44,6 +44,7 @@
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
     --returned:#9333EA; --returned-bg:#F5EEFC;
+    --rejected:#DC2626; --rejected-bg:#FEF2F2;
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
@@ -62,6 +63,7 @@
     --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
     --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
     --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
+    --rejected:#F87171;   --rejected-bg:rgba(248,113,113,.15);
   }
 
 
@@ -268,7 +270,8 @@
   .act:active{transform:scale(.97);}
   .act-work{background:var(--repairing-bg); color:var(--repairing);}
   .act-done{background:var(--done-bg); color:var(--done);}
-  .act-prob{background:#FEF3C7; color:var(--waiting); flex:0 0 auto;}
+  .act-prob{background:var(--waiting-bg); color:var(--waiting); flex:0 0 auto;}
+  .act-rej{background:var(--rejected-bg); color:var(--rejected); flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
   /* بطاقة المساعدة: أهدأ + بدون أزرار */
@@ -479,6 +482,7 @@ const ST = {
   repairing: {label:t('rp.stRepairing'), c:'--repairing'},
   done:      {label:t('rp.stDone'),   c:'--done'},
   returned:  {label:t('rp.stReturned'),    c:'--returned'},
+  rejected:  {label:t('rp.stRejected'),    c:'--rejected'},
 };
 const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
 
@@ -883,6 +887,7 @@ function ticketHtml(d, canAct){
       ${d.status!=='repairing' ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
       ${d.status!=='done' ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
       <button class="act act-prob" onclick="event.stopPropagation();reportProblem('${d.id}')" data-i18n="tp.problem">⚠️ مشكلة</button>
+      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🚫 تم الرفض</button>
     </div>`;
   return `<div class="ticket ${canAct?'':'assist'}" style="--sp:var(${s.c});" onclick="openSheet('${d.id}')">
     <div class="tk-top">
@@ -920,6 +925,12 @@ function render(){
 }
 
 /* ===== أكشنز ===== */
+// الرفض بيخرّج الجهاز من قايمة الفني نهائياً، فبيتأكد الأول
+async function rejectDevice(id){
+  if(!confirm(t('tp.rejectConfirm'))) return;
+  await setStatus(id, 'rejected');
+}
+
 async function setStatus(id, st){
   const d = devices.find(x=>x.id===id); if(!d || d.status===st) return;
 
@@ -941,7 +952,7 @@ async function setStatus(id, st){
 
   if(!ACTIVE.includes(st)){
     if(sheetId===id) closeSheet();
-    flash = `${d.type} ${d.model} اتنقل لـ «${t('rp.stDone')}» وخرج من قائمتك`;
+    flash = t('tp.movedOut', { device: `${d.type} ${d.model}`, status: lbl });
     render();
     setTimeout(()=>{ flash=''; render(); }, 4500);
   } else { render(); if(sheetId===id) renderSheet(); }

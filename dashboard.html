@@ -3351,7 +3351,8 @@ let pendingTechs = [];   // [{ name, addedBy, addedAt }]
 async function loadPendingTechs(){
   try{
     const r = await window.storage.get(PENDING_TECHS_KEY);
-    pendingTechs = (r && r.value) ? (JSON.parse(r.value) || []) : [];
+    const _p = (r && r.value) ? JSON.parse(r.value) : null;
+    pendingTechs = Array.isArray(_p) ? _p : [];   // لو الداتا اتخزّنت بشكل غلط منقعش
   }catch(e){ pendingTechs = []; }
 }
 async function savePendingTechs(){

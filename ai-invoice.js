@@ -35,7 +35,19 @@
     totalTolerance: 1,             // فرق مقبول بالجنيه بين مجموع البنود والإجمالي
     timeoutMs: 90000,
     deviceSearchLimit: 8,          // أقصى نتائج في بحث الأجهزة السريع
-    featureFlag: 'gemini_invoice_ocr'
+    featureFlag: 'gemini_invoice_ocr',
+
+    // ── خطّافات للربط بصفحة غير الداشبورد ─────────────────────
+    // الموديول اتكتب أصلاً وهو فاهم إنه جوه dashboard.html، وبيقرا
+    // منها devices و selectedId و currentUser مباشرة. لكن الديسباتشر
+    // بيخزّن الأجهزة بشكل مختلف (type/customer بدل deviceType/customerName)،
+    // فلو قرا منه على طول هيلاقي حقول فاضية.
+    // الخطّافات دي بتخلي الصفحة تقول للموديول من فين ياخد اللي محتاجه.
+    // سايبينها فاضية افتراضياً — فالداشبورد مايتأثرش بأي حاجة.
+    devicesFn:      null,   // () => [سجلات الأجهزة الخام]
+    openDeviceIdFn: null,   // () => id الجهاز المفتوح دلوقتي
+    meNameFn:       null,   // () => اسم المستخدم
+    flagFn:         null    // () => هل الميزة مفتوحة لليوزر ده؟
   }, window.PURCHASES_CONFIG || {});
   window.PURCHASES_CONFIG = CFG;
 
@@ -311,6 +323,9 @@
   const esc = s => { const d = document.createElement('div'); d.innerText = s == null ? '' : s; return d.innerHTML; };
   const online = () => (typeof isOnline === 'function' ? isOnline() : navigator.onLine !== false);
   const flagOn = () => {
+    if (typeof CFG.flagFn === 'function') {
+      try { return CFG.flagFn() === true; } catch (e) { return false; }
+    }
     try { return typeof isFeatureEnabled === 'function' && isFeatureEnabled(CFG.featureFlag); }
     catch (e) { return false; }
   };
@@ -366,14 +381,23 @@
   // بس الاسم متاح في النطاق العام المشترك، فبنقراه كاسم مجرد.
   // ============================================================
   function allDevices() {
+    if (typeof CFG.devicesFn === 'function') {
+      try { const v = CFG.devicesFn(); if (Array.isArray(v)) return v; } catch (e) {}
+    }
     try { if (typeof devices !== 'undefined' && Array.isArray(devices)) return devices; } catch (e) {}
     return Array.isArray(window.devices) ? window.devices : [];
   }
   function openDeviceId() {
+    if (typeof CFG.openDeviceIdFn === 'function') {
+      try { const v = CFG.openDeviceIdFn(); if (v) return v; } catch (e) {}
+    }
     try { if (typeof selectedId !== 'undefined' && selectedId) return selectedId; } catch (e) {}
     return window.selectedId || null;
   }
   function meName() {
+    if (typeof CFG.meNameFn === 'function') {
+      try { const v = CFG.meNameFn(); if (v) return v; } catch (e) {}
+    }
     try { if (typeof currentUser !== 'undefined' && currentUser) return currentUser.name || ''; } catch (e) {}
     return (window.currentUser && window.currentUser.name) || '';
   }
