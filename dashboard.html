@@ -3127,7 +3127,7 @@ function viewLockImage(id){
 
 // عرض القفل في تفاصيل الجهاز
 function lockDisplayHtml(d){
-  const editBtn = `<button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin:8px 0 10px;" onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
+  const editBtn = `<button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin:8px 0 10px;"${d.status==='returned'?' disabled':''} onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
     return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
@@ -3386,7 +3386,7 @@ function techSelectHtml(current, handler, opts){
     `<option value="${esc(x.name)}"${x.name===cur?' selected':''}>${esc(x.name)}${x.pending ? ' ⏳' : ''}</option>`).join('');
   const legacy = (cur && !known)
     ? `<option value="${esc(cur)}" selected>${esc(cur)} (${t('tech.legacy')})</option>` : '';
-  return `<select class="tech-select"${opts&&opts.id?` id="${opts.id}"`:''} onchange="${handler}">
+  return `<select class="tech-select"${opts&&opts.id?` id="${opts.id}"`:''}${opts&&opts.disabled?' disabled':''} onchange="${handler}">
       <option value=""${cur?'':' selected'}>— ${t('tech.none')} —</option>
       ${legacy}${rows}
       <option value="__ADD_TECH__">➕ ${t('tech.addNew')}</option>
@@ -3401,6 +3401,10 @@ function renderDetail(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return closeDetail();
   const s = statusInfo(d.status);
+  // ===== المرتجعات: تفاصيل الجهاز القديمة بتتقفل، وبتظهر حقول المرتجع الجديدة =====
+  const isRet = d.status === 'returned';
+  const roI = isRet ? ' readonly' : '';   // مدخلات ونصوص التفاصيل القديمة
+  const roB = isRet ? ' disabled' : '';   // أزرار وقوائم التفاصيل القديمة
   const rows = [
     [t('det.intakeAt'), formatDateTime(d.intakeDate)],
     d.serialNumber ? [t('det.serial'), d.serialNumber, true] : null,
@@ -3444,11 +3448,12 @@ function renderDetail(){
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
 
     <div class="row2">
-      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}" onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
     </div>
     <div class="money-only">
-    <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
+    ${isRet ? `<label class="field" style="margin-top:2px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPrice', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="${t('det.returnPricePh')}" /></label>` : ''}
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
@@ -3463,8 +3468,8 @@ function renderDetail(){
     ${isPriced(d) ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
       <div class="pay-choice">
-        <button type="button" class="pay-btn" style="border-color:var(--success);${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
-        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--success);${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}"${roB} onclick="editPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}"${roB} onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
       </div>
       ${d.paymentType === 'deferred'
         ? (isPaidDevice(d)
@@ -3476,16 +3481,19 @@ function renderDetail(){
                </div>`)
         : (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
-            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
-    <label class="field"><span>${t('det.issue')}</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+    <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+    ${isRet ? `
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2" placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.discoveredFault')}</span><textarea rows="2" placeholder="${t('det.discoveredFaultPh')}" onblur="editField('discoveredFault', this.value)">${esc(d.discoveredFault||'')}</textarea></label>` : ''}
 
     <div class="approval-box">
       ${!d.deepInspection || !d.deepInspection.requested ? `
-        <button class="btn-secondary" style="width:100%; color:var(--violet); border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 ${t('det.deepReq')}</button>
+        <button class="btn-secondary" style="width:100%; color:var(--violet); border-color:#DDD6FE;"${roB} onclick="requestDeepInspection()">🔬 ${t('det.deepReq')}</button>
       ` : !trackResponses.deep_inspection_response ? `
         <div class="approval-pending">⏳ ${t('det.deepWaiting')}
           <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">${t('det.deepCancel')}</button>
@@ -3505,14 +3513,15 @@ function renderDetail(){
     <div class="tech-row">
       <label class="field">
         <span>${t('det.technician')}</span>
-        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput' })}
+        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput', disabled: isRet })}
       </label>
       <label class="field">
         <span>${t('det.accountant')}</span>
-        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}" onblur="editField('registeredBy', this.value)" />
+        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}"${roI} onblur="editField('registeredBy', this.value)" />
       </label>
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
+    ${isRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>` : ''}
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
@@ -3523,21 +3532,21 @@ function renderDetail(){
       <div style="margin-bottom:10px;">
         <span style="font-size:13px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.dealType')}</span>
         <div class="pay-choice">
-          <button type="button" style="border-color:var(--info);${!d.isWholesale?'background:#2563EB;color:#fff;':'background:var(--surface);color:var(--info);'}" onclick="setWholesale(false)">${t('det.retail')}</button>
-          <button type="button" style="border-color:var(--violet);${d.isWholesale?'background:#7C3AED;color:#fff;':'background:var(--surface);color:var(--violet);'}" onclick="setWholesale(true)">${t('det.wholesale')}</button>
+          <button type="button" style="border-color:var(--info);${!d.isWholesale?'background:#2563EB;color:#fff;':'background:var(--surface);color:var(--info);'}"${roB} onclick="setWholesale(false)">${t('det.retail')}</button>
+          <button type="button" style="border-color:var(--violet);${d.isWholesale?'background:#7C3AED;color:#fff;':'background:var(--surface);color:var(--violet);'}"${roB} onclick="setWholesale(true)">${t('det.wholesale')}</button>
         </div>
       </div>
       ${!d.isWholesale ? `
         <label class="field"><span>⭐ ${t('det.points')}</span>
-          <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)" onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
+          <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
         </label>
         ${d.technician ? `
         <div class="tech-row">
           <label class="field"><span>🤝 ${t('det.assistTech')}</span>
-            ${techSelectHtml(d.assistTechnician, 'onTechPick(this, \'assistTechnician\')')}
+            ${techSelectHtml(d.assistTechnician, 'onTechPick(this, \'assistTechnician\')', { disabled: isRet })}
           </label>
           <label class="field"><span>${t('det.assistPercent')}</span>
-            <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)" onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
+            <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
           </label>
         </div>` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.assistNeedMain')}</div>`}
       ` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.wholesaleNote')}</div>`}
@@ -4964,7 +4973,10 @@ function renderLabelInto(containerId, d){
       <div class="label-row-title">${esc(d.shopName || '—')}</div>
       <div class="label-row" style="font-weight:800;">${esc(d.customerName)}</div>
       <div class="label-row" style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)}</div>
-      ${d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : ''}
+      ${d.status==='returned' ? `<div class="label-row" style="font-weight:900;">🔁 ${t('ui.returnMark')}</div>` : ''}
+      ${(d.status==='returned' && (d.discoveredFault || d.returnComplaint))
+        ? `<div class="label-row">${esc(d.discoveredFault || d.returnComplaint)}</div>`
+        : (d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : '')}
       <div class="label-row">${esc(shortDateTime(d.intakeDate))}</div>
       <div id="qrHolder"></div>
       <div style="font-family:'Cairo',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
@@ -5200,7 +5212,10 @@ async function renderLabelImage(d, sz, qrDataUrl){
     { t: d.customerName || '',                        f: fCust,  w: 700, fam: 'Cairo' },
     { t: `${d.deviceType||''} ${d.model||''}`.trim(), f: fDev,   w: 700, fam: 'Cairo' }
   ];
-  if(d.reportedIssue) rows.push({ t: d.reportedIssue, f: fIssue, w: 700, fam: 'Tajawal' });
+  const _ret = d.status === 'returned';
+  const _issue = (_ret && (d.discoveredFault || d.returnComplaint)) ? (d.discoveredFault || d.returnComplaint) : d.reportedIssue;
+  if(_ret) rows.push({ t: t('ui.returnMark'), f: fIssue, w: 900, fam: 'Tajawal' });
+  if(_issue) rows.push({ t: _issue, f: fIssue, w: 700, fam: 'Tajawal' });
   rows.push({ t: shortDateTime(d.intakeDate), f: fDate, w: 700, fam: 'Tajawal', ltr: true });
 
   const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);
