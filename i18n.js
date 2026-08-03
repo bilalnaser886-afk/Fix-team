@@ -350,6 +350,9 @@
       'det.priceWaiting': 'في انتظار رد العميل على السعر...',
       'det.priceYes': 'العميل وافق على السعر',
       'det.priceNo': 'العميل رفض السعر',
+      'det.returnPriceWaiting': 'في انتظار رد العميل على السعر الجديد...',
+      'det.returnPriceYes': 'العميل وافق على السعر الجديد',
+      'det.returnPriceNo': 'العميل رفض السعر الجديد',
 
       /* شاشة الحسابات */
       'acc.title': 'الحسابات — آجل المحلات',
@@ -951,6 +954,9 @@
       'det.priceWaiting': 'Waiting for customer response on price...',
       'det.priceYes': 'Customer approved the price',
       'det.priceNo': 'Customer declined the price',
+      'det.returnPriceWaiting': 'Waiting for customer response on new price...',
+      'det.returnPriceYes': 'Customer approved the new price',
+      'det.returnPriceNo': 'Customer declined the new price',
 
       /* Accounts screen */
       'acc.title': 'Accounts — Store Credit',

@@ -263,6 +263,18 @@
         <div class="approve-result" id="priceResult"></div>
       </div>
 
+      <div class="price-card" id="returnPriceCard" style="display:none;">
+        <div class="lbl">تكلفة إصلاح إضافي</div>
+        <div class="num" id="returnPriceNum"></div>
+        <div class="approve-card" id="returnPriceCardApprove" style="margin-top:14px; background:transparent; border:none; padding:0;">
+          <div class="approve-btns">
+            <button class="approve-btn approve-yes" onclick="respond('return_price','accepted')">موافق على السعر</button>
+            <button class="approve-btn approve-no" onclick="respond('return_price','declined')">مش موافق</button>
+          </div>
+        </div>
+        <div class="approve-result" id="returnPriceResult"></div>
+      </div>
+
       <div class="special" id="specialBox"></div>
 
       <div class="meta" id="meta"></div>
@@ -316,8 +328,8 @@ async function respond(kind, answer){
 }
 
 function showApproveResult(kind, answer){
-  const cardId = kind === 'deep' ? 'deepCard' : 'priceCardApprove';
-  const resultId = kind === 'deep' ? 'deepResult' : 'priceResult';
+  const cardId = kind === 'deep' ? 'deepCard' : kind === 'return_price' ? 'returnPriceCardApprove' : 'priceCardApprove';
+  const resultId = kind === 'deep' ? 'deepResult' : kind === 'return_price' ? 'returnPriceResult' : 'priceResult';
   $(cardId).style.display = 'none';
   const r = $(resultId);
   r.style.display = 'block';
@@ -443,6 +455,26 @@ function renderTrack(data){
     }
   } else {
     $('priceCard').style.display = 'none';
+  }
+
+  if(data.returnPrice > 0){
+    $('returnPriceCard').style.display = 'block';
+    $('returnPriceNum').textContent = data.returnPrice.toLocaleString('en-EG') + ' ج.م';
+    // طلب تأكيد السعر الجديد
+    if(data.returnPriceConfirmRequested && st !== 'delivered'){
+      if(responses.return_price_response){
+        $('returnPriceCardApprove').style.display = 'none';
+        showApproveResult('return_price', responses.return_price_response);
+      } else {
+        $('returnPriceCardApprove').style.display = 'block';
+        $('returnPriceResult').style.display = 'none';
+      }
+    } else {
+      $('returnPriceCardApprove').style.display = 'none';
+      $('returnPriceResult').style.display = 'none';
+    }
+  } else {
+    $('returnPriceCard').style.display = 'none';
   }
 
   $('meta').textContent = 'آخر تحديث: ' + new Date(data.updatedAt || Date.now()).toLocaleString('ar-EG');

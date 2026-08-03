@@ -3484,6 +3484,17 @@ function renderDetail(){
     </div>` : ''}
     ${isRet ? `
     <label class="field" style="margin-top:6px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}" oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
+    ${isReturnPriced(d) && d.returnPriceConfirmation && d.returnPriceConfirmation.requested ? `
+      <div class="approval-box">
+        ${!trackResponses.return_price_response ? `
+          <div class="approval-pending">${t('det.returnPriceWaiting')}</div>
+        ` : trackResponses.return_price_response === 'accepted' ? `
+          <div class="approval-yes">${t('det.returnPriceYes')}</div>
+        ` : `
+          <div class="approval-no">${t('det.returnPriceNo')}</div>
+        `}
+      </div>
+    ` : ''}
     ${isReturnPriced(d) ? `<div style="margin:2px 0 12px;">
       <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.returnPayMethod')}</span>
       <div class="pay-choice">
@@ -5564,8 +5575,10 @@ async function syncTrack(d){
       status: d.status,
       issue: d.reportedIssue || '',
       price: parseInt(d.agreedPrice) || 0,
+      returnPrice: parseInt(d.returnPrice) || 0,
       deepInspectionRequested: !!(d.deepInspection && d.deepInspection.requested),
       priceConfirmRequested: !!(d.priceConfirmation && d.priceConfirmation.requested),
+      returnPriceConfirmRequested: !!(d.returnPriceConfirmation && d.returnPriceConfirmation.requested),
       intakeDate: d.intakeDate,
       updatedAt: new Date().toISOString()
     });
@@ -5846,6 +5859,8 @@ async function resetTrackResponse(token, kind){
   try{
     const patch = kind === 'price'
       ? { price_response: null, price_responded_at: null }
+      : kind === 'return_price'
+      ? { return_price_response: null, return_price_responded_at: null }
       : { deep_inspection_response: null, deep_inspection_responded_at: null };
     await sb.from('public_track_responses').upsert({ token, ...patch, updated_at: new Date().toISOString() });
   }catch(e){}
@@ -5952,10 +5967,18 @@ async function editReturnPrice(value){
     }
   }
 
+  // لو السعر الجديد اتغيّر → نطلب موافقة العميل عليه (زي السعر الأساسي)
+  if(price !== '' && price !== d.returnPrice){
+    extra.returnPriceConfirmation = { requested: true, requestedAt: new Date().toISOString() };
+    resetTrackResponse(d.trackToken, 'return_price');
+  }
+
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
     : x);
   renderDetail(); render(); await persist();
+  const updT = devices.find(x => x.id === selectedId);
+  if(updT){ if(!updT.trackToken){ await ensureTrackToken(updT.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
 
 // فوري/آجل لحساب المرتجع — بيقيّد قيد مرتجع أو يرجّعه، من غير أي مساس بقيد الأصلي
