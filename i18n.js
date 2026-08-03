@@ -324,6 +324,8 @@
       'det.retail': 'قطاعي',
       'det.wholesale': 'جملة (بدون نقاط)',
       'det.points': 'نقاط الصيانة (لتقييم الفني في الملخص)',
+      'det.returnPoints': 'نقاط الصيانة الجديدة (للفني البديل)',
+      'det.returnPointsPh': 'مثال: 5',
       'det.assistTech': 'فني مساعد (اختياري)',
       'det.assistTechPh': 'اسم الفني المساعد',
       'det.assistPercent': 'نسبته من النقاط %',
@@ -442,6 +444,7 @@
       'te.main': 'رئيسي',
       'te.ofPoints': 'من',
       'te.afterAssist': 'بعد نصيب المساعد من',
+      'te.substitute': 'فني بديل (مرتجع)',
 
       /* صفحة الدخول */
       'login.title': 'تسجيل الدخول',
@@ -928,6 +931,8 @@
       'det.retail': 'Retail',
       'det.wholesale': 'Wholesale (no points)',
       'det.points': 'Repair points (for technician evaluation)',
+      'det.returnPoints': 'New repair points (for substitute)',
+      'det.returnPointsPh': 'e.g. 5',
       'det.assistTech': 'Assistant technician (optional)',
       'det.assistTechPh': 'Assistant technician name',
       'det.assistPercent': 'Share of points %',
@@ -1046,6 +1051,7 @@
       'te.main': 'Lead',
       'te.ofPoints': 'of',
       'te.afterAssist': 'after assistant share of',
+      'te.substitute': 'Substitute (return)',
 
       /* Login page */
       'login.title': 'Sign In',

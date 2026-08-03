@@ -3545,7 +3545,8 @@ function renderDetail(){
       </label>
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
-    ${isRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>` : ''}
+    ${isRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
+    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>` : ''}
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
@@ -7180,6 +7181,18 @@ function renderTechEval(){
   let wholesaleSkipped = 0;                // أجهزة جملة اتجاهلت
 
   devices.forEach(d => {
+    // ===== جهاز رجع بعد التسليم: الأصلي بصفر عليه، ونقاط الصيانة الجديدة للفني البديل =====
+    if(returnAfterDeliveryDate(d)){
+      const rpts = parseFloat(enDigits(d.returnPoints)) || 0;
+      if(!rpts || !d.substituteTechnician) return;
+      if(d.isWholesale){ wholesaleSkipped++; return; }
+      const cd = completionDate(d);
+      if(!cd){ pendingPts += rpts; pendingCount++; return; }
+      if(!inTeRange(cd)) return;
+      push(d.substituteTechnician, d, rpts, 'بديل');
+      return;
+    }
+
     const pts = parseFloat(enDigits(d.points)) || 0;
     if(!pts || !d.technician) return;
     if(d.isWholesale){ wholesaleSkipped++; return; }
@@ -7271,7 +7284,7 @@ function renderTechEval(){
                     <div>
                       <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
                       <div style="font-size:12px; color:var(--muted-2);">
-                        ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
+                        ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
                       </div>
                     </div>
                     <div style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif;">${round1(x.share)}</div>
