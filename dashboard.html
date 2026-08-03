@@ -140,7 +140,7 @@
     --delivered_unpaid:#B45309; --delivered_unpaid-bg:#FEF3C7;
     --paid:#15803D; --paid-bg:#EAF6EE;
     --unpaid:#B45309; --unpaid-bg:#FEF3E2;
-    --rejected_shop:#A16207; --rejected_shop-bg:#FEF6E7;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --rejected:#BE1D1D; --rejected-bg:#FEF2F2;
     --returned:#9333EA; --returned-bg:#F5EEFC;
   }
@@ -175,7 +175,7 @@
     --delivered_unpaid:#FBBF24; --delivered_unpaid-bg:rgba(251,191,36,.15);
     --paid:#4ADE80;             --paid-bg:rgba(74,222,128,.14);
     --unpaid:#FBBF24;           --unpaid-bg:rgba(251,191,36,.15);
-    --rejected_shop:#FCD34D;    --rejected_shop-bg:rgba(252,211,77,.15);
+    --rejected_shop:#F472B6;    --rejected_shop-bg:rgba(244,114,182,.15);
     --rejected:#F87171;         --rejected-bg:rgba(248,113,113,.15);
     --returned:#C084FC;         --returned-bg:rgba(192,132,252,.15);
   }
@@ -3881,7 +3881,7 @@ const APPROVAL_STATUSES = ['delivered', 'returned'];
 // نص شارة "بانتظار الموافقة" حسب نوع الطلب (فاضي لو مفيش طلب معلّق)
 function pendingApprovalText(d){
   if(!d || !d.pendingApproval || d.pendingApproval.status !== 'pending') return '';
-  return d.pendingApproval.type === 'return' ? t('appr.badgeReturn') : t('appr.badgeHandover');
+  return d.pendingApproval.type === 'return' ? t('appr.badgeReturn') : d.pendingApproval.type === 'reject' ? t('appr.badgeReject') : t('appr.badgeHandover');
 }
 
 // تسجيل طلب اعتماد معلّق على الجهاز بدل تنفيذ التغيير على طول
@@ -3922,7 +3922,7 @@ function pendingApprovals(){
 }
 
 // اسم نوع الطلب المختصر (تسليم / إرجاع)
-function apprKindLabel(type){ return type === 'return' ? t('appr.kindReturn') : t('appr.kindHandover'); }
+function apprKindLabel(type){ return type === 'return' ? t('appr.kindReturn') : type === 'reject' ? t('appr.kindReject') : t('appr.kindHandover'); }
 
 // ملاحظة نشاط لقرار الاعتماد — بتتكتب في سجل نشاط الجهاز بالشكل: [نص - وقت - مين - دوره]
 function approvalActivityNote(req, decision){
@@ -3940,10 +3940,10 @@ function approvalsPanelHtml(){
   if(list.length === 0) return '';
   const rows = list.map(d => {
     const req = d.pendingApproval;
-    const kindStyle = req.type === 'return' ? 'background:#F5EEFC;color:#9333EA;' : 'background:#EAF1F8;color:#2B6CB0;';
+    const kindStyle = req.type === 'return' ? 'background:#F5EEFC;color:#9333EA;' : req.type === 'reject' ? 'background:#FCE7F1;color:#C2185B;' : 'background:#EAF1F8;color:#2B6CB0;';
     return `<div class="appr-row">
       <div class="appr-row-info">
-        <div class="appr-row-dev"><span class="appr-row-kind" style="${kindStyle}">${apprKindLabel(req.type)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-dev"><span class="appr-row-kind" style="${kindStyle}">${apprKindLabel(req.type)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}${req.type === 'reject' ? ` <span style="color:var(--rejected_shop);font-weight:700;">(${req.payload && req.payload.rejectedInShop ? t('det.rejInShop') : t('det.rejPickedUp')})</span>` : ''}</div>
         <div class="appr-row-meta">${t('appr.logReqBy')} ${esc(req.requestedBy||'')} · ${new Date(req.requestedAt).toLocaleString(getLocale())}</div>
       </div>
       <div class="appr-row-actions">
@@ -3977,7 +3977,7 @@ async function approveRequest(deviceId){
   // المحاسب مش dispatcher، فمفيش اعتراض تاني — بيتنفذ فوراً وبيحفظ ويزامن صفحة المتابعة.
   const prevSel = selectedId;
   selectedId = deviceId;
-  await changeStatus(req.payload.status, req.payload.paymentChoice);
+  await changeStatus(req.payload.status, req.payload.paymentChoice, req.payload.rejectedInShop);
   selectedId = prevSel;
   render();
 }
@@ -4009,7 +4009,7 @@ async function markRejectedLocation(inShop){
   renderDetail(); render(); await persist();
 }
 
-async function changeStatus(newStatus, paymentChoice){
+async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
 
@@ -4056,7 +4056,7 @@ async function changeStatus(newStatus, paymentChoice){
   }
 
   showError('');
-  if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = true;   // رفض جديد → يبدأ في درج الرفض
+  if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
   devices = devices.map(x => x.id === selectedId
     ? {
         ...x, ...extra,

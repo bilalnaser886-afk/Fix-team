@@ -46,6 +46,7 @@
     --delivered:#64748B; --delivered-bg:#EEF1F3;
     --rejected:#DC2626; --rejected-bg:#FEF2F2;
     --returned:#9333EA; --returned-bg:#F5EEFC;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
@@ -64,6 +65,7 @@
     --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
     --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
     --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
+    --rejected_shop:#F472B6;   --rejected_shop-bg:rgba(244,114,182,.15);
   }
 
 
@@ -290,6 +292,7 @@
   .act:active{transform:scale(.97);}
   .act-hand{background:var(--repairing-bg); color:var(--repairing);}
   .act-ret{background:var(--returned-bg); color:var(--returned);}
+  .act-rej{background:var(--rejected_shop-bg); color:var(--rejected_shop);}
   .act-view{background:var(--paper); color:#52657A; flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
@@ -896,6 +899,35 @@ async function requestApproval(id, kind){
   render();
   toast(`اتبعت طلب ${label} للمحاسب ${isRet ? '↩️' : '📦'}`);
 }
+
+// رفض من الديسباتشر → بيسأل مكان الجهاز (درج الرفض / اتسلّم) وبيبعت طلب اعتماد للمحاسب
+async function requestReject(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  if(d.pending){ toast(t('tp.pendingReq')); return; }
+  if(!confirm(`طلب رفض «${d.type} ${d.model}» هيتبعت للمحاسب للاعتماد. تكمّل؟`)) return;
+  const inShop = confirm(`الجهاز لسه في المحل؟\n\nموافق = في المحل (درج الرفض)\nإلغاء = اتسلّم وخرج`);
+
+  const req = {
+    id: 'apr_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    type: 'reject',
+    requestedBy: ME,
+    requestedByEmail: MY_EMAIL,
+    requestedAt: nowIso(),
+    payload: { status: 'rejected', paymentChoice: null, rejectedInShop: inShop },
+    status: 'pending',
+    decidedBy: null, decidedAt: null, reason: null
+  };
+  const notes = [...((d._raw && d._raw.activityNotes) || []),
+                 mkNote(t('note.requestPending', { label: t('rp.reject') }), 'note.requestPending', { label: t('rp.reject') })];
+
+  if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
+                         lastModifiedAt: nowIso(), lastModifiedBy: ME }))) return;
+
+  d.pending = req;
+  if(d._raw){ d._raw.pendingApproval = req; d._raw.activityNotes = notes; }
+  render();
+  toast(`اتبعت طلب رفض للمحاسب 🚫`);
+}
 const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
 const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
   // التاريخ يتبع اللغة المختارة — عربي مصري أو إنجليزي بريطاني
@@ -916,7 +948,7 @@ function ticketHtml(d){
     ? ''
     : delivered
     ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')" data-i18n="rp.returnIco">↩️ ${t('rp.return')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`
-    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
+    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-rej" onclick="event.stopPropagation();requestReject('${d.id}')" data-i18n="rp.rejectIco">🚫 رفض</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
   return `<div class="ticket" style="--sp:var(${s.c});" onclick="showInfo('${d.id}')">
     <div class="tk-top"><span class="tk-no">${ticketNo(d.id)}</span>${statusPill(d.status)}</div>
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>

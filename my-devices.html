@@ -45,6 +45,7 @@
     --done:#15803D; --done-bg:#EAF6EE;
     --returned:#9333EA; --returned-bg:#F5EEFC;
     --rejected:#DC2626; --rejected-bg:#FEF2F2;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
@@ -64,6 +65,7 @@
     --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
     --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
     --rejected:#F87171;   --rejected-bg:rgba(248,113,113,.15);
+    --rejected_shop:#F472B6;   --rejected_shop-bg:rgba(244,114,182,.15);
   }
 
 
@@ -271,7 +273,7 @@
   .act-work{background:var(--repairing-bg); color:var(--repairing);}
   .act-done{background:var(--done-bg); color:var(--done);}
   .act-prob{background:var(--waiting-bg); color:var(--waiting); flex:0 0 auto;}
-  .act-rej{background:var(--rejected-bg); color:var(--rejected); flex:0 0 auto;}
+  .act-rej{background:var(--rejected_shop-bg); color:var(--rejected_shop); flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
   /* بطاقة المساعدة: أهدأ + بدون أزرار */
@@ -887,7 +889,7 @@ function ticketHtml(d, canAct){
       ${d.status!=='repairing' ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
       ${d.status!=='done' ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
       <button class="act act-prob" onclick="event.stopPropagation();reportProblem('${d.id}')" data-i18n="tp.problem">⚠️ مشكلة</button>
-      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🚫 تم الرفض</button>
+      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🗄️ درج الرفض</button>
     </div>`;
   return `<div class="ticket ${canAct?'':'assist'}" style="--sp:var(${s.c});" onclick="openSheet('${d.id}')">
     <div class="tk-top">
@@ -941,13 +943,14 @@ async function setStatus(id, st){
   const note = mkNote(t('note.statusChange', { from:_from, to:lbl }), 'note.statusChange', { from:_from, to:lbl });
   if(!(await save(id, {
         status:st, statusHistory:hist,
+        ...(st === 'rejected' ? { rejectedInShop: true } : {}),
         activityNotes: notesForSave(d, note),
         lastModifiedAt: nowIso(), lastModifiedBy: ME
       }))) return;
 
   // نحدّث النسخة المحلية عشان الواجهة تستجيب فوراً
   d.status = st;
-  if(d._raw){ d._raw.status = st; d._raw.statusHistory = hist; d._raw.activityNotes = notesForSave(d, note); }
+  if(d._raw){ d._raw.status = st; d._raw.statusHistory = hist; d._raw.activityNotes = notesForSave(d, note); if(st === 'rejected') d._raw.rejectedInShop = true; }
   d.notes = (d._raw.activityNotes || []).map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
 
   if(!ACTIVE.includes(st)){
