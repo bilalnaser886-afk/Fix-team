@@ -53,6 +53,7 @@
       'status.delivered': 'تم التسليم',
       'status.delivered_paid': 'تم التسليم والدفع',
       'status.delivered_unpaid': 'تم التسليم بانتظار الدفع',
+      'status.rejected_shop': 'درج الرفض',
       'status.rejected': 'تم الرفض',
       'status.returned': 'المرتجعات',
 
@@ -325,6 +326,9 @@
       'det.wholesale': 'جملة (بدون نقاط)',
       'det.points': 'نقاط الصيانة (لتقييم الفني في الملخص)',
       'det.returnPoints': 'نقاط الصيانة الجديدة (للفني البديل)',
+      'det.rejLocation': 'مكان الجهاز المرفوض',
+      'det.rejInShop': 'في المحل (الدرج)',
+      'det.rejPickedUp': 'اتسلّم — خرج',
       'det.returnPointsPh': 'مثال: 5',
       'det.assistTech': 'فني مساعد (اختياري)',
       'det.assistTechPh': 'اسم الفني المساعد',
@@ -594,6 +598,8 @@
       'hist.returnToCashRemoved': 'حساب المرتجع اتحوّل لفوري — اتشال قيد المرتجع من حساب المحل',
       'hist.returnPricedDeferred': 'اتحسب حساب الجهاز الجديد — آجل، اتضاف {amount} ج.م على حساب "{shop}"',
       'hist.returnPaidCash': 'حساب المرتجع — تم الدفع (فوري) {amount} ج.م',
+      'hist.rejToDrawer': 'رجع لدرج الرفض — لسه في المحل',
+      'hist.rejPickedUp': 'اتسلّم — خرج من المحل',
       'hist.lockUpdated': 'تم تحديث رمز قفل الجهاز ({kind})',
 
       /* نصوص واجهة متبقية */
@@ -666,6 +672,7 @@
       'status.delivered': 'Delivered',
       'status.delivered_paid': 'Delivered & Paid',
       'status.delivered_unpaid': 'Delivered - Pending Payment',
+      'status.rejected_shop': 'Rejection drawer',
       'status.rejected': 'Rejected',
       'status.returned': 'Returns',
 
@@ -932,6 +939,9 @@
       'det.wholesale': 'Wholesale (no points)',
       'det.points': 'Repair points (for technician evaluation)',
       'det.returnPoints': 'New repair points (for substitute)',
+      'det.rejLocation': 'Rejected device location',
+      'det.rejInShop': 'In shop (drawer)',
+      'det.rejPickedUp': 'Picked up',
       'det.returnPointsPh': 'e.g. 5',
       'det.assistTech': 'Assistant technician (optional)',
       'det.assistTechPh': 'Assistant technician name',
@@ -1200,6 +1210,8 @@
       'hist.returnToCashRemoved': 'Return charge switched to immediate — return entry removed from store account',
       'hist.returnPricedDeferred': 'New device charge set — deferred, {amount} EGP added to "{shop}" account',
       'hist.returnPaidCash': 'Return charge — paid (immediate) {amount} EGP',
+      'hist.rejToDrawer': 'Moved to rejection drawer — still in shop',
+      'hist.rejPickedUp': 'Picked up — left the shop',
       'hist.lockUpdated': 'Device lock code updated ({kind})',
 
       /* Remaining UI strings */
