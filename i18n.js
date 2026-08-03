@@ -158,6 +158,8 @@
       'det.returnPrice': 'حساب الجهاز الجديد',
       'det.returnPricePh': 'تكلفة الإصلاح الجديد — أرقام صحيحة',
       'det.substituteTech': 'الفني البديل',
+      'det.returnPayMethod': 'طريقة دفع الحساب الجديد',
+      'det.returnSettled': 'محاسَب عليه (مرتجع)',
       'det.intakeAt': 'تاريخ ووقت الدخول',
       'det.serial': 'الرقم التسلسلي',
       'det.condition': 'حالة الجهاز عند الاستلام',
@@ -581,6 +583,11 @@
       'hist.toCashRemoved': 'اتحوّل لفوري — اتشال القيد من حساب المحل، مستني تأكيد الدفع',
       'hist.toCash': 'اتحوّل لفوري — مستني تأكيد الدفع',
       'hist.pricedDeferred': 'اتسعّر بعد التسليم — آجل، اتضاف {amount} ج.م على حساب "{shop}"',
+      'hist.returnToDeferred': 'حساب المرتجع آجل — اتضاف {amount} ج.م على حساب "{shop}"',
+      'hist.returnToCash': 'حساب المرتجع فوري — مستني تأكيد الدفع',
+      'hist.returnToCashRemoved': 'حساب المرتجع اتحوّل لفوري — اتشال قيد المرتجع من حساب المحل',
+      'hist.returnPricedDeferred': 'اتحسب حساب الجهاز الجديد — آجل، اتضاف {amount} ج.م على حساب "{shop}"',
+      'hist.returnPaidCash': 'حساب المرتجع — تم الدفع (فوري) {amount} ج.م',
       'hist.lockUpdated': 'تم تحديث رمز قفل الجهاز ({kind})',
 
       /* نصوص واجهة متبقية */
@@ -752,6 +759,8 @@
       'det.returnPrice': 'New device charge',
       'det.returnPricePh': 'New repair cost — whole numbers',
       'det.substituteTech': 'Substitute technician',
+      'det.returnPayMethod': 'New charge payment',
+      'det.returnSettled': 'Settled (return)',
       'det.intakeAt': 'Intake Date & Time',
       'det.serial': 'Serial Number',
       'det.condition': 'Condition on Intake',
@@ -1174,6 +1183,11 @@
       'hist.toCashRemoved': 'Switched to immediate — entry removed from store account, awaiting payment',
       'hist.toCash': 'Switched to immediate — awaiting payment confirmation',
       'hist.pricedDeferred': 'Priced after delivery — deferred, {amount} EGP added to "{shop}" account',
+      'hist.returnToDeferred': 'Return charge deferred — {amount} EGP added to "{shop}" account',
+      'hist.returnToCash': 'Return charge immediate — awaiting payment confirmation',
+      'hist.returnToCashRemoved': 'Return charge switched to immediate — return entry removed from store account',
+      'hist.returnPricedDeferred': 'New device charge set — deferred, {amount} EGP added to "{shop}" account',
+      'hist.returnPaidCash': 'Return charge — paid (immediate) {amount} EGP',
       'hist.lockUpdated': 'Device lock code updated ({kind})',
 
       /* Remaining UI strings */

@@ -3453,7 +3453,6 @@ function renderDetail(){
     </div>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
-    ${isRet ? `<label class="field" style="margin-top:2px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPrice', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="${t('det.returnPricePh')}" /></label>` : ''}
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
@@ -3483,6 +3482,20 @@ function renderDetail(){
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
+    ${isRet ? `
+    <label class="field" style="margin-top:6px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}" oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
+    ${isReturnPriced(d) ? `<div style="margin:2px 0 12px;">
+      <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.returnPayMethod')}</span>
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:var(--success);${d.returnPaymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editReturnPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.returnPaymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editReturnPayType('deferred')">${t('det.payDeferred')}</button>
+      </div>
+      ${d.returnPaymentType === 'deferred'
+        ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidViaAccount')}${(d.returnBilledShop||d.billedShop)?` "${esc(d.returnBilledShop||d.billedShop)}"`:''} — ${t('det.returnSettled')}</div>`
+        : (d.returnPaymentStatus === 'paid'
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markReturnPaid()">💵 ${t('det.confirmPay')}</button>`)}
+    </div>` : ''}` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
@@ -3990,7 +4003,7 @@ async function changeStatus(newStatus, paymentChoice){
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, price);
         historyKey = 'hist.deliveredDeferred'; historyVars = { amount: price.toLocaleString('en-EG'), shop };
       } else {
@@ -5747,7 +5760,7 @@ async function editPayType(t){
     extra.billedShop = shop;
     if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({ ...d, billedShop: shop }, price);
       }
       extra.paymentStatus = 'paid';
@@ -5759,9 +5772,9 @@ async function editPayType(t){
     }
   } else {
     // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
-    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id);
+    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind);
     if(had){
-      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id));
+      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id && !e.kind));
       await persistLedger();
     }
     extra.paymentStatus = 'unpaid';   // مستني "تأكيد الدفع"
@@ -5798,7 +5811,7 @@ async function editPrice(value){
     if(shop){
       extra.paymentStatus = 'paid';
       extra.billedShop = shop;
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, parseInt(price));
       }
       histEntry = { status:d.status, labelKey:'hist.pricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
@@ -5888,8 +5901,9 @@ async function persistLedger(){
   try{ await window.storage.set(LEDGER_KEY, JSON.stringify(ledger)); }catch(e){}
 }
 
-function addLedgerDebit(d, price){
-  ledger = [{
+function addLedgerDebit(d, price, opts){
+  opts = opts || {};
+  const entry = {
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'debit',
     shop: (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل',
@@ -5897,11 +5911,102 @@ function addLedgerDebit(d, price){
     deviceId: d.id,
     deviceLabel: `${d.deviceType||''} ${d.model||''} — ${d.customerName||''}`.trim(),
     // بنحفظ العطل مع القيد — عشان كشف الحساب يفضل صح حتى لو الجهاز اتمسح
-    issue: (d.reportedIssue || '').trim(),
+    issue: (opts.issue !== undefined ? opts.issue : (d.reportedIssue || '')).trim(),
     date: new Date().toISOString(),
     by: currentUser.name
-  }, ...ledger];
+  };
+  if(opts.kind) entry.kind = opts.kind;   // 'return' = قيد حساب المرتجع، منفصل عن قيد الأصلي
+  ledger = [entry, ...ledger];
   persistLedger();
+}
+
+// ============================================================
+// حساب المرتجع — نفس ماكينة الفلوس بس على returnPrice.
+// القيد بماركة kind:'return' وميلمسش قيد الجهاز الأصلي أبداً.
+// الجهاز مرتجع = اتسلّم قبل كده، فالآجل بيتقيّد فوراً (مش مستني تسليم).
+// ============================================================
+function isReturnPriced(d){
+  if(!d) return false;
+  const v = d.returnPrice;
+  if(v === null || v === undefined || v === '') return false;
+  return isFinite(Number(v));
+}
+
+async function editReturnPrice(value){
+  const price = intPrice(value);
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  let extra = { returnPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let histEntry = null;
+
+  // محدد عليه آجل بالفعل واتسعّر دلوقتي → يتقيّد على حساب المحل فوراً
+  if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid'){
+    const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
+    if(shop){
+      extra.returnPaymentStatus = 'paid';
+      extra.returnBilledShop = shop;
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && e.kind === 'return')){
+        addLedgerDebit({ ...d, billedShop: shop }, parseInt(price), { kind: 'return', issue: (d.discoveredFault || d.returnComplaint || '') });
+      }
+      histEntry = { status:d.status, labelKey:'hist.returnPricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
+    }
+  }
+
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
+    : x);
+  renderDetail(); render(); await persist();
+}
+
+// فوري/آجل لحساب المرتجع — بيقيّد قيد مرتجع أو يرجّعه، من غير أي مساس بقيد الأصلي
+async function editReturnPayType(pt){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const price = parseInt(d.returnPrice) || 0;
+  if(pt === d.returnPaymentType && (pt !== 'deferred' || d.returnPaymentStatus === 'paid')) return;
+
+  let extra = { returnPaymentType: pt, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let noteKey = null, noteVars = null;
+
+  if(pt === 'deferred'){
+    if(!isReturnPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
+    if(!shop){ alert(t('msg.needShopForCredit')); return; }
+    extra.returnBilledShop = shop;
+    // الجهاز مرتجع (اتسلّم قبل كده) → القيد بيتعمل فوراً ويعتبر متسوّى
+    if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && e.kind === 'return')){
+      addLedgerDebit({ ...d, billedShop: shop }, price, { kind: 'return', issue: (d.discoveredFault || d.returnComplaint || '') });
+    }
+    extra.returnPaymentStatus = 'paid';
+    noteKey = 'hist.returnToDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
+  } else {
+    // رجوع لفوري: نشيل قيد المرتجع بس (بماركة return)، والأصلي زي ما هو
+    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && e.kind === 'return');
+    if(had){
+      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id && e.kind === 'return'));
+      await persistLedger();
+    }
+    extra.returnPaymentStatus = 'unpaid';
+    noteKey = had ? 'hist.returnToCashRemoved' : 'hist.returnToCash';
+  }
+
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory:[...(x.statusHistory||[]),
+        { status:x.status, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
+}
+
+// تأكيد دفع حساب المرتجع فوري (زي markPaid — الفوري مبيتقيّدش على الدفتر)
+async function markReturnPaid(){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  if(!isReturnPriced(d)){ alert(t('msg.needPriceFirst')); return; }
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, returnPaymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
+        statusHistory:[...(x.statusHistory||[]), { status:x.status, labelKey:'hist.returnPaidCash', labelVars:{ amount:(parseInt(x.returnPrice)||0).toLocaleString('en-EG') }, date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
 }
 
 async function recordPayment(){
@@ -6270,14 +6375,14 @@ function stmtDesc(e){
   if(e.type==='opening') return 'رصيد افتتاحي سابق';
   if(e.type==='discount') return 'خصم' + (e.note ? ' — ' + e.note : '');
   if(e.type==='credit') return 'دفعة' + (e.note ? ' — ' + e.note : '');
-  return 'جهاز: ' + (e.deviceLabel||'') + (e.prevShop ? ` (منقول من حساب ${e.prevShop})` : '');
+  return (e.kind==='return' ? 'مرتجع — ' : '') + 'جهاز: ' + (e.deviceLabel||'') + (e.prevShop ? ` (منقول من حساب ${e.prevShop})` : '');
 }
 // وصف الحركة بأيقونات (للـ PDF)
 function stmtDescHtml(e){
   if(e.type==='opening') return '🧾 رصيد افتتاحي سابق';
   if(e.type==='discount') return '🏷️ خصم' + (e.note ? ' — ' + esc(e.note) : '');
   if(e.type==='credit') return '💵 دفعة' + (e.note ? ' — ' + esc(e.note) : '');
-  return `📱 ${esc(e.deviceLabel||'جهاز')}` + (e.prevShop ? `<br><small style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</small>` : '');
+  return `${e.kind==='return' ? '🔁 ' : ''}📱 ${esc(e.deviceLabel||'جهاز')}${e.kind==='return' ? ` <small style="color:var(--violet);font-weight:800;">(مرتجع)</small>` : ''}` + (e.prevShop ? `<br><small style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</small>` : '');
 }
 
 // عطل الجهاز في كشف الحساب.
@@ -6287,6 +6392,7 @@ function stmtIssue(e){
   if(e.type !== 'debit') return '';
   if(e.issue) return e.issue;
   const d = devices.find(x => x.id === e.deviceId);
+  if(e.kind === 'return') return (d && (d.discoveredFault || d.returnComplaint)) ? String(d.discoveredFault || d.returnComplaint).trim() : '';
   return (d && d.reportedIssue) ? String(d.reportedIssue).trim() : '';
 }
 
