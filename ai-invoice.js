@@ -1688,6 +1688,8 @@
     } catch (e) { if (DP.deviceId === id) DP.rows = []; }
     DP.loading = false;
     paintDeviceSection(id);
+    // إخطار الداشبورد يعيد حساب النقط (يغطّي فتح الجهاز + الربط/الفصل)
+    try { if (typeof window.onDevicePartsChanged === 'function') window.onDevicePartsChanged(id); } catch (e) {}
   }
 
   // بتتنادى بعد ما renderDetail يرسم المودال (عن طريق التغليف في boot)
@@ -1729,6 +1731,9 @@
       INV.loadParts();
     },
     close() { const o = $('invOverlay'); if (o) o.classList.add('hidden'); },
+
+    // أسماء قطع الغيار المربوطة بجهاز (للحاسبة) — بترجّع null لو لسه ما اتحمّلتش
+    getDevicePartNames(id) { return (DP.deviceId === id && !DP.loading) ? DP.rows.map(r => r.name).filter(Boolean) : null; },
 
     setTab(tk) { IS.tab = tk; IS.adding = false; IS.allocId = null; invRender(); },
     search(v) {

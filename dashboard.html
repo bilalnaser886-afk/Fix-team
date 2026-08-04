@@ -905,6 +905,17 @@
   }
   .te-item:hover{background:var(--surface-3);}
 
+  /* ===== صفحة أجهزة الفني ===== */
+  .td-item{display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:9px; cursor:pointer; text-align:right; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .td-item:hover{background:var(--surface-3);}
+  .td-item:active{transform:scale(.995);}
+  .td-item-name{font-weight:800; font-size:15px; color:var(--ink);}
+  .td-item-sub{font-size:12.5px; color:var(--muted-2); margin-top:3px;}
+  .td-item-pts{text-align:center; flex-shrink:0; min-width:56px;}
+  .td-pts-num{font-family:'Cairo',sans-serif; font-weight:900; font-size:20px; color:var(--violet); line-height:1.05;}
+  .td-pts-lbl{font-size:9.5px; color:var(--muted-2);}
+  .td-pts-share{font-size:11px; color:var(--muted); margin-top:2px;}
+
   /* ===== كبار العملاء ===== */
   .cust-item{
     display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
@@ -999,6 +1010,18 @@
   .calc-apply:active{transform:translateY(1px);}
   .calc-open-btn{width:100%;margin-top:8px;background:var(--surface-3);border:1.5px dashed var(--info);color:var(--info);border-radius:11px;padding:11px;font-family:'Cairo','Segoe UI',sans-serif;font-weight:800;font-size:14px;cursor:pointer;}
   .calc-open-btn:disabled{opacity:.5;cursor:default;}
+  .calc-issue{background:var(--surface-3);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--muted);margin-bottom:2px;line-height:1.6;}
+  .calc-issue span{color:var(--ink);font-weight:600;}
+  .calc-sugg-wrap{display:flex;flex-direction:column;gap:8px;}
+  .calc-sugg{display:flex;flex-wrap:wrap;align-items:center;gap:7px;}
+  .calc-sugg-w{font-size:13px;font-weight:800;color:var(--rejected_shop,#C2185B);}
+  .calc-chip.mini{padding:6px 11px;font-size:12.5px;}
+  .calc-auto{font-size:12px;line-height:1.65;margin-top:7px;padding:8px 11px;border-radius:9px;}
+  .calc-auto.ok{background:rgba(37,99,235,.09);color:var(--info);}
+  .calc-auto.ok b{font-size:14px;font-weight:800;}
+  .calc-auto.warn{background:var(--rejected_shop-bg,#FCE7F1);color:var(--rejected_shop,#C2185B);font-weight:700;margin-top:5px;}
+  .calc-auto.part{background:rgba(147,51,234,.08);color:var(--violet);margin-top:5px;font-weight:600;}
+  .calc-auto-m{opacity:.75;}
 </style>
 </head>
 <body>
@@ -1342,6 +1365,17 @@
       <button class="close-btn" onclick="closeTechEval()">×</button>
     </div>
     <div id="techEvalBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- صفحة أجهزة الفني (تفتح بالضغط على اسم الفني في التقييم) -->
+<div id="techDevOverlay" class="overlay hidden" style="z-index:40; align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2 id="techDevTitle">🔧</h2>
+      <button class="close-btn" onclick="closeTechDevices()">×</button>
+    </div>
+    <div id="techDevBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -3596,6 +3630,7 @@ function renderDetail(){
           <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
         </label>
         <button type="button" class="calc-open-btn"${roB} onclick="openPtsCalc()">🧮 احسب النقط من الأعطال</button>
+        ${autoPointsNote(d)}
         ${d.technician ? `
         <div class="tech-row">
           <label class="field"><span>🤝 ${t('det.assistTech')}</span>
@@ -3783,21 +3818,141 @@ function _guessModel(model){
 
 const _fmtPts = n => (Math.round(n*10)/10).toString();
 
+// ===== مطابقة العطل المكتوب بالأعطال المعروفة =====
+function _norm(s){
+  return (typeof enDigits==='function' ? enDigits(String(s||'')) : String(s||'')).toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g,'')
+    .replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/[ى]/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي')
+    .replace(/[^\u0621-\u064A a-z0-9]/g,' ')
+    .replace(/(^| |و)ال/g,'$1')
+    .replace(/\s+/g,' ').trim();
+}
+const _SYN = {
+  'باغه':['جلاس','glass','زجاج','قزاز'],'شاشه':['lcd','سكرين','اسكرين'],'تاتش':['touch','لمس'],
+  'فلاته':['فلات','flex','فليكس'],'سماعه':['speaker','سبيكر'],'بطاريه':['battery'],
+  'كاميرا':['camera','كام'],'شحن':['charge','تشارج','شاحن'],'بصمه':['finger','فنجر'],
+  'فيس':['face','fid','face id','فيسايدي'],'مايك':['mic','مايكروفون','ميكروفون'],
+  'ضهر':['back','باك','ظهر','غطاء','كفر'],'شاسيه':['chassis','هيكل','بودي','body'],
+  'فريم':['frame','اطار','برواز'],'ووتر':['water','مياه','ميه','بلل','غرق'],'هوم':['home'],
+  'فلاش':['flash'],'سينسور':['sensor','حساس'],
+};
+const _STOP = new Set(['تغيير','اصلاح','عطل','مشكله','بيشتغل','مكسور','مكسوره','خربان','خربانه','تركيب','الجهاز','جهاز','بيسخن','وقع','معلق','بيهنج','عايز','بدون','فيه','عنده','بقاله','لسه','حاجه','غريبه','معروفه']);
+
+function _faultAliases(name){
+  const set = new Set();
+  const add = x => { const n=_norm(x); if(n.length>=2) set.add(n); };
+  const noPar = name.replace(/\([^)]*\)/g,' ');
+  add(noPar);
+  noPar.split('/').forEach(add);
+  const par = (name.match(/\(([^)]*)\)/)||[])[1];
+  if(par) par.split('/').forEach(add);
+  [...set].forEach(p => Object.keys(_SYN).forEach(k => { if(p.indexOf(k)>-1) _SYN[k].forEach(sy=>{const v=p.replace(k,_norm(sy)); if(v.length>=2)set.add(v);}); }));
+  return [...set];
+}
+function _autoMatch(text, cat){
+  let work = ' ' + _norm(text) + ' ';
+  const faults = PTS_DATA[cat] || [];
+  const pairs = [];
+  faults.forEach((f,i) => _faultAliases(f.n).forEach(a => pairs.push({a,i})));
+  pairs.sort((x,y) => y.a.length - x.a.length);
+  const matched = new Set();
+  pairs.forEach(({a,i}) => {
+    let idx = work.indexOf(' '+a+' '), mlen = a.length;
+    if(idx < 0){ const w = work.indexOf(' و'+a+' '); if(w>-1){ idx=w; mlen=a.length+1; } }   // واو العطف
+    if(idx > -1){ matched.add(i); const st=idx+1; work = work.slice(0,st) + ' '.repeat(mlen) + work.slice(st+mlen); }
+  });
+  const leftovers = [...new Set(work.split(/\s+/).filter(w => w.length>=3 && !_STOP.has(w)))];
+  return { matched:[...matched], leftovers };
+}
+function _sim(a,b){ if(a===b) return 1; if(a.indexOf(b)>-1||b.indexOf(a)>-1) return .8; let best=0; for(let i=0;i<a.length;i++)for(let j=0;j<b.length;j++){let k=0;while(a[i+k]&&a[i+k]===b[j+k])k++;if(k>best)best=k;} return best/Math.max(a.length,b.length); }
+function _closest(word, cat){
+  const f = PTS_DATA[cat] || [];
+  return f.map((x,i)=>{ let s=0; _faultAliases(x.n).forEach(a=>{const v=_sim(word,a); if(v>s)s=v;}); return {i,s}; })
+          .filter(x=>x.s>=0.55).sort((a,b)=>b.s-a.s).slice(0,3).map(x=>x.i);
+}
+function _ptsOf(i){ const f=(PTS_DATA[_calcCat]||[])[i]; if(!f) return null; return (_calcCat==='iphone_x') ? faultPts(f,_calcModel) : f.p; }
+function _applyAutoMatch(){
+  const r = _autoMatch(_calcIssueText, _calcCat);
+  _calcSel = new Set(r.matched);
+  _calcSuggestions = r.leftovers.map(w => ({ word:w, idxs:_closest(w, _calcCat) })).filter(s => s.idxs.length);
+}
+
+// ===== حساب تلقائي كامل من العطل — من غير فتح الحاسبة =====
+function autoCalcPoints(d){
+  if(!d) return null;
+  const cat = _guessCat(d.deviceType, d.model);
+  const model = (cat === 'iphone_x') ? _guessModel(d.model) : null;
+  const rText = _autoMatch(d.reportedIssue || '', cat);
+  const idxSet = new Set(rText.matched);
+  const fromText = new Set(rText.matched);
+  const fromParts = new Set();
+  // أعطال من قطع الغيار المربوطة بالجهاز (لو الميزة مفعّلة والقطع محمّلة)
+  let partNames = [];
+  try { if(window.INV && typeof window.INV.getDevicePartNames === 'function'){ partNames = window.INV.getDevicePartNames(d.id) || []; } } catch(e){}
+  partNames.forEach(nm => { _autoMatch(nm, cat).matched.forEach(i => { idxSet.add(i); fromParts.add(i); }); });
+  let total = 0; const names = [];
+  idxSet.forEach(i => {
+    const f = PTS_DATA[cat][i]; if(!f) return;
+    const p = (cat === 'iphone_x') ? faultPts(f, model) : f.p;
+    if(p != null){ total += p; names.push(f.n); }
+  });
+  const uncertain = rText.leftovers.filter(w => _closest(w, cat).length);
+  return { total: Math.round(total*10)/10, names, model, cat, uncertain, matchedCount: idxSet.size, fromText:[...fromText], fromParts:[...fromParts] };
+}
+
+// سطر توضيحي تحت حقل النقط: إيه اللي اترصد تلقائياً + تنبيه للمش متأكد منه
+function autoPointsNote(d){
+  const a = autoCalcPoints(d);
+  if(!a || (!a.names.length && !a.uncertain.length)) return '';
+  let h = '';
+  if(a.names.length)
+    h += `<div class="calc-auto ok">🧮 اتحسبت تلقائياً: ${esc(a.names.join('، '))}${a.model?` <span class="calc-auto-m">(iPhone ${esc(a.model)})</span>`:''} = <b>${_fmtPts(a.total)}</b> نقطة</div>`;
+  const partOnly = a.fromParts.filter(i => !a.fromText.includes(i)).map(i => (PTS_DATA[a.cat][i]||{}).n).filter(Boolean);
+  if(partOnly.length)
+    h += `<div class="calc-auto part">🔩 مضاف من القطع المركّبة: ${esc(partOnly.join('، '))}</div>`;
+  if(a.uncertain.length)
+    h += `<div class="calc-auto warn">⚠️ محتاج تأكيد: ${a.uncertain.map(w=>`«${esc(w)}»`).join(' ')} — افتح الحاسبة وأكّده</div>`;
+  return h;
+}
+
+// يتنده من موديول قطع الغيار لما القطع تتحمّل/تتغيّر → يعيد حساب النقط تلقائي
+let _partsBusy = false;
+window.onDevicePartsChanged = function(deviceId){
+  if(_partsBusy) return;
+  if(deviceId !== selectedId) return;
+  const d = devices.find(x => x.id === selectedId);
+  if(!d || d.isWholesale) return;
+  const auto = autoCalcPoints(d);
+  const newPts = (auto && auto.matchedCount > 0) ? String(auto.total) : null;
+  _partsBusy = true;
+  try {
+    if(newPts !== null && newPts !== String(d.points||'')){
+      devices = devices.map(x => x.id === selectedId ? { ...x, points:newPts, lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name } : x);
+      renderDetail(); render(); persist();
+    } else {
+      renderDetail();
+    }
+  } finally { _partsBusy = false; }
+};
+
 // ===== حالة الحاسبة =====
 let _calcCat = 'iphone_x';
 let _calcModel = 'X';
 let _calcSel = new Set();
+let _calcIssueText = '';
+let _calcSuggestions = [];
 
 function openPtsCalc(){
   const d = devices.find(x => x.id === selectedId); if(!d) return;
   _calcCat = _guessCat(d.deviceType, d.model);
   _calcModel = (_calcCat === 'iphone_x') ? _guessModel(d.model) : 'X';
-  _calcSel = new Set();
+  _calcIssueText = d.reportedIssue || '';
+  _applyAutoMatch();
   document.getElementById('ptsCalcOverlay').classList.remove('hidden');
   renderPtsCalc();
 }
 function closePtsCalc(){ document.getElementById('ptsCalcOverlay').classList.add('hidden'); }
-function setCalcCat(k){ if(_calcCat===k) return; _calcCat = k; _calcSel = new Set(); renderPtsCalc(); }
+function setCalcCat(k){ if(_calcCat===k) return; _calcCat = k; _applyAutoMatch(); renderPtsCalc(); }
 function setCalcModel(m){ _calcModel = m; renderPtsCalc(); }
 function togglePtsFault(i){ if(_calcSel.has(i)) _calcSel.delete(i); else _calcSel.add(i); renderPtsCalc(); }
 
@@ -3835,14 +3990,24 @@ function renderPtsCalc(){
       ${IPHONE_X_ORDER.map(m => `<option value="${esc(m)}"${m===_calcModel?' selected':''}>iPhone ${esc(m)}</option>`).join('')}
     </select>` : '';
 
+  const issueLine = _calcIssueText
+    ? `<div class="calc-issue">📋 العطل المكتوب: <span>${esc(_calcIssueText)}</span></div>` : '';
+
+  const sugg = (_calcSuggestions || []).filter(s => s.idxs.length);
+  const suggHtml = sugg.length ? `
+    <div class="calc-label">🔎 مش متأكد من دول — دوس لو صح:</div>
+    <div class="calc-sugg-wrap">${sugg.map(s => `<div class="calc-sugg"><span class="calc-sugg-w">«${esc(s.word)}»</span>${s.idxs.map(i => { const p=_ptsOf(i); if(p==null) return ''; return `<button type="button" class="calc-chip mini${_calcSel.has(i)?' on':''}" onclick="togglePtsFault(${i})"><span>${esc(faults[i].n)}</span><b>${_fmtPts(p)}</b></button>`; }).join('')}</div>`).join('')}</div>` : '';
+
   total = Math.round(total*10)/10;
 
   document.getElementById('ptsCalcModal').innerHTML = `
     <div class="calc-head"><span>🧮 حاسبة النقط</span><button type="button" onclick="closePtsCalc()">×</button></div>
+    ${issueLine}
     <div class="calc-label">الفئة</div>
     <div class="calc-cats">${catsBtns}</div>
     ${modelSel}
-    <div class="calc-label">الأعطال اللي اتعملت <span style="font-weight:400;color:var(--muted);">(اضغط لاختيار أكتر من واحد)</span></div>
+    ${suggHtml}
+    <div class="calc-label">الأعطال <span style="font-weight:400;color:var(--muted);">(الملوّن اترصد من العطل — دوس للتعديل)</span></div>
     <div class="calc-chips">${chips}</div>
     <div class="calc-foot">
       <div class="calc-total">المجموع: <b>${_fmtPts(total)}</b> نقطة</div>
@@ -3857,9 +4022,20 @@ function applyPtsCalc(){
 }
 
 async function editField(key, value){
-  devices = devices.map(d => d.id === selectedId ? { ...d, [key]: value.trim(), lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  let extra = {};
+  if(key === 'reportedIssue'){
+    const cur = devices.find(x => x.id === selectedId);
+    if(cur && !cur.isWholesale){
+      const auto = autoCalcPoints({ ...cur, reportedIssue: value.trim() });
+      if(auto && auto.matchedCount > 0) extra.points = String(auto.total);   // حساب تلقائي كامل
+    }
+  }
+  devices = devices.map(d => d.id === selectedId ? { ...d, [key]: value.trim(), ...extra, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
   renderDetail();
   render();
+  if(_openTechDevName && document.getElementById('techDevOverlay') && !document.getElementById('techDevOverlay').classList.contains('hidden')){
+    renderTechEval(); openTechDevices(_openTechDevName);   // تحديث صفحة الفني لو مفتوحة
+  }
   await persist();
   const updTrack = devices.find(x => x.id === selectedId);
   if(updTrack){ if(!updTrack.trackToken){ await ensureTrackToken(updTrack.id); } syncTrack(devices.find(x => x.id === selectedId)); }
@@ -7426,6 +7602,33 @@ function completionDate(d){
   return h.length ? h[h.length - 1].date : null;
 }
 
+// صفحة أجهزة الفني — تفتح بالضغط على اسم الفني في التقييم
+let _openTechDevName = null;
+function openTechDevices(techName){
+  const r = (teRows || []).find(x => x.t === techName);
+  if(!r) return;
+  _openTechDevName = techName;
+  const round1 = n => Math.round(n * 10) / 10;
+  const items = r.items.slice().sort((a,b) => b.share - a.share);
+  const roleLabel = x => x.role === 'مساعد' ? `🤝 ${t('te.assistant')}` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}`;
+  const rows = items.length ? items.map(x => `
+    <div class="td-item" onclick="openDetail('${x.d.id}')">
+      <div class="td-item-info">
+        <div class="td-item-name">${esc(x.d.deviceType)} ${esc(x.d.model)}</div>
+        <div class="td-item-sub">${x.d.customerName ? esc(x.d.customerName) + ' · ' : ''}${roleLabel(x)}${x.d.shopName ? ' · ' + esc(x.d.shopName) : ''}</div>
+      </div>
+      <div class="td-item-pts">
+        <div class="td-pts-num">${esc(x.d.points || '0')}</div>
+        <div class="td-pts-lbl">${t('te.devicePoints')}</div>
+        ${round1(x.share) !== (parseFloat(enDigits(x.d.points)) || 0) ? `<div class="td-pts-share">↳ ${round1(x.share)}</div>` : ''}
+      </div>
+    </div>`).join('') : `<div class="empty-col">${t('te.noPoints')}</div>`;
+  document.getElementById('techDevTitle').innerHTML = `🔧 ${esc(r.t)} <span style="font-size:13px;font-weight:500;color:var(--muted-2);">(${items.length} ${t('te.deviceCount')} · ⭐ ${r.points})</span>`;
+  document.getElementById('techDevBody').innerHTML = rows;
+  document.getElementById('techDevOverlay').classList.remove('hidden');
+}
+function closeTechDevices(){ _openTechDevName = null; document.getElementById('techDevOverlay').classList.add('hidden'); }
+
 function renderTechEval(){
   const chip = (mode, label) =>
     `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
@@ -7533,8 +7736,8 @@ function renderTechEval(){
     : `<table class="inv-table">
         <tr><th>${t('te.colTech')}</th><th>⭐ ${t('te.colPoints')}</th><th>${t('te.colDone')}</th><th>${t('te.colAvg')}</th><th>${t('te.colReturns')}</th><th>${t('te.colRate')}</th></tr>
         ${teRows.map((r, i) => `
-          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="${t('te.tapForDetails')}">
-            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:var(--muted-2);font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span>
+          <tr onclick="openTechDevices('${esc(r.t).replace(/'/g,"\\'")}')" style="cursor:pointer;" title="${t('te.tapForDetails')}">
+            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:var(--muted-2);font-weight:500;">‹</span>
               <button onclick="event.stopPropagation(); openTechPortal('${esc(r.t).replace(/'/g,"\\'")}')" title="${t('tp.openTech')}" style="margin-inline-start:6px;border:1px solid #DDD6FE;background:var(--surface-2);color:var(--violet);border-radius:7px;padding:3px 8px;font-size:12px;cursor:pointer;">📱</button></td>
             <td style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
             <td style="font-weight:800; color:var(--success);">${r.count}</td>
@@ -7555,7 +7758,11 @@ function renderTechEval(){
                         ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
                       </div>
                     </div>
-                    <div style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif;">${round1(x.share)}</div>
+                    <div style="text-align:center; flex-shrink:0; min-width:54px;">
+                      <div style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif; font-size:18px; line-height:1.05;">${esc(x.d.points||'0')}</div>
+                      <div style="font-size:9.5px; color:var(--muted-2);">${t('te.devicePoints')}</div>
+                      ${round1(x.share) !== (parseFloat(enDigits(x.d.points))||0) ? `<div style="font-size:11px; color:var(--muted); margin-top:1px;">↳ ${round1(x.share)}</div>` : ''}
+                    </div>
                   </div>`).join('')}
             </div>
           </td></tr>` : ''}
