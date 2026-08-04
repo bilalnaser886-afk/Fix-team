@@ -1021,6 +1021,8 @@
   .calc-auto.ok b{font-size:14px;font-weight:800;}
   .calc-auto.warn{background:var(--rejected_shop-bg,#FCE7F1);color:var(--rejected_shop,#C2185B);font-weight:700;margin-top:5px;}
   .calc-auto.part{background:rgba(147,51,234,.08);color:var(--violet);margin-top:5px;font-weight:600;}
+  .calc-auto.ai{background:rgba(37,99,235,.10);color:var(--info);margin-top:5px;font-weight:600;}
+  .calc-auto.ai-maybe{background:var(--surface-3);color:var(--muted);margin-top:5px;}
   .calc-auto-m{opacity:.75;}
 </style>
 </head>
@@ -3388,6 +3390,7 @@ function openDetail(id){
   if(d && d.trackToken){
     loadTrackResponses(d.trackToken).then(() => { if(selectedId === id) renderDetail(); });
   }
+  runAiIfNeeded(id);   // شغّل الذكاء الاصطناعي لو العطل صعب (يغطّي المكتوب وقت الاستلام)
 }
 function closeDetail(){
   document.getElementById('detailOverlay').classList.add('hidden');
@@ -3886,10 +3889,16 @@ function autoCalcPoints(d){
   const idxSet = new Set(rText.matched);
   const fromText = new Set(rText.matched);
   const fromParts = new Set();
-  // أعطال من قطع الغيار المربوطة بالجهاز (لو الميزة مفعّلة والقطع محمّلة)
+  const fromAI = new Set();
+  // أعطال من قطع الغيار المربوطة بالجهاز
   let partNames = [];
   try { if(window.INV && typeof window.INV.getDevicePartNames === 'function'){ partNames = window.INV.getDevicePartNames(d.id) || []; } } catch(e){}
   partNames.forEach(nm => { _autoMatch(nm, cat).matched.forEach(i => { idxSet.add(i); fromParts.add(i); }); });
+  // أعطال من الذكاء الاصطناعي (كاش لنفس النص والفئة)
+  const ai = _aiCache[d.id];
+  if(ai && ai.cat === cat && ai.text === (d.reportedIssue||'').trim()){
+    (ai.matched||[]).forEach(i => { if(!idxSet.has(i)){ idxSet.add(i); fromAI.add(i); } });
+  }
   let total = 0; const names = [];
   idxSet.forEach(i => {
     const f = PTS_DATA[cat][i]; if(!f) return;
@@ -3897,19 +3906,28 @@ function autoCalcPoints(d){
     if(p != null){ total += p; names.push(f.n); }
   });
   const uncertain = rText.leftovers.filter(w => _closest(w, cat).length);
-  return { total: Math.round(total*10)/10, names, model, cat, uncertain, matchedCount: idxSet.size, fromText:[...fromText], fromParts:[...fromParts] };
+  return { total: Math.round(total*10)/10, names, model, cat, uncertain, matchedCount: idxSet.size,
+           fromText:[...fromText], fromParts:[...fromParts], fromAI:[...fromAI], allIdx:[...idxSet] };
 }
 
 // سطر توضيحي تحت حقل النقط: إيه اللي اترصد تلقائياً + تنبيه للمش متأكد منه
 function autoPointsNote(d){
   const a = autoCalcPoints(d);
   if(!a || (!a.names.length && !a.uncertain.length)) return '';
+  const nm = i => (PTS_DATA[a.cat][i]||{}).n;
   let h = '';
   if(a.names.length)
     h += `<div class="calc-auto ok">🧮 اتحسبت تلقائياً: ${esc(a.names.join('، '))}${a.model?` <span class="calc-auto-m">(iPhone ${esc(a.model)})</span>`:''} = <b>${_fmtPts(a.total)}</b> نقطة</div>`;
-  const partOnly = a.fromParts.filter(i => !a.fromText.includes(i)).map(i => (PTS_DATA[a.cat][i]||{}).n).filter(Boolean);
+  const partOnly = a.fromParts.filter(i => !a.fromText.includes(i)).map(nm).filter(Boolean);
   if(partOnly.length)
     h += `<div class="calc-auto part">🔩 مضاف من القطع المركّبة: ${esc(partOnly.join('، '))}</div>`;
+  const aiOnly = a.fromAI.map(nm).filter(Boolean);
+  if(aiOnly.length)
+    h += `<div class="calc-auto ai">🤖 زوّده الذكاء الاصطناعي: ${esc(aiOnly.join('، '))}</div>`;
+  const ai = _aiCache[d.id];
+  const poss = (ai && ai.cat===a.cat && ai.text===(d.reportedIssue||'').trim()) ? (ai.possible||[]).map(nm).filter(Boolean) : [];
+  if(poss.length)
+    h += `<div class="calc-auto ai-maybe">🤖 يمكن كمان (من الشكوى): ${esc(poss.join('، '))} — افتح الحاسبة لو صح</div>`;
   if(a.uncertain.length)
     h += `<div class="calc-auto warn">⚠️ محتاج تأكيد: ${a.uncertain.map(w=>`«${esc(w)}»`).join(' ')} — افتح الحاسبة وأكّده</div>`;
   return h;
@@ -3935,6 +3953,55 @@ window.onDevicePartsChanged = function(deviceId){
   } finally { _partsBusy = false; }
 };
 
+// ===== طبقة الذكاء الاصطناعي (للحالات الصعبة بس — Edge Function: match-faults) =====
+let _aiCache = {};   // { devId: { text, cat, matched:[idx], possible:[idx] } }
+let _aiBusy = {};
+
+async function aiMatchFaults(text, cat){
+  const names = (PTS_DATA[cat] || []).map(f => f.n);
+  try {
+    const { data, error } = await sb.functions.invoke('match-faults', { body: { text, faults: names, category: cat } });
+    if(error || !data || !data.ok) return null;
+    const toIdx = arr => [...new Set((arr||[]).map(x => names.indexOf(x)).filter(i => i >= 0))];
+    return { matched: toIdx(data.matched), possible: toIdx(data.possible) };
+  } catch(e){ return null; }
+}
+
+async function runAiForDevice(deviceId){
+  if(_aiBusy[deviceId]) return;
+  const d0 = devices.find(x => x.id === deviceId);
+  if(!d0 || d0.isWholesale) return;
+  const text = (d0.reportedIssue||'').trim();
+  const cat = _guessCat(d0.deviceType, d0.model);
+  if(!text) return;
+  _aiBusy[deviceId] = true;
+  const res = await aiMatchFaults(text, cat);
+  delete _aiBusy[deviceId];
+  if(!res) return;
+  const d1 = devices.find(x => x.id === deviceId);
+  if(!d1 || (d1.reportedIssue||'').trim() !== text) return;   // النص اتغيّر أثناء النداء
+  _aiCache[deviceId] = { text, cat, matched: res.matched, possible: res.possible };
+  const auto = autoCalcPoints(d1);
+  if(auto && auto.matchedCount > 0 && String(auto.total) !== String(d1.points||'')){
+    devices = devices.map(x => x.id === deviceId ? { ...x, points: String(auto.total), lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name } : x);
+    render(); if(selectedId === deviceId) renderDetail(); persist();
+  } else if(selectedId === deviceId){
+    renderDetail();
+  }
+}
+
+// يشغّل الـ AI بس لو الكيوردز عاجز (ملقاش/فيه غموض) ومفيش كاش لنفس النص
+function runAiIfNeeded(deviceId){
+  const d = devices.find(x => x.id === deviceId);
+  if(!d || d.isWholesale) return;
+  const text = (d.reportedIssue||'').trim();
+  if(!text) return;
+  const cached = _aiCache[deviceId];
+  if(cached && cached.text === text) return;
+  const auto = autoCalcPoints(d);   // كيوردز + قطع (من غير AI)
+  if(auto.matchedCount === 0 || (auto.uncertain||[]).length) runAiForDevice(deviceId);
+}
+
 // ===== حالة الحاسبة =====
 let _calcCat = 'iphone_x';
 let _calcModel = 'X';
@@ -3947,7 +4014,16 @@ function openPtsCalc(){
   _calcCat = _guessCat(d.deviceType, d.model);
   _calcModel = (_calcCat === 'iphone_x') ? _guessModel(d.model) : 'X';
   _calcIssueText = d.reportedIssue || '';
-  _applyAutoMatch();
+  // اختيار مبدئي = كل مصادر الحساب (نص + قطع + AI)
+  const auto = autoCalcPoints(d);
+  _calcSel = new Set(auto ? auto.allIdx : []);
+  // اقتراحات = غموض الكيوردز + محتملات الـ AI من الشكوى
+  const r = _autoMatch(_calcIssueText, _calcCat);
+  _calcSuggestions = r.leftovers.map(w => ({ word:w, idxs:_closest(w, _calcCat) })).filter(s => s.idxs.length);
+  const ai = _aiCache[d.id];
+  if(ai && ai.cat === _calcCat && (ai.possible||[]).length){
+    _calcSuggestions.unshift({ word:'🤖 يمكن كمان', idxs: ai.possible });
+  }
   document.getElementById('ptsCalcOverlay').classList.remove('hidden');
   renderPtsCalc();
 }
@@ -4026,6 +4102,7 @@ async function editField(key, value){
   if(key === 'reportedIssue'){
     const cur = devices.find(x => x.id === selectedId);
     if(cur && !cur.isWholesale){
+      delete _aiCache[selectedId];   // نص جديد → ألغي كاش الـ AI القديم
       const auto = autoCalcPoints({ ...cur, reportedIssue: value.trim() });
       if(auto && auto.matchedCount > 0) extra.points = String(auto.total);   // حساب تلقائي كامل
     }
@@ -4039,6 +4116,7 @@ async function editField(key, value){
   await persist();
   const updTrack = devices.find(x => x.id === selectedId);
   if(updTrack){ if(!updTrack.trackToken){ await ensureTrackToken(updTrack.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+  if(key === 'reportedIssue') runAiIfNeeded(selectedId);   // الذكاء الاصطناعي للحالات الصعبة (بعد الحفظ)
 }
 
 // ===== ملاحظات إضافية (سجل بيتزاد وميتعدّلش) =====
