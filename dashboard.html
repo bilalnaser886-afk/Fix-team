@@ -98,6 +98,7 @@
 <script src="i18n.js"></script>
 <!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
 <script src="ai-invoice.js"></script>
+<script src="qr-scan.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1085,6 +1086,8 @@
 <div class="gs-wrap" id="gsWrap">
   <div class="gs-box">
     <span class="ic">🔍</span>
+    <button type="button" class="ifs-btn" id="gsScan" style="display:none;"
+            onclick="scanWithCamera()" data-i18n-title="scan.btn" title="مسح باركود">⬚</button>
     <input id="gsInput" type="search" autocomplete="off"
            data-i18n-ph="search.global.ph"
            placeholder="دوّر على عميل، محل، جهاز، أو رقم تليفون..."
@@ -5430,6 +5433,25 @@ function findDeviceByScan(raw){
 let gScanBuf = '', gScanLast = 0;
 
 // بيفتح الجهاز وينضف أي أثر للكود من الخانات
+// ============================================================
+// مسح الباركود بالكاميرا
+// ------------------------------------------------------------
+// بيستخدم findDeviceByScan الموجود — نفس المنطق اللي الماسح السلكي
+// بيمر عليه بالظبط، فمفيش نسختين من قواعد المطابقة تفترقوا بعدين.
+// ============================================================
+function scanWithCamera(){
+  if(!window.IFixScan) return;
+  IFixScan.open(text => {
+    const hit = findDeviceByScan(text);
+    if(hit) return openScannedDevice(hit);
+    // مفيش نتيجة؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
+    const box = document.getElementById('gsInput');
+    if(box){ box.value = text; box.dispatchEvent(new Event('input', { bubbles:true })); box.focus(); }
+    showError(t('scan.notFound'));
+    setTimeout(() => showError(''), 3000);
+  });
+}
+
 function openScannedDevice(hit){
   const el = document.activeElement;
   if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')){
@@ -8007,6 +8029,12 @@ requireAccess().then(ok => {
   }catch(e){}
   // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
   // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
+  try{
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+      const b = document.getElementById('gsScan'); if(b) b.style.display = '';
+    }
+  }catch(e){}
+
   loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
     .then(applyRoleVisibility);

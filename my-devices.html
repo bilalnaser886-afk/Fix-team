@@ -26,6 +26,7 @@
 <meta name="theme-color" content="#1B2A3A">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="i18n.js"></script>
+<script src="qr-scan.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -975,6 +976,52 @@ async function reportProblem(id){
 
 /* ===== شيت التفاصيل ===== */
 let sheetId='', handOn=false, handMode='', handTarget='';
+// ============================================================
+// مسح الباركود بالكاميرا
+// ------------------------------------------------------------
+// الباركود على الليبل فيه كود الجهاز (زي dev_1712345678901).
+// بنطابق بالأرقام: مبتتأثرش بلغة الكيبورد ولا بالمسافات، والكود
+// فيه ١٣ رقم فريدة — نفس أسلوب الداشبورد.
+// ============================================================
+function scanFind(text){
+  const raw = String(text || '').trim();
+  if(!raw) return null;
+  const digits = raw.replace(/[^0-9]/g, '');
+  if(digits.length >= 10){
+    const byDigits = devices.find(d => {
+      const idd = String(d.id).replace(/[^0-9]/g, '');
+      return idd && (idd === digits || idd.endsWith(digits) || digits.endsWith(idd));
+    });
+    if(byDigits) return byDigits;
+  }
+  const up = raw.toUpperCase().replace(/^#/, '');
+  return devices.find(d =>
+    String(d.id).toUpperCase() === up ||
+    String(d.id).slice(-5).toUpperCase() === up) || null;
+}
+
+function scanWithCamera(){
+  if(!window.IFixScan) return;
+  IFixScan.open(text => {
+    const hit = scanFind(text);
+    if(hit) return openSheet(hit.id);
+    // مفيش نتيجة؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
+    const box = document.getElementById('q');
+    if(box){ box.value = text; render(); box.focus(); }
+    toast(t('scan.notFound'));
+  });
+}
+
+function mountScanBtn(){
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    const box = document.getElementById('q');
+    if(box && window.IFixScan) IFixScan.mountButton(box, () => {});
+    const b = box && box.parentElement && box.parentElement.querySelector('.ifs-btn');
+    if(b) b.onclick = e => { e.preventDefault(); scanWithCamera(); };
+  }catch(e){}
+}
+
 function openSheet(id){ sheetId=id; handOn=false; handMode=''; handTarget=''; renderSheet(); $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); }
 function closeSheet(){ sheetId=''; $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
 
@@ -1271,6 +1318,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSett
 
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
+  try{ mountScanBtn(); }catch(e){}
 });
 </script>
 </body>
