@@ -1748,8 +1748,12 @@ function myBroadcastKeys(){
 }
 
 async function loadBroadcast(){
-  // مفتاح الميزة مقفول → مفيش إشعارات خالص
-  if(typeof isFeatureEnabled === 'function' && !isFeatureEnabled('live_broadcasts')) return;
+  // المفتاح مقفول صراحةً → مفيش إشعارات.
+  // ⚠️ الفحص على is_enabled === false مش على !isFeatureEnabled():
+  //    الصفحتين التانيتين بتعتبروا المفتاح الناقص = مفتوح، وكان
+  //    الداشبورد بيعتبره مقفول — فنفس الإشعار يوصل لواحد ولأ للتاني.
+  const _bcFlag = featureFlags['live_broadcasts'];
+  if(_bcFlag && _bcFlag.is_enabled === false) return;
   try{
     const rows = await Promise.all(myBroadcastKeys().map(k =>
       window.storage.get(k).catch(() => null)));
@@ -8035,11 +8039,15 @@ requireAccess().then(ok => {
     }
   }catch(e){}
 
+  // ⚠️ loadBroadcast لازم تيجي **بعد** المفاتيح والأدوار.
+  //    كانت بتتنادى فوراً، فبتلاقي featureFlags لسه فاضية وتخرج
+  //    من أول سطر — والإشعارات مبتوصلش أبداً. وكمان بتحتاج
+  //    myRole() عشان تعرف تقرا أنهي مفتاح.
   loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
-    .then(applyRoleVisibility);
+    .then(applyRoleVisibility)
+    .then(() => { try{ loadBroadcast(); }catch(e){} });
   injectAdminMenu();
-  loadBroadcast();
   loadDevices();
   loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
   setInterval(checkAutoBackup, 3600000);
