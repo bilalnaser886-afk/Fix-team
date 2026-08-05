@@ -26,6 +26,8 @@
 <meta name="apple-mobile-web-app-title" content="الحركة">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="i18n.js"></script>
+<script src="qr-scan.js"></script>
+<script src="fuzzy-search.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -34,7 +36,7 @@
      نفس لغة تصميم الفني: ستيل + خط التروس + تذاكر بشريط حالة.
      ============================================================ */
   :root{
-    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#475569;
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --chrome:#16233A; --ink-2:#475569;
     --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
@@ -46,6 +48,7 @@
     --delivered:#64748B; --delivered-bg:#EEF1F3;
     --rejected:#DC2626; --rejected-bg:#FEF2F2;
     --returned:#9333EA; --returned-bg:#F5EEFC;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
@@ -54,7 +57,7 @@
      الشاشة كلها بدل ما يخترع لون جديد. */
   html[data-theme="dark"]{
     color-scheme:dark;
-    --on-chrome:#E9EFF5; --on-color:#0E1721; --ink-2:#C3D2DF;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --chrome:#0E1721; --ink-2:#C3D2DF;
     --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
     --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
     --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
@@ -64,6 +67,7 @@
     --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
     --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
     --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
+    --rejected_shop:#F472B6;   --rejected_shop-bg:rgba(244,114,182,.15);
   }
 
 
@@ -89,11 +93,13 @@
   }
   .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
   .nt-ic{font-size:44px; line-height:1;}
-  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
+  /* ⚠️ var(--ink) مش لون ثابت: العنوان كان #16233A أزرق غامق —
+     في الوضع الداكن بيبقى غامق فوق غامق ومش باين. */
+  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:var(--ink);}
   .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:var(--chrome); color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -290,6 +296,7 @@
   .act:active{transform:scale(.97);}
   .act-hand{background:var(--repairing-bg); color:var(--repairing);}
   .act-ret{background:var(--returned-bg); color:var(--returned);}
+  .act-rej{background:var(--rejected_shop-bg); color:var(--rejected_shop);}
   .act-view{background:var(--paper); color:#52657A; flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
@@ -340,6 +347,27 @@
   .save{width:100%; margin-top:6px; background:var(--red); color:var(--on-color); border:none; border-radius:12px; padding:15px;
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 8px 20px rgba(232,50,30,.3);}
   .save:active{transform:translateY(1px);}
+
+  /* ===== شيت الأكشن العام: تفاصيل / تسليم / رفض ===== */
+  .info-row{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 2px; border-bottom:1px solid var(--line);}
+  .info-row:last-child{border-bottom:none;}
+  .info-k{color:var(--muted); font-size:13px; font-weight:700; flex:0 0 auto;}
+  .info-v{color:var(--ink); font-size:14.5px; font-weight:600; text-align:left; line-height:1.6; word-break:break-word;}
+  .info-chip{display:inline-block; padding:4px 13px; border-radius:999px; font-family:'Cairo',sans-serif; font-weight:800; font-size:12.5px; background:var(--st-bg); color:var(--st);}
+  .act-dev{display:flex; align-items:center; gap:13px; background:var(--paper); border:1px solid var(--line); border-radius:15px; padding:14px 15px; margin-bottom:18px;}
+  .act-dev-ic{font-size:30px; line-height:1; flex:0 0 auto;}
+  .act-dev-name{font-family:'Cairo',sans-serif; font-weight:900; font-size:16.5px; color:var(--ink); line-height:1.25;}
+  .act-dev-sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .act-note{font-size:14px; color:var(--muted); line-height:1.85; margin:0 0 18px; text-align:center;}
+  .act-q{font-family:'Cairo',sans-serif; font-weight:900; font-size:15.5px; color:var(--ink); text-align:center; margin:2px 0 16px;}
+  .act-btn{width:100%; border:none; border-radius:13px; padding:15px; font-family:'Cairo',sans-serif; font-weight:900; font-size:15.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px; color:#fff;}
+  .act-btn:active{transform:translateY(1px);}
+  .act-btn + .act-btn{margin-top:11px;}
+  .act-primary{background:var(--repairing); box-shadow:0 8px 20px rgba(15,23,34,.2);}
+  .act-drawer{background:var(--rejected_shop); box-shadow:0 8px 20px rgba(15,23,34,.2);}
+  .act-out{background:var(--card); color:var(--ink); border:1.5px solid var(--line); box-shadow:none;}
+  .act-ghost{background:transparent; color:var(--muted); box-shadow:none; padding:13px;}
+  @media (prefers-reduced-motion: reduce){ .sheet{transition:none;} }
 
   @media (max-width:520px){ .grid{grid-template-columns:1fr;} .tab{font-size:11.5px;} }
   @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
@@ -403,6 +431,16 @@
     <div class="fld"><label data-i18n="dp.issueLabel">العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." data-i18n-ph="dp.issuePh"></textarea></div>
     <button id="btnSave" class="save" onclick="saveIntake()" data-i18n="dp.submit">سجّل الجهاز في المحل</button>
   </div>
+</div>
+
+<!-- شيت الأكشن العام: تفاصيل الجهاز / تأكيد تسليم / رفض -->
+<div class="sheet-bg" id="actBg" onclick="closeAct()"></div>
+<div class="sheet" id="actSheet">
+  <div class="sheet-head">
+    <div class="grab"></div>
+    <div class="sh-row"><div class="sh-title" id="actTitle"></div><button class="sh-x" onclick="closeAct()">×</button></div>
+  </div>
+  <div class="sh-body" id="actBody"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -725,7 +763,7 @@ async function loadDevices(){
 
     const rows = [...(inShop.data || []), ...(out.data || [])]
       .map(r => r.data).filter(Boolean);
-    devices = rows.map(adapt);
+    devices = rows.map(adapt); reindexSearch();
     offline = false;
     document.querySelectorAll('.offbar').forEach(e => e.remove());
     document.querySelectorAll('.errbar').forEach(e => e.remove());
@@ -733,7 +771,7 @@ async function loadDevices(){
   }catch(e){
     // ⚠️ فرق مهم: "مفيش نت" حاجة، و"خطأ في القراءة" حاجة تانية خالص.
     const c = localStorage.getItem(CACHE_KEY);
-    devices = c ? (JSON.parse(c) || []).map(adapt) : [];
+    devices = c ? (JSON.parse(c) || []).map(adapt) : []; reindexSearch();
     if(!navigator.onLine){
       offline = true;
       showOffline();
@@ -764,7 +802,7 @@ async function boot(){
     if(c && u){
       try{
         const p = JSON.parse(u); ME = p.name || ''; MY_EMAIL = p.email || '';
-        devices = (JSON.parse(c) || []).map(adapt);
+        devices = (JSON.parse(c) || []).map(adapt); reindexSearch();
         offline = true; showOffline(); finish(); return;
       }catch(e){}
     }
@@ -869,11 +907,23 @@ async function patch(id, p){
 async function requestApproval(id, kind){
   const d = devices.find(x => x.id === id); if(!d) return;
   if(d.pending){ toast(t('tp.pendingReq')); return; }
+  const isRet = kind === 'return';
+  const accent = isRet ? '--returned' : '--repairing';
+  const icon   = isRet ? '↩️' : '📦';
+  const body = `
+    ${actDevBlock(d)}
+    <p class="act-note">${isRet ? t('rp.returnConfirmNote') : t('rp.deliverConfirmNote')}</p>
+    <button class="act-btn act-primary" style="background:var(${accent});" onclick="doApproval('${d.id}','${kind}')">${icon} ${t('rp.sendRequest')}</button>
+    <button class="act-btn act-ghost" onclick="closeAct()">${t('rp.cancel')}</button>`;
+  openAct(isRet ? t('rp.return') : t('rp.deliver'), body);
+}
 
+// تنفيذ طلب التسليم/الإرجاع بعد التأكيد من الشيت
+async function doApproval(id, kind){
+  const d = devices.find(x => x.id === id); if(!d){ closeAct(); return; }
+  if(d.pending){ closeAct(); toast(t('tp.pendingReq')); return; }
   const isRet = kind === 'return';
   const label = isRet ? t('rp.return') : t('rp.deliver');
-  if(!confirm(`طلب ${label} «${d.type} ${d.model}» هيتبعت للمحاسب للاعتماد. تكمّل؟`)) return;
-
   const req = {
     id: 'apr_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: isRet ? 'return' : 'handover',
@@ -893,8 +943,49 @@ async function requestApproval(id, kind){
 
   d.pending = req;
   if(d._raw){ d._raw.pendingApproval = req; d._raw.activityNotes = notes; }
+  closeAct();
   render();
-  toast(`اتبعت طلب ${label} للمحاسب ${isRet ? '↩️' : '📦'}`);
+  toast(t('rp.requestSent', { label }) + ' ' + (isRet ? '↩️' : '📦'));
+}
+
+// رفض من الديسباتشر → شيت اختيار مكان الجهاز، وبيبعت طلب اعتماد للمحاسب
+function requestReject(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  if(d.pending){ toast(t('tp.pendingReq')); return; }
+  const body = `
+    ${actDevBlock(d)}
+    <p class="act-q">${t('rp.rejectQuestion')}</p>
+    <button class="act-btn act-drawer" onclick="doReject('${d.id}',true)">🗄️ ${t('det.rejInShop')}</button>
+    <button class="act-btn act-out" onclick="doReject('${d.id}',false)">📤 ${t('det.rejPickedUp')}</button>
+    <button class="act-btn act-ghost" onclick="closeAct()">${t('rp.cancel')}</button>`;
+  openAct(t('rp.reject'), body);
+}
+
+// تنفيذ الرفض بعد اختيار المكان من الشيت
+async function doReject(id, inShop){
+  const d = devices.find(x => x.id === id); if(!d){ closeAct(); return; }
+  if(d.pending){ closeAct(); toast(t('tp.pendingReq')); return; }
+  const req = {
+    id: 'apr_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    type: 'reject',
+    requestedBy: ME,
+    requestedByEmail: MY_EMAIL,
+    requestedAt: nowIso(),
+    payload: { status: 'rejected', paymentChoice: null, rejectedInShop: !!inShop },
+    status: 'pending',
+    decidedBy: null, decidedAt: null, reason: null
+  };
+  const notes = [...((d._raw && d._raw.activityNotes) || []),
+                 mkNote(t('note.requestPending', { label: t('rp.reject') }), 'note.requestPending', { label: t('rp.reject') })];
+
+  if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
+                         lastModifiedAt: nowIso(), lastModifiedBy: ME }))) return;
+
+  d.pending = req;
+  if(d._raw){ d._raw.pendingApproval = req; d._raw.activityNotes = notes; }
+  closeAct();
+  render();
+  toast(t('rp.requestSent', { label: t('rp.reject') }) + ' 🚫');
 }
 const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
 const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
@@ -916,7 +1007,7 @@ function ticketHtml(d){
     ? ''
     : delivered
     ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')" data-i18n="rp.returnIco">↩️ ${t('rp.return')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`
-    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
+    : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-rej" onclick="event.stopPropagation();requestReject('${d.id}')" data-i18n="rp.rejectIco">🚫 رفض</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
   return `<div class="ticket" style="--sp:var(${s.c});" onclick="showInfo('${d.id}')">
     <div class="tk-top"><span class="tk-no">${ticketNo(d.id)}</span>${statusPill(d.status)}</div>
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
@@ -934,24 +1025,40 @@ function ticketHtml(d){
 // تفاصيل مختصرة — الديسباتشر مايشوفش أسعار
 function showInfo(id){
   const d = devices.find(x => x.id === id); if(!d) return;
-  const L = [
-    [t('rp.ticket'), ticketNo(d.id)],
-    [t('rp.device'), [d.type, d.model].filter(Boolean).join(' ')],
-    [t('rp.status'), (ST[d.status]||{}).label || d.status],
-    [t('rp.customer'), d.customer],
-    [t('rp.phone'), d.phone],
-    [t('rp.shop'), d.shop],
-    [t('rp.issue'), d.issue],
-    [t('rp.tech'), d.tech || t('tp.noTechYet')],
-    [t('rp.by'), d.by],
-    [t('dp.intake'), fmtDate(d.intake)]
-  ];
-  alert(L.filter(r => r[1]).map(r => r[0] + ': ' + r[1]).join('\n'));
+  const s = ST[d.status] || {label:d.status, c:'--muted'};
+  const V = txt => `<span class="info-v">${esc(String(txt))}</span>`;
+  const rows = [
+    [t('rp.ticket'),   V(ticketNo(d.id))],
+    [t('rp.device'),   V([d.type, d.model].filter(Boolean).join(' '))],
+    [t('rp.status'),   `<span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>`],
+    [t('rp.customer'), d.customer ? V(d.customer) : ''],
+    [t('rp.phone'),    d.phone ? `<span class="info-v" style="direction:ltr;">${esc(d.phone)}</span>` : ''],
+    [t('rp.shop'),     d.shop ? V(d.shop) : ''],
+    [t('rp.issue'),    d.issue ? V(d.issue) : ''],
+    [t('rp.tech'),     V(d.tech || t('tp.noTechYet'))],
+    [t('rp.by'),       d.by ? V(d.by) : ''],
+    [t('dp.intake'),   V(fmtDate(d.intake))]
+  ].filter(r => r[1]);
+  const body = rows.map(r => `<div class="info-row"><span class="info-k">${r[0]}</span>${r[1]}</div>`).join('');
+  openAct(t('rp.details'), body);
+}
+
+// فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع
+// كل ضغطة زرار — نفس أسلوب الداشبورد.
+function reindexSearch(){
+  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by], true); }catch(e){}
 }
 
 function render(){
   const q = ($('q').value||'').trim();
-  const match = d => !q || [d.type,d.model,d.customer,d.shop,ticketNo(d.id)].some(v => v && String(v).includes(q));
+  // بحث مرن — نفس منطق الداشبورد
+  const match = d => {
+    if(!q) return true;
+    if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
+    const fields = [d.type,d.model,d.customer,d.shop,ticketNo(d.id)];
+    if(window.IFixSearch) return IFixSearch.match(q, fields);
+    return fields.some(v => v && String(v).includes(q));
+  };
   // تبويبات بعدّاداتها
   $('tabs').innerHTML = TABS.map(t => {
     const n = devices.filter(t.filter).length;
@@ -973,6 +1080,60 @@ function render(){
 /* ===== إدخال جهاز ===== */
 function openIntake(){ $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); setTimeout(()=>$('f_type').focus(),300); }
 function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
+
+// ===== شيت الأكشن العام (تفاصيل / تسليم / رفض) — بيعيد استخدام ستايل الـ sheet =====
+// ============================================================
+// مسح الباركود بالكاميرا
+// ------------------------------------------------------------
+// الباركود على الليبل فيه كود الجهاز. بنطابق بالأرقام: مبتتأثرش
+// بلغة الكيبورد ولا بالمسافات — نفس أسلوب الداشبورد.
+// ============================================================
+function scanFind(text){
+  const raw = String(text || '').trim();
+  if(!raw) return null;
+  const digits = raw.replace(/[^0-9]/g, '');
+  if(digits.length >= 10){
+    const byDigits = devices.find(d => {
+      const idd = String(d.id).replace(/[^0-9]/g, '');
+      return idd && (idd === digits || idd.endsWith(digits) || digits.endsWith(idd));
+    });
+    if(byDigits) return byDigits;
+  }
+  const up = raw.toUpperCase().replace(/^#/, '');
+  return devices.find(d =>
+    String(d.id).toUpperCase() === up ||
+    String(d.id).slice(-5).toUpperCase() === up) || null;
+}
+
+function scanWithCamera(){
+  if(!window.IFixScan) return;
+  IFixScan.open(text => {
+    const hit = scanFind(text);
+    if(hit) return showInfo(hit.id);
+    // مفيش نتيجة؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
+    const box = document.getElementById('q');
+    if(box){ box.value = text; render(); box.focus(); }
+    toast(t('scan.notFound'));
+  });
+}
+
+function mountScanBtn(){
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    const box = document.getElementById('q');
+    if(!box || !window.IFixScan) return;
+    const b = IFixScan.mountButton(box, () => {});
+    if(b) b.onclick = e => { e.preventDefault(); scanWithCamera(); };
+  }catch(e){}
+}
+
+function openAct(title, bodyHtml){ $('actTitle').textContent = title; $('actBody').innerHTML = bodyHtml; $('actSheet').classList.add('on'); $('actBg').classList.add('on'); }
+function closeAct(){ $('actSheet').classList.remove('on'); $('actBg').classList.remove('on'); }
+function actDevBlock(d){
+  const name = [d.type, d.model].filter(Boolean).join(' ');
+  const sub  = [d.customer, d.shop].filter(Boolean).join(' · ');
+  return `<div class="act-dev"><span class="act-dev-ic">📱</span><div><div class="act-dev-name">${esc(name)}</div>${sub?`<div class="act-dev-sub">${esc(sub)}</div>`:''}</div></div>`;
+}
 // ============================================================
 // أسماء الفنيين — نفس مصدر الداشبورد بالظبط
 // ------------------------------------------------------------
@@ -1254,6 +1415,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSett
 
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
+  try{ mountScanBtn(); }catch(e){}
 });
 </script>
 </body>

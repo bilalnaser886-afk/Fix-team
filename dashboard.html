@@ -98,6 +98,8 @@
 <script src="i18n.js"></script>
 <!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
 <script src="ai-invoice.js"></script>
+<script src="qr-scan.js"></script>
+<script src="fuzzy-search.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -121,7 +123,7 @@
     --surface-2:#F8FAFC; --surface-3:#F1F5F9; --surface-alt:#EEF0F3;
     --border:#E2E8F0; --border-strong:#CBD5E1;
     /* درجات النص */
-    --ink-2:#475569; --ink-3:#334155; --muted-2:#94A3B8;
+    --ink-2:#475569; --ink-3:#334155; --muted-2:#64748B;
     --on-accent:#FFFFFF;
     --shadow:rgba(16,24,40,.10); --shadow-lg:rgba(16,24,40,.20);
     --chrome:#1A2332; --chrome-ink:#FFFFFF;   /* هيدر وأشرطة — غامقة دايماً */
@@ -131,16 +133,17 @@
     --success:#16A34A;--success-bg:#F0FDF4;--success-border:#BBF7D0;
     --info:#2563EB;   --info-bg:#EFF6FF;   --info-border:#BFDBFE;
     --violet:#7C3AED;
-    --waiting:#B5651D; --waiting-bg:#FBF2E9;
+    --waiting:#96521A; --waiting-bg:#FBF2E9;
     --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
     --delivered:#64748B; --delivered-bg:#EEF1F3;
-    --delivered_paid:#16A34A; --delivered_paid-bg:#DCFCE7;
-    --delivered_unpaid:#D97706; --delivered_unpaid-bg:#FEF3C7;
+    --delivered_paid:#15803D; --delivered_paid-bg:#DCFCE7;
+    --delivered_unpaid:#B45309; --delivered_unpaid-bg:#FEF3C7;
     --paid:#15803D; --paid-bg:#EAF6EE;
     --unpaid:#B45309; --unpaid-bg:#FEF3E2;
-    --rejected:#DC2626; --rejected-bg:#FEF2F2;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
+    --rejected:#BE1D1D; --rejected-bg:#FEF2F2;
     --returned:#9333EA; --returned-bg:#F5EEFC;
   }
 
@@ -174,6 +177,7 @@
     --delivered_unpaid:#FBBF24; --delivered_unpaid-bg:rgba(251,191,36,.15);
     --paid:#4ADE80;             --paid-bg:rgba(74,222,128,.14);
     --unpaid:#FBBF24;           --unpaid-bg:rgba(251,191,36,.15);
+    --rejected_shop:#F472B6;    --rejected_shop-bg:rgba(244,114,182,.15);
     --rejected:#F87171;         --rejected-bg:rgba(248,113,113,.15);
     --returned:#C084FC;         --returned-bg:rgba(192,132,252,.15);
   }
@@ -903,6 +907,17 @@
   }
   .te-item:hover{background:var(--surface-3);}
 
+  /* ===== صفحة أجهزة الفني ===== */
+  .td-item{display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:9px; cursor:pointer; text-align:right; box-shadow:0 2px 8px rgba(16,16,20,.04);}
+  .td-item:hover{background:var(--surface-3);}
+  .td-item:active{transform:scale(.995);}
+  .td-item-name{font-weight:800; font-size:15px; color:var(--ink);}
+  .td-item-sub{font-size:12.5px; color:var(--muted-2); margin-top:3px;}
+  .td-item-pts{text-align:center; flex-shrink:0; min-width:56px;}
+  .td-pts-num{font-family:'Cairo',sans-serif; font-weight:900; font-size:20px; color:var(--violet); line-height:1.05;}
+  .td-pts-lbl{font-size:9.5px; color:var(--muted-2);}
+  .td-pts-share{font-size:11px; color:var(--muted); margin-top:2px;}
+
   /* ===== كبار العملاء ===== */
   .cust-item{
     display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
@@ -975,6 +990,42 @@
     .pill{padding:10px 14px;}   /* أسهل في اللمس */
     .acc-mini-btn{padding:7px 12px; font-size:12.5px;}
   }
+
+  /* ===== حاسبة النقط ===== */
+  .calc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .calc-head span{font-family:'Cairo','Segoe UI',sans-serif;font-weight:900;font-size:18px;color:var(--ink);}
+  .calc-head button{background:var(--surface-3);border:none;color:var(--ink);width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1;}
+  .calc-label{font-size:12.5px;font-weight:700;color:var(--muted);margin:15px 0 8px;}
+  .calc-cats{display:flex;flex-wrap:wrap;gap:8px;}
+  .calc-cat{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px 13px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;}
+  .calc-cat.on{background:var(--info);border-color:var(--info);color:#fff;}
+  .calc-model{width:100%;font-size:15px;font-family:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;appearance:none;-webkit-appearance:none;}
+  .calc-chips{display:flex;flex-wrap:wrap;gap:8px;max-height:42vh;overflow-y:auto;padding:2px;}
+  .calc-chip{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 13px;font-size:13px;font-family:inherit;cursor:pointer;}
+  .calc-chip b{background:var(--surface-3);color:var(--muted);border-radius:10px;padding:1px 7px;font-size:12px;font-weight:800;}
+  .calc-chip.on{background:var(--info);border-color:var(--info);color:#fff;}
+  .calc-chip.on b{background:rgba(255,255,255,.25);color:#fff;}
+  .calc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--surface);}
+  .calc-total{font-size:15px;color:var(--ink);}
+  .calc-total b{font-family:'Cairo','Segoe UI',sans-serif;font-weight:900;font-size:22px;color:var(--info);}
+  .calc-apply{background:var(--info);color:#fff;border:none;border-radius:12px;padding:13px 26px;font-family:'Cairo','Segoe UI',sans-serif;font-weight:900;font-size:15px;cursor:pointer;}
+  .calc-apply:active{transform:translateY(1px);}
+  .calc-open-btn{width:100%;margin-top:8px;background:var(--surface-3);border:1.5px dashed var(--info);color:var(--info);border-radius:11px;padding:11px;font-family:'Cairo','Segoe UI',sans-serif;font-weight:800;font-size:14px;cursor:pointer;}
+  .calc-open-btn:disabled{opacity:.5;cursor:default;}
+  .calc-issue{background:var(--surface-3);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--muted);margin-bottom:2px;line-height:1.6;}
+  .calc-issue span{color:var(--ink);font-weight:600;}
+  .calc-sugg-wrap{display:flex;flex-direction:column;gap:8px;}
+  .calc-sugg{display:flex;flex-wrap:wrap;align-items:center;gap:7px;}
+  .calc-sugg-w{font-size:13px;font-weight:800;color:var(--rejected_shop,#C2185B);}
+  .calc-chip.mini{padding:6px 11px;font-size:12.5px;}
+  .calc-auto{font-size:12px;line-height:1.65;margin-top:7px;padding:8px 11px;border-radius:9px;}
+  .calc-auto.ok{background:rgba(37,99,235,.09);color:var(--info);}
+  .calc-auto.ok b{font-size:14px;font-weight:800;}
+  .calc-auto.warn{background:var(--rejected_shop-bg,#FCE7F1);color:var(--rejected_shop,#C2185B);font-weight:700;margin-top:5px;}
+  .calc-auto.part{background:rgba(147,51,234,.08);color:var(--violet);margin-top:5px;font-weight:600;}
+  .calc-auto.ai{background:rgba(37,99,235,.10);color:var(--info);margin-top:5px;font-weight:600;}
+  .calc-auto.ai-maybe{background:var(--surface-3);color:var(--muted);margin-top:5px;}
+  .calc-auto-m{opacity:.75;}
 </style>
 </head>
 <body>
@@ -1036,6 +1087,8 @@
 <div class="gs-wrap" id="gsWrap">
   <div class="gs-box">
     <span class="ic">🔍</span>
+    <button type="button" class="ifs-btn" id="gsScan" style="display:none;"
+            onclick="scanWithCamera()" data-i18n-title="scan.btn" title="مسح باركود">⬚</button>
     <input id="gsInput" type="search" autocomplete="off"
            data-i18n-ph="search.global.ph"
            placeholder="دوّر على عميل، محل، جهاز، أو رقم تليفون..."
@@ -1219,6 +1272,10 @@
 </div>
 
 <!-- تعديل رمز قفل الجهاز (في أي مرحلة) -->
+<div id="ptsCalcOverlay" class="overlay hidden" style="z-index:66;">
+  <div class="modal" id="ptsCalcModal"></div>
+</div>
+
 <div id="editLockOverlay" class="overlay hidden" style="z-index:58;">
   <div class="modal" style="max-width:420px;">
     <div class="modal-head"><h2 data-i18n="lock.edit">تعديل رمز قفل الجهاز</h2><button class="close-btn" onclick="closeEditLock()">×</button></div>
@@ -1314,6 +1371,17 @@
       <button class="close-btn" onclick="closeTechEval()">×</button>
     </div>
     <div id="techEvalBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- صفحة أجهزة الفني (تفتح بالضغط على اسم الفني في التقييم) -->
+<div id="techDevOverlay" class="overlay hidden" style="z-index:40; align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2 id="techDevTitle">🔧</h2>
+      <button class="close-btn" onclick="closeTechDevices()">×</button>
+    </div>
+    <div id="techDevBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -1681,8 +1749,12 @@ function myBroadcastKeys(){
 }
 
 async function loadBroadcast(){
-  // مفتاح الميزة مقفول → مفيش إشعارات خالص
-  if(typeof isFeatureEnabled === 'function' && !isFeatureEnabled('live_broadcasts')) return;
+  // المفتاح مقفول صراحةً → مفيش إشعارات.
+  // ⚠️ الفحص على is_enabled === false مش على !isFeatureEnabled():
+  //    الصفحتين التانيتين بتعتبروا المفتاح الناقص = مفتوح، وكان
+  //    الداشبورد بيعتبره مقفول — فنفس الإشعار يوصل لواحد ولأ للتاني.
+  const _bcFlag = featureFlags['live_broadcasts'];
+  if(_bcFlag && _bcFlag.is_enabled === false) return;
   try{
     const rows = await Promise.all(myBroadcastKeys().map(k =>
       window.storage.get(k).catch(() => null)));
@@ -1910,6 +1982,7 @@ const STATUSES = [
   { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
   { key: "delivered_paid", label: "تم التسليم والدفع", labelKey:"status.delivered_paid", varname:"delivered_paid" },
   { key: "delivered_unpaid", label: "تم التسليم بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
+  { key: "rejected_shop", label: "درج الرفض", labelKey:"status.rejected_shop", varname:"rejected_shop" },
   { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
   { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
 ];
@@ -1947,6 +2020,7 @@ function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
 function effStatus(d){
   if(!d) return '';
   if(d.status === 'delivered') return isPaidDevice(d) ? 'delivered_paid' : 'delivered_unpaid';
+  if(d.status === 'rejected') return d.rejectedInShop ? 'rejected_shop' : 'rejected';
   return d.status;
 }
 const STORAGE_KEY = "repair-devices";
@@ -2205,10 +2279,21 @@ function loadProgress(n){
   if(el) el.textContent = n ? t('app.loadingCount', { n: n.toLocaleString('en-EG') }) : '';
 }
 
+// بنبني فهرس البحث مرة واحدة بعد كل تحميل بدل ما نحسبه مع كل
+// ضغطة زرار. على ٢٠ ألف جهاز الفرق ٦٠ مللي → ٢ مللي لكل حرف.
+function reindexSearch(force){
+  try{
+    if(!window.IFixSearch) return;
+    IFixSearch.index(devices, d => [d.customerName, d.shopName, d.customerPhone,
+      d.serialNumber, d.deviceType, d.model, d.reportedIssue, d.technician], !!force);
+  }catch(e){}
+}
+
 function sortDevices(){
   const ts = new Map();
   for(const d of devices) ts.set(d, Date.parse(d.intakeDate) || 0);
   devices.sort((a,b) => ts.get(b) - ts.get(a));
+  reindexSearch();      // الفهرس بيتبني مع كل تحميل — الترتيب هو نقطة الالتقاء
 }
 
 async function loadDevices(opts){
@@ -2300,6 +2385,8 @@ async function persist(){
   const changed = [], removed = [];
   const ids = new Set(devices.map(d => d.id));
   devices.forEach(d => { if(lastSynced[d.id] !== JSON.stringify(d)) changed.push(d); });
+  // الجهاز اتغيّر → فهرس البحث بتاعه بقى قديم
+  try{ if(window.IFixSearch) changed.forEach(d => IFixSearch.invalidate(d)); }catch(e){}
   Object.keys(lastSynced).forEach(id => { if(!ids.has(id)) removed.push(id); });
 
   if(!changed.length && !removed.length){ setSaving(false); return; }
@@ -2824,8 +2911,13 @@ function matchesSearch(d, q){
   const up = q.toUpperCase();
   if(d.id === q || d.id.toUpperCase() === up) return true;
   if(devRef(d).toUpperCase() === up || devRef(d).toUpperCase() === '#' + up) return true;
-  return [d.customerName,d.shopName,d.customerPhone,d.serialNumber,d.deviceType,d.model,d.reportedIssue,d.technician]
-    .some(v => v && String(v).includes(q));
+  // بحث مرن: الأسماء بتتكتب عربي وإنجليزي وبأخطاء إملائية،
+  // فبنطابق بالهيكل الصوتي مش بالحروف. تفاصيله في fuzzy-search.js
+  if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
+  const fields = [d.customerName,d.shopName,d.customerPhone,d.serialNumber,
+                  d.deviceType,d.model,d.reportedIssue,d.technician];
+  if(window.IFixSearch) return IFixSearch.match(q, fields);
+  return fields.some(v => v && String(v).includes(q));
 }
 
 function clearSearchBox(id){
@@ -3127,7 +3219,7 @@ function viewLockImage(id){
 
 // عرض القفل في تفاصيل الجهاز
 function lockDisplayHtml(d){
-  const editBtn = `<button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin:8px 0 10px;" onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
+  const editBtn = `<button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin:8px 0 10px;"${d.status==='returned'?' disabled':''} onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
     return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
@@ -3324,6 +3416,7 @@ function openDetail(id){
   if(d && d.trackToken){
     loadTrackResponses(d.trackToken).then(() => { if(selectedId === id) renderDetail(); });
   }
+  runAiIfNeeded(id);   // شغّل الذكاء الاصطناعي لو العطل صعب (يغطّي المكتوب وقت الاستلام)
 }
 function closeDetail(){
   document.getElementById('detailOverlay').classList.add('hidden');
@@ -3386,7 +3479,7 @@ function techSelectHtml(current, handler, opts){
     `<option value="${esc(x.name)}"${x.name===cur?' selected':''}>${esc(x.name)}${x.pending ? ' ⏳' : ''}</option>`).join('');
   const legacy = (cur && !known)
     ? `<option value="${esc(cur)}" selected>${esc(cur)} (${t('tech.legacy')})</option>` : '';
-  return `<select class="tech-select"${opts&&opts.id?` id="${opts.id}"`:''} onchange="${handler}">
+  return `<select class="tech-select"${opts&&opts.id?` id="${opts.id}"`:''}${opts&&opts.disabled?' disabled':''} onchange="${handler}">
       <option value=""${cur?'':' selected'}>— ${t('tech.none')} —</option>
       ${legacy}${rows}
       <option value="__ADD_TECH__">➕ ${t('tech.addNew')}</option>
@@ -3401,6 +3494,10 @@ function renderDetail(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return closeDetail();
   const s = statusInfo(d.status);
+  // ===== المرتجعات: تفاصيل الجهاز القديمة بتتقفل، وبتظهر حقول المرتجع الجديدة =====
+  const isRet = d.status === 'returned';
+  const roI = isRet ? ' readonly' : '';   // مدخلات ونصوص التفاصيل القديمة
+  const roB = isRet ? ' disabled' : '';   // أزرار وقوائم التفاصيل القديمة
   const rows = [
     [t('det.intakeAt'), formatDateTime(d.intakeDate)],
     d.serialNumber ? [t('det.serial'), d.serialNumber, true] : null,
@@ -3444,11 +3541,11 @@ function renderDetail(){
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
 
     <div class="row2">
-      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}" onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}" onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
     </div>
     <div class="money-only">
-    <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
@@ -3463,8 +3560,8 @@ function renderDetail(){
     ${isPriced(d) ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
       <div class="pay-choice">
-        <button type="button" class="pay-btn" style="border-color:var(--success);${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
-        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--success);${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}"${roB} onclick="editPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}"${roB} onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
       </div>
       ${d.paymentType === 'deferred'
         ? (isPaidDevice(d)
@@ -3476,16 +3573,44 @@ function renderDetail(){
                </div>`)
         : (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
-            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
+    ${isRet ? `
+    <label class="field" style="margin-top:6px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}" oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
+    ${isReturnPriced(d) && d.returnPriceConfirmation && d.returnPriceConfirmation.requested ? `
+      <div class="approval-box">
+        ${!trackResponses.return_price_response ? `
+          <div class="approval-pending">${t('det.returnPriceWaiting')}</div>
+        ` : trackResponses.return_price_response === 'accepted' ? `
+          <div class="approval-yes">${t('det.returnPriceYes')}</div>
+        ` : `
+          <div class="approval-no">${t('det.returnPriceNo')}</div>
+        `}
+      </div>
+    ` : ''}
+    ${isReturnPriced(d) ? `<div style="margin:2px 0 12px;">
+      <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.returnPayMethod')}</span>
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:var(--success);${d.returnPaymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editReturnPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.returnPaymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editReturnPayType('deferred')">${t('det.payDeferred')}</button>
+      </div>
+      ${d.returnPaymentType === 'deferred'
+        ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidViaAccount')}${(d.returnBilledShop||d.billedShop)?` "${esc(d.returnBilledShop||d.billedShop)}"`:''} — ${t('det.returnSettled')}</div>`
+        : (d.returnPaymentStatus === 'paid'
+            ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markReturnPaid()">💵 ${t('det.confirmPay')}</button>`)}
+    </div>` : ''}` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
-    <label class="field"><span>${t('det.issue')}</span><textarea rows="2" onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+    <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
+    ${isRet ? `
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2" placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.discoveredFault')}</span><textarea rows="2" placeholder="${t('det.discoveredFaultPh')}" onblur="editField('discoveredFault', this.value)">${esc(d.discoveredFault||'')}</textarea></label>` : ''}
 
     <div class="approval-box">
       ${!d.deepInspection || !d.deepInspection.requested ? `
-        <button class="btn-secondary" style="width:100%; color:var(--violet); border-color:#DDD6FE;" onclick="requestDeepInspection()">🔬 ${t('det.deepReq')}</button>
+        <button class="btn-secondary" style="width:100%; color:var(--violet); border-color:#DDD6FE;"${roB} onclick="requestDeepInspection()">🔬 ${t('det.deepReq')}</button>
       ` : !trackResponses.deep_inspection_response ? `
         <div class="approval-pending">⏳ ${t('det.deepWaiting')}
           <button class="acc-mini-btn" onclick="cancelDeepInspection()" style="margin-inline-start:8px;">${t('det.deepCancel')}</button>
@@ -3505,14 +3630,16 @@ function renderDetail(){
     <div class="tech-row">
       <label class="field">
         <span>${t('det.technician')}</span>
-        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput' })}
+        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput', disabled: isRet })}
       </label>
       <label class="field">
         <span>${t('det.accountant')}</span>
-        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}" onblur="editField('registeredBy', this.value)" />
+        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}"${roI} onblur="editField('registeredBy', this.value)" />
       </label>
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
+    ${isRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
+    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>` : ''}
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
@@ -3523,21 +3650,23 @@ function renderDetail(){
       <div style="margin-bottom:10px;">
         <span style="font-size:13px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.dealType')}</span>
         <div class="pay-choice">
-          <button type="button" style="border-color:var(--info);${!d.isWholesale?'background:#2563EB;color:#fff;':'background:var(--surface);color:var(--info);'}" onclick="setWholesale(false)">${t('det.retail')}</button>
-          <button type="button" style="border-color:var(--violet);${d.isWholesale?'background:#7C3AED;color:#fff;':'background:var(--surface);color:var(--violet);'}" onclick="setWholesale(true)">${t('det.wholesale')}</button>
+          <button type="button" style="border-color:var(--info);${!d.isWholesale?'background:#2563EB;color:#fff;':'background:var(--surface);color:var(--info);'}"${roB} onclick="setWholesale(false)">${t('det.retail')}</button>
+          <button type="button" style="border-color:var(--violet);${d.isWholesale?'background:#7C3AED;color:#fff;':'background:var(--surface);color:var(--violet);'}"${roB} onclick="setWholesale(true)">${t('det.wholesale')}</button>
         </div>
       </div>
       ${!d.isWholesale ? `
         <label class="field"><span>⭐ ${t('det.points')}</span>
-          <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)" onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
+          <input type="text" inputmode="numeric" value="${esc(d.points||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editField('points', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="مثال: 5" />
         </label>
+        <button type="button" class="calc-open-btn"${roB} onclick="openPtsCalc()">🧮 احسب النقط من الأعطال</button>
+        ${autoPointsNote(d)}
         ${d.technician ? `
         <div class="tech-row">
           <label class="field"><span>🤝 ${t('det.assistTech')}</span>
-            ${techSelectHtml(d.assistTechnician, 'onTechPick(this, \'assistTechnician\')')}
+            ${techSelectHtml(d.assistTechnician, 'onTechPick(this, \'assistTechnician\')', { disabled: isRet })}
           </label>
           <label class="field"><span>${t('det.assistPercent')}</span>
-            <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)" onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
+            <input type="text" inputmode="numeric" value="${esc(d.assistPercent||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editField('assistPercent', enDigits(this.value).replace(/[^0-9]/g,''))" placeholder="مثال: 25" />
           </label>
         </div>` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.assistNeedMain')}</div>`}
       ` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.wholesaleNote')}</div>`}
@@ -3551,6 +3680,14 @@ function renderDetail(){
     </div>
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
     <div class="status-pills">${pills}</div>
+    ${d.status === 'rejected' ? `
+    <div style="margin:0 0 14px; padding:10px 12px; background:var(--rejected_shop-bg); border-radius:10px;">
+      <span style="font-size:12.5px; color:var(--ink-2); display:block; margin-bottom:7px; font-weight:700;">${t('det.rejLocation')}</span>
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:var(--rejected_shop);${d.rejectedInShop?'background:var(--rejected_shop);color:#fff;':'color:var(--rejected_shop);background:var(--surface);'}" onclick="markRejectedLocation(true)">${t('det.rejInShop')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--rejected);${!d.rejectedInShop?'background:var(--rejected);color:#fff;':'color:var(--rejected);background:var(--surface);'}" onclick="markRejectedLocation(false)">${t('det.rejPickedUp')}</button>
+      </div>
+    </div>` : ''}
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${t('det.statusLog')}</div>
     <div style="margin-bottom:10px;">${history}</div>
     <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
@@ -3567,13 +3704,445 @@ function renderDetail(){
   `;
 }
 
+// ============================================================
+// حاسبة النقاط — بيانات ومحرّك وواجهة
+// النقط بتتحسب من الأعطال؛ آيفون-من-X بتختلف حسب الموديل.
+// الناتج بيتكتب في حقل النقط ويفضل قابل للتعديل.
+// ============================================================
+const IPHONE_X_ORDER = [
+  'X','XR','XS','XS Max','11','11 Pro','11 Pro Max',
+  '12 mini','12','12 Pro','12 Pro Max',
+  '13 mini','13','13 Pro','13 Pro Max',
+  '14','14 Plus','14 Pro','14 Pro Max',
+  '15','15 Plus','15 Pro','15 Pro Max',
+  '16','16 Plus','16 Pro','16 Pro Max',
+  '17','17 Pro','17 Pro Max'
+];
+const _mIdx = m => IPHONE_X_ORDER.indexOf(m);
+
+// عطل: p (ثابت) أو tiers (متدرّج). rule: m=موديلات صريحة، r=[من,لـ] مدى، بدون م/ر = افتراضي.
+// na = موديلات لا ينطبق عليها العطل.
+function faultPts(f, model){
+  if(f.na && f.na.includes(model)) return null;
+  if(f.tiers){
+    const mi = _mIdx(model);
+    for(const rule of f.tiers){
+      if(rule.m){ if(rule.m.includes(model)) return rule.p; }
+      else if(rule.r){ if(mi >= _mIdx(rule.r[0]) && mi <= _mIdx(rule.r[1])) return rule.p; }
+      else return rule.p;
+    }
+    return null;
+  }
+  return f.p;
+}
+
+const PTS_DATA = {
+  iphone_x: [
+    {n:'فلاتة السماعة', tiers:[{r:['X','12 Pro Max'],p:5},{p:3}]},
+    {n:'كاميرا امامية', p:7},
+    {n:'سينسور', tiers:[{r:['X','12 Pro Max'],p:5},{p:3}]},
+    {n:'F-id (فيس)', tiers:[{m:['X','XR','XS','XS Max','11'],p:5},{r:['11 Pro','12 Pro Max'],p:6},{m:['13 mini','13'],p:7},{p:8}]},
+    {n:'شاشة', p:4},
+    {n:'باغة', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Plus'],p:7},{r:['14 Pro','14 Pro Max'],p:8},{r:['15','16 Pro Max'],p:9},{p:10}]},
+    {n:'تاتش', tiers:[{r:['X','11 Pro Max'],p:6},{r:['12 mini','14 Pro Max'],p:8},{r:['15','16 Pro Max'],p:10},{p:11}]},
+    {n:'بوليش / خرابيش الشاشة', p:5},
+    {n:'فريم الشاشة', na:['11'], tiers:[{m:['X','XR','XS','XS Max'],p:4},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','13 Pro Max'],p:6},{r:['14','14 Pro Max'],p:7},{p:9}]},
+    {n:'لزق فريم الشاشة', na:['11'], tiers:[{m:['X','XR','XS','XS Max'],p:4},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','13 Pro Max'],p:6},{r:['14','14 Pro Max'],p:7},{p:9}]},
+    {n:'اصلاح فلاتة شاشة', p:10},
+    {n:'تغيير فلاتة شاشة', p:10},
+    {n:'نقل IC شاشة', p:10},
+    {n:'نرملة شاشة', p:10},
+    {n:'بابل', p:0},
+    {n:'فلاتة شحن', tiers:[{m:['X','XS','XS Max'],p:4},{m:['XR','11'],p:3},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{r:['15','16 Pro Max'],p:8},{p:10}]},
+    {n:'جرس / سماعة تحت / خارجية', p:5},
+    {n:'بطارية', tiers:[{r:['X','11 Pro Max'],p:3},{m:['14','14 Plus','15','15 Plus','15 Pro','15 Pro Max','16','16 Plus','16 Pro','16 Pro Max','17','17 Pro','17 Pro Max'],p:8},{p:5}]},
+    {n:'فلاتة / نرملة بطارية', p:8},
+    {n:'نقل ابروم بطارية', p:10},
+    {n:'تعديل نسبة بطارية', p:5},
+    {n:'برمجة فلاتة بطارية', p:5},
+    {n:'كاميرا خلفية', tiers:[{r:['X','11 Pro Max'],p:4},{r:['12 mini','14 Pro Max'],p:5},{p:8}]},
+    {n:'نرملة كاميرا', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{p:7}]},
+    {n:'فلاش', p:6},
+    {n:'مايك الفيديو', tiers:[{r:['X','11 Pro Max'],p:6},{p:7}]},
+    {n:'فايبريشن', p:3},
+    {n:'زرار السايلنت', p:7},
+    {n:'فلاتة باور', p:7},
+    {n:'فلاتة فوليم', p:7},
+    {n:'ضهر', tiers:[{r:['X','11 Pro Max'],p:6},{p:7}]},
+    {n:'شاسيه', p:7},
+    {n:'ووتر', p:6},
+    {n:'تنضيف / تنضيف كاميرا', tiers:[{r:['X','11 Pro Max'],p:3},{r:['12 mini','12 Pro Max'],p:4},{r:['13 mini','14 Pro Max'],p:6},{p:9}]},
+    {n:'تنضيف سماعات / سوكت', p:1},
+    {n:'مشكلة في البوردة', p:10},
+    {n:'بطع الكاميرا', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{p:7}]},
+  ],
+  iphone_pre: [
+    {n:'فلاتة السماعة',p:1},{n:'كاميرا امامية',p:1},{n:'سينسور',p:1},{n:'شاشة',p:1},
+    {n:'تاتش',p:5},{n:'باغة',p:5},{n:'هوم',p:3},{n:'بصمة',p:3},{n:'فلاتة شحن',p:3},
+    {n:'جرس / سماعة تحت / خارجية',p:1},{n:'بطارية',p:1},{n:'كاميرا خلفية',p:2},{n:'فلاش',p:5},
+    {n:'فايبريشن',p:1},{n:'زرار السايلنت',p:5},{n:'فلاتة باور',p:5},{n:'فلاتة فوليم',p:5},
+    {n:'ضهر',p:5},{n:'شاسيه',p:5},{n:'تنضيف / تنضيف كاميرا',p:1},{n:'تنضيف سماعات / سوكت',p:1},
+    {n:'مشكلة في البوردة',p:7},
+  ],
+  android: [
+    {n:'كاميرا امامية',p:1},{n:'سماعة مكالمات',p:1},{n:'سينسور',p:1},{n:'عزل سينسور',p:0.5},
+    {n:'باغة شاشة IPS',p:2},{n:'باغة شاشة Super AMOLED',p:4},{n:'شاشة IPS',p:1},{n:'شاشة Super AMOLED',p:2},
+    {n:'فريم',p:2},{n:'عدل فريم',p:2.5},{n:'سوكت Micro',p:1},{n:'سوكت Type-C',p:2},{n:'مايك',p:1},
+    {n:'جرس (سماعة خارجية)',p:1},{n:'بوردة شحن',p:1},{n:'بطارية',p:1},{n:'فلاتة باور',p:1},{n:'فلاتة فوليم',p:1},
+    {n:'بصمة',p:1},{n:'عطل في البوردة',p:5},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
+  ],
+  tab: [
+    {n:'كاميرا امامية',p:1},{n:'سماعة مكالمات',p:1},{n:'سينسور',p:1},{n:'عزل سينسور',p:0.5},
+    {n:'باغة شاشة IPS',p:3},{n:'باغة شاشة Super AMOLED',p:4},{n:'شاشة IPS',p:1},{n:'شاشة Super AMOLED',p:2},
+    {n:'فريم',p:2},{n:'عدل فريم',p:2},{n:'سوكت Micro',p:1},{n:'سوكت Type-C',p:2},{n:'مايك',p:1.5},
+    {n:'جرس (سماعة خارجية)',p:1},{n:'بوردة شحن',p:1},{n:'بطارية',p:1},{n:'فلاتة باور',p:1},{n:'فلاتة فوليم',p:1},
+    {n:'بصمة',p:1},{n:'عطل في البوردة',p:5},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
+  ],
+  software: [
+    {n:'سوفت اندرويد / فلاشة / FRP',p:1},{n:'سوفت ايفون / فلاشة',p:1},{n:'جتاج',p:3},{n:'ذاكرة',p:5},
+    {n:'فك آي كلاود بدون شبكة',p:1},{n:'فك آي كلاود بشبكة',p:2},{n:'تخطي تاب مدرسة',p:1},
+    {n:'سوفت تاب مدرسة',p:1},{n:'فلاشة كاملة لأندرويد',p:2},
+  ],
+};
+
+const PTS_CATS = [
+  {k:'iphone_x',   label:'آيفون (X وطالع)'},
+  {k:'iphone_pre', label:'آيفون (قبل X)'},
+  {k:'android',    label:'أندرويد موبايل'},
+  {k:'tab',        label:'تاب أندرويد'},
+  {k:'software',   label:'سوفت وير'},
+];
+
+// ===== تخمين الفئة والموديل من نوع/موديل الجهاز =====
+function _guessCat(type, model){
+  const t = ((type||'') + ' ' + (model||'')).toLowerCase();
+  if(/tab|تاب|ipad|اي باد|آيباد/.test(t)) return 'tab';
+  if(/iphone|ايفون|أيفون|iph|apple|ابل|آبل/.test(t)){
+    const mm = (typeof enDigits==='function' ? enDigits(String(model||'')) : String(model||'')).toLowerCase();
+    if(/(^|\D)(4s?|5[sc]?|6s?|7|8|se)(\D|$)/.test(mm) && !/1[1-9]/.test(mm)) return 'iphone_pre';
+    return 'iphone_x';
+  }
+  return 'android';
+}
+function _guessModel(model){
+  if(!model) return 'X';
+  let s = (typeof enDigits==='function' ? enDigits(String(model)) : String(model)).toLowerCase()
+    .replace(/iphone|ايفون|أيفون|apple|ابل|آبل/g,' ')
+    .replace(/([a-z])(\d)/g,'$1 $2').replace(/(\d)([a-z])/g,'$1 $2')
+    .replace(/pro\s*max|promax|بروماكس|برو\s*ماكس/g,' pro max')
+    .replace(/\bpro\b|برو/g,' pro')
+    .replace(/plus|بلس|بلص|\+/g,' plus')
+    .replace(/mini|ميني/g,' mini')
+    .replace(/\bmax\b|ماكس/g,' max')
+    .replace(/[^a-z0-9 ]/g,' ')
+    .trim().replace(/\s+/g,' ');
+  const norm = x => x.toLowerCase();
+  for(const m of IPHONE_X_ORDER) if(s === norm(m)) return m;
+  let best=null;
+  for(const m of IPHONE_X_ORDER){ const nm=norm(m); if((s===nm || s.startsWith(nm+' ')) && (!best || nm.length>norm(best).length)) best=m; }
+  if(best) return best;
+  for(const m of [...IPHONE_X_ORDER].reverse()){ if(s.indexOf(norm(m))>-1) return m; }
+  return 'X';
+}
+
+const _fmtPts = n => (Math.round(n*10)/10).toString();
+
+// ===== مطابقة العطل المكتوب بالأعطال المعروفة =====
+function _norm(s){
+  return (typeof enDigits==='function' ? enDigits(String(s||'')) : String(s||'')).toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g,'')
+    .replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/[ى]/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي')
+    .replace(/[^\u0621-\u064A a-z0-9]/g,' ')
+    .replace(/(^| |و)ال/g,'$1')
+    .replace(/\s+/g,' ').trim();
+}
+const _SYN = {
+  'باغه':['جلاس','glass','زجاج','قزاز'],'شاشه':['lcd','سكرين','اسكرين'],'تاتش':['touch','لمس'],
+  'فلاته':['فلات','flex','فليكس'],'سماعه':['speaker','سبيكر'],'بطاريه':['battery'],
+  'كاميرا':['camera','كام'],'شحن':['charge','تشارج','شاحن'],'بصمه':['finger','فنجر'],
+  'فيس':['face','fid','face id','فيسايدي'],'مايك':['mic','مايكروفون','ميكروفون'],
+  'ضهر':['back','باك','ظهر','غطاء','كفر'],'شاسيه':['chassis','هيكل','بودي','body'],
+  'فريم':['frame','اطار','برواز'],'ووتر':['water','مياه','ميه','بلل','غرق'],'هوم':['home'],
+  'فلاش':['flash'],'سينسور':['sensor','حساس'],
+};
+const _STOP = new Set(['تغيير','اصلاح','عطل','مشكله','بيشتغل','مكسور','مكسوره','خربان','خربانه','تركيب','الجهاز','جهاز','بيسخن','وقع','معلق','بيهنج','عايز','بدون','فيه','عنده','بقاله','لسه','حاجه','غريبه','معروفه']);
+
+function _faultAliases(name){
+  const set = new Set();
+  const add = x => { const n=_norm(x); if(n.length>=2) set.add(n); };
+  const noPar = name.replace(/\([^)]*\)/g,' ');
+  add(noPar);
+  noPar.split('/').forEach(add);
+  const par = (name.match(/\(([^)]*)\)/)||[])[1];
+  if(par) par.split('/').forEach(add);
+  [...set].forEach(p => Object.keys(_SYN).forEach(k => { if(p.indexOf(k)>-1) _SYN[k].forEach(sy=>{const v=p.replace(k,_norm(sy)); if(v.length>=2)set.add(v);}); }));
+  return [...set];
+}
+function _autoMatch(text, cat){
+  let work = ' ' + _norm(text) + ' ';
+  const faults = PTS_DATA[cat] || [];
+  const pairs = [];
+  faults.forEach((f,i) => _faultAliases(f.n).forEach(a => pairs.push({a,i})));
+  pairs.sort((x,y) => y.a.length - x.a.length);
+  const matched = new Set();
+  pairs.forEach(({a,i}) => {
+    let idx = work.indexOf(' '+a+' '), mlen = a.length;
+    if(idx < 0){ const w = work.indexOf(' و'+a+' '); if(w>-1){ idx=w; mlen=a.length+1; } }   // واو العطف
+    if(idx > -1){ matched.add(i); const st=idx+1; work = work.slice(0,st) + ' '.repeat(mlen) + work.slice(st+mlen); }
+  });
+  const leftovers = [...new Set(work.split(/\s+/).filter(w => w.length>=3 && !_STOP.has(w)))];
+  return { matched:[...matched], leftovers };
+}
+function _sim(a,b){ if(a===b) return 1; if(a.indexOf(b)>-1||b.indexOf(a)>-1) return .8; let best=0; for(let i=0;i<a.length;i++)for(let j=0;j<b.length;j++){let k=0;while(a[i+k]&&a[i+k]===b[j+k])k++;if(k>best)best=k;} return best/Math.max(a.length,b.length); }
+function _closest(word, cat){
+  const f = PTS_DATA[cat] || [];
+  return f.map((x,i)=>{ let s=0; _faultAliases(x.n).forEach(a=>{const v=_sim(word,a); if(v>s)s=v;}); return {i,s}; })
+          .filter(x=>x.s>=0.55).sort((a,b)=>b.s-a.s).slice(0,3).map(x=>x.i);
+}
+function _ptsOf(i){ const f=(PTS_DATA[_calcCat]||[])[i]; if(!f) return null; return (_calcCat==='iphone_x') ? faultPts(f,_calcModel) : f.p; }
+function _applyAutoMatch(){
+  const r = _autoMatch(_calcIssueText, _calcCat);
+  _calcSel = new Set(r.matched);
+  _calcSuggestions = r.leftovers.map(w => ({ word:w, idxs:_closest(w, _calcCat) })).filter(s => s.idxs.length);
+}
+
+// ===== حساب تلقائي كامل من العطل — من غير فتح الحاسبة =====
+function autoCalcPoints(d){
+  if(!d) return null;
+  const cat = _guessCat(d.deviceType, d.model);
+  const model = (cat === 'iphone_x') ? _guessModel(d.model) : null;
+  const rText = _autoMatch(d.reportedIssue || '', cat);
+  const idxSet = new Set(rText.matched);
+  const fromText = new Set(rText.matched);
+  const fromParts = new Set();
+  const fromAI = new Set();
+  // أعطال من قطع الغيار المربوطة بالجهاز
+  let partNames = [];
+  try { if(window.INV && typeof window.INV.getDevicePartNames === 'function'){ partNames = window.INV.getDevicePartNames(d.id) || []; } } catch(e){}
+  partNames.forEach(nm => { _autoMatch(nm, cat).matched.forEach(i => { idxSet.add(i); fromParts.add(i); }); });
+  // أعطال من الذكاء الاصطناعي (كاش لنفس النص والفئة)
+  const ai = _aiCache[d.id];
+  if(ai && ai.cat === cat && ai.text === (d.reportedIssue||'').trim()){
+    (ai.matched||[]).forEach(i => { if(!idxSet.has(i)){ idxSet.add(i); fromAI.add(i); } });
+  }
+  let total = 0; const names = [];
+  idxSet.forEach(i => {
+    const f = PTS_DATA[cat][i]; if(!f) return;
+    const p = (cat === 'iphone_x') ? faultPts(f, model) : f.p;
+    if(p != null){ total += p; names.push(f.n); }
+  });
+  const uncertain = rText.leftovers.filter(w => _closest(w, cat).length);
+  return { total: Math.round(total*10)/10, names, model, cat, uncertain, matchedCount: idxSet.size,
+           fromText:[...fromText], fromParts:[...fromParts], fromAI:[...fromAI], allIdx:[...idxSet] };
+}
+
+// سطر توضيحي تحت حقل النقط: إيه اللي اترصد تلقائياً + تنبيه للمش متأكد منه
+function autoPointsNote(d){
+  const a = autoCalcPoints(d);
+  if(!a || (!a.names.length && !a.uncertain.length)) return '';
+  const nm = i => (PTS_DATA[a.cat][i]||{}).n;
+  let h = '';
+  if(a.names.length)
+    h += `<div class="calc-auto ok">🧮 اتحسبت تلقائياً: ${esc(a.names.join('، '))}${a.model?` <span class="calc-auto-m">(iPhone ${esc(a.model)})</span>`:''} = <b>${_fmtPts(a.total)}</b> نقطة</div>`;
+  const partOnly = a.fromParts.filter(i => !a.fromText.includes(i)).map(nm).filter(Boolean);
+  if(partOnly.length)
+    h += `<div class="calc-auto part">🔩 مضاف من القطع المركّبة: ${esc(partOnly.join('، '))}</div>`;
+  const aiOnly = a.fromAI.map(nm).filter(Boolean);
+  if(aiOnly.length)
+    h += `<div class="calc-auto ai">🤖 زوّده الذكاء الاصطناعي: ${esc(aiOnly.join('، '))}</div>`;
+  const ai = _aiCache[d.id];
+  const poss = (ai && ai.cat===a.cat && ai.text===(d.reportedIssue||'').trim()) ? (ai.possible||[]).map(nm).filter(Boolean) : [];
+  if(poss.length)
+    h += `<div class="calc-auto ai-maybe">🤖 يمكن كمان (من الشكوى): ${esc(poss.join('، '))} — افتح الحاسبة لو صح</div>`;
+  if(a.uncertain.length)
+    h += `<div class="calc-auto warn">⚠️ محتاج تأكيد: ${a.uncertain.map(w=>`«${esc(w)}»`).join(' ')} — افتح الحاسبة وأكّده</div>`;
+  return h;
+}
+
+// يتنده من موديول قطع الغيار لما القطع تتحمّل/تتغيّر → يعيد حساب النقط تلقائي
+let _partsBusy = false;
+window.onDevicePartsChanged = function(deviceId){
+  if(_partsBusy) return;
+  if(deviceId !== selectedId) return;
+  const d = devices.find(x => x.id === selectedId);
+  if(!d || d.isWholesale) return;
+  const auto = autoCalcPoints(d);
+  const newPts = (auto && auto.matchedCount > 0) ? String(auto.total) : null;
+  _partsBusy = true;
+  try {
+    if(newPts !== null && newPts !== String(d.points||'')){
+      devices = devices.map(x => x.id === selectedId ? { ...x, points:newPts, lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name } : x);
+      renderDetail(); render(); persist();
+    } else {
+      renderDetail();
+    }
+  } finally { _partsBusy = false; }
+};
+
+// ===== طبقة الذكاء الاصطناعي (للحالات الصعبة بس — Edge Function: match-faults) =====
+let _aiCache = {};   // { devId: { text, cat, matched:[idx], possible:[idx] } }
+let _aiBusy = {};
+
+async function aiMatchFaults(text, cat){
+  const names = (PTS_DATA[cat] || []).map(f => f.n);
+  try {
+    const { data, error } = await sb.functions.invoke('match-faults', { body: { text, faults: names, category: cat } });
+    if(error || !data || !data.ok) return null;
+    const toIdx = arr => [...new Set((arr||[]).map(x => names.indexOf(x)).filter(i => i >= 0))];
+    return { matched: toIdx(data.matched), possible: toIdx(data.possible) };
+  } catch(e){ return null; }
+}
+
+async function runAiForDevice(deviceId){
+  if(_aiBusy[deviceId]) return;
+  const d0 = devices.find(x => x.id === deviceId);
+  if(!d0 || d0.isWholesale) return;
+  const text = (d0.reportedIssue||'').trim();
+  const cat = _guessCat(d0.deviceType, d0.model);
+  if(!text) return;
+  _aiBusy[deviceId] = true;
+  const res = await aiMatchFaults(text, cat);
+  delete _aiBusy[deviceId];
+  if(!res) return;
+  const d1 = devices.find(x => x.id === deviceId);
+  if(!d1 || (d1.reportedIssue||'').trim() !== text) return;   // النص اتغيّر أثناء النداء
+  _aiCache[deviceId] = { text, cat, matched: res.matched, possible: res.possible };
+  const auto = autoCalcPoints(d1);
+  if(auto && auto.matchedCount > 0 && String(auto.total) !== String(d1.points||'')){
+    devices = devices.map(x => x.id === deviceId ? { ...x, points: String(auto.total), lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name } : x);
+    render(); if(selectedId === deviceId) renderDetail(); persist();
+  } else if(selectedId === deviceId){
+    renderDetail();
+  }
+}
+
+// يشغّل الـ AI بس لو الكيوردز عاجز (ملقاش/فيه غموض) ومفيش كاش لنفس النص
+function runAiIfNeeded(deviceId){
+  const d = devices.find(x => x.id === deviceId);
+  if(!d || d.isWholesale) return;
+  const text = (d.reportedIssue||'').trim();
+  if(!text) return;
+  const cached = _aiCache[deviceId];
+  if(cached && cached.text === text) return;
+  const auto = autoCalcPoints(d);   // كيوردز + قطع (من غير AI)
+  if(auto.matchedCount === 0 || (auto.uncertain||[]).length) runAiForDevice(deviceId);
+}
+
+// ===== حالة الحاسبة =====
+let _calcCat = 'iphone_x';
+let _calcModel = 'X';
+let _calcSel = new Set();
+let _calcIssueText = '';
+let _calcSuggestions = [];
+
+function openPtsCalc(){
+  const d = devices.find(x => x.id === selectedId); if(!d) return;
+  _calcCat = _guessCat(d.deviceType, d.model);
+  _calcModel = (_calcCat === 'iphone_x') ? _guessModel(d.model) : 'X';
+  _calcIssueText = d.reportedIssue || '';
+  // اختيار مبدئي = كل مصادر الحساب (نص + قطع + AI)
+  const auto = autoCalcPoints(d);
+  _calcSel = new Set(auto ? auto.allIdx : []);
+  // اقتراحات = غموض الكيوردز + محتملات الـ AI من الشكوى
+  const r = _autoMatch(_calcIssueText, _calcCat);
+  _calcSuggestions = r.leftovers.map(w => ({ word:w, idxs:_closest(w, _calcCat) })).filter(s => s.idxs.length);
+  const ai = _aiCache[d.id];
+  if(ai && ai.cat === _calcCat && (ai.possible||[]).length){
+    _calcSuggestions.unshift({ word:'🤖 يمكن كمان', idxs: ai.possible });
+  }
+  document.getElementById('ptsCalcOverlay').classList.remove('hidden');
+  renderPtsCalc();
+}
+function closePtsCalc(){ document.getElementById('ptsCalcOverlay').classList.add('hidden'); }
+function setCalcCat(k){ if(_calcCat===k) return; _calcCat = k; _applyAutoMatch(); renderPtsCalc(); }
+function setCalcModel(m){ _calcModel = m; renderPtsCalc(); }
+function togglePtsFault(i){ if(_calcSel.has(i)) _calcSel.delete(i); else _calcSel.add(i); renderPtsCalc(); }
+
+function _calcTotal(){
+  const faults = PTS_DATA[_calcCat] || [];
+  let total = 0;
+  _calcSel.forEach(i => {
+    const f = faults[i]; if(!f) return;
+    const p = (_calcCat === 'iphone_x') ? faultPts(f, _calcModel) : f.p;
+    if(p != null) total += p;
+  });
+  return Math.round(total*10)/10;
+}
+
+function renderPtsCalc(){
+  const faults = PTS_DATA[_calcCat] || [];
+  const isX = _calcCat === 'iphone_x';
+  let total = 0;
+
+  const chips = faults.map((f, i) => {
+    const p = isX ? faultPts(f, _calcModel) : f.p;
+    if(p == null){ _calcSel.delete(i); return ''; }   // لا ينطبق → إخفاء وإلغاء اختيار
+    const on = _calcSel.has(i);
+    if(on) total += p;
+    return `<button type="button" class="calc-chip${on?' on':''}" onclick="togglePtsFault(${i})"><span>${esc(f.n)}</span><b>${_fmtPts(p)}</b></button>`;
+  }).join('');
+
+  const catsBtns = PTS_CATS.map(c =>
+    `<button type="button" class="calc-cat${_calcCat===c.k?' on':''}" onclick="setCalcCat('${c.k}')">${c.label}</button>`
+  ).join('');
+
+  const modelSel = isX ? `
+    <div class="calc-label">الموديل</div>
+    <select class="calc-model" onchange="setCalcModel(this.value)">
+      ${IPHONE_X_ORDER.map(m => `<option value="${esc(m)}"${m===_calcModel?' selected':''}>iPhone ${esc(m)}</option>`).join('')}
+    </select>` : '';
+
+  const issueLine = _calcIssueText
+    ? `<div class="calc-issue">📋 العطل المكتوب: <span>${esc(_calcIssueText)}</span></div>` : '';
+
+  const sugg = (_calcSuggestions || []).filter(s => s.idxs.length);
+  const suggHtml = sugg.length ? `
+    <div class="calc-label">🔎 مش متأكد من دول — دوس لو صح:</div>
+    <div class="calc-sugg-wrap">${sugg.map(s => `<div class="calc-sugg"><span class="calc-sugg-w">«${esc(s.word)}»</span>${s.idxs.map(i => { const p=_ptsOf(i); if(p==null) return ''; return `<button type="button" class="calc-chip mini${_calcSel.has(i)?' on':''}" onclick="togglePtsFault(${i})"><span>${esc(faults[i].n)}</span><b>${_fmtPts(p)}</b></button>`; }).join('')}</div>`).join('')}</div>` : '';
+
+  total = Math.round(total*10)/10;
+
+  document.getElementById('ptsCalcModal').innerHTML = `
+    <div class="calc-head"><span>🧮 حاسبة النقط</span><button type="button" onclick="closePtsCalc()">×</button></div>
+    ${issueLine}
+    <div class="calc-label">الفئة</div>
+    <div class="calc-cats">${catsBtns}</div>
+    ${modelSel}
+    ${suggHtml}
+    <div class="calc-label">الأعطال <span style="font-weight:400;color:var(--muted);">(الملوّن اترصد من العطل — دوس للتعديل)</span></div>
+    <div class="calc-chips">${chips}</div>
+    <div class="calc-foot">
+      <div class="calc-total">المجموع: <b>${_fmtPts(total)}</b> نقطة</div>
+      <button type="button" class="calc-apply" onclick="applyPtsCalc()">طبّق</button>
+    </div>`;
+}
+
+function applyPtsCalc(){
+  const total = _calcTotal();
+  closePtsCalc();
+  editField('points', String(total));
+}
+
 async function editField(key, value){
-  devices = devices.map(d => d.id === selectedId ? { ...d, [key]: value.trim(), lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  let extra = {};
+  if(key === 'reportedIssue'){
+    const cur = devices.find(x => x.id === selectedId);
+    if(cur && !cur.isWholesale){
+      delete _aiCache[selectedId];   // نص جديد → ألغي كاش الـ AI القديم
+      const auto = autoCalcPoints({ ...cur, reportedIssue: value.trim() });
+      if(auto && auto.matchedCount > 0) extra.points = String(auto.total);   // حساب تلقائي كامل
+    }
+  }
+  devices = devices.map(d => d.id === selectedId ? { ...d, [key]: value.trim(), ...extra, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
   renderDetail();
   render();
+  if(_openTechDevName && document.getElementById('techDevOverlay') && !document.getElementById('techDevOverlay').classList.contains('hidden')){
+    renderTechEval(); openTechDevices(_openTechDevName);   // تحديث صفحة الفني لو مفتوحة
+  }
   await persist();
   const updTrack = devices.find(x => x.id === selectedId);
   if(updTrack){ if(!updTrack.trackToken){ await ensureTrackToken(updTrack.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+  if(key === 'reportedIssue') runAiIfNeeded(selectedId);   // الذكاء الاصطناعي للحالات الصعبة (بعد الحفظ)
 }
 
 // ===== ملاحظات إضافية (سجل بيتزاد وميتعدّلش) =====
@@ -3835,7 +4404,7 @@ const APPROVAL_STATUSES = ['delivered', 'returned'];
 // نص شارة "بانتظار الموافقة" حسب نوع الطلب (فاضي لو مفيش طلب معلّق)
 function pendingApprovalText(d){
   if(!d || !d.pendingApproval || d.pendingApproval.status !== 'pending') return '';
-  return d.pendingApproval.type === 'return' ? t('appr.badgeReturn') : t('appr.badgeHandover');
+  return d.pendingApproval.type === 'return' ? t('appr.badgeReturn') : d.pendingApproval.type === 'reject' ? t('appr.badgeReject') : t('appr.badgeHandover');
 }
 
 // تسجيل طلب اعتماد معلّق على الجهاز بدل تنفيذ التغيير على طول
@@ -3876,7 +4445,7 @@ function pendingApprovals(){
 }
 
 // اسم نوع الطلب المختصر (تسليم / إرجاع)
-function apprKindLabel(type){ return type === 'return' ? t('appr.kindReturn') : t('appr.kindHandover'); }
+function apprKindLabel(type){ return type === 'return' ? t('appr.kindReturn') : type === 'reject' ? t('appr.kindReject') : t('appr.kindHandover'); }
 
 // ملاحظة نشاط لقرار الاعتماد — بتتكتب في سجل نشاط الجهاز بالشكل: [نص - وقت - مين - دوره]
 function approvalActivityNote(req, decision){
@@ -3894,10 +4463,10 @@ function approvalsPanelHtml(){
   if(list.length === 0) return '';
   const rows = list.map(d => {
     const req = d.pendingApproval;
-    const kindStyle = req.type === 'return' ? 'background:#F5EEFC;color:#9333EA;' : 'background:#EAF1F8;color:#2B6CB0;';
+    const kindStyle = req.type === 'return' ? 'background:#F5EEFC;color:#9333EA;' : req.type === 'reject' ? 'background:#FCE7F1;color:#C2185B;' : 'background:#EAF1F8;color:#2B6CB0;';
     return `<div class="appr-row">
       <div class="appr-row-info">
-        <div class="appr-row-dev"><span class="appr-row-kind" style="${kindStyle}">${apprKindLabel(req.type)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-dev"><span class="appr-row-kind" style="${kindStyle}">${apprKindLabel(req.type)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}${req.type === 'reject' ? ` <span style="color:var(--rejected_shop);font-weight:700;">(${req.payload && req.payload.rejectedInShop ? t('det.rejInShop') : t('det.rejPickedUp')})</span>` : ''}</div>
         <div class="appr-row-meta">${t('appr.logReqBy')} ${esc(req.requestedBy||'')} · ${new Date(req.requestedAt).toLocaleString(getLocale())}</div>
       </div>
       <div class="appr-row-actions">
@@ -3931,7 +4500,7 @@ async function approveRequest(deviceId){
   // المحاسب مش dispatcher، فمفيش اعتراض تاني — بيتنفذ فوراً وبيحفظ ويزامن صفحة المتابعة.
   const prevSel = selectedId;
   selectedId = deviceId;
-  await changeStatus(req.payload.status, req.payload.paymentChoice);
+  await changeStatus(req.payload.status, req.payload.paymentChoice, req.payload.rejectedInShop);
   selectedId = prevSel;
   render();
 }
@@ -3951,7 +4520,19 @@ async function rejectRequest(deviceId){
   await persist();
 }
 
-async function changeStatus(newStatus, paymentChoice){
+// تبديل مكان الجهاز المرفوض: في درج الرفض (لسه بالمحل) ولا اتسلّم (خرج من المحل)
+async function markRejectedLocation(inShop){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d || d.status !== 'rejected') return;
+  if(!!d.rejectedInShop === inShop) return;   // مفيش تغيير فعلي
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, rejectedInShop: inShop, lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
+        statusHistory:[...(x.statusHistory||[]), { status:'rejected', labelKey: inShop ? 'hist.rejToDrawer' : 'hist.rejPickedUp', date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
+}
+
+async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
 
@@ -3981,7 +4562,7 @@ async function changeStatus(newStatus, paymentChoice){
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, price);
         historyKey = 'hist.deliveredDeferred'; historyVars = { amount: price.toLocaleString('en-EG'), shop };
       } else {
@@ -3998,6 +4579,7 @@ async function changeStatus(newStatus, paymentChoice){
   }
 
   showError('');
+  if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
   devices = devices.map(x => x.id === selectedId
     ? {
         ...x, ...extra,
@@ -4874,6 +5456,25 @@ function findDeviceByScan(raw){
 let gScanBuf = '', gScanLast = 0;
 
 // بيفتح الجهاز وينضف أي أثر للكود من الخانات
+// ============================================================
+// مسح الباركود بالكاميرا
+// ------------------------------------------------------------
+// بيستخدم findDeviceByScan الموجود — نفس المنطق اللي الماسح السلكي
+// بيمر عليه بالظبط، فمفيش نسختين من قواعد المطابقة تفترقوا بعدين.
+// ============================================================
+function scanWithCamera(){
+  if(!window.IFixScan) return;
+  IFixScan.open(text => {
+    const hit = findDeviceByScan(text);
+    if(hit) return openScannedDevice(hit);
+    // مفيش نتيجة؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
+    const box = document.getElementById('gsInput');
+    if(box){ box.value = text; box.dispatchEvent(new Event('input', { bubbles:true })); box.focus(); }
+    showError(t('scan.notFound'));
+    setTimeout(() => showError(''), 3000);
+  });
+}
+
 function openScannedDevice(hit){
   const el = document.activeElement;
   if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')){
@@ -4964,7 +5565,10 @@ function renderLabelInto(containerId, d){
       <div class="label-row-title">${esc(d.shopName || '—')}</div>
       <div class="label-row" style="font-weight:800;">${esc(d.customerName)}</div>
       <div class="label-row" style="font-weight:800;">${esc(d.deviceType)} ${esc(d.model)}</div>
-      ${d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : ''}
+      ${d.status==='returned' ? `<div class="label-row" style="font-weight:900;">🔁 ${t('ui.returnMark')}</div>` : ''}
+      ${(d.status==='returned' && (d.discoveredFault || d.returnComplaint))
+        ? `<div class="label-row">${esc(d.discoveredFault || d.returnComplaint)}</div>`
+        : (d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : '')}
       <div class="label-row">${esc(shortDateTime(d.intakeDate))}</div>
       <div id="qrHolder"></div>
       <div style="font-family:'Cairo',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
@@ -5200,7 +5804,10 @@ async function renderLabelImage(d, sz, qrDataUrl){
     { t: d.customerName || '',                        f: fCust,  w: 700, fam: 'Cairo' },
     { t: `${d.deviceType||''} ${d.model||''}`.trim(), f: fDev,   w: 700, fam: 'Cairo' }
   ];
-  if(d.reportedIssue) rows.push({ t: d.reportedIssue, f: fIssue, w: 700, fam: 'Tajawal' });
+  const _ret = d.status === 'returned';
+  const _issue = (_ret && (d.discoveredFault || d.returnComplaint)) ? (d.discoveredFault || d.returnComplaint) : d.reportedIssue;
+  if(_ret) rows.push({ t: t('ui.returnMark'), f: fIssue, w: 900, fam: 'Tajawal' });
+  if(_issue) rows.push({ t: _issue, f: fIssue, w: 700, fam: 'Tajawal' });
   rows.push({ t: shortDateTime(d.intakeDate), f: fDate, w: 700, fam: 'Tajawal', ltr: true });
 
   const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);
@@ -5536,8 +6143,10 @@ async function syncTrack(d){
       status: d.status,
       issue: d.reportedIssue || '',
       price: parseInt(d.agreedPrice) || 0,
+      returnPrice: parseInt(d.returnPrice) || 0,
       deepInspectionRequested: !!(d.deepInspection && d.deepInspection.requested),
       priceConfirmRequested: !!(d.priceConfirmation && d.priceConfirmation.requested),
+      returnPriceConfirmRequested: !!(d.returnPriceConfirmation && d.returnPriceConfirmation.requested),
       intakeDate: d.intakeDate,
       updatedAt: new Date().toISOString()
     });
@@ -5732,7 +6341,7 @@ async function editPayType(t){
     extra.billedShop = shop;
     if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({ ...d, billedShop: shop }, price);
       }
       extra.paymentStatus = 'paid';
@@ -5744,9 +6353,9 @@ async function editPayType(t){
     }
   } else {
     // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
-    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id);
+    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind);
     if(had){
-      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id));
+      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id && !e.kind));
       await persistLedger();
     }
     extra.paymentStatus = 'unpaid';   // مستني "تأكيد الدفع"
@@ -5783,7 +6392,7 @@ async function editPrice(value){
     if(shop){
       extra.paymentStatus = 'paid';
       extra.billedShop = shop;
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id)){
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, parseInt(price));
       }
       histEntry = { status:d.status, labelKey:'hist.pricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
@@ -5818,6 +6427,8 @@ async function resetTrackResponse(token, kind){
   try{
     const patch = kind === 'price'
       ? { price_response: null, price_responded_at: null }
+      : kind === 'return_price'
+      ? { return_price_response: null, return_price_responded_at: null }
       : { deep_inspection_response: null, deep_inspection_responded_at: null };
     await sb.from('public_track_responses').upsert({ token, ...patch, updated_at: new Date().toISOString() });
   }catch(e){}
@@ -5873,8 +6484,9 @@ async function persistLedger(){
   try{ await window.storage.set(LEDGER_KEY, JSON.stringify(ledger)); }catch(e){}
 }
 
-function addLedgerDebit(d, price){
-  ledger = [{
+function addLedgerDebit(d, price, opts){
+  opts = opts || {};
+  const entry = {
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'debit',
     shop: (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل',
@@ -5882,11 +6494,110 @@ function addLedgerDebit(d, price){
     deviceId: d.id,
     deviceLabel: `${d.deviceType||''} ${d.model||''} — ${d.customerName||''}`.trim(),
     // بنحفظ العطل مع القيد — عشان كشف الحساب يفضل صح حتى لو الجهاز اتمسح
-    issue: (d.reportedIssue || '').trim(),
+    issue: (opts.issue !== undefined ? opts.issue : (d.reportedIssue || '')).trim(),
     date: new Date().toISOString(),
     by: currentUser.name
-  }, ...ledger];
+  };
+  if(opts.kind) entry.kind = opts.kind;   // 'return' = قيد حساب المرتجع، منفصل عن قيد الأصلي
+  ledger = [entry, ...ledger];
   persistLedger();
+}
+
+// ============================================================
+// حساب المرتجع — نفس ماكينة الفلوس بس على returnPrice.
+// القيد بماركة kind:'return' وميلمسش قيد الجهاز الأصلي أبداً.
+// الجهاز مرتجع = اتسلّم قبل كده، فالآجل بيتقيّد فوراً (مش مستني تسليم).
+// ============================================================
+function isReturnPriced(d){
+  if(!d) return false;
+  const v = d.returnPrice;
+  if(v === null || v === undefined || v === '') return false;
+  return isFinite(Number(v));
+}
+
+async function editReturnPrice(value){
+  const price = intPrice(value);
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  let extra = { returnPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let histEntry = null;
+
+  // محدد عليه آجل بالفعل واتسعّر دلوقتي → يتقيّد على حساب المحل فوراً
+  if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid'){
+    const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
+    if(shop){
+      extra.returnPaymentStatus = 'paid';
+      extra.returnBilledShop = shop;
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && e.kind === 'return')){
+        addLedgerDebit({ ...d, billedShop: shop }, parseInt(price), { kind: 'return', issue: (d.discoveredFault || d.returnComplaint || '') });
+      }
+      histEntry = { status:d.status, labelKey:'hist.returnPricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
+    }
+  }
+
+  // لو السعر الجديد اتغيّر → نطلب موافقة العميل عليه (زي السعر الأساسي)
+  if(price !== '' && price !== d.returnPrice){
+    extra.returnPriceConfirmation = { requested: true, requestedAt: new Date().toISOString() };
+    resetTrackResponse(d.trackToken, 'return_price');
+  }
+
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
+    : x);
+  renderDetail(); render(); await persist();
+  const updT = devices.find(x => x.id === selectedId);
+  if(updT){ if(!updT.trackToken){ await ensureTrackToken(updT.id); } syncTrack(devices.find(x => x.id === selectedId)); }
+}
+
+// فوري/آجل لحساب المرتجع — بيقيّد قيد مرتجع أو يرجّعه، من غير أي مساس بقيد الأصلي
+async function editReturnPayType(pt){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const price = parseInt(d.returnPrice) || 0;
+  if(pt === d.returnPaymentType && (pt !== 'deferred' || d.returnPaymentStatus === 'paid')) return;
+
+  let extra = { returnPaymentType: pt, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
+  let noteKey = null, noteVars = null;
+
+  if(pt === 'deferred'){
+    if(!isReturnPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
+    if(!shop){ alert(t('msg.needShopForCredit')); return; }
+    extra.returnBilledShop = shop;
+    // الجهاز مرتجع (اتسلّم قبل كده) → القيد بيتعمل فوراً ويعتبر متسوّى
+    if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && e.kind === 'return')){
+      addLedgerDebit({ ...d, billedShop: shop }, price, { kind: 'return', issue: (d.discoveredFault || d.returnComplaint || '') });
+    }
+    extra.returnPaymentStatus = 'paid';
+    noteKey = 'hist.returnToDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
+  } else {
+    // رجوع لفوري: نشيل قيد المرتجع بس (بماركة return)، والأصلي زي ما هو
+    const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && e.kind === 'return');
+    if(had){
+      ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id && e.kind === 'return'));
+      await persistLedger();
+    }
+    extra.returnPaymentStatus = 'unpaid';
+    noteKey = had ? 'hist.returnToCashRemoved' : 'hist.returnToCash';
+  }
+
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, ...extra, statusHistory:[...(x.statusHistory||[]),
+        { status:x.status, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
+}
+
+// تأكيد دفع حساب المرتجع فوري (زي markPaid — الفوري مبيتقيّدش على الدفتر)
+async function markReturnPaid(){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  if(!isReturnPriced(d)){ alert(t('msg.needPriceFirst')); return; }
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, returnPaymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
+        statusHistory:[...(x.statusHistory||[]), { status:x.status, labelKey:'hist.returnPaidCash', labelVars:{ amount:(parseInt(x.returnPrice)||0).toLocaleString('en-EG') }, date:new Date().toISOString(), by:currentUser.name }] }
+    : x);
+  renderDetail(); render(); await persist();
 }
 
 async function recordPayment(){
@@ -6255,14 +6966,14 @@ function stmtDesc(e){
   if(e.type==='opening') return 'رصيد افتتاحي سابق';
   if(e.type==='discount') return 'خصم' + (e.note ? ' — ' + e.note : '');
   if(e.type==='credit') return 'دفعة' + (e.note ? ' — ' + e.note : '');
-  return 'جهاز: ' + (e.deviceLabel||'') + (e.prevShop ? ` (منقول من حساب ${e.prevShop})` : '');
+  return (e.kind==='return' ? 'مرتجع — ' : '') + 'جهاز: ' + (e.deviceLabel||'') + (e.prevShop ? ` (منقول من حساب ${e.prevShop})` : '');
 }
 // وصف الحركة بأيقونات (للـ PDF)
 function stmtDescHtml(e){
   if(e.type==='opening') return '🧾 رصيد افتتاحي سابق';
   if(e.type==='discount') return '🏷️ خصم' + (e.note ? ' — ' + esc(e.note) : '');
   if(e.type==='credit') return '💵 دفعة' + (e.note ? ' — ' + esc(e.note) : '');
-  return `📱 ${esc(e.deviceLabel||'جهاز')}` + (e.prevShop ? `<br><small style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</small>` : '');
+  return `${e.kind==='return' ? '🔁 ' : ''}📱 ${esc(e.deviceLabel||'جهاز')}${e.kind==='return' ? ` <small style="color:var(--violet);font-weight:800;">(مرتجع)</small>` : ''}` + (e.prevShop ? `<br><small style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</small>` : '');
 }
 
 // عطل الجهاز في كشف الحساب.
@@ -6272,6 +6983,7 @@ function stmtIssue(e){
   if(e.type !== 'debit') return '';
   if(e.issue) return e.issue;
   const d = devices.find(x => x.id === e.deviceId);
+  if(e.kind === 'return') return (d && (d.discoveredFault || d.returnComplaint)) ? String(d.discoveredFault || d.returnComplaint).trim() : '';
   return (d && d.reportedIssue) ? String(d.reportedIssue).trim() : '';
 }
 
@@ -7013,6 +7725,33 @@ function completionDate(d){
   return h.length ? h[h.length - 1].date : null;
 }
 
+// صفحة أجهزة الفني — تفتح بالضغط على اسم الفني في التقييم
+let _openTechDevName = null;
+function openTechDevices(techName){
+  const r = (teRows || []).find(x => x.t === techName);
+  if(!r) return;
+  _openTechDevName = techName;
+  const round1 = n => Math.round(n * 10) / 10;
+  const items = r.items.slice().sort((a,b) => b.share - a.share);
+  const roleLabel = x => x.role === 'مساعد' ? `🤝 ${t('te.assistant')}` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}`;
+  const rows = items.length ? items.map(x => `
+    <div class="td-item" onclick="openDetail('${x.d.id}')">
+      <div class="td-item-info">
+        <div class="td-item-name">${esc(x.d.deviceType)} ${esc(x.d.model)}</div>
+        <div class="td-item-sub">${x.d.customerName ? esc(x.d.customerName) + ' · ' : ''}${roleLabel(x)}${x.d.shopName ? ' · ' + esc(x.d.shopName) : ''}</div>
+      </div>
+      <div class="td-item-pts">
+        <div class="td-pts-num">${esc(x.d.points || '0')}</div>
+        <div class="td-pts-lbl">${t('te.devicePoints')}</div>
+        ${round1(x.share) !== (parseFloat(enDigits(x.d.points)) || 0) ? `<div class="td-pts-share">↳ ${round1(x.share)}</div>` : ''}
+      </div>
+    </div>`).join('') : `<div class="empty-col">${t('te.noPoints')}</div>`;
+  document.getElementById('techDevTitle').innerHTML = `🔧 ${esc(r.t)} <span style="font-size:13px;font-weight:500;color:var(--muted-2);">(${items.length} ${t('te.deviceCount')} · ⭐ ${r.points})</span>`;
+  document.getElementById('techDevBody').innerHTML = rows;
+  document.getElementById('techDevOverlay').classList.remove('hidden');
+}
+function closeTechDevices(){ _openTechDevName = null; document.getElementById('techDevOverlay').classList.add('hidden'); }
+
 function renderTechEval(){
   const chip = (mode, label) =>
     `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
@@ -7036,6 +7775,18 @@ function renderTechEval(){
   let wholesaleSkipped = 0;                // أجهزة جملة اتجاهلت
 
   devices.forEach(d => {
+    // ===== جهاز رجع بعد التسليم: الأصلي بصفر عليه، ونقاط الصيانة الجديدة للفني البديل =====
+    if(returnAfterDeliveryDate(d)){
+      const rpts = parseFloat(enDigits(d.returnPoints)) || 0;
+      if(!rpts || !d.substituteTechnician) return;
+      if(d.isWholesale){ wholesaleSkipped++; return; }
+      const cd = completionDate(d);
+      if(!cd){ pendingPts += rpts; pendingCount++; return; }
+      if(!inTeRange(cd)) return;
+      push(d.substituteTechnician, d, rpts, 'بديل');
+      return;
+    }
+
     const pts = parseFloat(enDigits(d.points)) || 0;
     if(!pts || !d.technician) return;
     if(d.isWholesale){ wholesaleSkipped++; return; }
@@ -7108,8 +7859,8 @@ function renderTechEval(){
     : `<table class="inv-table">
         <tr><th>${t('te.colTech')}</th><th>⭐ ${t('te.colPoints')}</th><th>${t('te.colDone')}</th><th>${t('te.colAvg')}</th><th>${t('te.colReturns')}</th><th>${t('te.colRate')}</th></tr>
         ${teRows.map((r, i) => `
-          <tr onclick="toggleTeTech(${i})" style="cursor:pointer;" title="${t('te.tapForDetails')}">
-            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:var(--muted-2);font-weight:500;">${teOpenTech === r.t ? '▲' : '▼'}</span>
+          <tr onclick="openTechDevices('${esc(r.t).replace(/'/g,"\\'")}')" style="cursor:pointer;" title="${t('te.tapForDetails')}">
+            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:var(--muted-2);font-weight:500;">‹</span>
               <button onclick="event.stopPropagation(); openTechPortal('${esc(r.t).replace(/'/g,"\\'")}')" title="${t('tp.openTech')}" style="margin-inline-start:6px;border:1px solid #DDD6FE;background:var(--surface-2);color:var(--violet);border-radius:7px;padding:3px 8px;font-size:12px;cursor:pointer;">📱</button></td>
             <td style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
             <td style="font-weight:800; color:var(--success);">${r.count}</td>
@@ -7127,10 +7878,14 @@ function renderTechEval(){
                     <div>
                       <div style="font-weight:700;">${esc(x.d.deviceType)} ${esc(x.d.model)} — ${esc(x.d.customerName)}</div>
                       <div style="font-size:12px; color:var(--muted-2);">
-                        ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
+                        ${x.role === 'مساعد' ? `🤝 ${t('te.assistant')} (${esc(x.d.assistPercent)}% ${t('te.ofPoints')} ${esc(x.d.points)})` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}${x.d.assistTechnician ? ` (${t('te.afterAssist')} ${esc(x.d.points)})` : ''}`}
                       </div>
                     </div>
-                    <div style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif;">${round1(x.share)}</div>
+                    <div style="text-align:center; flex-shrink:0; min-width:54px;">
+                      <div style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif; font-size:18px; line-height:1.05;">${esc(x.d.points||'0')}</div>
+                      <div style="font-size:9.5px; color:var(--muted-2);">${t('te.devicePoints')}</div>
+                      ${round1(x.share) !== (parseFloat(enDigits(x.d.points))||0) ? `<div style="font-size:11px; color:var(--muted); margin-top:1px;">↳ ${round1(x.share)}</div>` : ''}
+                    </div>
                   </div>`).join('')}
             </div>
           </td></tr>` : ''}
@@ -7297,11 +8052,21 @@ requireAccess().then(ok => {
   }catch(e){}
   // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
   // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
+  try{
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+      const b = document.getElementById('gsScan'); if(b) b.style.display = '';
+    }
+  }catch(e){}
+
+  // ⚠️ loadBroadcast لازم تيجي **بعد** المفاتيح والأدوار.
+  //    كانت بتتنادى فوراً، فبتلاقي featureFlags لسه فاضية وتخرج
+  //    من أول سطر — والإشعارات مبتوصلش أبداً. وكمان بتحتاج
+  //    myRole() عشان تعرف تقرا أنهي مفتاح.
   loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
-    .then(applyRoleVisibility);
+    .then(applyRoleVisibility)
+    .then(() => { try{ loadBroadcast(); }catch(e){} });
   injectAdminMenu();
-  loadBroadcast();
   loadDevices();
   loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
   setInterval(checkAutoBackup, 3600000);

@@ -26,6 +26,8 @@
 <meta name="theme-color" content="#1B2A3A">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="i18n.js"></script>
+<script src="qr-scan.js"></script>
+<script src="fuzzy-search.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -34,7 +36,7 @@
      التوقيع: تذكرة صيانة — شريط حالة ملوّن على حافة الكارت + رقم تذكرة
      ============================================================ */
   :root{
-    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#475569;
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --chrome:#16233A; --ink-2:#475569;
     --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
@@ -45,6 +47,7 @@
     --done:#15803D; --done-bg:#EAF6EE;
     --returned:#9333EA; --returned-bg:#F5EEFC;
     --rejected:#DC2626; --rejected-bg:#FEF2F2;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
   }
 
@@ -53,7 +56,7 @@
      الشاشة كلها بدل ما يخترع لون جديد. */
   html[data-theme="dark"]{
     color-scheme:dark;
-    --on-chrome:#E9EFF5; --on-color:#0E1721; --ink-2:#C3D2DF;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --chrome:#0E1721; --ink-2:#C3D2DF;
     --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
     --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
     --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
@@ -64,6 +67,7 @@
     --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
     --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
     --rejected:#F87171;   --rejected-bg:rgba(248,113,113,.15);
+    --rejected_shop:#F472B6;   --rejected_shop-bg:rgba(244,114,182,.15);
   }
 
 
@@ -89,11 +93,13 @@
   }
   .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
   .nt-ic{font-size:44px; line-height:1;}
-  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
+  /* ⚠️ var(--ink) مش لون ثابت: العنوان كان #16233A أزرق غامق —
+     في الوضع الداكن بيبقى غامق فوق غامق ومش باين. */
+  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:var(--ink);}
   .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:var(--chrome); color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -271,7 +277,7 @@
   .act-work{background:var(--repairing-bg); color:var(--repairing);}
   .act-done{background:var(--done-bg); color:var(--done);}
   .act-prob{background:var(--waiting-bg); color:var(--waiting); flex:0 0 auto;}
-  .act-rej{background:var(--rejected-bg); color:var(--rejected); flex:0 0 auto;}
+  .act-rej{background:var(--rejected_shop-bg); color:var(--rejected_shop); flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
 
   /* بطاقة المساعدة: أهدأ + بدون أزرار */
@@ -570,7 +576,7 @@ async function loadDevices(){
       .limit(300);
     if(error) throw error;
     const rows = (data || []).map(r => r.data).filter(Boolean);
-    devices = rows.map(adapt);
+    devices = rows.map(adapt); reindexSearch();
     offline = false;
     document.querySelectorAll('.offbar').forEach(e => e.remove());
     document.querySelectorAll('.errbar').forEach(e => e.remove());
@@ -579,7 +585,7 @@ async function loadDevices(){
     // ⚠️ فرق مهم: "مفيش نت" حاجة، و"خطأ في القراءة" حاجة تانية خالص.
     // خلطهم كان بيدّي رسالة مضلّلة وبيخبّي السبب الحقيقي.
     const c = localStorage.getItem(CACHE_KEY);
-    devices = c ? (JSON.parse(c) || []).map(adapt) : [];
+    devices = c ? (JSON.parse(c) || []).map(adapt) : []; reindexSearch();
     if(!navigator.onLine){
       offline = true;
       showOffline();
@@ -768,7 +774,7 @@ async function boot(){
     if(c && u){
       try{
         const p = JSON.parse(u); ME = p.name || ''; MY_EMAIL = p.email || '';
-        devices = (JSON.parse(c) || []).map(adapt);
+        devices = (JSON.parse(c) || []).map(adapt); reindexSearch();
         offline = true; showOffline();
         finish(); return;
       }catch(e){}
@@ -887,7 +893,7 @@ function ticketHtml(d, canAct){
       ${d.status!=='repairing' ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
       ${d.status!=='done' ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
       <button class="act act-prob" onclick="event.stopPropagation();reportProblem('${d.id}')" data-i18n="tp.problem">⚠️ مشكلة</button>
-      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🚫 تم الرفض</button>
+      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🗄️ درج الرفض</button>
     </div>`;
   return `<div class="ticket ${canAct?'':'assist'}" style="--sp:var(${s.c});" onclick="openSheet('${d.id}')">
     <div class="tk-top">
@@ -902,9 +908,22 @@ function ticketHtml(d, canAct){
   </div>`;
 }
 
+// فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع
+// كل ضغطة زرار — نفس أسلوب الداشبورد.
+function reindexSearch(){
+  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.issue, d.tech], true); }catch(e){}
+}
+
 function render(){
   const q = ($('q').value||'').trim();
-  const match = d => !q || [d.type,d.model,d.customer,d.shop,d.issue,ticketNo(d.id)].some(v => v && String(v).includes(q));
+  // بحث مرن — نفس منطق الداشبورد
+  const match = d => {
+    if(!q) return true;
+    if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
+    const fields = [d.type,d.model,d.customer,d.shop,d.issue,ticketNo(d.id)];
+    if(window.IFixSearch) return IFixSearch.match(q, fields);
+    return fields.some(v => v && String(v).includes(q));
+  };
   const mine   = devices.filter(d => d.tech===ME   && ACTIVE.includes(d.status) && match(d));
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
 
@@ -941,13 +960,14 @@ async function setStatus(id, st){
   const note = mkNote(t('note.statusChange', { from:_from, to:lbl }), 'note.statusChange', { from:_from, to:lbl });
   if(!(await save(id, {
         status:st, statusHistory:hist,
+        ...(st === 'rejected' ? { rejectedInShop: true } : {}),
         activityNotes: notesForSave(d, note),
         lastModifiedAt: nowIso(), lastModifiedBy: ME
       }))) return;
 
   // نحدّث النسخة المحلية عشان الواجهة تستجيب فوراً
   d.status = st;
-  if(d._raw){ d._raw.status = st; d._raw.statusHistory = hist; d._raw.activityNotes = notesForSave(d, note); }
+  if(d._raw){ d._raw.status = st; d._raw.statusHistory = hist; d._raw.activityNotes = notesForSave(d, note); if(st === 'rejected') d._raw.rejectedInShop = true; }
   d.notes = (d._raw.activityNotes || []).map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
 
   if(!ACTIVE.includes(st)){
@@ -972,6 +992,52 @@ async function reportProblem(id){
 
 /* ===== شيت التفاصيل ===== */
 let sheetId='', handOn=false, handMode='', handTarget='';
+// ============================================================
+// مسح الباركود بالكاميرا
+// ------------------------------------------------------------
+// الباركود على الليبل فيه كود الجهاز (زي dev_1712345678901).
+// بنطابق بالأرقام: مبتتأثرش بلغة الكيبورد ولا بالمسافات، والكود
+// فيه ١٣ رقم فريدة — نفس أسلوب الداشبورد.
+// ============================================================
+function scanFind(text){
+  const raw = String(text || '').trim();
+  if(!raw) return null;
+  const digits = raw.replace(/[^0-9]/g, '');
+  if(digits.length >= 10){
+    const byDigits = devices.find(d => {
+      const idd = String(d.id).replace(/[^0-9]/g, '');
+      return idd && (idd === digits || idd.endsWith(digits) || digits.endsWith(idd));
+    });
+    if(byDigits) return byDigits;
+  }
+  const up = raw.toUpperCase().replace(/^#/, '');
+  return devices.find(d =>
+    String(d.id).toUpperCase() === up ||
+    String(d.id).slice(-5).toUpperCase() === up) || null;
+}
+
+function scanWithCamera(){
+  if(!window.IFixScan) return;
+  IFixScan.open(text => {
+    const hit = scanFind(text);
+    if(hit) return openSheet(hit.id);
+    // مفيش نتيجة؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
+    const box = document.getElementById('q');
+    if(box){ box.value = text; render(); box.focus(); }
+    toast(t('scan.notFound'));
+  });
+}
+
+function mountScanBtn(){
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    const box = document.getElementById('q');
+    if(box && window.IFixScan) IFixScan.mountButton(box, () => {});
+    const b = box && box.parentElement && box.parentElement.querySelector('.ifs-btn');
+    if(b) b.onclick = e => { e.preventDefault(); scanWithCamera(); };
+  }catch(e){}
+}
+
 function openSheet(id){ sheetId=id; handOn=false; handMode=''; handTarget=''; renderSheet(); $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); }
 function closeSheet(){ sheetId=''; $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
 
@@ -1268,6 +1334,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSett
 
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
+  try{ mountScanBtn(); }catch(e){}
 });
 </script>
 </body>
