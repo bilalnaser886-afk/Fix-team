@@ -71,7 +71,12 @@
       '.ifs-btn{flex:none;width:44px;height:44px;border-radius:12px;cursor:pointer;',
       '  display:inline-flex;align-items:center;justify-content:center;font-size:20px;',
       '  background:transparent;border:none;color:inherit;opacity:.75;}',
-      '.ifs-btn:active{opacity:1;}'
+      '.ifs-btn:active{opacity:1;}',
+      /* زرار التصوير — تحت الإطار، واضح بس مش مزاحم */
+      '.ifs-shot{position:relative;margin-top:18px;font-family:inherit;font-size:14.5px;',
+      '  font-weight:700;cursor:pointer;padding:12px 20px;border-radius:999px;',
+      '  background:rgba(255,255,255,.14);color:#fff;border:1.5px solid rgba(255,255,255,.3);}',
+      '.ifs-shot:active{background:rgba(255,255,255,.26);}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -86,9 +91,24 @@
       '<button class="ifs-x" id="ifixScanX" aria-label="close">\u00d7</button>' +
       '<div class="ifs-frame"><i></i><i></i><i></i><i></i></div>' +
       '<div class="ifs-hint" id="ifixScanHint"></div>' +
-      '<div class="ifs-err" id="ifixScanErr"></div>';
+      '<div class="ifs-err" id="ifixScanErr"></div>' +
+      '<button class="ifs-shot" id="ifixScanShot"></button>' +
+      '<input type="file" id="ifixScanFile" accept="image/*" capture="environment" hidden>';
     document.body.appendChild(d);
     document.getElementById('ifixScanX').onclick = close;
+
+    // ⚠️ الطريق التاني: تصوير بالكاميرا الأصلية.
+    //    القراءة الحية بتفشل كتير مع الباركود الصغير لأن الكاميرا
+    //    مش بتركّز عليه من مسافة قريبة. كاميرا النظام عندها تركيز
+    //    وماكرو حقيقيين، فالصورة بتطلع حادة والقراءة بتنجح.
+    var shot = document.getElementById('ifixScanShot');
+    var file = document.getElementById('ifixScanFile');
+    shot.textContent = T('scan.shoot', '📷 مش راضي يقرا؟ صوّره');
+    shot.onclick = function () { file.value = ''; file.click(); };
+    file.onchange = function () {
+      var f = file.files && file.files[0];
+      if (f) decodeFile(f);
+    };
   }
 
   // بيجرّب المصادر بالترتيب لحد ما واحد ينجح
@@ -120,8 +140,9 @@
     onHit = cb;
     var ov = document.getElementById('ifixScanOv');
     var vid = document.getElementById('ifixScanVid');
-    document.getElementById('ifixScanHint').textContent =
-      T('scan.hint', 'صوّب الكاميرا على الباركود اللي على الليبل');
+    var hint0 = document.getElementById('ifixScanHint');
+    hint0.textContent = T('scan.hint', 'صوّب الكاميرا على الباركود اللي على الليبل');
+    delete hint0.dataset.hinted;
     fail('');
     ov.classList.remove('hidden');
 
@@ -131,10 +152,26 @@
 
     try {
       // facingMode environment = الكاميرا الخلفية على الموبايل
+      // باركود الليبل صغير (حوالي ١٢مم)، فمحتاجين دقة عالية
+      // وتركيز مستمر. focusMode مش مدعوم في كل المتصفحات —
+      // بنطلبه كتفضيل عشان ميرفضش الطلب كله لو مش موجود.
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [{ focusMode: 'continuous' }]
+        },
         audio: false
       });
+      // نجرّب نفعّل التركيز المستمر بعد ما الكاميرا تفتح كمان
+      try {
+        var track = stream.getVideoTracks()[0];
+        var caps  = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) {
+          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+        }
+      } catch (e) {}
     } catch (e) {
       var m = (e && e.name) === 'NotAllowedError'
         ? T('scan.denied', 'الكاميرا مرفوضة. افتح إعدادات المتصفح واسمح بالكاميرا للموقع ده.')
@@ -161,10 +198,12 @@
     }
 
     running = true;
+    scanned = 0;
+    startedAt = performance.now();
     loop();
   }
 
-  var cvs = null, ctx = null, lastTry = 0;
+  var cvs = null, ctx = null, lastTry = 0, scanned = 0, startedAt = 0;
 
   async function loop() {
     if (!running) return;
@@ -177,6 +216,17 @@
     if (now - lastTry < 120) { raf = requestAnimationFrame(loop); return; }
     lastTry = now;
 
+    // مرّت ٦ ثواني من غير قراءة؟ بنقول للمستخدم يعمل إيه بدل
+    // ما يفضل مصوّب ومستني من غير أي إشارة
+    if (startedAt && now - startedAt > 6000) {
+      var hintEl = document.getElementById('ifixScanHint');
+      if (hintEl && !hintEl.dataset.hinted) {
+        hintEl.dataset.hinted = '1';
+        hintEl.textContent = T('scan.tryCloser',
+          'قرّب الموبايل من الباركود لحد ما يملا المربع، وثبّت إيدك شوية');
+      }
+    }
+
     var text = null;
     try {
       if (det) {
@@ -184,20 +234,79 @@
         if (codes && codes.length) text = codes[0].rawValue;
       } else {
         if (!cvs) { cvs = document.createElement('canvas'); ctx = cvs.getContext('2d', { willReadFrequently: true }); }
-        // بنقص النص من وسط الصورة بس — أسرع، وبيمنع قراءة كود جنبي بالغلط
         var w = vid.videoWidth, h = vid.videoHeight;
         if (!w || !h) { raf = requestAnimationFrame(loop); return; }
-        var side = Math.floor(Math.min(w, h) * 0.7);
-        cvs.width = side; cvs.height = side;
-        ctx.drawImage(vid, (w - side) / 2, (h - side) / 2, side, side, 0, 0, side, side);
-        var img = ctx.getImageData(0, 0, side, side);
-        var r = window.jsQR(img.data, side, side, { inversionAttempts: 'attemptBoth' });
+        scanned++;
+
+        // ⚠️ بنجرّب قصّتين بالتبادل مش واحدة:
+        //    الوسط المقرّب بيقرا الباركود الصغير من مسافة قريبة،
+        //    والإطار الكامل بيمسكه لو المستخدم مصوّب بعيد شوية.
+        //    القص الواحد كان بيفوّت الحالتين على التبادل.
+        var full = (scanned % 2 === 0);
+        var side, sx, sy;
+        if (full) { side = Math.min(w, h); }
+        else      { side = Math.floor(Math.min(w, h) * 0.55); }
+        sx = Math.floor((w - side) / 2);
+        sy = Math.floor((h - side) / 2);
+
+        // بنحدّ حجم اللوحة: القراءة على صورة أكبر من ٧٠٠ نقطة
+        // بطيئة من غير فايدة
+        var out = Math.min(side, 700);
+        cvs.width = out; cvs.height = out;
+        ctx.drawImage(vid, sx, sy, side, side, 0, 0, out, out);
+        var img = ctx.getImageData(0, 0, out, out);
+        var r = window.jsQR(img.data, out, out, { inversionAttempts: 'attemptBoth' });
         if (r && r.data) text = r.data;
       }
     } catch (e) { /* إطار بايظ — نكمّل */ }
 
     if (text) return hit(String(text).trim());
     raf = requestAnimationFrame(loop);
+  }
+
+  // قراءة صورة ملتقطة — بنجرّب أكتر من مقاس وقصّة، لأن الصورة
+  // من كاميرا الموبايل كبيرة والباركود جواها جزء صغير
+  async function decodeFile(f) {
+    fail('');
+    var hintEl = document.getElementById('ifixScanHint');
+    if (hintEl) hintEl.textContent = T('scan.reading', 'بيقرا الصورة...');
+    try {
+      if (!window.jsQR && !(await loadJsQR())) {
+        return fail(T('scan.noLib', 'قارئ الباركود مش موجود.'));
+      }
+      var bmp = await new Promise(function (res, rej) {
+        var img = new Image();
+        img.onload = function () { res(img); };
+        img.onerror = function () { rej(new Error('image')); };
+        img.src = URL.createObjectURL(f);
+      });
+
+      var c = document.createElement('canvas');
+      var x = c.getContext('2d', { willReadFrequently: true });
+      var W = bmp.naturalWidth, H = bmp.naturalHeight;
+
+      // من الكل للوسط: أول ما يقرا نقف
+      var tries = [
+        { s: 1.00, max: 1400 }, { s: 1.00, max: 900 },
+        { s: 0.60, max: 900 },  { s: 0.35, max: 800 }
+      ];
+      for (var i = 0; i < tries.length; i++) {
+        var t = tries[i];
+        var side = Math.floor(Math.min(W, H) * t.s);
+        var sx = Math.floor((W - side) / 2), sy = Math.floor((H - side) / 2);
+        var out = Math.min(side, t.max);
+        c.width = out; c.height = out;
+        x.drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
+        var d = x.getImageData(0, 0, out, out);
+        var r = window.jsQR(d.data, out, out, { inversionAttempts: 'attemptBoth' });
+        if (r && r.data) { URL.revokeObjectURL(bmp.src); return hit(String(r.data).trim()); }
+      }
+      URL.revokeObjectURL(bmp.src);
+      if (hintEl) hintEl.textContent = T('scan.hint', 'صوّب الكاميرا على الباركود');
+      fail(T('scan.shotFail', 'مقدرتش أقرا الباركود من الصورة — قرّب أكتر وصوّر تاني.'));
+    } catch (e) {
+      fail(T('scan.shotFail', 'مقدرتش أقرا الباركود من الصورة — قرّب أكتر وصوّر تاني.'));
+    }
   }
 
   function hit(text) {
