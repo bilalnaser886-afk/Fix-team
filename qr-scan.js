@@ -76,7 +76,29 @@
       '.ifs-shot{position:relative;margin-top:18px;font-family:inherit;font-size:14.5px;',
       '  font-weight:700;cursor:pointer;padding:12px 20px;border-radius:999px;',
       '  background:rgba(255,255,255,.14);color:#fff;border:1.5px solid rgba(255,255,255,.3);}',
-      '.ifs-shot:active{background:rgba(255,255,255,.26);}'
+      '.ifs-shot:active{background:rgba(255,255,255,.26);}',
+      /* شاشة القص — بتظهر بس لو القراءة التلقائية فشلت */
+      '#ifixCropOv{position:fixed;inset:0;z-index:99100;background:#000;display:flex;',
+      '  flex-direction:column;}',
+      '#ifixCropOv.hidden{display:none;}',
+      '.ifs-cstage{position:relative;flex:1;overflow:hidden;touch-action:none;}',
+      '.ifs-cstage img{position:absolute;user-select:none;-webkit-user-drag:none;}',
+      /* التحديد: الخارج معتم عن طريق ظل ضخم، فالداخل بيبان لوحده */
+      '.ifs-sel{position:absolute;border:2px solid #fff;border-radius:6px;',
+      '  box-shadow:0 0 0 100vmax rgba(0,0,0,.6);cursor:move;}',
+      '.ifs-sel i{position:absolute;inset-block-end:-16px;inset-inline-end:-16px;width:44px;height:44px;',
+      '  border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;}',
+      '.ifs-sel i:after{content:"";width:15px;height:15px;border:3px solid #111;',
+      '  border-width:0 3px 3px 0;transform:rotate(-45deg);margin:-3px 4px 0 0;}',
+      '.ifs-cbar{flex:none;display:flex;gap:10px;padding:14px 16px calc(16px + env(safe-area-inset-bottom));',
+      '  background:#111;}',
+      '.ifs-cbar button{flex:1;font-family:inherit;font-size:15.5px;font-weight:800;',
+      '  padding:14px;border-radius:13px;border:none;cursor:pointer;}',
+      '.ifs-cok{background:#fff;color:#111;}',
+      '.ifs-ccancel{background:rgba(255,255,255,.14);color:#fff;}',
+      '.ifs-ctip{position:absolute;inset-inline:0;inset-block-start:max(14px,env(safe-area-inset-top));',
+      '  text-align:center;color:#fff;font-size:14px;font-weight:700;padding:0 20px;',
+      '  text-shadow:0 1px 6px #000;pointer-events:none;}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -95,6 +117,22 @@
       '<button class="ifs-shot" id="ifixScanShot"></button>' +
       '<input type="file" id="ifixScanFile" accept="image/*" capture="environment" hidden>';
     document.body.appendChild(d);
+
+    var cp = document.createElement('div');
+    cp.id = 'ifixCropOv'; cp.className = 'hidden';
+    cp.innerHTML =
+      '<div class="ifs-cstage" id="ifixCropStage">' +
+        '<img id="ifixCropImg" alt="">' +
+        '<div class="ifs-sel" id="ifixCropSel"><i></i></div>' +
+        '<div class="ifs-ctip" id="ifixCropTip"></div>' +
+      '</div>' +
+      '<div class="ifs-cbar">' +
+        '<button class="ifs-ccancel" id="ifixCropCancel"></button>' +
+        '<button class="ifs-cok" id="ifixCropOk"></button>' +
+      '</div>';
+    cp.style.display = '';
+    document.body.appendChild(cp);
+    wireCrop();
     document.getElementById('ifixScanX').onclick = close;
 
     // ⚠️ الطريق التاني: تصوير بالكاميرا الأصلية.
@@ -264,6 +302,143 @@
     raf = requestAnimationFrame(loop);
   }
 
+  // ============================================================
+  // شاشة القص
+  // ------------------------------------------------------------
+  // بتظهر بس لو القراءة التلقائية فشلت. المستخدم بيحرّك المربع
+  // على الباركود ويكبّره أو يصغّره، وإحنا بنقرا الجزء ده لوحده.
+  //
+  // كل الإحداثيات على الشاشة، وبنحوّلها لإحداثيات الصورة الأصلية
+  // وقت القراءة بس — عشان الصورة من كاميرا الموبايل ممكن تكون
+  // ٤٠٠٠ نقطة والشاشة ٤٠٠.
+  // ============================================================
+  var cropImg = null, cropFit = null, cropSel = { x:0, y:0, w:0, h:0 };
+
+  function wireCrop() {
+    var stage  = document.getElementById('ifixCropStage');
+    var sel    = document.getElementById('ifixCropSel');
+    var handle = sel.querySelector('i');
+
+    document.getElementById('ifixCropCancel').textContent = T('scan.cancel', 'إلغاء');
+    document.getElementById('ifixCropOk').textContent     = T('scan.readSel', 'اقرا المحدد');
+    document.getElementById('ifixCropTip').textContent    =
+      T('scan.cropTip', 'حرّك المربع على الباركود، واسحب الركن لتكبيره');
+
+    var mode = null, sx = 0, sy = 0, s0 = null;
+
+    function begin(e, m) {
+      mode = m;
+      var p = e.touches ? e.touches[0] : e;
+      sx = p.clientX; sy = p.clientY;
+      s0 = { x: cropSel.x, y: cropSel.y, w: cropSel.w, h: cropSel.h };
+      e.preventDefault(); e.stopPropagation();
+    }
+    function move(e) {
+      if (!mode || !cropFit) return;
+      var p  = e.touches ? e.touches[0] : e;
+      var dx = p.clientX - sx, dy = p.clientY - sy;
+      if (mode === 'move') {
+        cropSel.x = clamp(s0.x + dx, cropFit.x, cropFit.x + cropFit.w - cropSel.w);
+        cropSel.y = clamp(s0.y + dy, cropFit.y, cropFit.y + cropFit.h - cropSel.h);
+      } else {
+        // مربع دايماً — الباركود مربع، والتحديد المستطيل بيضيّع منه
+        var d    = Math.max(dx, dy);
+        var maxW = Math.min(cropFit.x + cropFit.w - cropSel.x,
+                            cropFit.y + cropFit.h - cropSel.y);
+        var side = clamp(s0.w + d, 60, maxW);
+        cropSel.w = cropSel.h = side;
+      }
+      paintSel();
+      e.preventDefault();
+    }
+    function end() { mode = null; }
+
+    sel.addEventListener('touchstart',  function(e){ begin(e,'move'); }, { passive:false });
+    sel.addEventListener('mousedown',   function(e){ begin(e,'move'); });
+    handle.addEventListener('touchstart', function(e){ begin(e,'size'); }, { passive:false });
+    handle.addEventListener('mousedown',  function(e){ begin(e,'size'); });
+    document.addEventListener('touchmove', move, { passive:false });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchend', end);
+    document.addEventListener('mouseup',  end);
+
+    document.getElementById('ifixCropCancel').onclick = function(){ closeCrop(); };
+    document.getElementById('ifixCropOk').onclick     = function(){ readSelection(); };
+  }
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function paintSel() {
+    var sel = document.getElementById('ifixCropSel');
+    sel.style.left   = cropSel.x + 'px';
+    sel.style.top    = cropSel.y + 'px';
+    sel.style.width  = cropSel.w + 'px';
+    sel.style.height = cropSel.h + 'px';
+  }
+
+  function openCrop(img) {
+    cropImg = img;
+    var ov    = document.getElementById('ifixCropOv');
+    var stage = document.getElementById('ifixCropStage');
+    var el    = document.getElementById('ifixCropImg');
+    ov.classList.remove('hidden');
+
+    // نحسب مقاس العرض بنفسنا بدل object-fit — عشان نعرف مكان
+    // الصورة بالظبط ونحوّل الإحداثيات صح
+    var box = stage.getBoundingClientRect();
+    var W = img.naturalWidth, H = img.naturalHeight;
+    var k = Math.min(box.width / W, box.height / H);
+    var dw = Math.round(W * k), dh = Math.round(H * k);
+    var dx = Math.round((box.width - dw) / 2), dy = Math.round((box.height - dh) / 2);
+
+    el.src = img.src;
+    el.style.left = dx + 'px'; el.style.top = dy + 'px';
+    el.style.width = dw + 'px'; el.style.height = dh + 'px';
+    cropFit = { x: dx, y: dy, w: dw, h: dh, k: k };
+
+    // تحديد ابتدائي في النص، نص المساحة تقريباً
+    var side = Math.round(Math.min(dw, dh) * 0.5);
+    cropSel = { x: dx + (dw - side) / 2, y: dy + (dh - side) / 2, w: side, h: side };
+    paintSel();
+  }
+
+  function closeCrop() {
+    var ov = document.getElementById('ifixCropOv');
+    if (ov) ov.classList.add('hidden');
+    if (cropImg && cropImg.src) { try { URL.revokeObjectURL(cropImg.src); } catch (e) {} }
+    cropImg = null; cropFit = null;
+  }
+
+  function readSelection() {
+    if (!cropImg || !cropFit) return;
+    // من إحداثيات الشاشة لإحداثيات الصورة الأصلية
+    var k  = cropFit.k;
+    var sx = Math.max(0, (cropSel.x - cropFit.x) / k);
+    var sy = Math.max(0, (cropSel.y - cropFit.y) / k);
+    var sw = cropSel.w / k, sh = cropSel.h / k;
+
+    var c = document.createElement('canvas');
+    var x = c.getContext('2d', { willReadFrequently: true });
+
+    // نجرّب تلات دقات: الباركود الصغير أحياناً بيتقرا أحسن مكبّر
+    var outs = [Math.min(Math.round(sw), 1000), 700, 400];
+    for (var i = 0; i < outs.length; i++) {
+      var out = Math.max(200, outs[i]);
+      c.width = out; c.height = out;
+      x.imageSmoothingEnabled = true;
+      x.drawImage(cropImg, sx, sy, sw, sh, 0, 0, out, out);
+      var d = x.getImageData(0, 0, out, out);
+      var r = window.jsQR(d.data, out, out, { inversionAttempts: 'attemptBoth' });
+      if (r && r.data) {
+        var val = String(r.data).trim();
+        closeCrop();
+        return hit(val);
+      }
+    }
+    var tip = document.getElementById('ifixCropTip');
+    if (tip) tip.textContent = T('scan.selFail', 'مفيش باركود في المربع — حرّكه أو كبّره وجرّب تاني');
+  }
+
   // قراءة صورة ملتقطة — بنجرّب أكتر من مقاس وقصّة، لأن الصورة
   // من كاميرا الموبايل كبيرة والباركود جواها جزء صغير
   async function decodeFile(f) {
@@ -301,9 +476,10 @@
         var r = window.jsQR(d.data, out, out, { inversionAttempts: 'attemptBoth' });
         if (r && r.data) { URL.revokeObjectURL(bmp.src); return hit(String(r.data).trim()); }
       }
-      URL.revokeObjectURL(bmp.src);
+      // القراءة التلقائية فشلت → نسيب المستخدم يحدد الباركود بنفسه
+      // بدل ما نقوله "مقدرتش" ونسيبه واقف
       if (hintEl) hintEl.textContent = T('scan.hint', 'صوّب الكاميرا على الباركود');
-      fail(T('scan.shotFail', 'مقدرتش أقرا الباركود من الصورة — قرّب أكتر وصوّر تاني.'));
+      openCrop(bmp);
     } catch (e) {
       fail(T('scan.shotFail', 'مقدرتش أقرا الباركود من الصورة — قرّب أكتر وصوّر تاني.'));
     }
@@ -318,6 +494,7 @@
   }
 
   function close() {
+    closeCrop();
     running = false;
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     if (stream) { try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {} stream = null; }
