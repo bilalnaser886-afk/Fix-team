@@ -77,7 +77,19 @@
     // التاء المربوطة بتتنطق فتحة مش هاء: خليفة = khalifa مش khalifah.
     // التطبيع بيحوّلها ه (وده صح للمطابقة النصية: فاطمة/فاطمه)،
     // بس الهيكل الصوتي محتاجها ألف.
-    var n = normalize(String(text == null ? '' : text).replace(/\u0629/g, '\u0627'));
+    var raw = String(text == null ? '' : text).replace(/\u0629/g, '\u0627');
+
+    // ⚠️ "ال" التعريف لازم تتشال قبل بناء الهيكل.
+    //    من غير كده بتديني "al" — ونفس الهيكل بتاع "علي" بالظبط،
+    //    فالبحث عن علي كان بيجيب "الميدان" و"العالمية" وكل كلمة
+    //    معرّفة في النظام. وكمان بتخلي "الأمانة" تطابق "أمانة".
+    //    فحص رخيص قبل الـ regex: أغلب النصوص مفيهاش "ال" أصلاً،
+    //    والـ regex هو أغلى سطر في بناء الفهرس كله.
+    if (raw.indexOf('\u0627\u0644') >= 0) {
+      raw = raw.replace(/(^|\s)\u0627\u0644(?=[\u0621-\u064A]{3,})/g, '$1');
+    }
+
+    var n = normalize(raw);
     if (!n) return '';
 
     var p = '';
@@ -173,9 +185,10 @@
       var k = v.ks[i];
 
       // ② الهيكل الصوتي: **بداية الكلمة** مش أي مكان جواها.
-      //    لو سمحنا بالمنتصف، "سارة" (sr) هتطابق "ياسر" (ysr)
-      //    وهي أسماء مختلفة تماماً.
-      if (k.indexOf(qk) === 0) return true;
+      //    لو سمحنا بالمنتصف، "سارة" (sr) هتطابق "ياسر" (ysr).
+      //    والهياكل القصيرة (حرفين) لازم تطابق تام: "علي" هيكلها
+      //    "al" وهي بادئة لعشرات الكلمات، فالبداية مش كفاية.
+      if (qk.length >= 3 ? k.indexOf(qk) === 0 : k === qk) return true;
 
       // ③ خطأ مطبعي — للأسماء الطويلة بس.
       //    الهياكل القصيرة بتتشابه بطبيعتها: "أحمد" (ahmd) و
@@ -226,11 +239,20 @@
   var SEP = '\u0001';          // فاصل مستحيل يظهر في اسم — بيمنع
                                // تطابق عابر لحدود حقلين
 
-  function index(items, fieldsFn) {
-    idxVer++;
+  // force = يعيد بناء كل حاجة (بعد تحميل كامل).
+  // الافتراضي تزايدي: بيفهرس الجديد بس.
+  //
+  // ⚠️ ضروري: الداشبورد بينادي الترتيب مع كل رسمة في العرض
+  //    التدريجي. من غير التزايدية بنعيد بناء الـ ٢٠ ألف ست مرات
+  //    أثناء التحميل — يعني ثواني تجميد على الموبايل.
+  function index(items, fieldsFn, force) {
+    if (force) idxVer++;
+    if (!idxVer) idxVer = 1;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       if (!it || typeof it !== 'object') continue;
+      var old = it[IDX];
+      if (old && old.v === idxVer) continue;      // مفهرس خلاص
       var vals = fieldsFn(it) || [];
       var ns = [], ks = [];
       for (var j = 0; j < vals.length; j++) {
@@ -274,7 +296,10 @@
 
     var qk = lastQK;
     if (!qk || !e.k) return false;
-    if (e.k.indexOf(SEP + qk) >= 0) return true;   // بداية أي كلمة
+    // الهياكل القصيرة (حرفين) تطابق تام، والأطول بداية كلمة —
+    // نفس قاعدة المسار غير المفهرس بالظبط
+    if (qk.length >= 3) { if (e.k.indexOf(SEP + qk) >= 0) return true; }
+    else if (e.k.indexOf(SEP + qk + SEP) >= 0) return true;
 
     // الخطأ المطبعي — أغلى جزء، فبيتعمل آخر حاجة وللأسماء الطويلة بس
     if (qk.length >= 5) {
@@ -289,9 +314,12 @@
 
   function isIndexed(item) { var e = item && item[IDX]; return !!(e && e.v === idxVer); }
 
+  // بعد تعديل جهاز — بنفضّي فهرسه عشان يتبني من جديد
+  function invalidate(item) { if (item && item[IDX]) { try { delete item[IDX]; } catch (e) { item[IDX] = null; } } }
+
   window.IFixSearch = {
     match: match, key: key, normalize: normalize,
-    index: index, matchIndexed: matchIndexed, isIndexed: isIndexed,
+    index: index, matchIndexed: matchIndexed, isIndexed: isIndexed, invalidate: invalidate,
     clearCache: function(){ cache.clear(); }
   };
 })();

@@ -2281,11 +2281,11 @@ function loadProgress(n){
 
 // بنبني فهرس البحث مرة واحدة بعد كل تحميل بدل ما نحسبه مع كل
 // ضغطة زرار. على ٢٠ ألف جهاز الفرق ٦٠ مللي → ٢ مللي لكل حرف.
-function reindexSearch(){
+function reindexSearch(force){
   try{
     if(!window.IFixSearch) return;
     IFixSearch.index(devices, d => [d.customerName, d.shopName, d.customerPhone,
-      d.serialNumber, d.deviceType, d.model, d.reportedIssue, d.technician]);
+      d.serialNumber, d.deviceType, d.model, d.reportedIssue, d.technician], !!force);
   }catch(e){}
 }
 
@@ -2385,6 +2385,8 @@ async function persist(){
   const changed = [], removed = [];
   const ids = new Set(devices.map(d => d.id));
   devices.forEach(d => { if(lastSynced[d.id] !== JSON.stringify(d)) changed.push(d); });
+  // الجهاز اتغيّر → فهرس البحث بتاعه بقى قديم
+  try{ if(window.IFixSearch) changed.forEach(d => IFixSearch.invalidate(d)); }catch(e){}
   Object.keys(lastSynced).forEach(id => { if(!ids.has(id)) removed.push(id); });
 
   if(!changed.length && !removed.length){ setSaving(false); return; }

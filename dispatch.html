@@ -1046,7 +1046,7 @@ function showInfo(id){
 // فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع
 // كل ضغطة زرار — نفس أسلوب الداشبورد.
 function reindexSearch(){
-  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by]); }catch(e){}
+  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by], true); }catch(e){}
 }
 
 function render(){
