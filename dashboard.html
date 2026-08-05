@@ -8052,8 +8052,10 @@ requireAccess().then(ok => {
   }catch(e){}
   // .catch قبل .then عشان applyRoleVisibility تشتغل حتى لو تحميل الأدوار أو
   // المفاتيح فشل — هي اللي بتشيل ستارة الإقلاع، ولو ما اشتغلتش المستخدم يتقفل.
+  // زرار المسح للموبايل بس — الكمبيوتر عنده ماسح سلكي،
+  // وزرار كاميرا على شاشة من غير كاميرا بيلخبط الموظف
   try{
-    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    if(window.IFixScan && IFixScan.scanUseful()){
       const b = document.getElementById('gsScan'); if(b) b.style.display = '';
     }
   }catch(e){}

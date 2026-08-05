@@ -21,7 +21,21 @@
   'use strict';
   if (window.IFixScan) return;
 
-  var JSQR_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+  // ⚠️ الملف المحلي الأول.
+  //    كان بيتحمّل من الإنترنت وقت الاستخدام بس — ولو الشبكة
+  //    بطيئة أو المصدر محجوب، الماسح بيقف. والنظام ده بيتستخدم
+  //    أوفلاين كتير، فالاعتماد على مصدر خارجي وقت الحاجة غلط.
+  //    الملف المحلي بيتخزّن مع باقي النظام في الكاش وبيشتغل
+  //    من غير نت خالص.
+  //    بنجرّب أكتر من اسم محلي: بعض الأنظمة بتفرّق بين الحروف
+  //    الكبيرة والصغيرة في أسماء الملفات، والمكتبة بتتحمّل باسم
+  //    jsQR.js من مصدرها. كده مفيش فرق مهما حفظتها إزاي.
+  var JSQR_SOURCES = [
+    'jsQR.js',                                                            // محلي
+    'jsqr.min.js',                                                        // محلي (اسم بديل)
+    'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js',      // احتياطي
+    'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'                           // احتياطي تاني
+  ];
   var stream = null, raf = null, det = null, onHit = null, running = false;
 
   function T(key, fallback) {
@@ -77,15 +91,22 @@
     document.getElementById('ifixScanX').onclick = close;
   }
 
-  function loadJsQR() {
-    if (window.jsQR) return Promise.resolve(true);
+  // بيجرّب المصادر بالترتيب لحد ما واحد ينجح
+  function loadOne(src) {
     return new Promise(function (res) {
-      var s = document.createElement('script');
-      s.src = JSQR_CDN;
-      s.onload = function () { res(!!window.jsQR); };
-      s.onerror = function () { res(false); };
-      document.head.appendChild(s);
+      var el = document.createElement('script');
+      el.src = src;
+      el.onload  = function () { res(!!window.jsQR); };
+      el.onerror = function () { res(false); };
+      document.head.appendChild(el);
     });
+  }
+  async function loadJsQR() {
+    if (window.jsQR) return true;
+    for (var i = 0; i < JSQR_SOURCES.length; i++) {
+      try { if (await loadOne(JSQR_SOURCES[i])) return true; } catch (e) {}
+    }
+    return false;
   }
 
   function fail(msg) {
@@ -135,7 +156,8 @@
 
     if (!det) {
       var ok = await loadJsQR();
-      if (!ok) return fail(T('scan.noLib', 'مش قادرين نحمّل قارئ الباركود — اتأكد من النت.'));
+      if (!ok) return fail(T('scan.noLib',
+        'قارئ الباركود مش موجود. حمّل ملف jsqr.min.js وحطه جنب ملفات النظام.'));
     }
 
     running = true;
@@ -198,8 +220,21 @@
   }
 
   // زرار كاميرا جنب خانة بحث. بيتحط في نفس أب الخانة عشان يبان جوها.
+  // الماسح للموبايل بس. الكمبيوتر بيستخدم ماسح باركود سلكي —
+  // وزرار كاميرا على شاشة مفيهاش كاميرا مفيدة بيشغل مساحة
+  // ويلخبط الموظف.
+  function scanUseful() {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+      // pointer: coarse = شاشة لمس. الكمبيوتر حتى لو عليه كاميرا
+      // بيطلع false — وده المطلوب.
+      return !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+    } catch (e) { return false; }
+  }
+
   function mountButton(input, cb) {
     if (!input || input.dataset.ifsMounted) return;
+    if (!scanUseful()) return;
     injectCss();
     var b = document.createElement('button');
     b.type = 'button';
@@ -217,5 +252,5 @@
   window.addEventListener('popstate', function () { if (running) close(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && running) close(); });
 
-  window.IFixScan = { open: open, close: close, mountButton: mountButton };
+  window.IFixScan = { open: open, close: close, mountButton: mountButton, scanUseful: scanUseful };
 })();
