@@ -27,6 +27,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
+<script src="fuzzy-search.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -35,7 +36,7 @@
      التوقيع: تذكرة صيانة — شريط حالة ملوّن على حافة الكارت + رقم تذكرة
      ============================================================ */
   :root{
-    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --ink-2:#475569;
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --chrome:#16233A; --ink-2:#475569;
     --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
@@ -55,7 +56,7 @@
      الشاشة كلها بدل ما يخترع لون جديد. */
   html[data-theme="dark"]{
     color-scheme:dark;
-    --on-chrome:#E9EFF5; --on-color:#0E1721; --ink-2:#C3D2DF;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --chrome:#0E1721; --ink-2:#C3D2DF;
     --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
     --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
     --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
@@ -92,11 +93,13 @@
   }
   .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
   .nt-ic{font-size:44px; line-height:1;}
-  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:#16233A;}
+  /* ⚠️ var(--ink) مش لون ثابت: العنوان كان #16233A أزرق غامق —
+     في الوضع الداكن بيبقى غامق فوق غامق ومش باين. */
+  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:var(--ink);}
   .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
   .nt-ok{
     margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
-    background:#16233A; color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+    background:var(--chrome); color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
   }
 
   /* ===== ستارة الإقلاع ===== */
@@ -573,7 +576,7 @@ async function loadDevices(){
       .limit(300);
     if(error) throw error;
     const rows = (data || []).map(r => r.data).filter(Boolean);
-    devices = rows.map(adapt);
+    devices = rows.map(adapt); reindexSearch();
     offline = false;
     document.querySelectorAll('.offbar').forEach(e => e.remove());
     document.querySelectorAll('.errbar').forEach(e => e.remove());
@@ -582,7 +585,7 @@ async function loadDevices(){
     // ⚠️ فرق مهم: "مفيش نت" حاجة، و"خطأ في القراءة" حاجة تانية خالص.
     // خلطهم كان بيدّي رسالة مضلّلة وبيخبّي السبب الحقيقي.
     const c = localStorage.getItem(CACHE_KEY);
-    devices = c ? (JSON.parse(c) || []).map(adapt) : [];
+    devices = c ? (JSON.parse(c) || []).map(adapt) : []; reindexSearch();
     if(!navigator.onLine){
       offline = true;
       showOffline();
@@ -771,7 +774,7 @@ async function boot(){
     if(c && u){
       try{
         const p = JSON.parse(u); ME = p.name || ''; MY_EMAIL = p.email || '';
-        devices = (JSON.parse(c) || []).map(adapt);
+        devices = (JSON.parse(c) || []).map(adapt); reindexSearch();
         offline = true; showOffline();
         finish(); return;
       }catch(e){}
@@ -905,9 +908,22 @@ function ticketHtml(d, canAct){
   </div>`;
 }
 
+// فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع
+// كل ضغطة زرار — نفس أسلوب الداشبورد.
+function reindexSearch(){
+  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.issue, d.tech]); }catch(e){}
+}
+
 function render(){
   const q = ($('q').value||'').trim();
-  const match = d => !q || [d.type,d.model,d.customer,d.shop,d.issue,ticketNo(d.id)].some(v => v && String(v).includes(q));
+  // بحث مرن — نفس منطق الداشبورد
+  const match = d => {
+    if(!q) return true;
+    if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
+    const fields = [d.type,d.model,d.customer,d.shop,d.issue,ticketNo(d.id)];
+    if(window.IFixSearch) return IFixSearch.match(q, fields);
+    return fields.some(v => v && String(v).includes(q));
+  };
   const mine   = devices.filter(d => d.tech===ME   && ACTIVE.includes(d.status) && match(d));
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
 

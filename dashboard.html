@@ -99,6 +99,7 @@
 <!-- فواتير المشتريات + مخزن قطع الغيار (جزء 5 و 6) — مقفول ورا مفتاح gemini_invoice_ocr -->
 <script src="ai-invoice.js"></script>
 <script src="qr-scan.js"></script>
+<script src="fuzzy-search.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -2278,10 +2279,21 @@ function loadProgress(n){
   if(el) el.textContent = n ? t('app.loadingCount', { n: n.toLocaleString('en-EG') }) : '';
 }
 
+// بنبني فهرس البحث مرة واحدة بعد كل تحميل بدل ما نحسبه مع كل
+// ضغطة زرار. على ٢٠ ألف جهاز الفرق ٦٠ مللي → ٢ مللي لكل حرف.
+function reindexSearch(){
+  try{
+    if(!window.IFixSearch) return;
+    IFixSearch.index(devices, d => [d.customerName, d.shopName, d.customerPhone,
+      d.serialNumber, d.deviceType, d.model, d.reportedIssue, d.technician]);
+  }catch(e){}
+}
+
 function sortDevices(){
   const ts = new Map();
   for(const d of devices) ts.set(d, Date.parse(d.intakeDate) || 0);
   devices.sort((a,b) => ts.get(b) - ts.get(a));
+  reindexSearch();      // الفهرس بيتبني مع كل تحميل — الترتيب هو نقطة الالتقاء
 }
 
 async function loadDevices(opts){
@@ -2897,8 +2909,13 @@ function matchesSearch(d, q){
   const up = q.toUpperCase();
   if(d.id === q || d.id.toUpperCase() === up) return true;
   if(devRef(d).toUpperCase() === up || devRef(d).toUpperCase() === '#' + up) return true;
-  return [d.customerName,d.shopName,d.customerPhone,d.serialNumber,d.deviceType,d.model,d.reportedIssue,d.technician]
-    .some(v => v && String(v).includes(q));
+  // بحث مرن: الأسماء بتتكتب عربي وإنجليزي وبأخطاء إملائية،
+  // فبنطابق بالهيكل الصوتي مش بالحروف. تفاصيله في fuzzy-search.js
+  if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
+  const fields = [d.customerName,d.shopName,d.customerPhone,d.serialNumber,
+                  d.deviceType,d.model,d.reportedIssue,d.technician];
+  if(window.IFixSearch) return IFixSearch.match(q, fields);
+  return fields.some(v => v && String(v).includes(q));
 }
 
 function clearSearchBox(id){
