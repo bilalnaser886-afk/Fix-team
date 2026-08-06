@@ -5838,6 +5838,31 @@ async function renderLabelImage(d, sz, qrDataUrl){
   if(_issue) rows.push({ t: _issue, f: fIssue, w: 700, fam: 'Tajawal' });
   rows.push({ t: shortDateTime(d.intakeDate), f: fDate, w: 700, fam: 'Tajawal', ltr: true });
 
+  // ⚠️ مقاسات الخط محسوبة من ارتفاع الليبل بس، مالهاش أي علاقة
+  //    بطول النص الفعلي. والنتيجة إن ليبل باسم قصير ('الساحر')
+  //    بيسيب نص الليبل فاضي والحروف أصغر من اللازم.
+  //    وعلى طابعة ٢٠٣ نقطة الحجم هو الوضوح بعينه: حرف ٢.٢مم =
+  //    ١٨ نقطة، و٢.٩مم = ٢٣ نقطة — فرق واضح في حروف العربي.
+  //    بنكبّر كل السطور بنفس النسبة لحد ما توصل لحد العرض أو
+  //    الارتفاع، أيهما أقرب.
+  //    الحد الأدنى ١ — يعني مابنصغّرش أبداً، والنص الطويل بيفضل
+  //    يتقص بالنقط زي ما هو. والسقف ١.٣٥ عشان الشكل مايختلش.
+  let kFit = 1;
+  try{
+    let wK = Infinity;
+    for(const r of rows){
+      if(!r.t) continue;
+      setFont(r.w, r.f, r.fam);
+      const tw = x.measureText(r.t).width;
+      if(tw > 0) wK = Math.min(wK, infoW / tw);
+    }
+    if(!isFinite(wK)) wK = 1;
+    const baseH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);
+    const hK = baseH > 0 ? (topBottom - pad) / baseH : 1;
+    kFit = Math.max(1, Math.min(hK, wK, 1.35));
+  }catch(e){ kFit = 1; }
+  if(kFit > 1.01) for(const r of rows) r.f *= kFit;
+
   const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);
   let ry = topMid - infoH / 2;
   x.textAlign = 'right';

@@ -113,6 +113,12 @@ edit(
 #    الموظف أحياناً بيمسح من على شاشة كمبيوتر زميله
 # ============================================================
 edit(
+    'renderLabelImage: fit text to free width',
+    '  const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);\n  let ry = topMid - infoH / 2;',
+    "  // ⚠️ مقاسات الخط محسوبة من ارتفاع الليبل بس، مالهاش أي علاقة\n  //    بطول النص الفعلي. والنتيجة إن ليبل باسم قصير ('الساحر')\n  //    بيسيب نص الليبل فاضي والحروف أصغر من اللازم.\n  //    وعلى طابعة ٢٠٣ نقطة الحجم هو الوضوح بعينه: حرف ٢.٢مم =\n  //    ١٨ نقطة، و٢.٩مم = ٢٣ نقطة — فرق واضح في حروف العربي.\n  //    بنكبّر كل السطور بنفس النسبة لحد ما توصل لحد العرض أو\n  //    الارتفاع، أيهما أقرب.\n  //    الحد الأدنى ١ — يعني مابنصغّرش أبداً، والنص الطويل بيفضل\n  //    يتقص بالنقط زي ما هو. والسقف ١.٣٥ عشان الشكل مايختلش.\n  let kFit = 1;\n  try{\n    let wK = Infinity;\n    for(const r of rows){\n      if(!r.t) continue;\n      setFont(r.w, r.f, r.fam);\n      const tw = x.measureText(r.t).width;\n      if(tw > 0) wK = Math.min(wK, infoW / tw);\n    }\n    if(!isFinite(wK)) wK = 1;\n    const baseH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);\n    const hK = baseH > 0 ? (topBottom - pad) / baseH : 1;\n    kFit = Math.max(1, Math.min(hK, wK, 1.35));\n  }catch(e){ kFit = 1; }\n  if(kFit > 1.01) for(const r of rows) r.f *= kFit;\n\n  const infoH = rows.reduce((sum, r) => sum + r.f * 1.3, 0);\n  let ry = topMid - infoH / 2;"
+)
+
+edit(
     'preview: white frame',
     """  #qrHolder{display:flex; justify-content:center; margin:10px 0;}""",
     """  /* الخلفية البيضا والحشو = الهامش المطلوب للقراءة (quiet zone)،
