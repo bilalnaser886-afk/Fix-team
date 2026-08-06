@@ -4579,6 +4579,12 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
       newPaymentStatus = 'unpaid';
       historyKey = 'hist.deliveredNoPrice';
     }
+
+    // نقاط الفني تتحسب تلقائياً عند التسليم لو لسه فاضية — من غير ما نلمس قيمة اتحطّت بإيد
+    if(!d.isWholesale && (!d.points || d.points === '0')){
+      const auto = autoCalcPoints(d);
+      if(auto && auto.matchedCount > 0) extra.points = String(auto.total);
+    }
   }
 
   showError('');
@@ -4953,6 +4959,9 @@ let techPortalAutoOpened = false;  // فتح تلقائي مرة واحدة بس
 const TP_ACTIVE = ['waiting','diagnosing','repairing'];
 
 function openTechPortal(name){
+  // البوابة التشغيلية للفني بس. المحاسب عنده صفحة المراجعة (openTechDevices) بدالها،
+  // فده بيمنع أي فتح غير مقصود للبوابة من حساب مش فني (زيادة أمان).
+  if(!isTechnician()) return;
   const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
   techPortalName = (name || myTechName() || '').trim();
   clearSearchBox('techSearch');
@@ -7973,8 +7982,7 @@ function renderTechEval(){
         <tr><th>${t('te.colTech')}</th><th>⭐ ${t('te.colPoints')}</th><th>${t('te.colDone')}</th><th>${t('te.colAvg')}</th><th>${t('te.colReturns')}</th><th>${t('te.colRate')}</th></tr>
         ${teRows.map((r, i) => `
           <tr onclick="openTechDevices('${esc(r.t).replace(/'/g,"\\'")}')" style="cursor:pointer;" title="${t('te.tapForDetails')}">
-            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:var(--muted-2);font-weight:500;">‹</span>
-              <button onclick="event.stopPropagation(); openTechPortal('${esc(r.t).replace(/'/g,"\\'")}')" title="${t('tp.openTech')}" style="margin-inline-start:6px;border:1px solid #DDD6FE;background:var(--surface-2);color:var(--violet);border-radius:7px;padding:3px 8px;font-size:12px;cursor:pointer;">📱</button></td>
+            <td style="font-weight:800;">🔧 ${esc(r.t)} <span style="color:var(--muted-2);font-weight:500;">‹</span></td>
             <td style="font-weight:900; color:var(--violet); font-family:'Cairo',sans-serif; font-size:16px;">${r.points}</td>
             <td style="font-weight:800; color:var(--success);">${r.count}</td>
             <td>${avgFmt(r.avg)}</td>
