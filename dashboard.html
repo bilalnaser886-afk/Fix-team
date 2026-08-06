@@ -8103,6 +8103,8 @@ function tdT(k){
     blameYes:  ['أيوه — اخصم نصيبه',      'Yes — deduct their share'],
     flagWait:  ['⏳ لسه في المرتجعات — النقاط تتحسب بعد التسليم',
                 '⏳ Still in returns — points count after delivery'],
+    flagRej:   ['🚫 الجهاز اترفض — النقاط اتمسحت',
+                '🚫 Device rejected — points removed'],
     roundN:    ['الرجوع',        'Return'],
     rComplaint:['شكوى العميل', 'Complaint'],
     rFault:    ['العطل المكتشف', 'Fault found'],
@@ -8121,7 +8123,7 @@ function openTechDevices(techName){
   const round1 = n => Math.round(n * 10) / 10;
 
   // اللي عليه ملاحظة يطلع فوق — ده الهدف من الشاشة أصلاً
-  const NEEDS_EYE = { zero: 1, moved: 1, blamed: 1, waiting: 1 };
+  const NEEDS_EYE = { zero: 1, moved: 1, blamed: 1, waiting: 1, rejected: 1 };
   const rank = x => NEEDS_EYE[x.flag] ? 0 : (x.flag ? 1 : 2);
   const items = (r.allItems || []).slice()
     .sort((a,b) => rank(a) - rank(b) || b.share - a.share);
@@ -8134,6 +8136,7 @@ function openTechDevices(techName){
       f === 'zero'      ? `<div class="td-flag zero">${tdT('flagZero')}</div>`
     : f === 'wholesale' ? `<div class="td-flag info">${tdT('flagWhole')}</div>`
     : f === 'returned'  ? `<div class="td-flag info">${tdT('flagRet')}</div>`
+    : f === 'rejected'  ? `<div class="td-flag zero">${tdT('flagRej')}</div>`
     : f === 'waiting'   ? `<div class="td-flag info">${tdT('flagWait')}</div>`
     : f === 'moved'     ? `<div class="td-flag zero">${tdT('flagMoved')}</div>`
     : f === 'blamed'    ? `<div class="td-flag zero">${tdT('flagBlame')}</div>`
@@ -8149,7 +8152,8 @@ function openTechDevices(techName){
   const rows = items.length ? items.map(x => {
     // المرتجع إجماليه = نقاط الصيانة + نقاط العطل الجديد.
     // عرض d.points لوحدها كان هيقول رقم غير اللي اتحسب فعلاً.
-    const isRetItem = x.flag === 'returned' || x.flag === 'moved' || x.flag === 'blamed' || x.flag === 'waiting';
+    const isRetItem = x.flag === 'returned' || x.flag === 'moved' || x.flag === 'blamed'
+                   || x.flag === 'waiting'  || x.flag === 'rejected';
     const retTot = isRetItem ? returnPointParts(x.d).reduce((s, p) => s + p.amt, 0) : 0;
     const shown = x.flag === 'wholesale' ? '—'
                 : isRetItem ? String(Math.round(retTot * 10) / 10)
@@ -8216,6 +8220,20 @@ function renderTechEval(){
   let wholesaleSkipped = 0;                // أجهزة جملة اتجاهلت
 
   devices.forEach(d => {
+    // ============================================================
+    // ⚠️ الجهاز المرفوض مالوش نقاط لحد — لا محسوبة ولا معلّقة.
+    // ------------------------------------------------------------
+    // الرفض بيلغي الشغل كله مهما كان اللي حصل قبله:
+    //   اترفض من غير تسليم        → كانت بتفضل "معلّقة" للأبد
+    //   اتسلّم وبعدين اترفض       → كان بياخد نقاطه كاملة
+    //   اتسلّم → رجع → اترفض      → معلّقة باسم الفني البديل
+    // والتلاتة كانوا غلط لأن 'rejected' مكانش مذكور في الحلقة أصلاً.
+    //
+    // والسجل بيفضل زي ما هو: الجهاز يفضل مكتوب إنه اتسلّم ورجع
+    // واترفض. إحنا بنشيل النقاط بس — مش التاريخ.
+    // ============================================================
+    if(d.status === 'rejected') return;
+
     // ===== جهاز رجع بعد التسليم: الأصلي بصفر عليه، ونقاط الصيانة الجديدة للفني البديل =====
     if(returnAfterDeliveryDate(d)){
       // ============================================================
@@ -8298,6 +8316,20 @@ function renderTechEval(){
   };
 
   devices.forEach(d => {
+    // المرفوض: نقاطه اتمسحت، بس لو كان متحطله نقاط بيبان في القايمة
+    // بصفر ومعاه السبب. لو مكانش متحطله حاجة مالوش لازمة يظهر.
+    if(d.status === 'rejected'){
+      const rjPts = (parseFloat(enDigits(d.points)) || 0) + (parseFloat(enDigits(d.returnPoints)) || 0);
+      if(!rjPts) return;
+      const rjDate = completionDate(d) || lastChangeOf(d);
+      if(!rjDate || !inTeRange(rjDate)) return;
+      const rjOwner = d.substituteTechnician || d.technician;
+      if(rjOwner) pushAll(rjOwner, d, 0, 'رئيسي', 'rejected');
+      if(d.technician && d.technician !== rjOwner) pushAll(d.technician, d, 0, 'رئيسي', 'rejected');
+      if(d.assistTechnician) pushAll(d.assistTechnician, d, 0, 'مساعد', 'rejected');
+      return;
+    }
+
     const cd = completionDate(d);
     if(!cd || !inTeRange(cd)) return;          // نفس نطاق الفترة بالظبط
 
