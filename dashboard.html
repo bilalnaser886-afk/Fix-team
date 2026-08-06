@@ -7224,6 +7224,31 @@ function stmtDescHtml(e){
 // عطل الجهاز في كشف الحساب.
 // القيود الجديدة بتحفظه جواها. القديمة بنجيبه من الجهاز نفسه.
 // الحركات اللي مش أجهزة (دفعة/خصم/رصيد افتتاحي) مالهاش عطل.
+// ============================================================
+// تاريخ السطر في كشف حساب المحل
+// ------------------------------------------------------------
+// ⚠️ e.date هو لحظة إنشاء القيد في الدفتر — مش تاريخ تسليم الجهاز:
+//       date: new Date().toISOString()   في addLedgerDebit
+//
+// الاتنين بيتساووا بس لو المحاسب حدد "آجل" وقت التسليم بالظبط.
+// لو حدده بعدين، أو سعّر الجهاز بعدين، أو ظبّط دفعة قديمة النهاردة —
+// القيد بياخد تاريخ النهاردة. فكشف فيه عشرين جهاز اتسلّموا الشهر
+// اللي فات كان بيطلع كلهم بتاريخ واحد: يوم ما فتحت الكشف.
+//
+// والمحل عايز يعرف "الجهاز ده رجعلي إمتى"، مش إمتى المحاسب سجّل القيد.
+//
+// القيود اللي مش مربوطة بجهاز (دفعة · رصيد افتتاحي · خصم) بتفضل
+// على تاريخ القيد — وده صح ليها: ده فعلاً يوم ما حصلت.
+// ============================================================
+function stmtDate(e){
+  if(e && e.deviceId){
+    const dev = devices.find(x => x.id === e.deviceId);
+    const dd = dev && deliveredDateOf(dev);
+    if(dd) return dd;
+  }
+  return e && e.date;
+}
+
 function stmtIssue(e){
   if(e.type !== 'debit') return '';
   if(e.issue) return e.issue;
@@ -7233,8 +7258,10 @@ function stmtIssue(e){
 }
 
 function shopStatementRows(shop){
+  // الترتيب بنفس التاريخ اللي بيتعرض — وإلا السطور تطلع مبعثرة
+  // قدام المحل. مفيش عمود رصيد جاري، فالترتيب عرض بحت.
   const entries = ledger.filter(e => (e.shop||'بدون محل') === shop)
-    .slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+    .slice().sort((a,b) => new Date(stmtDate(a)) - new Date(stmtDate(b)));
   const debit = entries.filter(e=>e.type==='debit'||e.type==='opening').reduce((t,e)=>t+(e.amount||0),0);
   const credit = entries.filter(e=>e.type==='credit'||e.type==='discount').reduce((t,e)=>t+(e.amount||0),0);
   return { entries, debit, credit, balance: debit - credit };
@@ -7263,7 +7290,7 @@ async function exportShopExcel(shop){
   // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
   const head = ws.getRow(4);
   // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
-  head.values = ['التاريخ','البيان','العطل','عليه (آجل)','له (دفعات)'];
+  head.values = ['تاريخ التسليم','البيان','العطل','عليه (آجل)','له (دفعات)'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -7275,7 +7302,7 @@ async function exportShopExcel(shop){
   // الحركات
   entries.forEach(e => {
     const r = ws.addRow([
-      new Date(e.date).toLocaleString('ar-EG'),
+      new Date(stmtDate(e)).toLocaleString('ar-EG'),
       stmtDesc(e),
       stmtIssue(e),
       isDebitLike(e) ? (e.amount||0) : null,
@@ -7317,7 +7344,7 @@ function exportShopPdf(shop){
     const issue = stmtIssue(e);
     return `
     <tr style="background:${i%2 ? 'var(--surface-2)' : 'var(--surface)'};">
-      <td>${new Date(e.date).toLocaleString('ar-EG')}</td>
+      <td>${new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="text-align:right; color:var(--ink-2);">${issue ? esc(issue) : '—'}</td>
       <td style="color:var(--warn); font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
@@ -7357,7 +7384,7 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? 'var(--danger)' : 'var(--info)'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:20%;">التاريخ</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      <tr><th style="width:20%;">تاريخ التسليم</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
       ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
