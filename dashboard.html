@@ -920,6 +920,22 @@
   .td-pts-num{font-family:'Cairo',sans-serif; font-weight:900; font-size:20px; color:var(--violet); line-height:1.05;}
   .td-pts-lbl{font-size:9.5px; color:var(--muted-2);}
   .td-pts-share{font-size:11px; color:var(--muted); margin-top:2px;}
+  /* ===== أجهزة الفني: تمييز اللي ماتحسبش ===== */
+  .td-item.is-zero{border-color:var(--warn-border); background:var(--warn-tint);}
+  .td-item.is-muted{opacity:.72;}
+  .td-item.is-zero .td-pts-num{color:var(--warn);}
+  .td-item.is-muted .td-pts-num{color:var(--muted-2);}
+  .td-flag{display:inline-block; font-size:10.5px; font-weight:800; border-radius:6px;
+           padding:2px 7px; margin-top:5px; line-height:1.6;}
+  .td-flag.zero{color:var(--warn-strong); background:var(--warn-bg); border:1px solid var(--warn-border);}
+  .td-flag.info{color:var(--muted); background:var(--surface-3); border:1px solid var(--border);}
+  .td-sum{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+  .td-sum-box{flex:1; min-width:84px; text-align:center; background:var(--surface);
+              border:1px solid var(--border); border-radius:11px; padding:9px 6px;}
+  .td-sum-box.warn{border-color:var(--warn-border); background:var(--warn-tint);}
+  .td-sum-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:19px; color:var(--ink); line-height:1.1;}
+  .td-sum-box.warn .td-sum-n{color:var(--warn);}
+  .td-sum-l{font-size:10px; color:var(--muted-2); margin-top:2px;}
 
   /* ===== كبار العملاء ===== */
   .cust-item{
@@ -7891,27 +7907,71 @@ function completionDate(d){
 
 // صفحة أجهزة الفني — تفتح بالضغط على اسم الفني في التقييم
 let _openTechDevName = null;
+
+// ترجمة محلية للشاشة دي — أسطر قليلة ما تستاهلش لمس i18n.js المشترك
+function tdT(k){
+  let en = false;
+  try{ en = (typeof I18N !== 'undefined' && I18N.getLang() === 'en'); }catch(e){}
+  const M = {
+    total:     ['إجمالي',            'Total'],
+    scored:    ['اتحسب',            'Scored'],
+    zero:      ['بصفر نقاط',       'Zero points'],
+    flagZero:  ['⚠️ خلص ومافيش نقاط', '⚠️ Finished, no points'],
+    flagWhole: ['📦 جملة — بدون نقاط', '📦 Wholesale — no points'],
+    flagRet:   ['↩️ رجع بعد التسليم',  '↩️ Returned after delivery'],
+    none:      ['مفيش أجهزة في الفترة دي', 'No devices in this period'],
+  };
+  return (M[k] || ['',''])[en ? 1 : 0];
+}
+
 function openTechDevices(techName){
   const r = (teRows || []).find(x => x.t === techName);
   if(!r) return;
   _openTechDevName = techName;
   const round1 = n => Math.round(n * 10) / 10;
-  const items = r.items.slice().sort((a,b) => b.share - a.share);
+
+  // اللي عليه ملاحظة يطلع فوق — ده الهدف من الشاشة أصلاً
+  const rank = x => x.flag === 'zero' ? 0 : (x.flag ? 1 : 2);
+  const items = (r.allItems || []).slice()
+    .sort((a,b) => rank(a) - rank(b) || b.share - a.share);
+
+  const nZero   = items.filter(x => x.flag === 'zero').length;
+  const nScored = items.filter(x => !x.flag).length;
+
   const roleLabel = x => x.role === 'مساعد' ? `🤝 ${t('te.assistant')}` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}`;
-  const rows = items.length ? items.map(x => `
-    <div class="td-item" onclick="openDetail('${x.d.id}')">
+  const flagHtml = f =>
+      f === 'zero'      ? `<div class="td-flag zero">${tdT('flagZero')}</div>`
+    : f === 'wholesale' ? `<div class="td-flag info">${tdT('flagWhole')}</div>`
+    : f === 'returned'  ? `<div class="td-flag info">${tdT('flagRet')}</div>`
+    : '';
+
+  const summary = items.length ? `
+    <div class="td-sum">
+      <div class="td-sum-box"><div class="td-sum-n">${items.length}</div><div class="td-sum-l">${tdT('total')}</div></div>
+      <div class="td-sum-box"><div class="td-sum-n">${nScored}</div><div class="td-sum-l">${tdT('scored')}</div></div>
+      <div class="td-sum-box ${nZero ? 'warn' : ''}"><div class="td-sum-n">${nZero}</div><div class="td-sum-l">${tdT('zero')}</div></div>
+    </div>` : '';
+
+  const rows = items.length ? items.map(x => {
+    const shown = x.flag === 'wholesale' ? '—' : esc(x.d.points || '0');
+    const cls = x.flag === 'zero' ? ' is-zero' : (x.flag ? ' is-muted' : '');
+    const showShare = !x.flag && round1(x.share) !== (parseFloat(enDigits(x.d.points)) || 0);
+    return `
+    <div class="td-item${cls}" onclick="openDetail('${x.d.id}')">
       <div class="td-item-info">
         <div class="td-item-name">${esc(x.d.deviceType)} ${esc(x.d.model)}</div>
         <div class="td-item-sub">${x.d.customerName ? esc(x.d.customerName) + ' · ' : ''}${roleLabel(x)}${x.d.shopName ? ' · ' + esc(x.d.shopName) : ''}</div>
+        ${flagHtml(x.flag)}
       </div>
       <div class="td-item-pts">
-        <div class="td-pts-num">${esc(x.d.points || '0')}</div>
+        <div class="td-pts-num">${shown}</div>
         <div class="td-pts-lbl">${t('te.devicePoints')}</div>
-        ${round1(x.share) !== (parseFloat(enDigits(x.d.points)) || 0) ? `<div class="td-pts-share">↳ ${round1(x.share)}</div>` : ''}
+        ${showShare ? `<div class="td-pts-share">↳ ${round1(x.share)}</div>` : ''}
       </div>
-    </div>`).join('') : `<div class="empty-col">${t('te.noPoints')}</div>`;
+    </div>`; }).join('') : `<div class="empty-col">${tdT('none')}</div>`;
+
   document.getElementById('techDevTitle').innerHTML = `🔧 ${esc(r.t)} <span style="font-size:13px;font-weight:500;color:var(--muted-2);">(${items.length} ${t('te.deviceCount')} · ⭐ ${r.points})</span>`;
-  document.getElementById('techDevBody').innerHTML = rows;
+  document.getElementById('techDevBody').innerHTML = summary + rows;
   document.getElementById('techDevOverlay').classList.remove('hidden');
 }
 function closeTechDevices(){ _openTechDevName = null; document.getElementById('techDevOverlay').classList.add('hidden'); }
@@ -7986,6 +8046,53 @@ function renderTechEval(){
     }
   });
 
+  // ============================================================
+  // قايمة صفحة الفني — كل جهاز اشتغل عليه، بنقاط أو بصفر
+  // ------------------------------------------------------------
+  // حلقة مستقلة تماماً عن حساب النقاط فوق — وده مقصود.
+  // الأرقام في الجدول ما تتغيّرش بحرف: إحنا بنزوّد رؤية،
+  // مش بنعيد حساب. الهدف: الجهاز اللي خلص ومحدش حطّله
+  // نقاط يبان بدل ما يتشال من القايمة.
+  //
+  // flag:  ''         اتحسب عادي
+  //        'zero'     خلص ومافيش نقاط  ← دي الغلطة
+  //        'wholesale' جملة — بدون نقاط بالتصميم
+  //        'returned' الجهاز رجع بعد التسليم
+  // ============================================================
+  const contribAll = {};
+  const pushAll = (name, d, share, role, flag) => {
+    if(!name) return;
+    (contribAll[name] = contribAll[name] || []).push({ d, share, role, flag });
+  };
+
+  devices.forEach(d => {
+    const cd = completionDate(d);
+    if(!cd || !inTeRange(cd)) return;          // نفس نطاق الفترة بالظبط
+
+    if(returnAfterDeliveryDate(d)){
+      const rpts = parseFloat(enDigits(d.returnPoints)) || 0;
+      if(d.substituteTechnician){
+        pushAll(d.substituteTechnician, d, d.isWholesale ? 0 : rpts, 'بديل',
+                d.isWholesale ? 'wholesale' : (rpts ? '' : 'zero'));
+      }
+      // الفني الأصلي بياخد صفر على الراجع — لكن لازم يبان في قايمته
+      if(d.technician) pushAll(d.technician, d, 0, 'رئيسي', 'returned');
+      return;
+    }
+
+    const pts  = d.isWholesale ? 0 : (parseFloat(enDigits(d.points)) || 0);
+    const flag = d.isWholesale ? 'wholesale' : (pts ? '' : 'zero');
+    const pct  = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+
+    if(d.assistTechnician && pct > 0){
+      const assistShare = pts * (pct / 100);
+      pushAll(d.assistTechnician, d, assistShare, 'مساعد', flag);
+      pushAll(d.technician,       d, pts - assistShare, 'رئيسي', flag);
+    } else {
+      pushAll(d.technician, d, pts, 'رئيسي', flag);
+    }
+  });
+
   // الأجهزة اللي خلصت في الفترة (بغض النظر عن النقاط)
   const completedInRange = devices.filter(d => { const cd = completionDate(d); return cd && inTeRange(cd); });
 
@@ -8010,6 +8117,7 @@ function renderTechEval(){
       t,
       points: round1(items.reduce((s, x) => s + x.share, 0)),
       items,
+      allItems: contribAll[techName] || [],
       count: mine.length,
       avg,
       returns,
