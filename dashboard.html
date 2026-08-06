@@ -701,7 +701,10 @@
   .label-row{font-size:12px; color:var(--ink-3); margin-bottom:2px;}
   .label-row.mono{font-family:monospace; font-size:11px;}
   .label-id{font-size:10px; color:var(--muted-2); margin-top:8px; font-family:monospace;}
+  /* الخلفية البيضا والحشو = الهامش المطلوب للقراءة (quiet zone)،
+     عشان المعاينة على الشاشة تتمسح زي الليبل المطبوع */
   #qrHolder{display:flex; justify-content:center; margin:10px 0;}
+  #qrHolder img, #qrHolder canvas{background:#fff; padding:12px; box-sizing:content-box;}
   /* الطباعة بقت في نافذة مستقلة (printLabel) — مفيش @media print هنا
      عشان منطبعش الداشبورد كله بالغلط */
   .label-size-row{
@@ -5784,12 +5787,37 @@ async function renderLabelImage(d, sz, qrDataUrl){
   const topMid = (pad + topBottom) / 2;
 
   // عمود الكود على اليمين
-  const brandMargin = mm(sz.h * 0.022);
+  // ⚠️ الهامش الأبيض حوالين الكود (quiet zone).
+  //    مواصفة QR بتفرض ٤ مربعات فاضية على كل ناحية، وقارئ
+  //    الموبايل بيرفض الكود من غيرها حتى لو مطبوع مظبوط تماماً.
+  //    مكتبة qrcodejs بترسم المصفوفة بس من غير أي هامش، فاللي كان
+  //    موجود هو الحشو الخارجي وحده:
+  //        على الجنب = pad         ≈ ٢.٤ مربع
+  //        من تحت    = brandMargin ≈ ١.٢ مربع   ← الأسوأ
+  //    وده كان بيخلي القراءة بالموبايل تفشل على ليبل سليم.
+  //
+  //    الحل: نرسم الكود جوه مربعه مزوّد بالهامش الناقص، والحشو
+  //    الخارجي بيكمّل الباقي. كود الجهاز = 'dev_' + ١٣ رقم =
+  //    ١٧ بايت بتصحيح M → نسخة ٢ = ٢٥ مربع.
+  //        quiet + pad = 4×مربع   و   مربع = (qrSz - 2·quiet)/25
+  //        ⇒ quiet = (4·qrSz - 25·pad) / 33
+  //    وسقف أخير: المربع الواحد مايقلّش عن ٣ نقط طابعة، وإلا
+  //    الليبل الصغير يطلع كود مهروس. على المقاسات دي بناخد أكبر
+  //    هامش نقدر عليه من غير ما نضحّي بوضوح المربعات.
+  const QR_MODS   = 25;
+  const QR_MIN_MOD = 3;                      // نقط الطابعة (PX_PER_MM = 8 ≈ 203dpi)
+  const qrQuiet   = Math.max(0, Math.min(
+                      qrSz * 0.20,
+                      (4 * qrSz - QR_MODS * pad) / (QR_MODS + 8),
+                      (qrSz - QR_MODS * QR_MIN_MOD) / 2));
+  // الهامش تحت الكود لازم يبقى زي اللي على الجنب على الأقل
+  const brandMargin = Math.max(mm(sz.h * 0.022), pad);
   const qrBoxH = qrSz + brandMargin + fBrand;
   const qrX = W - pad - qrSz;
   const qrY = topMid - qrBoxH / 2;
   const qrImg = await loadImg((await hiResQr(d.id, Math.round(qrSz) * S * 2)) || qrDataUrl);
-  if(qrImg) x.drawImage(qrImg, qrX, qrY, qrSz, qrSz);
+  if(qrImg) x.drawImage(qrImg, qrX + qrQuiet, qrY + qrQuiet,
+                               qrSz - qrQuiet * 2, qrSz - qrQuiet * 2);
   setFont(900, fBrand, 'Cairo');
   x.direction = 'ltr'; x.textAlign = 'center';
   try{ x.letterSpacing = mm(0.15).toFixed(2) + 'px'; }catch(e){}
@@ -5966,6 +5994,18 @@ function browserPrintLabel(){
   const fDate = Math.max(1.5, sz.h * 0.090 * k).toFixed(2);   // تاريخ الدخول
   const fBrand= Math.max(1.4, sz.h * 0.088 * k).toFixed(2);   // اسم I FIX TEAM تحت الباركود
 
+  // الهامش الأبيض حوالين الكود — نفس معادلة renderLabelImage بالحرف.
+  // ⚠️ أي تعديل هنا لازم يتعمل في المكانين وإلا الليبل يطلع مختلف
+  //    حسب مسار الطباعة (وكيل صامت / نافذة متصفح).
+  const QR_MODS  = 25;
+  const QR_MIN_MOD = 3 / PX_PER_MM;          // ٣ نقط طابعة، بالمليمتر
+  const _qs = parseFloat(qrSz), _pd = parseFloat(pad);
+  const qrQuiet  = Math.max(0, Math.min(
+                     _qs * 0.20,
+                     (4 * _qs - QR_MODS * _pd) / (QR_MODS + 8),
+                     (_qs - QR_MODS * QR_MIN_MOD) / 2)).toFixed(2);
+  const brandGap = Math.max(sz.h * 0.022, parseFloat(pad)).toFixed(2);
+
   // خط حالة الجهاز بيصغّر لوحده كل ما الكلام يكتر عشان يوسع في الشريط
   const stripW = sz.w - (parseFloat(pad) * 2);          // العرض المتاح
   const stripH = Math.max(2.6, sz.h * 0.20);            // الارتفاع المسموح للشريط
@@ -6001,11 +6041,11 @@ function browserPrintLabel(){
     flex-shrink:0; display:flex; flex-direction:column; align-items:center;
     width:${qrSz}mm;
   }
-  .qr{ width:${qrSz}mm; height:${qrSz}mm; }
+  .qr{ width:${qrSz}mm; height:${qrSz}mm; padding:${qrQuiet}mm; background:#fff; }
   .qr img{ width:100%; height:100%; display:block; }
   .brand{
     font-family:'Cairo',sans-serif; font-weight:900; font-size:${fBrand}mm;
-    letter-spacing:.15mm; margin-top:${(sz.h*0.022).toFixed(2)}mm;
+    letter-spacing:.15mm; margin-top:${brandGap}mm;
     white-space:nowrap; direction:ltr;
   }
   .info{ flex:1; min-width:0; line-height:1.3; }
