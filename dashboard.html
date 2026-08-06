@@ -5647,6 +5647,10 @@ function grabQrDataUrl(){
 // لو الوكيل مش شغال أو حصل أي مشكلة → بنرجع لنافذة الطباعة العادية.
 // ============================================================
 const PRINT_AGENT_URL = 'http://localhost:9123';
+// الوكيل بيشتغل على كمبيوتر المحل بس. من الموبايل الطباعة بتروح
+// للسحابة، ونافذة الطباعة العادية مالهاش لازمة — الطابعة أصلاً
+// مش متوصلة بالموبايل.
+const IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const PX_PER_MM = 8;   // ≈203 نقطة/بوصة وهو دقة طابعات الليبل الحرارية
 
 // بنرسم الليبل بـ3 أضعاف الدقة وبعدين نصغّره — الرسام بياخد راحته في
@@ -5913,6 +5917,9 @@ async function printAgentAlive(){
 }
 
 async function trySilentPrintLocal(image, sz, ref, jobId){
+  // الموبايل مالوش وكيل محلي — بنوفّر ثانية ونص انتظار وخطأ
+  // في الكونسول مع كل طباعة
+  if(IS_MOBILE) return false;
   // ⚠️ الفحص الأول مهم: من غيره كنّا بنبعت أمر الطباعة
   // ونقطع الاتصال بعد 1.2 ثانية — والوكيل يكمّل طباعة،
   // وإحنا نفتكر إنه فشل ونبعت الأمر تاني عبر السحابة = ليبلين.
@@ -5952,7 +5959,11 @@ async function trySilentPrintCloud(image, sz, ref, jobId){
   }catch(e){ return false; }
 
   // نستنى الوكيل يستلم الأمر ويطبع — بنسأل كل شوية لحد ما ياخد نتيجة نهائية أو الوقت يخلص
-  const deadline = Date.now() + 12000;
+  // ⚠️ ٣٠ ثانية مش ١٢. دورة سؤال الوكيل لوحدها ٤ ثواني
+  //    (POLL_MS في print-agent.js)، والطباعة الحرارية بتاخد
+  //    ثواني كمان. ١٢ كانت بتنتهي والوكيل لسه بيطبع — فالمستخدم
+  //    يشوف رسالة فشل والليبل بيطلع من الطابعة بعدها بثانيتين.
+  const deadline = Date.now() + 30000;
   let result = false;
   while(Date.now() < deadline){
     await new Promise(r => setTimeout(r, 800));
@@ -5980,11 +5991,31 @@ async function trySilentPrint(d, sz, qrDataUrl){
   return await trySilentPrintCloud(image, sz, ref, jobId);
 }
 
+// شريط بيبان طول ما الطباعة السحابية شغالة. من غيره المستخدم
+// بيستنى نص دقيقة من غير أي إشارة، بيفتكر إن الزرار مااشتغلش،
+// وبيدوس تاني — فيطلع ليبلين.
+function showPrintBusy(msg){
+  let el = document.getElementById('printBusyBar');
+  if(!msg){ if(el) el.remove(); return; }
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'printBusyBar';
+    el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;background:#0F766E;color:#fff;'
+      + 'text-align:center;font:800 14px/1.7 inherit;padding:12px 14px;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+}
+
 async function printLabel(){
   const dv = devices.find(x => x.id === labelDeviceId);
   if(dv && typeof isFeatureEnabled === 'function' && isFeatureEnabled('silent_label_print')){
     saveLabelSize();
-    const ok = await trySilentPrint(dv, getLabelSize(), grabQrDataUrl());
+    showError('');
+    showPrintBusy(t('print.sending'));
+    let ok = false;
+    try{ ok = await trySilentPrint(dv, getLabelSize(), grabQrDataUrl()); }
+    finally{ showPrintBusy(''); }
     if(ok){
       showImportDone(t('print.silentDone'));
       // نقفل معاينة الليبل بعد الطباعة (مفيش دالة closeLabel — الليبل معروض داخل الصفحة)
@@ -5993,6 +6024,11 @@ async function printLabel(){
       });
       return;
     }
+    // ⚠️ على الموبايل مابنفتحش نافذة الطباعة العادية: سفاري
+    //    بيمنع النوافذ المنبثقة فبتطلع رسالة تانية فوق الأولى،
+    //    وحتى لو فتحت مفيش طابعة ليبل متوصلة بالموبايل.
+    //    رسالة واحدة واضحة أنفع من اتنين مالهمش لازمة.
+    if(IS_MOBILE){ showError(t('print.cloudFailed')); return; }
     showError(t('print.silentFailed'));
   }
   browserPrintLabel();

@@ -674,6 +674,8 @@
       /* الطباعة الصامتة */
       'print.silentDone': 'اتطبع الليبل مباشرة على الطابعة ✅',
       'print.silentFailed': 'برنامج الطباعة المباشرة مش شغال — هنفتح نافذة الطباعة العادية.',
+      'print.sending': 'بيتبعت لطابعة المحل...',
+      'print.cloudFailed': 'مقدرناش نوصل لطابعة المحل — اتأكد إن الكمبيوتر شغال وجرّب تاني.',
 
       /* اللغة */
       'lang.switch': 'English',
@@ -1326,6 +1328,8 @@
       /* Silent printing */
       'print.silentDone': 'Label sent directly to the printer ✅',
       'print.silentFailed': 'Direct print service is not running — opening the normal print dialog.',
+      'print.sending': 'Sending to the shop printer...',
+      'print.cloudFailed': "Couldn't reach the shop printer — make sure the computer is on, then try again.",
 
       'lang.switch': 'العربية',
       'lang.switchTitle': 'Change system language'
