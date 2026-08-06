@@ -3683,7 +3683,15 @@ function renderDetail(){
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
     ${isRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
-    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>` : ''}
+    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>
+    ${d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0 ? `
+    <div style="margin-bottom:10px;">
+      <span style="font-size:13px;color:var(--muted);display:block;margin-bottom:6px;">🤝 ${tdT('blameQ')}</span>
+      <div class="pay-choice">
+        <button type="button" style="border-color:var(--info);${!d.assistBlamed?'background:#2563EB;color:#fff;':'background:var(--surface);color:var(--info);'}"${roB} onclick="setAssistBlamed(false)">${tdT('blameNo')}</button>
+        <button type="button" style="border-color:var(--danger);${d.assistBlamed?'background:#DC2626;color:#fff;':'background:var(--surface);color:var(--danger);'}"${roB} onclick="setAssistBlamed(true)">${tdT('blameYes')}</button>
+      </div>
+    </div>` : ''}` : ''}
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
@@ -4366,6 +4374,18 @@ async function purgeAllData(){
     importing = false; hideImportProgress(); setSaving(false);
     return false;
   }
+}
+
+// قرار المحاسب لكل جهاز على حدة — مش قاعدة عامة.
+// المساعد ممكن يكون عمل حتة مالهاش علاقة بالعطل اللي رجع.
+async function setAssistBlamed(val){
+  devices = devices.map(d => d.id === selectedId ? { ...d, assistBlamed: !!val, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  renderDetail();
+  render();
+  if(_openTechDevName && document.getElementById('techDevOverlay') && !document.getElementById('techDevOverlay').classList.contains('hidden')){
+    renderTechEval(); openTechDevices(_openTechDevName);
+  }
+  await persist();
 }
 
 async function setWholesale(val){
@@ -7919,7 +7939,14 @@ function tdT(k){
     flagZero:  ['⚠️ خلص ومافيش نقاط', '⚠️ Finished, no points'],
     flagWhole: ['📦 جملة — بدون نقاط', '📦 Wholesale — no points'],
     flagRet:   ['↩️ رجع بعد التسليم',  '↩️ Returned after delivery'],
+    flagMoved: ['↪️ رجع وراح لفني تاني — النقاط اتحوّلت',
+                '↪️ Returned and reassigned — points moved'],
+    flagBlame: ['⛔ اتخصمت — له يد في الرجوع',
+                '⛔ Deducted — shared blame for the return'],
     none:      ['مفيش أجهزة في الفترة دي', 'No devices in this period'],
+    blameQ:    ['المساعد له يد في رجوع الجهاز؟', 'Did the assistant share blame for the return?'],
+    blameNo:   ['لأ — ياخد نصيبه',        'No — keeps their share'],
+    blameYes:  ['أيوه — اخصم نصيبه',      'Yes — deduct their share'],
   };
   return (M[k] || ['',''])[en ? 1 : 0];
 }
@@ -7931,7 +7958,8 @@ function openTechDevices(techName){
   const round1 = n => Math.round(n * 10) / 10;
 
   // اللي عليه ملاحظة يطلع فوق — ده الهدف من الشاشة أصلاً
-  const rank = x => x.flag === 'zero' ? 0 : (x.flag ? 1 : 2);
+  const NEEDS_EYE = { zero: 1, moved: 1, blamed: 1 };
+  const rank = x => NEEDS_EYE[x.flag] ? 0 : (x.flag ? 1 : 2);
   const items = (r.allItems || []).slice()
     .sort((a,b) => rank(a) - rank(b) || b.share - a.share);
 
@@ -7943,6 +7971,8 @@ function openTechDevices(techName){
       f === 'zero'      ? `<div class="td-flag zero">${tdT('flagZero')}</div>`
     : f === 'wholesale' ? `<div class="td-flag info">${tdT('flagWhole')}</div>`
     : f === 'returned'  ? `<div class="td-flag info">${tdT('flagRet')}</div>`
+    : f === 'moved'     ? `<div class="td-flag zero">${tdT('flagMoved')}</div>`
+    : f === 'blamed'    ? `<div class="td-flag zero">${tdT('flagBlame')}</div>`
     : '';
 
   const summary = items.length ? `
@@ -7953,9 +7983,15 @@ function openTechDevices(techName){
     </div>` : '';
 
   const rows = items.length ? items.map(x => {
-    const shown = x.flag === 'wholesale' ? '—' : esc(x.d.points || '0');
+    // المرتجع إجماليه = نقاط الصيانة + نقاط العطل الجديد.
+    // عرض d.points لوحدها كان هيقول رقم غير اللي اتحسب فعلاً.
+    const isRetItem = x.flag === 'returned' || x.flag === 'moved' || x.flag === 'blamed';
+    const retTot = (parseFloat(enDigits(x.d.points)) || 0) + (parseFloat(enDigits(x.d.returnPoints)) || 0);
+    const shown = x.flag === 'wholesale' ? '—'
+                : isRetItem ? String(Math.round(retTot * 10) / 10)
+                : esc(x.d.points || '0');
     const cls = x.flag === 'zero' ? ' is-zero' : (x.flag ? ' is-muted' : '');
-    const showShare = !x.flag && round1(x.share) !== (parseFloat(enDigits(x.d.points)) || 0);
+    const showShare = (!x.flag || isRetItem) && round1(x.share) !== round1(isRetItem ? retTot : (parseFloat(enDigits(x.d.points)) || 0));
     return `
     <div class="td-item${cls}" onclick="openDetail('${x.d.id}')">
       <div class="td-item-info">
@@ -8018,13 +8054,36 @@ function renderTechEval(){
   devices.forEach(d => {
     // ===== جهاز رجع بعد التسليم: الأصلي بصفر عليه، ونقاط الصيانة الجديدة للفني البديل =====
     if(returnAfterDeliveryDate(d)){
+      // ============================================================
+      // الجهاز المرتجع — اللي عمل المرتجع ياخد نقاط الجهاز كلها
+      // ------------------------------------------------------------
+      // النسخة القديمة كانت بترمي d.points خالص وتدي returnPoints
+      // للبديل بس. فالفني اللي صلّح الجهاز الأول كان بيخسر نقاطه
+      // حتى لو محدش دخّل الجهاز على حد تاني أصلاً.
+      //
+      //   owner = البديل لو موجود، وإلا الفني الأصلي
+      //   وبياخد:  points + returnPoints
+      //
+      // والمساعد بياخد نصيبه من الإجمالي بنفس نسبته — إلا لو
+      // المحاسب قرر إن له يد في الرجوع (assistBlamed).
+      // ============================================================
       const rpts = parseFloat(enDigits(d.returnPoints)) || 0;
-      if(!rpts || !d.substituteTechnician) return;
+      const rBase = parseFloat(enDigits(d.points)) || 0;
+      const rTot = rBase + rpts;
+      const rOwner = d.substituteTechnician || d.technician;
+      if(!rTot || !rOwner) return;
       if(d.isWholesale){ wholesaleSkipped++; return; }
-      const cd = completionDate(d);
-      if(!cd){ pendingPts += rpts; pendingCount++; return; }
+      const cd = completionDate(d); if(!cd){ pendingPts += rTot; pendingCount++; return; }
       if(!inTeRange(cd)) return;
-      push(d.substituteTechnician, d, rpts, 'بديل');
+      const rRole = (rOwner === d.substituteTechnician && rOwner !== d.technician) ? 'بديل' : 'رئيسي';
+      const rPct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+      if(d.assistTechnician && rPct > 0 && !d.assistBlamed){
+        const rA = rTot * (rPct / 100);
+        push(d.assistTechnician, d, rA, 'مساعد');
+        push(rOwner, d, rTot - rA, rRole);
+      } else {
+        push(rOwner, d, rTot, rRole);
+      }
       return;
     }
 
@@ -8070,13 +8129,34 @@ function renderTechEval(){
     if(!cd || !inTeRange(cd)) return;          // نفس نطاق الفترة بالظبط
 
     if(returnAfterDeliveryDate(d)){
-      const rpts = parseFloat(enDigits(d.returnPoints)) || 0;
-      if(d.substituteTechnician){
-        pushAll(d.substituteTechnician, d, d.isWholesale ? 0 : rpts, 'بديل',
-                d.isWholesale ? 'wholesale' : (rpts ? '' : 'zero'));
+      // نفس معادلة الحساب فوق بالحرف.
+      // ⚠️ أي تعديل هنا لازم يتعمل في المكانين وإلا القايمة
+      //    هتقول حاجة والجدول يقول حاجة تانية.
+      const rpts  = parseFloat(enDigits(d.returnPoints)) || 0;
+      const rBase = parseFloat(enDigits(d.points)) || 0;
+      const rTot  = d.isWholesale ? 0 : (rBase + rpts);
+      const rOwner = d.substituteTechnician || d.technician;
+      const rMoved = !!(d.substituteTechnician && d.technician &&
+                        d.substituteTechnician !== d.technician);
+      const rRole = rMoved ? 'بديل' : 'رئيسي';
+      const rFlag = d.isWholesale ? 'wholesale' : (rTot ? 'returned' : 'zero');
+      const rPct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+
+      if(d.assistTechnician && rPct > 0 && !d.assistBlamed){
+        const rA = rTot * (rPct / 100);
+        pushAll(d.assistTechnician, d, rA, 'مساعد', rFlag);
+        pushAll(rOwner, d, rTot - rA, rRole, rFlag);
+      } else {
+        pushAll(rOwner, d, rTot, rRole, rFlag);
+        // المساعد المخصوم لازم يبان في قايمته معاه السبب —
+        // مش يختفي وهو فاكر إن فيه غلطة
+        if(d.assistTechnician && rPct > 0 && d.assistBlamed)
+          pushAll(d.assistTechnician, d, 0, 'مساعد', 'blamed');
       }
-      // الفني الأصلي بياخد صفر على الراجع — لكن لازم يبان في قايمته
-      if(d.technician) pushAll(d.technician, d, 0, 'رئيسي', 'returned');
+
+      // الفني الأصلي لما البديل ياخد الشغل: لازم يبان بصفر
+      // ومعاه السبب، وإلا الجهاز يختفي من قايمته خالص
+      if(rMoved) pushAll(d.technician, d, 0, 'رئيسي', 'moved');
       return;
     }
 
