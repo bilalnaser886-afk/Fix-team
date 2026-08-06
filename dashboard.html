@@ -7471,20 +7471,41 @@ function returnCompletionDate(d){
 // واحدة للحساب والعرض مع بعض — مستحيل يختلفوا.
 function returnPointParts(d){
   const rounds = retRounds(d);
+  if(!rounds.length) return [];
+  const roleOf = o => (o && o !== d.technician) ? 'بديل' : 'رئيسي';
+
+  // الجولة المفتوحة = رجع ولسه ماتسلّمش تاني
+  const openIdx = returnCompletionDate(d) ? -1 : rounds.length - 1;
+  const openSub = openIdx >= 0 ? (rounds[openIdx].substituteTechnician || '') : '';
+
+  // مين كان ماسك الجهاز قبل الجولة المفتوحة؟
+  const upto = openIdx >= 0 ? openIdx : rounds.length;
+  let prevOwner = d.technician, prevIdx = -1;
+  for(let i = 0; i < upto; i++)
+    if(rounds[i].substituteTechnician){ prevOwner = rounds[i].substituteTechnician; prevIdx = i; }
+
   const out = [];
   const base = parseFloat(enDigits(d.points)) || 0;
-  const last = rounds.length ? rounds[rounds.length - 1] : null;
-  const finalOwner = (last && last.substituteTechnician) || d.technician;
-  const roleOf = o => (o && o !== d.technician) ? 'بديل' : 'رئيسي';
-  if(base && finalOwner)
-    out.push({ owner: finalOwner, amt: base, blamed: !!(last && last.assistBlamed),
-               role: roleOf(finalOwner), kind: 'base' });
+  if(base){
+    // ⚠️ الفرق اللي كل الحكاية فيه:
+    //    رجع واتحوّل لفني جديد → القديم خسرها من دلوقتي،
+    //      والجديد ما استحقهاش لحد ما يسلّم (earned=false)
+    //    رجع وماراحش لحد  → تفضل زي ما هي مع صاحبها
+    const owner  = openIdx >= 0 ? (openSub || prevOwner)
+                                : ((rounds[rounds.length - 1].substituteTechnician) || d.technician);
+    const bIdx   = openIdx >= 0 ? (openSub ? openIdx : prevIdx) : rounds.length - 1;
+    const earned = openIdx < 0 || !openSub;
+    if(owner) out.push({ owner, amt: base, blamed: !!(rounds[bIdx] && rounds[bIdx].assistBlamed),
+                         role: roleOf(owner), kind: 'base', earned });
+  }
+
+  // نقاط كل جولة لصاحبها — والجولة المفتوحة لسه ما خلصتش
   rounds.forEach((r, i) => {
     const p = parseFloat(enDigits(r.returnPoints)) || 0;
     const o = r.substituteTechnician || d.technician;
     if(!p || !o) return;
     out.push({ owner: o, amt: p, blamed: !!r.assistBlamed, role: roleOf(o),
-               kind: 'round', round: i + 1 });
+               kind: 'round', round: i + 1, earned: i !== openIdx });
   });
   return out;
 }
@@ -8080,6 +8101,8 @@ function tdT(k){
     blameQ:    ['المساعد له يد في رجوع الجهاز؟', 'Did the assistant share blame for the return?'],
     blameNo:   ['لأ — ياخد نصيبه',        'No — keeps their share'],
     blameYes:  ['أيوه — اخصم نصيبه',      'Yes — deduct their share'],
+    flagWait:  ['⏳ لسه في المرتجعات — النقاط تتحسب بعد التسليم',
+                '⏳ Still in returns — points count after delivery'],
     roundN:    ['الرجوع',        'Return'],
     rComplaint:['شكوى العميل', 'Complaint'],
     rFault:    ['العطل المكتشف', 'Fault found'],
@@ -8098,7 +8121,7 @@ function openTechDevices(techName){
   const round1 = n => Math.round(n * 10) / 10;
 
   // اللي عليه ملاحظة يطلع فوق — ده الهدف من الشاشة أصلاً
-  const NEEDS_EYE = { zero: 1, moved: 1, blamed: 1 };
+  const NEEDS_EYE = { zero: 1, moved: 1, blamed: 1, waiting: 1 };
   const rank = x => NEEDS_EYE[x.flag] ? 0 : (x.flag ? 1 : 2);
   const items = (r.allItems || []).slice()
     .sort((a,b) => rank(a) - rank(b) || b.share - a.share);
@@ -8111,6 +8134,7 @@ function openTechDevices(techName){
       f === 'zero'      ? `<div class="td-flag zero">${tdT('flagZero')}</div>`
     : f === 'wholesale' ? `<div class="td-flag info">${tdT('flagWhole')}</div>`
     : f === 'returned'  ? `<div class="td-flag info">${tdT('flagRet')}</div>`
+    : f === 'waiting'   ? `<div class="td-flag info">${tdT('flagWait')}</div>`
     : f === 'moved'     ? `<div class="td-flag zero">${tdT('flagMoved')}</div>`
     : f === 'blamed'    ? `<div class="td-flag zero">${tdT('flagBlame')}</div>`
     : '';
@@ -8125,7 +8149,7 @@ function openTechDevices(techName){
   const rows = items.length ? items.map(x => {
     // المرتجع إجماليه = نقاط الصيانة + نقاط العطل الجديد.
     // عرض d.points لوحدها كان هيقول رقم غير اللي اتحسب فعلاً.
-    const isRetItem = x.flag === 'returned' || x.flag === 'moved' || x.flag === 'blamed';
+    const isRetItem = x.flag === 'returned' || x.flag === 'moved' || x.flag === 'blamed' || x.flag === 'waiting';
     const retTot = isRetItem ? returnPointParts(x.d).reduce((s, p) => s + p.amt, 0) : 0;
     const shown = x.flag === 'wholesale' ? '—'
                 : isRetItem ? String(Math.round(retTot * 10) / 10)
@@ -8209,14 +8233,22 @@ function renderTechEval(){
       // ============================================================
       if(d.isWholesale){ wholesaleSkipped++; return; }
       const rParts = returnPointParts(d);
-      const rTot = rParts.reduce((s, p) => s + p.amt, 0);
-      if(!rTot) return;
-      // ⚠️ تاريخ إنجاز المرتجع مش تاريخ التسليم القديم
-      const cd = returnCompletionDate(d);
-      if(!cd){ pendingPts += rTot; pendingCount++; return; }
-      if(!inTeRange(cd)) return;
+      if(!rParts.length) return;
+
+      // اللي لسه ما استحقش يروح للمعلّق — مش لحد
+      const rWait = rParts.filter(p => !p.earned).reduce((s, p) => s + p.amt, 0);
+      if(rWait){ pendingPts += rWait; pendingCount++; }
+
+      const rDone = rParts.filter(p => p.earned);
+      if(!rDone.length) return;
+
+      // ⚠️ الجهاز اللي لسه في المرتجعات بيتقاس بتاريخ تسليمه
+      //    الأصلي — عشان نقاط الفني اللي ماحدش أخدها منه
+      //    تفضل في نفس الشهر اللي كانت فيه بالظبط.
+      const cd = returnCompletionDate(d) || completionDate(d);
+      if(!cd || !inTeRange(cd)) return;
       const rPct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
-      rParts.forEach(p => {
+      rDone.forEach(p => {
         if(d.assistTechnician && rPct > 0 && !p.blamed){
           const a = p.amt * (rPct / 100);
           push(d.assistTechnician, d, a, 'مساعد');
@@ -8283,6 +8315,9 @@ function renderTechEval(){
       if(!rParts.length){ pushAll(d.substituteTechnician || d.technician, d, 0, 'رئيسي', rFlag); }
       rParts.forEach(p => {
         seen[p.owner] = 1;
+        // اللي لسه ما استحقش يبان بصفر ومعاه السبب —
+        // مش يختفي والفني مستني نقاط ماشافهاش
+        if(!p.earned){ pushAll(p.owner, d, 0, p.role, 'waiting'); return; }
         if(d.assistTechnician && rPct > 0 && !p.blamed){
           const a = p.amt * (rPct / 100);
           pushAll(d.assistTechnician, d, a, 'مساعد', rFlag); seen[d.assistTechnician] = 1;
