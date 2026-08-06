@@ -2256,6 +2256,24 @@ async function serverWatermark(){
   return (data && data[0] && data[0].updated_at) || null;
 }
 
+// تنظيف المحذوفات بجلب الـ IDs بس — رخيص جداً بدل تحميل كل الداتا (توفير Egress).
+async function reconcileDeletes(){
+  const serverIds = new Set();
+  let lastId = '', guard = 0;
+  while(guard++ < 1000){
+    let q = sb.from('devices_data').select('id').order('id', { ascending:true }).limit(5000);
+    if(lastId) q = q.gt('id', lastId);
+    const { data, error } = await withTimeout(q, 30000, 'مطابقة المحذوفات');
+    if(error) throw error;
+    if(!data || !data.length) break;
+    for(const r of data) serverIds.add(r.id);
+    lastId = data[data.length - 1].id;
+  }
+  const before = devices.length;
+  devices = devices.filter(d => serverIds.has(d.id));
+  if(devices.length !== before) sortDevices();
+}
+
 // بيجيب صفوف بالـ keyset. لو اتبعت since بيجيب المتغيّر بس.
 // onPage بتتنادى بعد كل صفحة — عشان نقدر نعرض قبل ما الكل يخلص.
 async function fetchRows(since, onPage){
@@ -2306,9 +2324,9 @@ async function loadDevices(opts){
     const meta = (await idbSafe(idbGet('sync_meta'), null)) || {};
     const cached = forceFull ? [] : await idbSafe(readCache(), []);
     const stale  = !meta.lastFullSync || (Date.now() - meta.lastFullSync) > FULL_SYNC_EVERY_MS;
-    const canDelta = !forceFull && cached.length && meta.watermark && !stale;
+    const hasBase = !forceFull && cached.length && meta.watermark;   // عندنا كاش نبني عليه؟
 
-    if(canDelta){
+    if(hasBase){
       // ✅ الطريق السريع: الكاش على الشاشة فوراً، وبعدين المتغيّر بس
       devices = cached;
       sortDevices();
@@ -2322,9 +2340,16 @@ async function loadDevices(opts){
         devices = Array.from(byId.values());
         sortDevices();
       }
+      // بدل التحميل الكامل الدوري (كان ~١٨ ميجا كل ٢٤ ساعة × كل مستخدم → أكبر مصدر Egress متبقّي):
+      // تنظيف المحذوفات بجلب الـ IDs بس — أرخص بحوالي ٩٠×. المحذوفات والصفحة مفتوحة
+      // بيمسكها الـ realtime أصلاً، فده بس للمحذوفات اللي حصلت والصفحة مقفولة.
+      if(stale){
+        await reconcileDeletes();
+        meta.lastFullSync = Date.now();
+      }
       meta.watermark = (await serverWatermark()) || meta.watermark;
       await idbSafe(idbSet('sync_meta', meta), false, 5000);
-      console.log('مزامنة تزايدية:', changed.length, 'جهاز اتغيّر');
+      console.log('مزامنة تزايدية:', changed.length, 'جهاز' + (stale ? ' + تنظيف محذوفات' : ''));
     } else {
       // 🐢 الطريق الكامل: أول مرة، أو الكاش فاضي، أو عدّى ٢٤ ساعة
       const wm = await serverWatermark();
