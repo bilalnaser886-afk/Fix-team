@@ -1,234 +1,230 @@
 /* ============================================================
-   I Fix Team — شريط الأدوات السفلي (Dock)
+   I Fix Team — رفّ العدة (Dock)
    ------------------------------------------------------------
-   شريط رفيع مركون تحت الشاشة، فيه زرار مثلث صغير. لما تدوس عليه
-   الشريط بيكبر لتلت الشاشة تقريباً، وبيفتح على أول أداة.
-   الأدوات مرصوصة في عمود على الجنب — واللي بتدوس عليها بتطلع فوق
-   وتفتح مكان الأولى.
+   شريط واقف على جنب الشاشة تحت التوب بار، الأيقونات بانية فيه
+   طول الوقت. تدوس على واحدة فتفتح لوحتها، وكروت النظام بتصغر
+   وتروح للنص التاني — زي ما تكون فاتح تطبيقين جنب بعض.
 
-   ⚠️ الشريط ده **مش** بيعرف أي أدوات من نفسه. كل أداة بتسجّل
-      نفسها، فالملف ده يقدر يشتغل في أي صفحة من غير تعديل:
+   ⚠️ الشريط مش عارف أي أداة من نفسه — كل أداة بتسجّل نفسها:
 
         IFixDock.register({
           id:    'assist',
           icon:  '💬',
           title: 'محادثات العملاء',
-          badge: () => 3,                 // اختياري: رقم على الأيقونة
-          render: (host) => { ... }        // بتملا العنصر ده
+          badge: () => 3,                  // اختياري
+          render: (host) => { ... },       // مرة واحدة
+          onShow: (host) => { ... }        // مع كل فتحة
         });
 
-      و render بتتنادى مرة واحدة أول ما الأداة تتفتح. لو محتاجة
-      تتحدّث بعد كده استخدم onShow.
+   كده الملف يشتغل في أي صفحة من غير تعديل.
 
-   ⚠️ الارتفاع: الصفحة فيها تلات حاجات مركونة تحت —
-        شريط STAGING            z-index 99999
-        شريطي حالة الطباعة/الحفظ z-index 99998
-      فالدوك بياخد 99990 (تحتيهم كلهم) وبيقيس ارتفاع شريط
-      الـstaging ويقعد فوقه، عشان ما يتغطاش ولا يغطيه.
+   ⚠️ التوب بار position:sticky وجوه تدفّق الصفحة، فلما نزوّد حشو
+      على body عشان المحتوى يصغر، التوب بار بيصغر معاه. بنرجّعه
+      بهامش سالب مساوي — عشان يفضل بعرض الشاشة كامل والرف يبدأ
+      من تحته.
    ============================================================ */
 (function () {
   'use strict';
   if (window.IFixDock) return;
 
-  var TOOLS = [];
-  var openId = null;
-  var expanded = false;
-  var built = false;
-  var LS_OPEN = 'ifix-dock-open';
-  var LS_TOOL = 'ifix-dock-tool';
+  var TOOLS = [], openId = null, expanded = false, built = false;
+  var LS_OPEN = 'ifix-dock-open', LS_TOOL = 'ifix-dock-tool';
+  var RAIL = 56;                       // عرض الرف — أتخن من النسخة الأولى
+  var SPLIT_MIN = 760;                 // تحت كده القسمة مبتنفعش (شوف width())
 
-  // ===== ارتفاع اللي مركون تحتنا =====
-  // بنقيسه مش بنفترضه: شريط الـstaging بيظهر في التجريبي بس،
-  // وارتفاعه بيختلف مع حجم الخط ولغة الجهاز.
-  function bottomOffset() {
-    var h = 0;
+  // عرض اللوحة. على شاشة صغيرة القسمة نص/نص بتسيب للكروت ١٤٠ بكسل
+  // — مش صالحة للقراية. فبنخلي اللوحة تغطي، والمحتوى مايتزحلقش.
+  function width() {
+    var w = innerWidth;
+    if (w < SPLIT_MIN) return { panel: w - RAIL, push: false };
+    return { panel: Math.round(Math.min(w * 0.44, 620)), push: true };
+  }
+
+  // ارتفاع التوب بار — بنقيسه مش بنفترضه: بيتغيّر مع
+  // safe-area-inset-top على الأيفون ومع حجم الخط.
+  function topOffset() {
     try {
-      var bars = document.querySelectorAll('body > div');
-      for (var i = 0; i < bars.length; i++) {
-        var el = bars[i], s = getComputedStyle(el);
-        if (s.position === 'fixed' && s.bottom === '0px' &&
-            parseInt(s.zIndex || '0', 10) > 99900 && el.id !== 'ifixDock') {
-          h = Math.max(h, el.offsetHeight);
-        }
-      }
+      var tb = document.querySelector('.topbar');
+      if (tb) return Math.round(tb.getBoundingClientRect().height);
     } catch (e) {}
-    return h;
+    return 64;
   }
 
   function css() {
     if (document.getElementById('ifixDockCss')) return;
-    var st = document.createElement('style');
-    st.id = 'ifixDockCss';
-    st.textContent = [
-      '#ifixDock{position:fixed;left:0;right:0;z-index:99990;',
-      '  background:var(--surface,#fff);border-top:1px solid var(--border,#E2E8F0);',
-      '  box-shadow:0 -6px 24px rgba(0,0,0,.10);',
-      '  display:flex;flex-direction:column;',
-      '  transition:height .22s cubic-bezier(.4,0,.2,1);overflow:hidden;}',
-      '#ifixDock .dk-handle{height:26px;flex:0 0 26px;display:flex;align-items:center;',
-      '  justify-content:center;cursor:pointer;user-select:none;position:relative;}',
-      '#ifixDock .dk-handle:hover{background:var(--surface-2,#F8FAFC);}',
-      /* المثلث نفسه — صغير خالص زي ما طلبت */
-      '#ifixDock .dk-tri{width:0;height:0;border-inline-start:6px solid transparent;',
-      '  border-inline-end:6px solid transparent;border-bottom:7px solid var(--muted,#64748B);',
-      '  transition:transform .22s;}',
-      '#ifixDock.on .dk-tri{transform:rotate(180deg);}',
-      '#ifixDock .dk-hint{position:absolute;inset-inline-start:12px;font-size:11px;',
-      '  color:var(--muted-2,#94A3B8);font-weight:700;pointer-events:none;}',
-      /* الجسم: عمود أيقونات + محتوى */
-      '#ifixDock .dk-body{flex:1;display:flex;min-height:0;border-top:1px solid var(--border,#E2E8F0);}',
-      '#ifixDock .dk-rail{flex:0 0 52px;display:flex;flex-direction:column;gap:4px;',
-      '  padding:8px 6px;overflow-y:auto;background:var(--surface-2,#F8FAFC);',
-      '  border-inline-end:1px solid var(--border,#E2E8F0);}',
-      '#ifixDock .dk-ico{position:relative;width:40px;height:40px;flex:0 0 40px;border-radius:10px;',
-      '  border:1px solid transparent;background:transparent;cursor:pointer;font-size:18px;',
-      '  display:flex;align-items:center;justify-content:center;transition:.15s;}',
-      '#ifixDock .dk-ico:hover{background:var(--surface,#fff);border-color:var(--border,#E2E8F0);}',
-      '#ifixDock .dk-ico.act{background:var(--surface,#fff);border-color:var(--blue,#2563EB);',
-      '  box-shadow:0 1px 4px rgba(0,0,0,.10);}',
-      '#ifixDock .dk-badge{position:absolute;top:-2px;inset-inline-end:-2px;min-width:16px;height:16px;',
-      '  border-radius:9px;background:#DC2626;color:#fff;font:900 10px/16px system-ui;text-align:center;',
-      '  padding:0 4px;}',
-      '#ifixDock .dk-pane{flex:1;min-width:0;overflow:auto;padding:12px 14px;}',
-      '#ifixDock .dk-empty{color:var(--muted,#64748B);font-size:12.5px;text-align:center;padding:26px 12px;line-height:1.9;}',
-      '#ifixDock .dk-title{font:900 13px/1.5 inherit;color:var(--ink,#101014);margin-bottom:8px;}'
+    var s = document.createElement('style');
+    s.id = 'ifixDockCss';
+    s.textContent = [
+      ':root{--dk-rail:56px;--dk-panel:0px;}',
+
+      /* ===== الرف ===== */
+      '#dkRail{position:fixed;inset-inline-end:0;z-index:30;width:var(--dk-rail);',
+      '  background:var(--surface-2);border-inline-start:1px solid var(--border);',
+      '  display:flex;flex-direction:column;align-items:center;gap:6px;',
+      '  padding:10px 0;overflow:visible;}',
+
+      '.dk-ico{position:relative;width:40px;height:40px;flex:0 0 40px;border-radius:11px;',
+      '  border:1px solid transparent;background:transparent;cursor:pointer;',
+      '  font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;',
+      '  color:var(--muted);transition:background .15s,border-color .15s;}',
+      '.dk-ico:hover{background:var(--surface);border-color:var(--border);}',
+      '.dk-ico:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}',
+
+      /* العلامة: السلوت المفتوح بيكسر خط حد الرف، فالأيقونة واللوحة
+         يقروا كسطح واحد — العدة المرفوعة من الرف. */
+      '.dk-ico.act{background:var(--surface);border-color:var(--border);',
+      '  border-inline-start-color:var(--surface);}',
+      '.dk-ico.act::after{content:"";position:absolute;inset-inline-start:-7px;top:-1px;bottom:-1px;',
+      '  width:8px;background:var(--surface);}',
+      '.dk-ico.act::before{content:"";position:absolute;inset-inline-end:6px;top:9px;bottom:9px;',
+      '  width:2px;border-radius:2px;background:var(--accent);}',
+
+      '.dk-badge{position:absolute;top:-3px;inset-inline-start:-3px;min-width:16px;height:16px;',
+      '  border-radius:9px;background:var(--danger,#DC2626);color:#fff;',
+      '  font:900 10px/16px system-ui;text-align:center;padding:0 4px;}',
+
+      /* ===== اللوحة ===== */
+      '#dkPanel{position:fixed;inset-inline-end:var(--dk-rail);z-index:29;',
+      '  width:var(--dk-panel);background:var(--surface);',
+      '  border-inline-start:1px solid var(--border);',
+      '  display:flex;flex-direction:column;overflow:hidden;',
+      '  transition:width .22s cubic-bezier(.4,0,.2,1);}',
+      '#dkPanel .dk-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;',
+      '  padding:11px 14px;border-bottom:1px solid var(--border);}',
+      '#dkPanel .dk-t{font-family:"Cairo",sans-serif;font-weight:900;font-size:13px;',
+      '  color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '#dkPanel .dk-x{margin-inline-start:auto;background:none;border:none;cursor:pointer;',
+      '  color:var(--muted);font-size:17px;line-height:1;padding:4px 6px;border-radius:7px;}',
+      '#dkPanel .dk-x:hover{background:var(--surface-3);color:var(--ink);}',
+      '#dkPanel .dk-body{flex:1;min-height:0;overflow:auto;padding:14px;}',
+      '.dk-empty{color:var(--muted);font-size:12.5px;line-height:2;text-align:center;padding:30px 14px;}',
+
+      /* ===== دفع المحتوى ===== */
+      'body.dk-open{padding-inline-end:calc(var(--dk-rail) + var(--dk-panel));}',
+      'body.dk-rail-on{padding-inline-end:var(--dk-rail);}',
+      /* التوب بار sticky وجوه التدفّق — بنرجّعه لعرض الشاشة الكامل */
+      'body.dk-open .topbar,body.dk-rail-on .topbar{',
+      '  margin-inline-end:calc(-1 * (var(--dk-rail) + var(--dk-panel)));}',
+      'body.dk-rail-on .topbar{margin-inline-end:calc(-1 * var(--dk-rail));}',
+
+      '@media (prefers-reduced-motion:reduce){#dkPanel{transition:none;}}'
     ].join('\n');
-    document.head.appendChild(st);
+    document.head.appendChild(s);
   }
 
   function build() {
     if (built) return;
     css();
-    var d = document.createElement('div');
-    d.id = 'ifixDock';
-    d.innerHTML =
-      '<div class="dk-handle" id="dkHandle">' +
-        '<span class="dk-hint" id="dkHint"></span>' +
-        '<span class="dk-tri"></span>' +
-      '</div>' +
-      '<div class="dk-body" id="dkBody">' +
-        '<div class="dk-rail" id="dkRail"></div>' +
-        '<div class="dk-pane" id="dkPane"></div>' +
-      '</div>';
-    document.body.appendChild(d);
-    document.getElementById('dkHandle').addEventListener('click', toggle);
+    var rail = document.createElement('div'); rail.id = 'dkRail';
+    var panel = document.createElement('div'); panel.id = 'dkPanel';
+    panel.innerHTML =
+      '<div class="dk-head"><span class="dk-t" id="dkTitle"></span>' +
+      '<button class="dk-x" id="dkClose" title="إقفال" aria-label="إقفال">✕</button></div>' +
+      '<div class="dk-body" id="dkBody"></div>';
+    document.body.appendChild(panel);
+    document.body.appendChild(rail);
+    document.getElementById('dkClose').addEventListener('click', close);
     built = true;
-    layout();
-    // شريط الـstaging بيتحط بعد DOMContentLoaded، والوضع الأفقي
-    // بيغيّر الارتفاعات — فبنعيد القياس
     addEventListener('resize', layout);
-    setTimeout(layout, 800);
+    addEventListener('keydown', function (e) { if (e.key === 'Escape' && expanded) close(); });
+    setTimeout(layout, 600);           // التوب بار بيستقر بعد تحميل الخطوط
+    layout();
   }
 
   function layout() {
-    var d = document.getElementById('ifixDock');
-    if (!d) return;
-    d.style.bottom = bottomOffset() + 'px';
-    // تلت الشاشة، بحد أدنى وأقصى معقولين
-    var h = Math.round(innerHeight * 0.34);
-    h = Math.max(200, Math.min(h, 460));
-    d.style.height = expanded ? h + 'px' : '26px';
-    d.classList.toggle('on', expanded);
-    var body = document.getElementById('dkBody');
-    if (body) body.style.display = expanded ? 'flex' : 'none';
+    var rail = document.getElementById('dkRail'), panel = document.getElementById('dkPanel');
+    if (!rail || !panel) return;
+    var top = topOffset(), w = width();
+    rail.style.top = top + 'px';  rail.style.bottom = '0';
+    panel.style.top = top + 'px'; panel.style.bottom = '0';
+
+    var root = document.documentElement.style;
+    root.setProperty('--dk-rail', RAIL + 'px');
+    root.setProperty('--dk-panel', (expanded ? w.panel : 0) + 'px');
+
+    document.body.classList.toggle('dk-open', expanded && w.push);
+    document.body.classList.toggle('dk-rail-on', !(expanded && w.push));
   }
 
   function renderRail() {
     var rail = document.getElementById('dkRail');
     if (!rail) return;
-    // ⚠️ المفتوحة بتطلع أول العمود — ده اللي بيخلي الترتيب يتغيّر
-    //    مع كل ضغطة زي ما طلبت.
+    // المفتوحة بتطلع أول الرف
     var list = TOOLS.slice().sort(function (a, b) {
       return (b.id === openId ? 1 : 0) - (a.id === openId ? 1 : 0);
     });
     rail.innerHTML = list.map(function (t) {
-      var n = 0;
-      try { n = t.badge ? (t.badge() || 0) : 0; } catch (e) {}
-      return '<button class="dk-ico' + (t.id === openId ? ' act' : '') + '" ' +
-             'data-id="' + t.id + '" title="' + (t.title || '') + '">' +
-             (t.icon || '•') +
+      var n = 0; try { n = t.badge ? (t.badge() || 0) : 0; } catch (e) {}
+      return '<button class="dk-ico' + (t.id === openId && expanded ? ' act' : '') + '"' +
+             ' data-id="' + t.id + '" title="' + (t.title || '') + '"' +
+             ' aria-label="' + (t.title || '') + '">' + (t.icon || '•') +
              (n > 0 ? '<span class="dk-badge">' + (n > 99 ? '99+' : n) + '</span>' : '') +
              '</button>';
     }).join('');
     Array.prototype.forEach.call(rail.querySelectorAll('.dk-ico'), function (b) {
-      b.addEventListener('click', function () { open(b.getAttribute('data-id')); });
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-id');
+        if (expanded && id === openId) close(); else open(id);
+      });
     });
   }
 
   function renderPane() {
-    var pane = document.getElementById('dkPane');
-    var hint = document.getElementById('dkHint');
-    if (!pane) return;
+    var body = document.getElementById('dkBody'), title = document.getElementById('dkTitle');
+    if (!body) return;
     var t = TOOLS.filter(function (x) { return x.id === openId; })[0];
+    if (title) title.textContent = t ? (t.title || '') : '';
+    if (!t) { body.innerHTML = '<div class="dk-empty">مفيش أدوات متسجّلة</div>'; return; }
 
-    if (hint) hint.textContent = TOOLS.length && expanded && t ? (t.title || '') : '';
-
-    if (!TOOLS.length) {
-      pane.innerHTML = '<div class="dk-empty">🧰 الشريط جاهز — لسه مفيش أدوات متسجّلة</div>';
-      return;
-    }
-    if (!t) { pane.innerHTML = ''; return; }
-
-    // render بتتنادى مرة واحدة لكل أداة، وonShow مع كل فتحة
-    if (t._host && t._host.parentNode === pane) {
-      pane.innerHTML = ''; pane.appendChild(t._host);
-    } else {
-      pane.innerHTML = '';
-      var host = document.createElement('div');
-      t._host = host;
-      pane.appendChild(host);
-      try { if (t.render) t.render(host); } catch (e) { host.textContent = 'حصل خطأ في الأداة دي'; }
+    // العنصر بيتحفظ لكل أداة — فالسكرول واللي متكتب مبيضيعش لما تبدّل
+    if (t._host) { body.innerHTML = ''; body.appendChild(t._host); }
+    else {
+      body.innerHTML = '';
+      var host = document.createElement('div'); t._host = host; body.appendChild(host);
+      try { if (t.render) t.render(host); }
+      catch (e) { host.innerHTML = '<div class="dk-empty">الأداة دي مش راضية تفتح — جرّب تقفل الصفحة وتفتحها</div>'; }
     }
     try { if (t.onShow) t.onShow(t._host); } catch (e) {}
   }
 
   function open(id) {
-    var t = TOOLS.filter(function (x) { return x.id === id; })[0];
-    if (!t) return;
-    openId = id;
-    try { localStorage.setItem(LS_TOOL, id); } catch (e) {}
-    if (!expanded) { expanded = true; try { localStorage.setItem(LS_OPEN, '1'); } catch (e) {} }
+    if (!TOOLS.some(function (x) { return x.id === id; })) return;
+    openId = id; expanded = true;
+    try { localStorage.setItem(LS_TOOL, id); localStorage.setItem(LS_OPEN, '1'); } catch (e) {}
     layout(); renderRail(); renderPane();
   }
 
-  function toggle() {
-    expanded = !expanded;
-    try { localStorage.setItem(LS_OPEN, expanded ? '1' : '0'); } catch (e) {}
-    if (expanded && !openId && TOOLS.length) openId = TOOLS[0].id;
-    layout(); renderRail(); renderPane();
+  function close() {
+    expanded = false;
+    try { localStorage.setItem(LS_OPEN, '0'); } catch (e) {}
+    layout(); renderRail();
   }
 
   function register(tool) {
     if (!tool || !tool.id) return;
-    if (TOOLS.some(function (x) { return x.id === tool.id; })) return;  // مفيش تسجيل مكرر
+    if (TOOLS.some(function (x) { return x.id === tool.id; })) return;
     TOOLS.push(tool);
     build();
-    if (!openId) openId = TOOLS[0].id;
     renderRail();
-    if (expanded) renderPane();
+    if (expanded && openId === tool.id) renderPane();
   }
-
-  function refresh() { renderRail(); }   // لتحديث أرقام الأيقونات من برّه
 
   function boot() {
     build();
     try {
       expanded = localStorage.getItem(LS_OPEN) === '1';
-      var saved = localStorage.getItem(LS_TOOL);
-      if (saved) openId = saved;
+      openId = localStorage.getItem(LS_TOOL) || null;
     } catch (e) {}
-    layout(); renderRail(); renderPane();
+    layout(); renderRail(); if (expanded) renderPane();
   }
 
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', boot);
   else boot();
 
   window.IFixDock = {
-    register: register,
-    open: open,
-    toggle: toggle,
-    refresh: refresh,
-    close: function () { expanded = false; layout(); },
+    register: register, open: open, close: close,
+    toggle: function () { expanded ? close() : open(openId || (TOOLS[0] && TOOLS[0].id)); },
+    refresh: renderRail,
     tools: function () { return TOOLS.map(function (t) { return t.id; }); }
   };
 })();
