@@ -1178,11 +1178,16 @@
       <button class="close-btn" onclick="closeAddModal()">×</button>
     </div>
     <div id="addFormWrap">
-      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" oninput="onCustomerNameInput()" /></label>
+      <!-- ⚠️ autocomplete="off" ضروري: من غيره المتصفح بيعرض اقتراحاته
+           هو من اللي اتكتب في الحقول قبل كده، ولما تدوس على واحد
+           بيملّي الاسم **والرقم** من أقدم تسجيل — مش أحدث واحد.
+           الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
+      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
+      <datalist id="custNameList"></datalist>
       <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" /></label>
       <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
-      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" oninput="fixDigitsInput(this)" /></label>
+      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
         <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
@@ -3116,7 +3121,7 @@ async function markPaid(){
 // Add device modal
 function openAddModal(){
   ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
-    .forEach(id => document.getElementById('f_'+id).value = '');
+    .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
   if(_sec && _back && _sec.parentElement !== _back) _back.appendChild(_sec);   // نضمن رجوعه لمكانه
@@ -4242,28 +4247,82 @@ async function addActivityNote(){
 
 // ===== أوتوكومبليت اسم العميل → رقم التليفون (بالتاريخ من الأحدث) =====
 let custPhoneMap = {};
+
+// مفتاح اسم العميل — مطابقة **محافظة** عن قصد.
+//
+// ⚠️ مش بنستخدم IFixSearch هنا. التطبيع المرن بتاع البحث بيدمج
+//    أسامي مختلفة تحت مفتاح واحد، وهنا الدمج الغلط معناه إننا
+//    نحط رقم عميل تاني خالص في خانة الرقم — وده أسوأ بكتير من
+//    إننا نفوّت اقتراح.
+//    البحث بيسامح لأن المستخدم بيراجع النتيجة بعينه؛ الملء
+//    التلقائي مبيتراجعش.
+//
+// اللي بنسامح فيه هنا بس: المسافات الزيادة وحالة الحروف — دول
+// اختلافات كتابة مش اختلافات أسامي.
+function custKey(s){
+  return String(s||'').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// أسامي العملاء للاقتراح — واحد لكل مفتاح، بأحدث صيغة اتكتب بيها
+let custNames = [];
+
 function buildCustPhoneMap(){
   custPhoneMap = {};
+  const nameSeen = new Map();
   for(const d of devices){
     const name = (d.customerName||'').trim();
     const phone = (d.customerPhone||'').trim();
     if(!name || !phone) continue;
-    const key = name.toLowerCase();
+    const key = custKey(name);
+    if(!key) continue;
     const ts = new Date(d.intakeDate||0).getTime() || 0;
-    (custPhoneMap[key] = custPhoneMap[key] || []).push({ phone, ts });
+    // ⚠️ فاصل التعادل: المعرّف 'dev_' + Date.now() فهو بيحمل وقت
+    //    الإنشاء بالملي. محتاجينه لأن خانة وقت الدخول <input type="time">
+    //    دقتها **دقيقة** — فجهازين اتسجّلوا في نفس الدقيقة ليهم نفس
+    //    intakeDate بالحرف، والترتيب بينهم كان بيرجع لترتيب القاعدة
+    //    وهو مش مضمون.
+    const seq = Number(String(d.id||'').replace(/^dev_/, '')) || 0;
+    (custPhoneMap[key] = custPhoneMap[key] || []).push({ phone, ts, seq });
+    // أحدث صيغة اتكتب بيها الاسم هي اللي بتتعرض
+    const prev = nameSeen.get(key);
+    if(!prev || ts > prev.ts || (ts === prev.ts && seq > prev.seq))
+      nameSeen.set(key, { name, ts, seq });
   }
+  custNames = [...nameSeen.values()].sort((a,b) => (b.ts - a.ts) || (b.seq - a.seq));
 }
 function onCustomerNameInput(){
   const el = document.getElementById('f_customerName');
   const dl = document.getElementById('phoneHistory');
   const phoneInput = document.getElementById('f_customerPhone');
   if(!el || !dl || !phoneInput) return;
-  const name = (el.value||'').trim().toLowerCase();
-  if(!name || !custPhoneMap[name]){ dl.innerHTML=''; return; }
+  const key = custKey(el.value||'');
+
+  // اقتراح الأسامي — **بادئة** بس، مش تطابق مرن.
+  // القايمة مقصوصة على ١٥: قايمة أطول من كده مبتتقريش على الموبايل
+  // وبتثقّل الكتابة على قايمة أجهزة كبيرة.
+  const nameDl = document.getElementById('custNameList');
+  if(nameDl){
+    nameDl.innerHTML = key.length < 2 ? '' :
+      custNames.filter(x => custKey(x.name).indexOf(key) === 0)
+               .slice(0, 15)
+               .map(x => `<option value="${esc(x.name)}">`).join('');
+  }
+
+  if(!key || !custPhoneMap[key]){ dl.innerHTML=''; return; }
   const seen = new Set(); const phones = [];
-  custPhoneMap[name].slice().sort((a,b)=>b.ts-a.ts).forEach(x=>{ if(!seen.has(x.phone)){ seen.add(x.phone); phones.push(x.phone); } });
+  // التاريخ الأول، وعند التعادل الأحدث إنشاءً (المعرّف الأكبر)
+  custPhoneMap[key].slice()
+    .sort((a,b) => (b.ts - a.ts) || (b.seq - a.seq))
+    .forEach(x=>{ if(!seen.has(x.phone)){ seen.add(x.phone); phones.push(x.phone); } });
   dl.innerHTML = phones.map(p=>`<option value="${esc(p)}">`).join('');
-  if(phones.length && !phoneInput.value.trim()) phoneInput.value = phones[0];   // أحدث رقم
+  // بنملا لو الخانة فاضية، أو لو اللي فيها إحنا اللي حطيناه.
+  // ⚠️ من غير الشرط التاني: لو فيه عميل اسمه "بل" وانت بتكتب "بلال"،
+  //    الرقم بتاعه بيتحط عند حرف "ل" وبيفضل محطوط لما تكمّل الاسم —
+  //    لأن الخانة بقت مليانة. اللي المستخدم كتبه بإيده مابنلمسوش.
+  if(phones.length && (!phoneInput.value.trim() || phoneInput.dataset.autoFill === '1')){
+    phoneInput.value = phones[0];              // أحدث رقم
+    phoneInput.dataset.autoFill = '1';
+  }
 }
 
 // ===== استيراد بخيار دمج / استبدال كامل + نسخة أمان تلقائية قبل =====
