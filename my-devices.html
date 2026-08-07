@@ -393,6 +393,8 @@
     <button class="kebab-btn" onclick="toggleKebab()" aria-label="قائمة">⋮</button>
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
     <div id="kebabMenu" class="kebab-menu hidden">
+      <button onclick="openTechBoard()" >🏆 ترتيب الفنيين</button>
+      <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
       <button class="danger" onclick="kebabLogout()" data-i18n="rp.logout">تسجيل الخروج ⏻</button>
@@ -682,11 +684,17 @@ async function loadNotices(){
   try{
     const { data, error } = await sb.from('app_data')
       .select('key,value')
-      .in('key', ['system-config','feature-flags','broadcast','broadcast:technician']);
+      .in('key', ['system-config','feature-flags','broadcast','broadcast:technician','tech-board']);
     if(error) throw error;
 
     const map = {};
     (data || []).forEach(r => { try{ map[r.key] = JSON.parse(r.value); }catch(e){} });
+
+    // ترتيب الفنيين — الداشبورد بينشره جاهز.
+    // ⚠️ الفني بيشوف أجهزته هو بس (is_my_device في devices_safe)،
+    //    فمستحيل يحسب ترتيب كل الفنيين من عنده. والداشبورد بينشره
+    //    بعد كل تحميل عشان الحساب يفضل في مكان واحد.
+    if(map['tech-board']) techBoard = map['tech-board'];
 
     // ===== وضع النظام =====
     const cfg = map['system-config'] || {};
@@ -1285,6 +1293,91 @@ function applyTheme(){
   var mt = document.querySelector('meta[name="theme-color"]');
   if(mt) mt.setAttribute('content', d ? '#0E1721' : '#1B2A3A');
 }
+// ============================================================
+// ترتيب الفنيين — عرض بس
+// ------------------------------------------------------------
+// مفيش ضغط على اسم ولا صفحة أجهزة: الفني بيشوف أرقامه وأرقام
+// زمايله، مش أجهزتهم. ده مقصود — قايمة الأجهزة فيها أسامي عملاء
+// وأرقامهم، وde مش شغل الفني.
+let techBoard = null;
+let tbMode = 'month';        // 'today' | 'month'
+
+// نصوص الشاشة دي بس — أسطر قليلة ما تستاهلش لمس i18n.js المشترك
+function tbT(k){
+  let en = false;
+  try{ en = (typeof I18N !== 'undefined' && I18N.getLang() === 'en'); }catch(e){}
+  const M = {
+    title:   ['\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0641\u0646\u064a\u064a\u0646', 'Technician ranking'],
+    today:   ['\u0627\u0644\u0646\u0647\u0627\u0631\u062f\u0647', 'Today'],
+    d30:     ['\u0622\u062e\u0631 \u0663\u0660 \u064a\u0648\u0645', 'Last 30 days'],
+    tech:    ['\u0627\u0644\u0641\u0646\u064a', 'Technician'],
+    points:  ['\u0627\u0644\u0646\u0642\u0627\u0637', 'Points'],
+    done:    ['\u0623\u062c\u0647\u0632\u0629', 'Devices'],
+    avg:     ['\u0645\u062a\u0648\u0633\u0637 \u0627\u0644\u0645\u062f\u0629', 'Avg time'],
+    returns: ['\u0645\u0631\u062a\u062c\u0639', 'Returns'],
+    day:     ['\u064a\u0648\u0645', 'd'],
+    lessDay: ['\u0623\u0642\u0644 \u0645\u0646 \u064a\u0648\u0645', '< 1d'],
+    you:     ['(\u0625\u0646\u062a)', '(you)'],
+    updated: ['\u0622\u062e\u0631 \u062a\u062d\u062f\u064a\u062b:', 'Updated:'],
+    empty:   ['\u0644\u0633\u0647 \u0645\u0641\u064a\u0634 \u062a\u0631\u062a\u064a\u0628 \u2014 \u0647\u064a\u0638\u0647\u0631 \u0623\u0648\u0644 \u0645\u0627 \u0627\u0644\u0645\u062d\u0627\u0633\u0628 \u064a\u0641\u062a\u062d \u0627\u0644\u0646\u0638\u0627\u0645',
+              'No ranking yet — it appears once the accountant opens the system'],
+  };
+  return (M[k] || ['',''])[en ? 1 : 0];
+}
+
+function openTechBoard(){
+  closeKebab();
+  renderTechBoard();
+  $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
+}
+
+function setTbMode(m){ tbMode = m; renderTechBoard(); }
+
+function renderTechBoard(){
+  const rows = (techBoard && techBoard[tbMode === 'today' ? 'today' : 'd30']) || [];
+  const at = techBoard && techBoard.at;
+  const chip = (m, lbl) =>
+    `<button onclick="setTbMode('${m}')" style="border:1px solid ${tbMode===m?'var(--accent)':'var(--line)'};`
+    + `background:${tbMode===m?'var(--accent)':'transparent'};color:${tbMode===m?'#fff':'var(--muted)'};`
+    + `border-radius:999px;padding:7px 15px;font:800 12.5px/1 inherit;cursor:pointer;">${lbl}</button>`;
+
+  const fmtAvg = v => (v === null || v === undefined) ? '—'
+                    : (v < 1 ? tbT('lessDay') : Number(v).toFixed(1) + ' ' + tbT('day'));
+
+  const body = rows.length ? `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <tr style="color:var(--muted);font-size:11.5px;">
+        <th style="text-align:start;padding:7px 6px;">#</th>
+        <th style="text-align:start;padding:7px 6px;">${tbT('tech')}</th>
+        <th style="padding:7px 6px;">⭐ ${tbT('points')}</th>
+        <th style="padding:7px 6px;">${tbT('done')}</th>
+        <th style="padding:7px 6px;">${tbT('avg')}</th>
+        <th style="padding:7px 6px;">${tbT('returns')}</th>
+      </tr>
+      ${rows.map((r,i) => `
+      <tr style="border-top:1px solid var(--line);${r.t === ME ? 'background:var(--accent-soft,rgba(37,99,235,.10));' : ''}">
+        <td style="padding:9px 6px;color:var(--muted);">${i+1}</td>
+        <td style="padding:9px 6px;font-weight:800;">${esc(r.t)}${r.t === ME ? ' <span style="color:var(--accent);font-size:11px;">'+tbT('you')+'</span>' : ''}</td>
+        <td style="padding:9px 6px;text-align:center;font-weight:900;color:var(--accent);">${r.points}</td>
+        <td style="padding:9px 6px;text-align:center;">${r.count}</td>
+        <td style="padding:9px 6px;text-align:center;color:var(--muted);">${fmtAvg(r.avg)}</td>
+        <td style="padding:9px 6px;text-align:center;">${r.ret} <span style="color:var(--muted);font-size:11px;">(${r.rate}%)</span></td>
+      </tr>`).join('')}
+    </table></div>` :
+    `<div style="text-align:center;color:var(--muted);padding:26px 10px;font-size:13px;">${tbT('empty')}</div>`;
+
+  $('sheet').innerHTML = `
+    <div style="padding:16px 16px 22px;">
+      <div style="font:900 16px/1.4 'Cairo',sans-serif;margin-bottom:12px;">🏆 ${tbT('title')}</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        ${chip('today', tbT('today'))}${chip('month', tbT('d30'))}
+      </div>
+      ${body}
+      ${at ? `<div style="color:var(--muted);font-size:11px;margin-top:12px;text-align:center;">${tbT('updated')} ${new Date(at).toLocaleString('ar-EG')}</div>` : ''}
+    </div>`;
+}
+
 function openSettings(){ closeKebab(); renderSettings(); document.getElementById('setBg').classList.remove('hidden'); }
 function closeSettings(){ var e=document.getElementById('setBg'); if(e) e.classList.add('hidden'); }
 function renderSettings(){
