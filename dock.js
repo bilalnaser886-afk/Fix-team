@@ -27,7 +27,7 @@
   'use strict';
   if (window.IFixDock) return;
 
-  var TOOLS = [], openId = null, expanded = false, built = false;
+  var TOOLS = [], openId = null, expanded = false, built = false, _lastMain = true;
   var LS_OPEN = 'ifix-dock-open', LS_TOOL = 'ifix-dock-tool';
   var RAIL = 56;                       // عرض الرف — أتخن من النسخة الأولى
   var SPLIT_MIN = 760;                 // تحت كده القسمة مبتنفعش (شوف width())
@@ -37,7 +37,10 @@
   function width() {
     var w = innerWidth;
     if (w < SPLIT_MIN) return { panel: w - RAIL, push: false };
-    return { panel: Math.round(Math.min(w * 0.44, 620)), push: true };
+    // ربع الشاشة. بحد أدنى ٣٠٠ عشان المحتوى جوه اللوحة يفضل مقروء،
+    // وسقف ٤٦٠ عشان على شاشة عريضة ما تفضاش.
+    var p = Math.round(w * 0.25);
+    return { panel: Math.max(300, Math.min(p, 460)), push: true };
   }
 
   // ارتفاع التوب بار — بنقيسه مش بنفترضه: بيتغيّر مع
@@ -58,7 +61,11 @@
       ':root{--dk-rail:56px;--dk-panel:0px;}',
 
       /* ===== الرف ===== */
-      '#dkRail{position:fixed;inset-inline-end:0;z-index:30;width:var(--dk-rail);',
+      /* ⚠️ 15 مش 30. التوب بار z-index:20 وبيعمل سياق تكديس خاص،
+         والقايمة المنسدلة جواه — فأي رقم أعلى من 20 على الرف بيخلي
+         الرف يركب على القايمة. تحت العشرين، والرف لسه فوق محتوى
+         الصفحة العادي (z-index:auto). */
+      '#dkRail{position:fixed;inset-inline-end:0;z-index:15;width:var(--dk-rail);',
       '  background:var(--surface-2);border-inline-start:1px solid var(--border);',
       '  display:flex;flex-direction:column;align-items:center;gap:6px;',
       '  padding:10px 0;overflow:visible;}',
@@ -84,7 +91,7 @@
       '  font:900 10px/16px system-ui;text-align:center;padding:0 4px;}',
 
       /* ===== اللوحة ===== */
-      '#dkPanel{position:fixed;inset-inline-end:var(--dk-rail);z-index:29;',
+      '#dkPanel{position:fixed;inset-inline-end:var(--dk-rail);z-index:14;',
       '  width:var(--dk-panel);background:var(--surface);',
       '  border-inline-start:1px solid var(--border);',
       '  display:flex;flex-direction:column;overflow:hidden;',
@@ -126,14 +133,44 @@
     document.getElementById('dkClose').addEventListener('click', close);
     built = true;
     addEventListener('resize', layout);
+    // نفس المراقب اللي الصفحة بتستخدمه: بنسمع تغيّر class على body.
+    // ⚠️ حارس ضروري: layout بنفسه بيحط/يشيل dk-open و dk-rail-on على
+    //    body، فمن غير الحارس ده المراقب هينده layout اللي هيغيّر
+    //    الكلاس اللي هينده المراقب… حلقة مقفولة.
+    //    بنقارن حالة modal-open بس، ومانتحركش غير لما تتغيّر فعلاً.
+    try {
+      new MutationObserver(function () {
+        var m = onMain();
+        if (m === _lastMain) return;
+        _lastMain = m;
+        layout(); if (m) { renderRail(); if (expanded) renderPane(); }
+      }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    } catch (e) {}
     addEventListener('keydown', function (e) { if (e.key === 'Escape' && expanded) close(); });
     setTimeout(layout, 600);           // التوب بار بيستقر بعد تحميل الخطوط
     layout();
   }
 
+  // ⚠️ الرف على الشاشة الرئيسية بس.
+  //    الصفحة فيها ١٨ أوفرلاي (الحسابات · الجرد · التقييم · التفاصيل …)
+  //    ومراقبتهم واحد واحد هشة — أي أوفرلاي جديد هينسى.
+  //    فبنقرا من الآلية الموجودة أصلاً: مراقب بيحط modal-open على
+  //    body أول ما أي .overlay تتفتح. مصدر واحد للحقيقة.
+  function onMain() {
+    try { return !document.body.classList.contains('modal-open'); }
+    catch (e) { return true; }
+  }
+
   function layout() {
     var rail = document.getElementById('dkRail'), panel = document.getElementById('dkPanel');
     if (!rail || !panel) return;
+
+    if (!onMain()) {
+      rail.style.display = 'none'; panel.style.display = 'none';
+      document.body.classList.remove('dk-open', 'dk-rail-on');
+      return;
+    }
+    rail.style.display = ''; panel.style.display = '';
     var top = topOffset(), w = width();
     rail.style.top = top + 'px';  rail.style.bottom = '0';
     panel.style.top = top + 'px'; panel.style.bottom = '0';
