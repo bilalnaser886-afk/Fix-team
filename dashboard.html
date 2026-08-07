@@ -8397,23 +8397,36 @@ function publishTechBoardSoon(){
   _boardTimer = setTimeout(() => { _boardTimer = null; publishTechBoard(); }, 3000);
 }
 
+// كل ٥ دقايق بنجدّد الوقت حتى لو الأرقام ما اتغيّرتش
+const BOARD_HEARTBEAT_MS = 5 * 60 * 1000;
+
 async function publishTechBoard(){
   try{
     if(!Array.isArray(devices) || !devices.length) return;
-    const payload = {
-      at: new Date().toISOString(),
-      today: techBoardFor('today'),
-      d30:   techBoardFor('month')
-    };
-    const body = JSON.stringify(payload);
-    if(body === _lastTechBoard) return;          // ما اتغيّرش — مانكتبش
-    _lastTechBoard = body;
+    const rows = { today: techBoardFor('today'), d30: techBoardFor('month') };
+
+    // ⚠️ المقارنة على **الأرقام بس** — من غير الوقت.
+    //    كانت: JSON.stringify({at: new Date(), ...}) والوقت جوه
+    //    المقارنة، فمستحيل تتساوى — وكنا بنكتب مع كل تغيير في أي
+    //    جهاز. التعليق كان بيقول "مانكتبش لو ما اتغيّرش" والكود
+    //    بيعمل العكس بالظبط.
+    const sig = JSON.stringify(rows);
+    const now = Date.now();
+
+    // ⚠️ والوجه التاني: الوقت ده هو إشارة "فيه محاسب فاتح النظام".
+    //    لو قارنّا الأرقام بس ووقفنا، الوقت هيتجمّد في فترات الهدوء
+    //    والفني هيشوف "التحديثات موقوفة" والمحاسب قاعد قدام الشاشة.
+    //    فبنجدّده كل ٥ دقايق حتى من غير تغيير — كتابة صغيرة جداً.
+    if(sig === _lastBoardSig && (now - _lastBoardAt) < BOARD_HEARTBEAT_MS) return;
+    _lastBoardSig = sig; _lastBoardAt = now;
+
+    const body = JSON.stringify({ at: new Date(now).toISOString(), today: rows.today, d30: rows.d30 });
     await sb.from('app_data').upsert({
       key: TECH_BOARD_KEY, value: body, updated_at: new Date().toISOString()
     });
   }catch(e){ /* النشر مايوقفش أي حاجة */ }
 }
-let _lastTechBoard = '';
+let _lastBoardSig = '', _lastBoardAt = 0;
 
 function renderTechEval(){
   const chip = (mode, label) =>
