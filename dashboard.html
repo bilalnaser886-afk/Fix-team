@@ -920,6 +920,22 @@
   .td-pts-num{font-family:'Cairo',sans-serif; font-weight:900; font-size:20px; color:var(--violet); line-height:1.05;}
   .td-pts-lbl{font-size:9.5px; color:var(--muted-2);}
   .td-pts-share{font-size:11px; color:var(--muted); margin-top:2px;}
+  /* ===== أجهزة الفني: تمييز اللي ماتحسبش ===== */
+  .td-item.is-zero{border-color:var(--warn-border); background:var(--warn-tint);}
+  .td-item.is-muted{opacity:.72;}
+  .td-item.is-zero .td-pts-num{color:var(--warn);}
+  .td-item.is-muted .td-pts-num{color:var(--muted-2);}
+  .td-flag{display:inline-block; font-size:10.5px; font-weight:800; border-radius:6px;
+           padding:2px 7px; margin-top:5px; line-height:1.6;}
+  .td-flag.zero{color:var(--warn-strong); background:var(--warn-bg); border:1px solid var(--warn-border);}
+  .td-flag.info{color:var(--muted); background:var(--surface-3); border:1px solid var(--border);}
+  .td-sum{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+  .td-sum-box{flex:1; min-width:84px; text-align:center; background:var(--surface);
+              border:1px solid var(--border); border-radius:11px; padding:9px 6px;}
+  .td-sum-box.warn{border-color:var(--warn-border); background:var(--warn-tint);}
+  .td-sum-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:19px; color:var(--ink); line-height:1.1;}
+  .td-sum-box.warn .td-sum-n{color:var(--warn);}
+  .td-sum-l{font-size:10px; color:var(--muted-2); margin-top:2px;}
 
   /* ===== كبار العملاء ===== */
   .cust-item{
@@ -1162,11 +1178,17 @@
       <button class="close-btn" onclick="closeAddModal()">×</button>
     </div>
     <div id="addFormWrap">
-      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" oninput="onCustomerNameInput()" /></label>
-      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" /></label>
+      <!-- ⚠️ autocomplete="off" ضروري: من غيره المتصفح بيعرض اقتراحاته
+           هو من اللي اتكتب في الحقول قبل كده، ولما تدوس على واحد
+           بيملّي الاسم **والرقم** من أقدم تسجيل — مش أحدث واحد.
+           الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
+      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
+      <datalist id="custNameList"></datalist>
+      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" /></label>
+      <datalist id="shopNameList"></datalist>
       <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
-      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" oninput="fixDigitsInput(this)" /></label>
+      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
         <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
@@ -3100,12 +3122,14 @@ async function markPaid(){
 // Add device modal
 function openAddModal(){
   ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
-    .forEach(id => document.getElementById('f_'+id).value = '');
+    .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
   if(_sec && _back && _sec.parentElement !== _back) _back.appendChild(_sec);   // نضمن رجوعه لمكانه
   resetLock();
   buildCustPhoneMap();
+  const _shopDl = document.getElementById('shopNameList');
+  if(_shopDl) _shopDl.innerHTML = shopNamesForDatalist();
   setAddPayType('cash');
   setAddWholesale(false);
   togglePayTypeVisibility();
@@ -3524,6 +3548,15 @@ function renderDetail(){
   const s = statusInfo(d.status);
   // ===== المرتجعات: تفاصيل الجهاز القديمة بتتقفل، وبتظهر حقول المرتجع الجديدة =====
   const isRet = d.status === 'returned';
+  // ⚠️ الفرق بين الاتنين مهم:
+  //    isRet  = الجهاز في المرتجعات دلوقتي  → التعديل
+  //    hasRet = الجهاز ليه تاريخ مرتجع     → الظهور
+  //    قبل كده الاتنين كانوا حاجة واحدة، فأول ما الجهاز
+  //    يتسلّم كانت ست حقول تختفي والبيانات تفضل في القاعدة
+  //    من غير أي شاشة توريها.
+  const hasRet = hasRetData(d);
+  const roR = isRet ? '' : ' readonly';    // حقول وقت الصيانة — تتقفل بعد التسليم
+  const roRB = isRet ? '' : ' disabled';
   const roI = isRet ? ' readonly' : '';   // مدخلات ونصوص التفاصيل القديمة
   const roB = isRet ? ' disabled' : '';   // أزرار وقوائم التفاصيل القديمة
   const rows = [
@@ -3570,7 +3603,8 @@ function renderDetail(){
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
+      <datalist id="shopNameListDetail">${shopNamesForDatalist()}</datalist>
     </div>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
@@ -3603,8 +3637,9 @@ function renderDetail(){
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
     </div>` : ''}
-    ${isRet ? `
-    <label class="field" style="margin-top:6px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}" oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
+    ${hasRet ? `
+    ${retRoundsHtml(d)}
+    <label class="field" style="margin-top:6px;"><span style="color:var(--violet);font-weight:800;">${t('det.returnPrice')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}"${roR} oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
     ${isReturnPriced(d) && d.returnPriceConfirmation && d.returnPriceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.return_price_response ? `
@@ -3619,8 +3654,8 @@ function renderDetail(){
     ${isReturnPriced(d) ? `<div style="margin:2px 0 12px;">
       <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.returnPayMethod')}</span>
       <div class="pay-choice">
-        <button type="button" class="pay-btn" style="border-color:var(--success);${d.returnPaymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editReturnPayType('cash')">${t('det.payCash')}</button>
-        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.returnPaymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editReturnPayType('deferred')">${t('det.payDeferred')}</button>
+        <button type="button" class="pay-btn"${roRB} style="border-color:var(--success);${d.returnPaymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editReturnPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn"${roRB} style="border-color:var(--warn);${d.returnPaymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editReturnPayType('deferred')">${t('det.payDeferred')}</button>
       </div>
       ${d.returnPaymentType === 'deferred'
         ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidViaAccount')}${(d.returnBilledShop||d.billedShop)?` "${esc(d.returnBilledShop||d.billedShop)}"`:''} — ${t('det.returnSettled')}</div>`
@@ -3632,9 +3667,9 @@ function renderDetail(){
     </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
     <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
-    ${isRet ? `
-    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2" placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
-    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.discoveredFault')}</span><textarea rows="2" placeholder="${t('det.discoveredFaultPh')}" onblur="editField('discoveredFault', this.value)">${esc(d.discoveredFault||'')}</textarea></label>` : ''}
+    ${hasRet ? `
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2"${roR} placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.discoveredFault')}</span><textarea rows="2"${roR} placeholder="${t('det.discoveredFaultPh')}" onblur="editField('discoveredFault', this.value)">${esc(d.discoveredFault||'')}</textarea></label>` : ''}
 
     <div class="approval-box">
       ${!d.deepInspection || !d.deepInspection.requested ? `
@@ -3666,8 +3701,19 @@ function renderDetail(){
       </label>
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
-    ${isRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
-    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>` : ''}
+    ${/* ⚠️ hasRet مش isRet: التقييم شهري، والجهاز أكيد هيكون
+         اتسلّم وقتها. فلو قفلنا الحقول دي بعد التسليم بتبقى
+         مالهاش لازمة خالص — محدش هيقدر يصحح نقطة غلط. */ ''}
+    ${hasRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
+    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>
+    ${d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0 ? `
+    <div style="margin-bottom:10px;">
+      <span style="font-size:13px;color:var(--muted);display:block;margin-bottom:6px;">🤝 ${tdT('blameQ')}</span>
+      <div class="pay-choice">
+        <button type="button" style="border-color:var(--info);${!d.assistBlamed?'background:#2563EB;color:#fff;':'background:var(--surface);color:var(--info);'}"${roB} onclick="setAssistBlamed(false)">${tdT('blameNo')}</button>
+        <button type="button" style="border-color:var(--danger);${d.assistBlamed?'background:#DC2626;color:#fff;':'background:var(--surface);color:var(--danger);'}"${roB} onclick="setAssistBlamed(true)">${tdT('blameYes')}</button>
+      </div>
+    </div>` : ''}` : ''}
     ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
     <button type="button" class="points-toggle" onclick="togglePointsBox()">
@@ -4205,28 +4251,82 @@ async function addActivityNote(){
 
 // ===== أوتوكومبليت اسم العميل → رقم التليفون (بالتاريخ من الأحدث) =====
 let custPhoneMap = {};
+
+// مفتاح اسم العميل — مطابقة **محافظة** عن قصد.
+//
+// ⚠️ مش بنستخدم IFixSearch هنا. التطبيع المرن بتاع البحث بيدمج
+//    أسامي مختلفة تحت مفتاح واحد، وهنا الدمج الغلط معناه إننا
+//    نحط رقم عميل تاني خالص في خانة الرقم — وده أسوأ بكتير من
+//    إننا نفوّت اقتراح.
+//    البحث بيسامح لأن المستخدم بيراجع النتيجة بعينه؛ الملء
+//    التلقائي مبيتراجعش.
+//
+// اللي بنسامح فيه هنا بس: المسافات الزيادة وحالة الحروف — دول
+// اختلافات كتابة مش اختلافات أسامي.
+function custKey(s){
+  return String(s||'').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// أسامي العملاء للاقتراح — واحد لكل مفتاح، بأحدث صيغة اتكتب بيها
+let custNames = [];
+
 function buildCustPhoneMap(){
   custPhoneMap = {};
+  const nameSeen = new Map();
   for(const d of devices){
     const name = (d.customerName||'').trim();
     const phone = (d.customerPhone||'').trim();
     if(!name || !phone) continue;
-    const key = name.toLowerCase();
+    const key = custKey(name);
+    if(!key) continue;
     const ts = new Date(d.intakeDate||0).getTime() || 0;
-    (custPhoneMap[key] = custPhoneMap[key] || []).push({ phone, ts });
+    // ⚠️ فاصل التعادل: المعرّف 'dev_' + Date.now() فهو بيحمل وقت
+    //    الإنشاء بالملي. محتاجينه لأن خانة وقت الدخول <input type="time">
+    //    دقتها **دقيقة** — فجهازين اتسجّلوا في نفس الدقيقة ليهم نفس
+    //    intakeDate بالحرف، والترتيب بينهم كان بيرجع لترتيب القاعدة
+    //    وهو مش مضمون.
+    const seq = Number(String(d.id||'').replace(/^dev_/, '')) || 0;
+    (custPhoneMap[key] = custPhoneMap[key] || []).push({ phone, ts, seq });
+    // أحدث صيغة اتكتب بيها الاسم هي اللي بتتعرض
+    const prev = nameSeen.get(key);
+    if(!prev || ts > prev.ts || (ts === prev.ts && seq > prev.seq))
+      nameSeen.set(key, { name, ts, seq });
   }
+  custNames = [...nameSeen.values()].sort((a,b) => (b.ts - a.ts) || (b.seq - a.seq));
 }
 function onCustomerNameInput(){
   const el = document.getElementById('f_customerName');
   const dl = document.getElementById('phoneHistory');
   const phoneInput = document.getElementById('f_customerPhone');
   if(!el || !dl || !phoneInput) return;
-  const name = (el.value||'').trim().toLowerCase();
-  if(!name || !custPhoneMap[name]){ dl.innerHTML=''; return; }
+  const key = custKey(el.value||'');
+
+  // اقتراح الأسامي — **بادئة** بس، مش تطابق مرن.
+  // القايمة مقصوصة على ١٥: قايمة أطول من كده مبتتقريش على الموبايل
+  // وبتثقّل الكتابة على قايمة أجهزة كبيرة.
+  const nameDl = document.getElementById('custNameList');
+  if(nameDl){
+    nameDl.innerHTML = key.length < 2 ? '' :
+      custNames.filter(x => custKey(x.name).indexOf(key) === 0)
+               .slice(0, 15)
+               .map(x => `<option value="${esc(x.name)}">`).join('');
+  }
+
+  if(!key || !custPhoneMap[key]){ dl.innerHTML=''; return; }
   const seen = new Set(); const phones = [];
-  custPhoneMap[name].slice().sort((a,b)=>b.ts-a.ts).forEach(x=>{ if(!seen.has(x.phone)){ seen.add(x.phone); phones.push(x.phone); } });
+  // التاريخ الأول، وعند التعادل الأحدث إنشاءً (المعرّف الأكبر)
+  custPhoneMap[key].slice()
+    .sort((a,b) => (b.ts - a.ts) || (b.seq - a.seq))
+    .forEach(x=>{ if(!seen.has(x.phone)){ seen.add(x.phone); phones.push(x.phone); } });
   dl.innerHTML = phones.map(p=>`<option value="${esc(p)}">`).join('');
-  if(phones.length && !phoneInput.value.trim()) phoneInput.value = phones[0];   // أحدث رقم
+  // بنملا لو الخانة فاضية، أو لو اللي فيها إحنا اللي حطيناه.
+  // ⚠️ من غير الشرط التاني: لو فيه عميل اسمه "بل" وانت بتكتب "بلال"،
+  //    الرقم بتاعه بيتحط عند حرف "ل" وبيفضل محطوط لما تكمّل الاسم —
+  //    لأن الخانة بقت مليانة. اللي المستخدم كتبه بإيده مابنلمسوش.
+  if(phones.length && (!phoneInput.value.trim() || phoneInput.dataset.autoFill === '1')){
+    phoneInput.value = phones[0];              // أحدث رقم
+    phoneInput.dataset.autoFill = '1';
+  }
 }
 
 // ===== استيراد بخيار دمج / استبدال كامل + نسخة أمان تلقائية قبل =====
@@ -4350,6 +4450,39 @@ async function purgeAllData(){
     importing = false; hideImportProgress(); setSaving(false);
     return false;
   }
+}
+
+// قرار المحاسب لكل جهاز على حدة — مش قاعدة عامة.
+// المساعد ممكن يكون عمل حتة مالهاش علاقة بالعطل اللي رجع.
+// الجولات المنتهية — للقراءة بس.
+// الجولة الحالية بتتعرض تحت في الحقول العادية.
+function retRoundsHtml(d){
+  const past = Array.isArray(d && d.returnRounds) ? d.returnRounds : [];
+  if(!past.length) return '';
+  const dt = s => { if(!s) return '—'; try{ return new Date(s).toLocaleDateString('en-GB'); }catch(e){ return s; } };
+  const line = (lbl, val) => val ? `<div style="font-size:12.5px;margin-top:3px;"><span style="color:var(--muted-2);">${lbl}:</span> <b>${esc(val)}</b></div>` : '';
+  return past.map((r, i) => `
+    <div style="border:1px solid var(--border);border-inline-start:3px solid var(--violet);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--surface-2);">
+      <div style="font-family:'Cairo',sans-serif;font-weight:900;font-size:12.5px;color:var(--violet);">
+        ↩️ ${tdT('roundN')} ${i + 1} <span style="font-weight:500;color:var(--muted-2);">· ${dt(r.at)} ← ${dt(r.doneAt)}</span>
+      </div>
+      ${line(tdT('rComplaint'), r.returnComplaint)}
+      ${line(tdT('rFault'), r.discoveredFault)}
+      ${line(tdT('rTech'), r.substituteTechnician)}
+      ${line(tdT('rPoints'), r.returnPoints)}
+      ${line(tdT('rPrice'), r.returnPrice)}
+      ${r.assistBlamed ? `<div style="font-size:11.5px;margin-top:4px;color:var(--danger);font-weight:800;">⛔ ${tdT('rBlamed')}</div>` : ''}
+    </div>`).join('');
+}
+
+async function setAssistBlamed(val){
+  devices = devices.map(d => d.id === selectedId ? { ...d, assistBlamed: !!val, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
+  renderDetail();
+  render();
+  if(_openTechDevName && document.getElementById('techDevOverlay') && !document.getElementById('techDevOverlay').classList.contains('hidden')){
+    renderTechEval(); openTechDevices(_openTechDevName);
+  }
+  await persist();
 }
 
 async function setWholesale(val){
@@ -4627,6 +4760,17 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
     if(!d.isWholesale && (!d.points || d.points === '0')){
       extra.points = String(computeAutoPointsValue(d));
     }
+  }
+
+  // ⚠️ رجوع جديد والحقول فيها بيانات جولة قبل كده؟
+  //    نأرشفها الأول ونفضّي الحقول للجولة الجديدة.
+  //    من غير كده الرجوع التاني بيدهس على الأول وبياناته
+  //    بتضيع خالص — سعره ونقاطه وفنيه.
+  if(newStatus === 'returned' && d.status !== 'returned' && curRoundHasData(d)){
+    extra.returnRounds = (Array.isArray(d.returnRounds) ? d.returnRounds : []).concat([curRound(d)]);
+    RET_FIELDS.forEach(k => extra[k] = '');
+    extra.assistBlamed = false;
+    extra.returnPriceConfirmation = null;
   }
 
   showError('');
@@ -6833,10 +6977,27 @@ function closeAccounts(){ document.getElementById('accountsOverlay').classList.a
 let accOpenShop = null;
 
 function shopNamesForDatalist(){
-  const s = new Set();
-  ledger.forEach(e => e.shop && s.add(e.shop));
-  devices.forEach(d => d.shopName && s.add(d.shopName.trim()));
-  return [...s].filter(Boolean).map(n => `<option value="${esc(n)}">`).join('');
+  // ⚠️ كانت Set على النص الخام: اسم الدفتر مش متقصوص، فـ"محل النور"
+  //    و"محل النور " كانوا بيطلعوا سطرين في القايمة. والترتيب كان
+  //    ترتيب الإدخال — يعني المحل اللي بتتعامل معاه كل يوم ممكن
+  //    يكون في آخر القايمة.
+  //
+  //    دلوقتي: دمج على مفتاح متقصوص (مسافات وحالة حروف بس — مفيش
+  //    تطبيع مرن عشان محلين بأسامي متقاربة ما يندمجوش)، والعرض
+  //    بأحدث صيغة اتكتبت، والترتيب بالأحدث استخداماً.
+  const seen = new Map();
+  const put = (raw, ts) => {
+    const n = String(raw||'').trim();
+    if(!n) return;
+    const k = n.toLowerCase().replace(/\s+/g, ' ');
+    const prev = seen.get(k);
+    if(!prev || ts > prev.ts) seen.set(k, { name: n, ts });
+  };
+  ledger.forEach(e => put(e.shop, new Date(e.date||0).getTime() || 0));
+  devices.forEach(d => put(d.shopName, new Date(d.intakeDate||0).getTime() || 0));
+  return [...seen.values()]
+    .sort((a,b) => b.ts - a.ts)
+    .map(x => `<option value="${esc(x.name)}">`).join('');
 }
 
 function shopStats(){
@@ -7143,6 +7304,31 @@ function stmtDescHtml(e){
 // عطل الجهاز في كشف الحساب.
 // القيود الجديدة بتحفظه جواها. القديمة بنجيبه من الجهاز نفسه.
 // الحركات اللي مش أجهزة (دفعة/خصم/رصيد افتتاحي) مالهاش عطل.
+// ============================================================
+// تاريخ السطر في كشف حساب المحل
+// ------------------------------------------------------------
+// ⚠️ e.date هو لحظة إنشاء القيد في الدفتر — مش تاريخ تسليم الجهاز:
+//       date: new Date().toISOString()   في addLedgerDebit
+//
+// الاتنين بيتساووا بس لو المحاسب حدد "آجل" وقت التسليم بالظبط.
+// لو حدده بعدين، أو سعّر الجهاز بعدين، أو ظبّط دفعة قديمة النهاردة —
+// القيد بياخد تاريخ النهاردة. فكشف فيه عشرين جهاز اتسلّموا الشهر
+// اللي فات كان بيطلع كلهم بتاريخ واحد: يوم ما فتحت الكشف.
+//
+// والمحل عايز يعرف "الجهاز ده رجعلي إمتى"، مش إمتى المحاسب سجّل القيد.
+//
+// القيود اللي مش مربوطة بجهاز (دفعة · رصيد افتتاحي · خصم) بتفضل
+// على تاريخ القيد — وده صح ليها: ده فعلاً يوم ما حصلت.
+// ============================================================
+function stmtDate(e){
+  if(e && e.deviceId){
+    const dev = devices.find(x => x.id === e.deviceId);
+    const dd = dev && deliveredDateOf(dev);
+    if(dd) return dd;
+  }
+  return e && e.date;
+}
+
 function stmtIssue(e){
   if(e.type !== 'debit') return '';
   if(e.issue) return e.issue;
@@ -7152,8 +7338,10 @@ function stmtIssue(e){
 }
 
 function shopStatementRows(shop){
+  // الترتيب بنفس التاريخ اللي بيتعرض — وإلا السطور تطلع مبعثرة
+  // قدام المحل. مفيش عمود رصيد جاري، فالترتيب عرض بحت.
   const entries = ledger.filter(e => (e.shop||'بدون محل') === shop)
-    .slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+    .slice().sort((a,b) => new Date(stmtDate(a)) - new Date(stmtDate(b)));
   const debit = entries.filter(e=>e.type==='debit'||e.type==='opening').reduce((t,e)=>t+(e.amount||0),0);
   const credit = entries.filter(e=>e.type==='credit'||e.type==='discount').reduce((t,e)=>t+(e.amount||0),0);
   return { entries, debit, credit, balance: debit - credit };
@@ -7182,7 +7370,7 @@ async function exportShopExcel(shop){
   // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
   const head = ws.getRow(4);
   // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
-  head.values = ['التاريخ','البيان','العطل','عليه (آجل)','له (دفعات)'];
+  head.values = ['تاريخ التسليم','البيان','العطل','عليه (آجل)','له (دفعات)'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -7194,7 +7382,7 @@ async function exportShopExcel(shop){
   // الحركات
   entries.forEach(e => {
     const r = ws.addRow([
-      new Date(e.date).toLocaleString('ar-EG'),
+      new Date(stmtDate(e)).toLocaleString('ar-EG'),
       stmtDesc(e),
       stmtIssue(e),
       isDebitLike(e) ? (e.amount||0) : null,
@@ -7236,7 +7424,7 @@ function exportShopPdf(shop){
     const issue = stmtIssue(e);
     return `
     <tr style="background:${i%2 ? 'var(--surface-2)' : 'var(--surface)'};">
-      <td>${new Date(e.date).toLocaleString('ar-EG')}</td>
+      <td>${new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="text-align:right; color:var(--ink-2);">${issue ? esc(issue) : '—'}</td>
       <td style="color:var(--warn); font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
@@ -7276,7 +7464,7 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? 'var(--danger)' : 'var(--info)'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:20%;">التاريخ</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      <tr><th style="width:20%;">تاريخ التسليم</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
       ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
@@ -7320,6 +7508,115 @@ function inRange(iso){
   if(t && d > t) return false;
   return true;
 }
+// ============================================================
+// جولات المرتجع
+// ------------------------------------------------------------
+// الجولة الحالية بتفضل في الحقول القديمة (returnPrice …)،
+// والجولات المنتهية بتتأرشف في returnRounds[].
+//
+// ليه مش كلهم في المصفوفة؟ لأن كل كود الفلوس بيقرا
+// الحقول القديمة — editReturnPrice · markReturnPaid · الدفتر ·
+// syncTrack. وكمان الأجهزة الموجودة بتبقى صح تلقائياً
+// من غير أي ترحيل على بيانات فلوس.
+// ============================================================
+const RET_FIELDS = ['returnPrice','returnComplaint','discoveredFault',
+                    'substituteTechnician','returnPoints','returnPaymentType',
+                    'returnPaymentStatus','returnBilledShop'];
+
+// فيه أي بيانات مرتجع في الحقول الحالية؟
+function curRoundHasData(d){
+  if(!d) return false;
+  if(d.assistBlamed) return true;
+  if(d.returnPriceConfirmation && d.returnPriceConfirmation.requested) return true;
+  return RET_FIELDS.some(k => { const v = d[k]; return v !== undefined && v !== null && String(v).trim() !== ''; });
+}
+
+// الجولة الحالية ككائن — نفس شكل المؤرشف
+function curRound(d){
+  const o = { at: returnAfterDeliveryDate(d) || '', doneAt: returnCompletionDate(d) || '',
+              assistBlamed: !!d.assistBlamed };
+  RET_FIELDS.forEach(k => o[k] = d[k] || '');
+  return o;
+}
+
+// كل الجولات: المؤرشف + الحالية لو فيها حاجة
+function retRounds(d){
+  const past = Array.isArray(d && d.returnRounds) ? d.returnRounds : [];
+  return curRoundHasData(d) || (d && d.status === 'returned')
+       ? past.concat([curRound(d)]) : past.slice();
+}
+
+// الجهاز ليه تاريخ مرتجع؟ (للعرض مش للتعديل)
+function hasRetData(d){
+  if(!d) return false;
+  if(d.status === 'returned') return true;
+  if(Array.isArray(d.returnRounds) && d.returnRounds.length) return true;
+  return !!returnAfterDeliveryDate(d) || curRoundHasData(d);
+}
+
+// ⚠️ تاريخ إنجاز المرتجع — أول تسليم/إنجاز **بعد** الرجوع.
+//    completionDate العادية بترجّع آخر تسليم، والجهاز اللي
+//    لسه في المرتجعات مالوش تسليم جديد — فبترجّع القديم
+//    ويطلع برّه فترة التقييم فيروح من الحساب خالص.
+function returnCompletionDate(d){
+  const h = (d && d.statusHistory) || [];
+  let deliveredAt = -1, retAt = -1;
+  for(let i = 0; i < h.length; i++){
+    if(h[i].status === 'delivered') deliveredAt = i;
+    if(h[i].status === 'returned' && deliveredAt !== -1 && i > deliveredAt) retAt = i;
+  }
+  if(retAt === -1) return null;
+  for(let i = retAt + 1; i < h.length; i++){
+    if(h[i].status === 'delivered' || h[i].status === 'done') return h[i].date;
+  }
+  return null;                      // لسه في المرتجعات — معلّق
+}
+
+// تقسيم نقاط الجهاز المرتجع على أصحابها:
+//   • نقاط الصيانة الأساسية  ←  صاحب آخر جولة (اللي سلّمه آخر مرة)
+//   • نقاط كل جولة           ←  صاحب الجولة دي هو
+// واحدة للحساب والعرض مع بعض — مستحيل يختلفوا.
+function returnPointParts(d){
+  const rounds = retRounds(d);
+  if(!rounds.length) return [];
+  const roleOf = o => (o && o !== d.technician) ? 'بديل' : 'رئيسي';
+
+  // الجولة المفتوحة = رجع ولسه ماتسلّمش تاني
+  const openIdx = returnCompletionDate(d) ? -1 : rounds.length - 1;
+  const openSub = openIdx >= 0 ? (rounds[openIdx].substituteTechnician || '') : '';
+
+  // مين كان ماسك الجهاز قبل الجولة المفتوحة؟
+  const upto = openIdx >= 0 ? openIdx : rounds.length;
+  let prevOwner = d.technician, prevIdx = -1;
+  for(let i = 0; i < upto; i++)
+    if(rounds[i].substituteTechnician){ prevOwner = rounds[i].substituteTechnician; prevIdx = i; }
+
+  const out = [];
+  const base = parseFloat(enDigits(d.points)) || 0;
+  if(base){
+    // ⚠️ الفرق اللي كل الحكاية فيه:
+    //    رجع واتحوّل لفني جديد → القديم خسرها من دلوقتي،
+    //      والجديد ما استحقهاش لحد ما يسلّم (earned=false)
+    //    رجع وماراحش لحد  → تفضل زي ما هي مع صاحبها
+    const owner  = openIdx >= 0 ? (openSub || prevOwner)
+                                : ((rounds[rounds.length - 1].substituteTechnician) || d.technician);
+    const bIdx   = openIdx >= 0 ? (openSub ? openIdx : prevIdx) : rounds.length - 1;
+    const earned = openIdx < 0 || !openSub;
+    if(owner) out.push({ owner, amt: base, blamed: !!(rounds[bIdx] && rounds[bIdx].assistBlamed),
+                         role: roleOf(owner), kind: 'base', earned });
+  }
+
+  // نقاط كل جولة لصاحبها — والجولة المفتوحة لسه ما خلصتش
+  rounds.forEach((r, i) => {
+    const p = parseFloat(enDigits(r.returnPoints)) || 0;
+    const o = r.substituteTechnician || d.technician;
+    if(!p || !o) return;
+    out.push({ owner: o, amt: p, blamed: !!r.assistBlamed, role: roleOf(o),
+               kind: 'round', round: i + 1, earned: i !== openIdx });
+  });
+  return out;
+}
+
 function deliveredDateOf(d){
   const h = (d.statusHistory||[]).filter(x => x.status === 'delivered');
   return h.length ? h[h.length-1].date : null;
@@ -7891,27 +8188,101 @@ function completionDate(d){
 
 // صفحة أجهزة الفني — تفتح بالضغط على اسم الفني في التقييم
 let _openTechDevName = null;
+
+// ترجمة محلية للشاشة دي — أسطر قليلة ما تستاهلش لمس i18n.js المشترك
+function tdT(k){
+  let en = false;
+  try{ en = (typeof I18N !== 'undefined' && I18N.getLang() === 'en'); }catch(e){}
+  const M = {
+    total:     ['إجمالي',            'Total'],
+    scored:    ['اتحسب',            'Scored'],
+    zero:      ['بصفر نقاط',       'Zero points'],
+    flagZero:  ['⚠️ خلص ومافيش نقاط', '⚠️ Finished, no points'],
+    flagWhole: ['📦 جملة — بدون نقاط', '📦 Wholesale — no points'],
+    flagRet:   ['↩️ رجع بعد التسليم',  '↩️ Returned after delivery'],
+    flagMoved: ['↪️ رجع وراح لفني تاني — النقاط اتحوّلت',
+                '↪️ Returned and reassigned — points moved'],
+    flagBlame: ['⛔ اتخصمت — له يد في الرجوع',
+                '⛔ Deducted — shared blame for the return'],
+    none:      ['مفيش أجهزة في الفترة دي', 'No devices in this period'],
+    blameQ:    ['المساعد له يد في رجوع الجهاز؟', 'Did the assistant share blame for the return?'],
+    blameNo:   ['لأ — ياخد نصيبه',        'No — keeps their share'],
+    blameYes:  ['أيوه — اخصم نصيبه',      'Yes — deduct their share'],
+    flagWait:  ['⏳ لسه في المرتجعات — النقاط تتحسب بعد التسليم',
+                '⏳ Still in returns — points count after delivery'],
+    flagRej:   ['🚫 الجهاز اترفض — النقاط اتمسحت',
+                '🚫 Device rejected — points removed'],
+    roundN:    ['الرجوع',        'Return'],
+    rComplaint:['شكوى العميل', 'Complaint'],
+    rFault:    ['العطل المكتشف', 'Fault found'],
+    rTech:     ['الفني',         'Technician'],
+    rPoints:   ['⭐ النقاط',     '⭐ Points'],
+    rPrice:    ['السعر',         'Price'],
+    rBlamed:   ['المساعد اتخصم', 'Assistant deducted'],
+  };
+  return (M[k] || ['',''])[en ? 1 : 0];
+}
+
 function openTechDevices(techName){
   const r = (teRows || []).find(x => x.t === techName);
   if(!r) return;
   _openTechDevName = techName;
   const round1 = n => Math.round(n * 10) / 10;
-  const items = r.items.slice().sort((a,b) => b.share - a.share);
+
+  // اللي عليه ملاحظة يطلع فوق — ده الهدف من الشاشة أصلاً
+  const NEEDS_EYE = { zero: 1, moved: 1, blamed: 1, waiting: 1, rejected: 1 };
+  const rank = x => NEEDS_EYE[x.flag] ? 0 : (x.flag ? 1 : 2);
+  const items = (r.allItems || []).slice()
+    .sort((a,b) => rank(a) - rank(b) || b.share - a.share);
+
+  const nZero   = items.filter(x => x.flag === 'zero').length;
+  const nScored = items.filter(x => !x.flag).length;
+
   const roleLabel = x => x.role === 'مساعد' ? `🤝 ${t('te.assistant')}` : x.role === 'بديل' ? `🔁 ${t('te.substitute')}` : `👤 ${t('te.main')}`;
-  const rows = items.length ? items.map(x => `
-    <div class="td-item" onclick="openDetail('${x.d.id}')">
+  const flagHtml = f =>
+      f === 'zero'      ? `<div class="td-flag zero">${tdT('flagZero')}</div>`
+    : f === 'wholesale' ? `<div class="td-flag info">${tdT('flagWhole')}</div>`
+    : f === 'returned'  ? `<div class="td-flag info">${tdT('flagRet')}</div>`
+    : f === 'rejected'  ? `<div class="td-flag zero">${tdT('flagRej')}</div>`
+    : f === 'waiting'   ? `<div class="td-flag info">${tdT('flagWait')}</div>`
+    : f === 'moved'     ? `<div class="td-flag zero">${tdT('flagMoved')}</div>`
+    : f === 'blamed'    ? `<div class="td-flag zero">${tdT('flagBlame')}</div>`
+    : '';
+
+  const summary = items.length ? `
+    <div class="td-sum">
+      <div class="td-sum-box"><div class="td-sum-n">${items.length}</div><div class="td-sum-l">${tdT('total')}</div></div>
+      <div class="td-sum-box"><div class="td-sum-n">${nScored}</div><div class="td-sum-l">${tdT('scored')}</div></div>
+      <div class="td-sum-box ${nZero ? 'warn' : ''}"><div class="td-sum-n">${nZero}</div><div class="td-sum-l">${tdT('zero')}</div></div>
+    </div>` : '';
+
+  const rows = items.length ? items.map(x => {
+    // المرتجع إجماليه = نقاط الصيانة + نقاط العطل الجديد.
+    // عرض d.points لوحدها كان هيقول رقم غير اللي اتحسب فعلاً.
+    const isRetItem = x.flag === 'returned' || x.flag === 'moved' || x.flag === 'blamed'
+                   || x.flag === 'waiting'  || x.flag === 'rejected';
+    const retTot = isRetItem ? returnPointParts(x.d).reduce((s, p) => s + p.amt, 0) : 0;
+    const shown = x.flag === 'wholesale' ? '—'
+                : isRetItem ? String(Math.round(retTot * 10) / 10)
+                : esc(x.d.points || '0');
+    const cls = x.flag === 'zero' ? ' is-zero' : (x.flag ? ' is-muted' : '');
+    const showShare = (!x.flag || isRetItem) && round1(x.share) !== round1(isRetItem ? retTot : (parseFloat(enDigits(x.d.points)) || 0));
+    return `
+    <div class="td-item${cls}" onclick="openDetail('${x.d.id}')">
       <div class="td-item-info">
         <div class="td-item-name">${esc(x.d.deviceType)} ${esc(x.d.model)}</div>
         <div class="td-item-sub">${x.d.customerName ? esc(x.d.customerName) + ' · ' : ''}${roleLabel(x)}${x.d.shopName ? ' · ' + esc(x.d.shopName) : ''}</div>
+        ${flagHtml(x.flag)}
       </div>
       <div class="td-item-pts">
-        <div class="td-pts-num">${esc(x.d.points || '0')}</div>
+        <div class="td-pts-num">${shown}</div>
         <div class="td-pts-lbl">${t('te.devicePoints')}</div>
-        ${round1(x.share) !== (parseFloat(enDigits(x.d.points)) || 0) ? `<div class="td-pts-share">↳ ${round1(x.share)}</div>` : ''}
+        ${showShare ? `<div class="td-pts-share">↳ ${round1(x.share)}</div>` : ''}
       </div>
-    </div>`).join('') : `<div class="empty-col">${t('te.noPoints')}</div>`;
+    </div>`; }).join('') : `<div class="empty-col">${tdT('none')}</div>`;
+
   document.getElementById('techDevTitle').innerHTML = `🔧 ${esc(r.t)} <span style="font-size:13px;font-weight:500;color:var(--muted-2);">(${items.length} ${t('te.deviceCount')} · ⭐ ${r.points})</span>`;
-  document.getElementById('techDevBody').innerHTML = rows;
+  document.getElementById('techDevBody').innerHTML = summary + rows;
   document.getElementById('techDevOverlay').classList.remove('hidden');
 }
 function closeTechDevices(){ _openTechDevName = null; document.getElementById('techDevOverlay').classList.add('hidden'); }
@@ -7956,15 +8327,61 @@ function renderTechEval(){
   let wholesaleSkipped = 0;                // أجهزة جملة اتجاهلت
 
   devices.forEach(d => {
+    // ============================================================
+    // ⚠️ الجهاز المرفوض مالوش نقاط لحد — لا محسوبة ولا معلّقة.
+    // ------------------------------------------------------------
+    // الرفض بيلغي الشغل كله مهما كان اللي حصل قبله:
+    //   اترفض من غير تسليم        → كانت بتفضل "معلّقة" للأبد
+    //   اتسلّم وبعدين اترفض       → كان بياخد نقاطه كاملة
+    //   اتسلّم → رجع → اترفض      → معلّقة باسم الفني البديل
+    // والتلاتة كانوا غلط لأن 'rejected' مكانش مذكور في الحلقة أصلاً.
+    //
+    // والسجل بيفضل زي ما هو: الجهاز يفضل مكتوب إنه اتسلّم ورجع
+    // واترفض. إحنا بنشيل النقاط بس — مش التاريخ.
+    // ============================================================
+    if(d.status === 'rejected') return;
+
     // ===== جهاز رجع بعد التسليم: الأصلي بصفر عليه، ونقاط الصيانة الجديدة للفني البديل =====
     if(returnAfterDeliveryDate(d)){
-      const rpts = parseFloat(enDigits(d.returnPoints)) || 0;
-      if(!rpts || !d.substituteTechnician) return;
+      // ============================================================
+      // الجهاز المرتجع — اللي عمل المرتجع ياخد نقاط الجهاز كلها
+      // ------------------------------------------------------------
+      // النسخة القديمة كانت بترمي d.points خالص وتدي returnPoints
+      // للبديل بس. فالفني اللي صلّح الجهاز الأول كان بيخسر نقاطه
+      // حتى لو محدش دخّل الجهاز على حد تاني أصلاً.
+      //
+      //   owner = البديل لو موجود، وإلا الفني الأصلي
+      //   وبياخد:  points + returnPoints
+      //
+      // والمساعد بياخد نصيبه من الإجمالي بنفس نسبته — إلا لو
+      // المحاسب قرر إن له يد في الرجوع (assistBlamed).
+      // ============================================================
       if(d.isWholesale){ wholesaleSkipped++; return; }
-      const cd = completionDate(d);
-      if(!cd){ pendingPts += rpts; pendingCount++; return; }
-      if(!inTeRange(cd)) return;
-      push(d.substituteTechnician, d, rpts, 'بديل');
+      const rParts = returnPointParts(d);
+      if(!rParts.length) return;
+
+      // اللي لسه ما استحقش يروح للمعلّق — مش لحد
+      const rWait = rParts.filter(p => !p.earned).reduce((s, p) => s + p.amt, 0);
+      if(rWait){ pendingPts += rWait; pendingCount++; }
+
+      const rDone = rParts.filter(p => p.earned);
+      if(!rDone.length) return;
+
+      // ⚠️ الجهاز اللي لسه في المرتجعات بيتقاس بتاريخ تسليمه
+      //    الأصلي — عشان نقاط الفني اللي ماحدش أخدها منه
+      //    تفضل في نفس الشهر اللي كانت فيه بالظبط.
+      const cd = returnCompletionDate(d) || completionDate(d);
+      if(!cd || !inTeRange(cd)) return;
+      const rPct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+      rDone.forEach(p => {
+        if(d.assistTechnician && rPct > 0 && !p.blamed){
+          const a = p.amt * (rPct / 100);
+          push(d.assistTechnician, d, a, 'مساعد');
+          push(p.owner, d, p.amt - a, p.role);
+        } else {
+          push(p.owner, d, p.amt, p.role);
+        }
+      });
       return;
     }
 
@@ -7983,6 +8400,91 @@ function renderTechEval(){
       push(d.technician, d, pts - assistShare, 'رئيسي');
     } else {
       push(d.technician, d, pts, 'رئيسي');
+    }
+  });
+
+  // ============================================================
+  // قايمة صفحة الفني — كل جهاز اشتغل عليه، بنقاط أو بصفر
+  // ------------------------------------------------------------
+  // حلقة مستقلة تماماً عن حساب النقاط فوق — وده مقصود.
+  // الأرقام في الجدول ما تتغيّرش بحرف: إحنا بنزوّد رؤية،
+  // مش بنعيد حساب. الهدف: الجهاز اللي خلص ومحدش حطّله
+  // نقاط يبان بدل ما يتشال من القايمة.
+  //
+  // flag:  ''         اتحسب عادي
+  //        'zero'     خلص ومافيش نقاط  ← دي الغلطة
+  //        'wholesale' جملة — بدون نقاط بالتصميم
+  //        'returned' الجهاز رجع بعد التسليم
+  // ============================================================
+  const contribAll = {};
+  const pushAll = (name, d, share, role, flag) => {
+    if(!name) return;
+    (contribAll[name] = contribAll[name] || []).push({ d, share, role, flag });
+  };
+
+  devices.forEach(d => {
+    // المرفوض: نقاطه اتمسحت، بس لو كان متحطله نقاط بيبان في القايمة
+    // بصفر ومعاه السبب. لو مكانش متحطله حاجة مالوش لازمة يظهر.
+    if(d.status === 'rejected'){
+      const rjPts = (parseFloat(enDigits(d.points)) || 0) + (parseFloat(enDigits(d.returnPoints)) || 0);
+      if(!rjPts) return;
+      const rjDate = completionDate(d) || lastChangeOf(d);
+      if(!rjDate || !inTeRange(rjDate)) return;
+      const rjOwner = d.substituteTechnician || d.technician;
+      if(rjOwner) pushAll(rjOwner, d, 0, 'رئيسي', 'rejected');
+      if(d.technician && d.technician !== rjOwner) pushAll(d.technician, d, 0, 'رئيسي', 'rejected');
+      if(d.assistTechnician) pushAll(d.assistTechnician, d, 0, 'مساعد', 'rejected');
+      return;
+    }
+
+    const cd = completionDate(d);
+    if(!cd || !inTeRange(cd)) return;          // نفس نطاق الفترة بالظبط
+
+    if(returnAfterDeliveryDate(d)){
+      // نفس معادلة الحساب فوق بالحرف.
+      // ⚠️ أي تعديل هنا لازم يتعمل في المكانين وإلا القايمة
+      //    هتقول حاجة والجدول يقول حاجة تانية.
+      // نفس دالة التقسيم اللي الحساب بيستخدمها — مستحيل يختلفوا
+      const rParts = d.isWholesale ? [] : returnPointParts(d);
+      const rTot = rParts.reduce((s, p) => s + p.amt, 0);
+      const rFlag = d.isWholesale ? 'wholesale' : (rTot ? 'returned' : 'zero');
+      const rPct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+      const seen = {};
+
+      if(!rParts.length){ pushAll(d.substituteTechnician || d.technician, d, 0, 'رئيسي', rFlag); }
+      rParts.forEach(p => {
+        seen[p.owner] = 1;
+        // اللي لسه ما استحقش يبان بصفر ومعاه السبب —
+        // مش يختفي والفني مستني نقاط ماشافهاش
+        if(!p.earned){ pushAll(p.owner, d, 0, p.role, 'waiting'); return; }
+        if(d.assistTechnician && rPct > 0 && !p.blamed){
+          const a = p.amt * (rPct / 100);
+          pushAll(d.assistTechnician, d, a, 'مساعد', rFlag); seen[d.assistTechnician] = 1;
+          pushAll(p.owner, d, p.amt - a, p.role, rFlag);
+        } else {
+          pushAll(p.owner, d, p.amt, p.role, rFlag);
+        }
+      });
+
+      // المساعد المخصوم — يبان بصفر ومعاه السبب بدل ما يختفي
+      if(d.assistTechnician && rPct > 0 && !seen[d.assistTechnician])
+        pushAll(d.assistTechnician, d, 0, 'مساعد', 'blamed');
+      // الفني الأصلي لو الشغل راح لغيره بالكامل
+      if(d.technician && !seen[d.technician])
+        pushAll(d.technician, d, 0, 'رئيسي', 'moved');
+      return;
+    }
+
+    const pts  = d.isWholesale ? 0 : (parseFloat(enDigits(d.points)) || 0);
+    const flag = d.isWholesale ? 'wholesale' : (pts ? '' : 'zero');
+    const pct  = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
+
+    if(d.assistTechnician && pct > 0){
+      const assistShare = pts * (pct / 100);
+      pushAll(d.assistTechnician, d, assistShare, 'مساعد', flag);
+      pushAll(d.technician,       d, pts - assistShare, 'رئيسي', flag);
+    } else {
+      pushAll(d.technician, d, pts, 'رئيسي', flag);
     }
   });
 
@@ -8010,6 +8512,7 @@ function renderTechEval(){
       t,
       points: round1(items.reduce((s, x) => s + x.share, 0)),
       items,
+      allItems: contribAll[techName] || [],
       count: mine.length,
       avg,
       returns,

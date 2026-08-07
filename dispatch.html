@@ -420,10 +420,16 @@
       <div class="fld"><label data-i18n="dp.deviceType">نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..." data-i18n-ph="dp.deviceTypePh"></div>
       <div class="fld"><label data-i18n="dp.model">الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
     </div>
-    <div class="fld"><label data-i18n="dp.customerName">اسم العميل</label><input id="f_cust" placeholder="اسم صاحب الجهاز" data-i18n-ph="dp.customerNamePh"></div>
+    <!-- ⚠️ autocomplete="off" ضروري: من غيره المتصفح بيعرض اقتراحاته
+         هو من اللي اتكتب قبل كده، ولما تدوس على واحد بيملّي الاسم
+         **والرقم** من أقدم تسجيل مش أحدث واحد. -->
+    <div class="fld"><label data-i18n="dp.customerName">اسم العميل</label><input id="f_cust" list="dpCustList" autocomplete="off" oninput="onDpCustInput()" placeholder="اسم صاحب الجهاز" data-i18n-ph="dp.customerNamePh"></div>
+    <datalist id="dpCustList"></datalist>
     <div class="frow">
-      <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" inputmode="numeric" placeholder="010..." style="direction:ltr;text-align:right;"></div>
-      <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
+      <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" list="dpPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill='';" placeholder="010..." style="direction:ltr;text-align:right;"></div>
+      <datalist id="dpPhoneList"></datalist>
+      <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
+      <datalist id="dpShopList"></datalist>
     </div>
     <div class="fld"><label data-i18n="rp.tech">الفني</label>
       <select id="f_tech" class="tech-select"></select>
@@ -734,6 +740,26 @@ function saveCache(rows){
   }
 }
 
+// ⚠️ PostgREST بيقص الرد عند حد الصفوف بتاع المشروع (١٠٠٠ افتراضياً)
+//    حتى من غير .limit(). فشيل السقف لوحده مش كفاية — لازم نجيب
+//    على صفحات لحد ما الصفوف تخلص.
+//
+//    بنستخدم range مش keyset: أعمدة الترتيب (intake_date /
+//    delivered_at) مش في الـ select، والأحجام هنا بالآلاف مش
+//    بالعشرات آلاف — فالـ OFFSET رخيص عليها.
+async function fetchPaged(makeQuery){
+  const PAGE = 1000, MAX_PAGES = 40;     // حارس: ٤٠ ألف صف
+  const rows = [];
+  for(let p = 0; p < MAX_PAGES; p++){
+    const { data, error } = await makeQuery().range(p * PAGE, p * PAGE + PAGE - 1);
+    if(error) throw error;
+    if(!data || !data.length) break;
+    rows.push(...data);
+    if(data.length < PAGE) break;        // آخر صفحة
+  }
+  return rows;
+}
+
 async function loadDevices(){
   try{
     // ⚠️ الفلترة على السيرفر مش في المتصفح.
@@ -742,28 +768,34 @@ async function loadDevices(){
     // طلبين منفصلين عن قصد:
     //   أجهزة المحل  → كلها (دي شغل اليوم)
     //   المسلَّمة     → آخر ٢٠٠ بس (أرشيف، مش محتاجينه كله)
-    const inShop = await sb.from('devices_dispatch')
+    // ⚠️ الحد بقى **بالمدة والحالة بس** — مفيش سقف عدد.
+    //    كان .limit(600) و .limit(400)، والسقف ده كان بيقص من جوه
+    //    المدة نفسها: لو بتسلّم ٥٠ جهاز في اليوم، الـ٤٠٠ بتغطي ٨
+    //    أيام مش ٣٠ — والباقي بيختفي من غير أي تحذير، فالبحث
+    //    ومسح الباركود بيقولوا "مش موجود" والجهاز موجود فعلاً.
+    const inShopRows = await fetchPaged(() => sb.from('devices_dispatch')
       .select('id,data')
       .in('status', IN_SHOP)
-      .order('intake_date', { ascending:false })
-      .limit(600);
-    if(inShop.error) throw inShop.error;
+      .order('intake_date', { ascending:false }));
 
-    // المسلَّمة: آخر ٣٠ يوم بس، بالفلترة على السيرفر.
+    // المسلَّمة: آخر ٣٠ يوم كاملة.
     // delivered_at عمود محسوب في الـ view من statusHistory.
     // الحد بيتحسب مع كل تحميل، فالنافذة بتتحرك يوم بيوم لوحدها.
     const cutoff = new Date(Date.now() - DELIVERED_DAYS * 86400000).toISOString();
-    const out = await sb.from('devices_dispatch')
+    const outRows = await fetchPaged(() => sb.from('devices_dispatch')
       .select('id,data')
       .eq('status', 'delivered')
       .gte('delivered_at', cutoff)
-      .order('delivered_at', { ascending:false })
-      .limit(400);
-    if(out.error) throw out.error;
+      .order('delivered_at', { ascending:false }));
 
-    const rows = [...(inShop.data || []), ...(out.data || [])]
-      .map(r => r.data).filter(Boolean);
+    // دمج مع منع التكرار — ترقيم الصفحات ممكن يكرّر صف لو جهاز
+    // اتغيّرت حالته بين صفحة وصفحة
+    const byId = new Map();
+    for(const r of [...inShopRows, ...outRows])
+      if(r && r.data && !byId.has(r.id)) byId.set(r.id, r.data);
+    const rows = [...byId.values()];
     devices = rows.map(adapt); reindexSearch();
+    lastLoadAt = Date.now();
     offline = false;
     document.querySelectorAll('.offbar').forEach(e => e.remove());
     document.querySelectorAll('.errbar').forEach(e => e.remove());
@@ -1078,7 +1110,91 @@ function render(){
 }
 
 /* ===== إدخال جهاز ===== */
-function openIntake(){ $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); setTimeout(()=>$('f_type').focus(),300); }
+// ============================================================
+// اقتراح اسم العميل + ملء رقمه، واقتراح اسم المحل
+// ------------------------------------------------------------
+// ⚠️ محدودية لازم تكون معروفة: الديسباتشر بيحمّل اللي في المحل +
+//    المسلَّم آخر ٣٠ يوم بس (شوف loadDevices فوق). فعميل آخر زيارة
+//    ليه من شهرين مش هيطلع هنا — عكس الداشبورد اللي شايف الكل.
+//    ده مقصود عشان النقل (Egress)، مش سهو.
+//
+// ⚠️ والمطابقة **محافظة** عن قصد: مسافات وحالة حروف بس. مفيش
+//    تطبيع مرن زي البحث — لأن البحث بتراجع نتيجته بعينك، لكن رقم
+//    اتحط تلقائي مبيتراجعش. دمج غلط هنا معناه رقم عميل تاني خالص.
+const dpKey = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+
+let dpCustNames = [];      // [{ name, ts, seq }]
+let dpPhoneMap  = {};      // key -> [{ phone, ts, seq }]
+let dpShops     = [];      // [{ name, ts }]
+
+function buildDpSuggest(){
+  dpCustNames = []; dpPhoneMap = {}; dpShops = [];
+  const nameSeen = new Map(), shopSeen = new Map();
+  for(const d of devices){
+    const ts  = new Date(d.intakeDate||0).getTime() || 0;
+    // المعرّف 'dev_' + الوقت بالملي — فاصل التعادل لما التاريخ يتساوى
+    // (خانة وقت الدخول دقتها دقيقة، فجهازين في نفس الدقيقة واردين)
+    const seq = Number(String(d.id||'').replace(/^dev_/,'')) || 0;
+
+    const name = (d.customerName||'').trim();
+    const phone = (d.customerPhone||'').trim();
+    if(name){
+      const k = dpKey(name);
+      if(k){
+        const prev = nameSeen.get(k);
+        if(!prev || ts > prev.ts || (ts === prev.ts && seq > prev.seq)) nameSeen.set(k, { name, ts, seq });
+        if(phone) (dpPhoneMap[k] = dpPhoneMap[k] || []).push({ phone, ts, seq });
+      }
+    }
+
+    const shop = (d.shopName||'').trim();
+    if(shop){
+      const sk = dpKey(shop);
+      const prev = shopSeen.get(sk);
+      if(!prev || ts > prev.ts) shopSeen.set(sk, { name: shop, ts });
+    }
+  }
+  dpCustNames = [...nameSeen.values()].sort((a,b)=>(b.ts-a.ts)||(b.seq-a.seq));
+  dpShops     = [...shopSeen.values()].sort((a,b)=>b.ts-a.ts);
+  const sl = $('dpShopList');
+  if(sl) sl.innerHTML = dpShops.map(x=>`<option value="${esc(x.name)}">`).join('');
+}
+
+function onDpCustInput(){
+  const el = $('f_cust'), nameDl = $('dpCustList'), phDl = $('dpPhoneList'), ph = $('f_phone');
+  if(!el) return;
+  const key = dpKey(el.value||'');
+
+  // اقتراح الأسامي: **بادئة** بس ومقصوص على ١٥ — قايمة أطول مبتتقريش
+  // على الموبايل وبتثقّل الكتابة
+  if(nameDl) nameDl.innerHTML = key.length < 2 ? '' :
+    dpCustNames.filter(x => dpKey(x.name).indexOf(key) === 0).slice(0,15)
+               .map(x=>`<option value="${esc(x.name)}">`).join('');
+
+  const list = key && dpPhoneMap[key];
+  if(!list){ if(phDl) phDl.innerHTML=''; return; }
+
+  const seen = new Set(), phones = [];
+  list.slice().sort((a,b)=>(b.ts-a.ts)||(b.seq-a.seq))
+      .forEach(x=>{ if(!seen.has(x.phone)){ seen.add(x.phone); phones.push(x.phone); } });
+  if(phDl) phDl.innerHTML = phones.map(p=>`<option value="${esc(p)}">`).join('');
+
+  // بنملا لو الخانة فاضية، أو لو اللي فيها إحنا اللي حطيناه.
+  // ⚠️ من غير الشرط التاني: عميل اسمه "بل" وانت بتكتب "بلال" — رقمه
+  //    بيتحط عند حرف "ل" وبيفضل محطوط لما تكمّل الاسم.
+  //    واللي المستخدم كتبه بإيده مابنلمسوش.
+  if(ph && phones.length && (!ph.value.trim() || ph.dataset.autoFill === '1')){
+    ph.value = phones[0];              // أحدث رقم
+    ph.dataset.autoFill = '1';
+  }
+}
+
+function openIntake(){
+  buildDpSuggest();
+  const ph = $('f_phone'); if(ph && ph.dataset) ph.dataset.autoFill = '';
+  $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
+  setTimeout(()=>$('f_type').focus(),300);
+}
 function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
 
 // ===== شيت الأكشن العام (تفاصيل / تسليم / رفض) — بيعيد استخدام ستايل الـ sheet =====
@@ -1237,7 +1353,10 @@ async function saveIntake(){
 
   if(error){ toast('فشل التسجيل: ' + esc(error.message || error)); return; }
 
-  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue'].forEach(id=>$(id).value='');
+  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue'].forEach(id=>{
+    const e = $(id); if(!e) return; e.value=''; if(e.dataset) e.dataset.autoFill='';
+  });
+  ['dpCustList','dpPhoneList'].forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; });
   if($('f_tech')) $('f_tech').value = '';
   closeIntake();
   await loadDevices();
@@ -1276,7 +1395,20 @@ async function refresh(){
   await loadDevices();
   render();
 }
-document.addEventListener('visibilitychange', () => { if(!document.hidden) refresh(); });
+// ⚠️ كبح ضروري بعد ما شيلنا سقف العدد.
+//    الديسباتشر شغال على موبايل: بيقفل الشاشة، بيرد على واتساب،
+//    بيفتح الكاميرا، بيرجع — مية لتلتمية مرة في اليوم. وكل رجوع
+//    كان بيعمل تحميل كامل. بألف جهاز الرد ~٧٠٠ كيلو، وبتلاتة
+//    آلاف ~٢ ميجا. يعني ٤٠٠ ميجا في اليوم من ديسباتشر واحد.
+//    دقيقة ونص كفاية جداً: الجهاز الجديد بيتسجّل عنده هو، والباقي
+//    تغييرات مش لحظية.
+const REFRESH_MIN_MS = 90000;
+let lastLoadAt = 0;
+function refreshIfStale(){
+  if(Date.now() - lastLoadAt < REFRESH_MIN_MS) return;
+  refresh();
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) refreshIfStale(); });
 
 addEventListener('online', refresh);
 addEventListener('offline', () => { offline = true; showOffline(); });
