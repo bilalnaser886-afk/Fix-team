@@ -100,6 +100,7 @@
 <script src="ai-invoice.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
+<script src="wholesale.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1184,7 +1185,8 @@
            الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
       <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
       <datalist id="custNameList"></datalist>
-      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" /></label>
+      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" oninput="autoWholesaleCheck()" /></label>
+      <div id="wsAutoHint" style="display:none;background:var(--violet-bg,#F5F3FF);color:var(--violet);border:1px solid var(--violet);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:800;margin-bottom:10px;">🏷️ عميل جملة معروف — اتظبط تلقائي (تقدر تغيّره تحت)</div>
       <datalist id="shopNameList"></datalist>
       <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
@@ -4294,11 +4296,26 @@ function buildCustPhoneMap(){
   }
   custNames = [...nameSeen.values()].sort((a,b) => (b.ts - a.ts) || (b.seq - a.seq));
 }
+// وانت بتكتب الاسم أو المحل: لو طابق قايمة الجملة، الزرار بيتظبط
+// لوحده. تقدر ترجّعه قطاعي بضغطة — القرار في إيدك، ده تسهيل بس.
+function autoWholesaleCheck(){
+  try{
+    const W = window.IFixWholesale; if(!W) return;
+    const nm = (document.getElementById('f_customerName')||{}).value || '';
+    const sh = (document.getElementById('f_shopName')||{}).value || '';
+    const hit = W.match(nm, sh);
+    const bar = document.getElementById('wsAutoHint');
+    if(hit && !addIsWholesale) setAddWholesale(true);
+    if(bar) bar.style.display = hit ? 'block' : 'none';
+  }catch(e){}
+}
+
 function onCustomerNameInput(){
   const el = document.getElementById('f_customerName');
   const dl = document.getElementById('phoneHistory');
   const phoneInput = document.getElementById('f_customerPhone');
   if(!el || !dl || !phoneInput) return;
+  autoWholesaleCheck();
   const key = custKey(el.value||'');
 
   // اقتراح الأسامي — **بادئة** بس، مش تطابق مرن.
@@ -4757,7 +4774,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
 
     // نقاط الفني تتحسب تلقائياً عند التسليم لو لسه فاضية — من غير ما نلمس قيمة اتحطّت بإيد.
     // (مطابقة واضحة ← أول اقتراح للغامض ← افتراضي) — وتقدر تصحّحها من صفحة المراجعة.
-    if(!d.isWholesale && (!d.points || d.points === '0')){
+    if(!isWS(d) && (!d.points || d.points === '0')){
       extra.points = String(computeAutoPointsValue(d));
     }
   }
@@ -7576,6 +7593,27 @@ function returnCompletionDate(d){
 //   • نقاط الصيانة الأساسية  ←  صاحب آخر جولة (اللي سلّمه آخر مرة)
 //   • نقاط كل جولة           ←  صاحب الجولة دي هو
 // واحدة للحساب والعرض مع بعض — مستحيل يختلفوا.
+// ============================================================
+// جهاز جملة؟
+// ------------------------------------------------------------
+// العلم اليدوي (isWholesale) له الأولوية، وبعدين قايمة أسامي
+// عملاء الجملة في wholesale.js.
+//
+// ⚠️ ليه بنحسبها هنا بدل ما نكتبها على الجهاز؟
+//    عشان device_intake بتكتب isWholesale=false ثابتة — الديسباتشر
+//    مش قادر يحدد جملة أصلاً. ولو اعتمدنا على العلم بس، كل جهاز
+//    سجّله الديسباتشر هياخد نقاط غلط.
+//    والحساب هنا بيغطي كمان الأجهزة القديمة المسجّلة قبل القايمة،
+//    من غير ما نلمس أي بيانات محفوظة.
+function isWS(d){
+  if(!d) return false;
+  if(d.isWholesale) return true;
+  try{
+    const W = (typeof window !== 'undefined') && window.IFixWholesale;
+    return !!(W && W.match(d.customerName || '', d.shopName || ''));
+  }catch(e){ return false; }
+}
+
 function returnPointParts(d){
   const rounds = retRounds(d);
   if(!rounds.length) return [];
@@ -8292,7 +8330,7 @@ function closeTechDevices(){ _openTechDevName = null; document.getElementById('t
 // وبيحفظ المتغيّر بس في رفعة واحدة، وميلمسش أي قيمة اتحطّت بإيد.
 async function recalcOldDeliveredPoints(){
   if(!canSeeMoney()){ showError(t('appr.noPermission')); return; }
-  const cands = devices.filter(d => d.status === 'delivered' && !d.isWholesale && (!d.points || d.points === '0'));
+  const cands = devices.filter(d => d.status === 'delivered' && !isWS(d) && (!d.points || d.points === '0'));
   if(!cands.length){ alert('مفيش أجهزة مسلّمة نقطها صفر — كله متحسب ✅'); return; }
   if(!confirm('هيتحسب نقط تلقائي لـ ' + cands.length + ' جهاز مسلّم نقطهم صفر.\nالأجهزة اللي ليها نقط بالفعل مش هتتلمس.\nتمام؟')) return;
   const now = new Date().toISOString();
@@ -8356,7 +8394,7 @@ function renderTechEval(){
       // والمساعد بياخد نصيبه من الإجمالي بنفس نسبته — إلا لو
       // المحاسب قرر إن له يد في الرجوع (assistBlamed).
       // ============================================================
-      if(d.isWholesale){ wholesaleSkipped++; return; }
+      if(isWS(d)){ wholesaleSkipped++; return; }
       const rParts = returnPointParts(d);
       if(!rParts.length) return;
 
@@ -8387,7 +8425,7 @@ function renderTechEval(){
 
     const pts = parseFloat(enDigits(d.points)) || 0;
     if(!pts || !d.technician) return;
-    if(d.isWholesale){ wholesaleSkipped++; return; }
+    if(isWS(d)){ wholesaleSkipped++; return; }
 
     const cd = completionDate(d);
     if(!cd){ pendingPts += pts; pendingCount++; return; }
@@ -8445,7 +8483,7 @@ function renderTechEval(){
       // ⚠️ أي تعديل هنا لازم يتعمل في المكانين وإلا القايمة
       //    هتقول حاجة والجدول يقول حاجة تانية.
       // نفس دالة التقسيم اللي الحساب بيستخدمها — مستحيل يختلفوا
-      const rParts = d.isWholesale ? [] : returnPointParts(d);
+      const rParts = isWS(d) ? [] : returnPointParts(d);
       const rTot = rParts.reduce((s, p) => s + p.amt, 0);
       const rFlag = d.isWholesale ? 'wholesale' : (rTot ? 'returned' : 'zero');
       const rPct = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
@@ -8475,8 +8513,8 @@ function renderTechEval(){
       return;
     }
 
-    const pts  = d.isWholesale ? 0 : (parseFloat(enDigits(d.points)) || 0);
-    const flag = d.isWholesale ? 'wholesale' : (pts ? '' : 'zero');
+    const pts  = isWS(d) ? 0 : (parseFloat(enDigits(d.points)) || 0);
+    const flag = isWS(d) ? 'wholesale' : (pts ? '' : 'zero');
     const pct  = Math.min(100, Math.max(0, parseFloat(enDigits(d.assistPercent)) || 0));
 
     if(d.assistTechnician && pct > 0){
