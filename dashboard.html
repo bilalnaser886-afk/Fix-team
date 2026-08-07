@@ -1959,6 +1959,9 @@ function startRealtimeSync(){
         devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
         lastSynced[row.id] = j;
         writeCache(); render();
+        // الفني علّم "تم الصيانة" من صفحته → الترتيب اتغيّر → ننشره.
+        // مؤجّل ٣ ثواني: التغييرات بتيجي ورا بعض، فمانكتبش مع كل واحد.
+        publishTechBoardSoon();
       })
       .subscribe();
 
@@ -2426,6 +2429,9 @@ async function loadDevices(opts){
   render();
   // لو البوابة مفتوحة وكانت بتوري "جاري التحميل"، تتحدّث دلوقتي
   try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
+  // ننشر ترتيب الفنيين لصفحاتهم — بيتكتب لما يتغيّر بس
+  try{ publishTechBoard(); }catch(e){}
+  
 }
 
 async function persist(){
@@ -7575,7 +7581,15 @@ function hasRetData(d){
 //    completionDate العادية بترجّع آخر تسليم، والجهاز اللي
 //    لسه في المرتجعات مالوش تسليم جديد — فبترجّع القديم
 //    ويطلع برّه فترة التقييم فيروح من الحساب خالص.
+// الحالات اللي معناها "الشغل خلص" — النقاط بتتحسب عندها بس
+const PT_DONE = { done: 1, delivered: 1 };
+
 function returnCompletionDate(d){
+  // ⚠️ الحالة **الحالية** هي اللي بتحكم، مش التاريخ.
+  //    الجهاز اللي رجع لجاري الصيانة تاني بعد "تم الصيانة" لسه
+  //    ما خلصش — والتاريخ فيه إدخال 'done' قديم بيخدع أي حساب
+  //    معتمد على التاريخ لوحده.
+  if(!d || !PT_DONE[d.status]) return null;
   const h = (d && d.statusHistory) || [];
   let deliveredAt = -1, retAt = -1;
   for(let i = 0; i < h.length; i++){
@@ -8342,6 +8356,78 @@ async function recalcOldDeliveredPoints(){
   alert('تم ✅ — اتحسبت نقط لـ ' + cands.length + ' جهاز. راجعها من صفحة الفني لو حابب.');
 }
 
+// ============================================================
+// نشر ترتيب الفنيين لصفحة الفني
+// ------------------------------------------------------------
+// ⚠️ ليه بننشره بدل ما الفني يحسبه؟
+//    devices_safe بتفلتر بـ is_my_device — الفني بيشوف أجهزته هو
+//    بس. فمستحيل يحسب ترتيب كل الفنيين من عنده.
+//
+//    والبديل التاني (دالة SQL بتحسب الترتيب) كان معناه إننا نكتب
+//    منطق النقاط مرة تانية بـ PL/pgSQL: المرتجعات والجولات والجملة
+//    وخصم المساعد والمرفوض. منطقين لنفس الحساب = هيختلفوا يوم ما
+//    نعدّل واحد وننسى التاني.
+//
+//    فبننشر النتيجة الجاهزة: الحساب فضل في مكان واحد، والفني بيقرا
+//    صف واحد صغير.
+const TECH_BOARD_KEY = 'tech-board';
+
+// بنبني الصفوف للفترة المطلوبة من غير ما نلمس الشاشة:
+// بنغيّر tePeriod مؤقتاً، ننادي renderTechEval (اللي بتملا teRows)،
+// وبعدين نرجّع الفترة زي ما كانت ونعيد الرسم.
+function techBoardFor(mode){
+  const save = { mode: tePeriod.mode, from: tePeriod.from, to: tePeriod.to };
+  let rows = [];
+  try{
+    tePeriod.mode = mode; tePeriod.from = ''; tePeriod.to = '';
+    renderTechEval();
+    rows = (teRows || []).map(r => ({
+      t: r.t, points: r.points, count: r.count,
+      avg: r.avg, ret: r.returns, rate: r.rate
+    }));
+  }catch(e){ rows = []; }
+  tePeriod.mode = save.mode; tePeriod.from = save.from; tePeriod.to = save.to;
+  return rows;
+}
+
+// النشر بيتأجّل شوية عشان لو ٥ أجهزة اتغيّروا ورا بعض ننشر مرة واحدة
+let _boardTimer = null;
+function publishTechBoardSoon(){
+  if(_boardTimer) clearTimeout(_boardTimer);
+  _boardTimer = setTimeout(() => { _boardTimer = null; publishTechBoard(); }, 3000);
+}
+
+// كل ٥ دقايق بنجدّد الوقت حتى لو الأرقام ما اتغيّرتش
+const BOARD_HEARTBEAT_MS = 5 * 60 * 1000;
+
+async function publishTechBoard(){
+  try{
+    if(!Array.isArray(devices) || !devices.length) return;
+    const rows = { today: techBoardFor('today'), d30: techBoardFor('month') };
+
+    // ⚠️ المقارنة على **الأرقام بس** — من غير الوقت.
+    //    كانت: JSON.stringify({at: new Date(), ...}) والوقت جوه
+    //    المقارنة، فمستحيل تتساوى — وكنا بنكتب مع كل تغيير في أي
+    //    جهاز. التعليق كان بيقول "مانكتبش لو ما اتغيّرش" والكود
+    //    بيعمل العكس بالظبط.
+    const sig = JSON.stringify(rows);
+    const now = Date.now();
+
+    // ⚠️ والوجه التاني: الوقت ده هو إشارة "فيه محاسب فاتح النظام".
+    //    لو قارنّا الأرقام بس ووقفنا، الوقت هيتجمّد في فترات الهدوء
+    //    والفني هيشوف "التحديثات موقوفة" والمحاسب قاعد قدام الشاشة.
+    //    فبنجدّده كل ٥ دقايق حتى من غير تغيير — كتابة صغيرة جداً.
+    if(sig === _lastBoardSig && (now - _lastBoardAt) < BOARD_HEARTBEAT_MS) return;
+    _lastBoardSig = sig; _lastBoardAt = now;
+
+    const body = JSON.stringify({ at: new Date(now).toISOString(), today: rows.today, d30: rows.d30 });
+    await sb.from('app_data').upsert({
+      key: TECH_BOARD_KEY, value: body, updated_at: new Date().toISOString()
+    });
+  }catch(e){ /* النشر مايوقفش أي حاجة */ }
+}
+let _lastBoardSig = '', _lastBoardAt = 0;
+
 function renderTechEval(){
   const chip = (mode, label) =>
     `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
@@ -8378,6 +8464,22 @@ function renderTechEval(){
     // واترفض. إحنا بنشيل النقاط بس — مش التاريخ.
     // ============================================================
     if(d.status === 'rejected') return;
+
+    // ============================================================
+    // ⚠️ النقاط بتتحسب بالحالة **الحالية** مش بتاريخ الحالات.
+    // ------------------------------------------------------------
+    //   تم الصيانة / تم التسليم  →  تتحسب
+    //   قيد الانتظار / جاري الكشف / جاري الصيانة  →  تتشال
+    //   تم الرفض (في المحل أو لأ)  →  تتشال (فوق)
+    //   المرتجعات  →  الفرع اللي تحت بيتصرف فيها
+    //
+    // من غير البوابة دي: جهاز راح "تم الصيانة" وبعدين رجع "جاري
+    // الصيانة" كان بيفضل بنقاطه، لأن completionDate بتقرا آخر إدخال
+    // 'done' في التاريخ — والإدخال ده مبيتشالش لما الحالة ترجع.
+    //
+    // والجهاز بيفضل مسجّل عند المحاسب عادي — إحنا بنشيل النقاط بس.
+    // ============================================================
+    const PT_STATUS = d && d.status;
 
     // ===== جهاز رجع بعد التسليم: الأصلي بصفر عليه، ونقاط الصيانة الجديدة للفني البديل =====
     if(returnAfterDeliveryDate(d)){
@@ -8422,6 +8524,9 @@ function renderTechEval(){
       });
       return;
     }
+
+    // الفرع العادي (مش مرتجع): لازم الحالة تكون خلصت دلوقتي
+    if(!PT_DONE[PT_STATUS]) return;
 
     const pts = parseFloat(enDigits(d.points)) || 0;
     if(!pts || !d.technician) return;
@@ -8477,6 +8582,9 @@ function renderTechEval(){
 
     const cd = completionDate(d);
     if(!cd || !inTeRange(cd)) return;          // نفس نطاق الفترة بالظبط
+
+    // نفس بوابة الحساب بالحرف — وإلا القايمة تقول حاجة والجدول تاني
+    if(!returnAfterDeliveryDate(d) && !PT_DONE[d.status]) return;
 
     if(returnAfterDeliveryDate(d)){
       // نفس معادلة الحساب فوق بالحرف.
@@ -8565,14 +8673,19 @@ function renderTechEval(){
   // الكروت التلاتة اتشالت — أرقامها موجودة في الجدول نفسه،
   // والجدول بقى أول حاجة في الشاشة.
 
-  // تنبيهات توضح ليه ممكن رقم يبان ناقص
+  // ⚠️ السطرين اللي كانوا هنا اتشالوا:
+  //      "⏳ فيه N جهاز عليهم P نقطة لسه الشغل فيهم ما خلصش"
+  //      "📦 اتجاهل N جهاز مسجل جملة"
+  //
+  //    سطر الجملة كان تكرار: أجهزة الجملة بتظهر جوه قايمة كل فني
+  //    بعلامة "📦 جملة — بدون نقاط"، فالعدّ فوق مكانش بيضيف حاجة.
+  //
+  //    ⚠️ لكن سطر المعلّق كان بيقول حاجة **مش موجودة في أي مكان
+  //    تاني**: الجهاز اللي لسه ما خلصش مبيظهرش في قايمة الفني أصلاً
+  //    (القايمة بتفلتر على تاريخ الإنجاز). يعني النقاط المعلّقة بقت
+  //    غير مرئية خالص. لو احتجناها تاني، الأنضف إنها تظهر جوه
+  //    القايمة بعلامة زي الباقي بدل سطر عدّاد فوق.
   let notes = '';
-  if(pendingCount > 0){
-    notes += `<div class="te-note">⏳ ${t('te.pendingNote',{n:pendingCount,p:round1(pendingPts)})}</div>`;
-  }
-  if(wholesaleSkipped > 0){
-    notes += `<div class="te-note">📦 ${t('te.wholesaleNote',{n:wholesaleSkipped})}</div>`;
-  }
 
   const avgFmt = v => v === null ? '—' : (v < 1 ? t('te.lessThanDay') : v.toFixed(1) + ' ' + t('te.day'));
 
@@ -8614,7 +8727,9 @@ function renderTechEval(){
       </table>`;
 
   const recalcBtn = canSeeMoney()
-    ? `<button onclick="recalcOldDeliveredPoints()" style="margin:8px 0 2px;background:var(--surface-3);border:1px solid var(--border);color:var(--ink);border-radius:9px;padding:9px 14px;font:700 12.5px/1.3 inherit;cursor:pointer;">🔄 احسب نقط المسلّم القديم (اللي نقطه صفر)</button>`
+    ? ``   /* زرار "احسب نقط المسلّم القديم" اتشال — بيتضغط مرة واحدة
+              وخلاص. الدالة recalcOldDeliveredPoints لسه موجودة تحت لو
+              احتجتها من الكونسول يوم ما تستورد بيانات قديمة. */
     : '';
   document.getElementById('techEvalBody').innerHTML = `
     ${filterBar}
