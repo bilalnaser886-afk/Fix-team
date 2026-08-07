@@ -1379,16 +1379,33 @@ function renderTechBoard(){
   // الألقاب من فوق (١·٢·٣) ومن تحت (الأخير · قبل الأخير).
   // بنطبّق ألقاب التحت لما الترتيب أكبر من ٣ بس — عشان مع فريق
   // صغير مايحصلش تضارب (تالت = قبل الأخير في نفس الوقت).
+  // ⚠️ الشارة لازم تتغيّر مع الثيم — لون واحد للاتنين مستحيل ينفع.
+  //    أول محاولة كانت ألوان غامقة (#475569 للفضي) — مقروءة على
+  //    الأبيض وبتختفي تماماً على الأزرق الداكن.
+  //    فالغامق بياخد درجات فاتحة، والفاتح بياخد درجات غامقة.
+  const tbDark = () => {
+    try{ return document.documentElement.getAttribute('data-theme') === 'dark'; }
+    catch(e){ return false; }
+  };
+
   function tbRankLabel(i, total){
     const r = i + 1;
-    if(r === 1) return { txt: tbT('r1'), col: '#B45309', bg: 'rgba(217,119,6,.16)',  bd: 'rgba(217,119,6,.42)' };   // ذهبي
-    if(r === 2) return { txt: tbT('r2'), col: '#475569', bg: 'rgba(100,116,139,.18)', bd: 'rgba(100,116,139,.42)' }; // فضي
-    if(r === 3) return { txt: tbT('r3'), col: '#92400E', bg: 'rgba(180,83,9,.16)',   bd: 'rgba(180,83,9,.42)' };    // برونزي
-    if(r > 3 && r === total)     return { txt: tbT('rLast'),  col: '#DC2626', bg: 'rgba(220,38,38,.14)', bd: 'rgba(220,38,38,.42)' };
-    if(r > 3 && r === total - 1) return { txt: tbT('rLast2'), col: '#EA580C', bg: 'rgba(234,88,12,.14)', bd: 'rgba(234,88,12,.42)' };
-    // ⚠️ الترتيب في النص لازم يبقى ملوّن برضه — كان بيطلع رمادي بلا
-    //    خلفية فيبان كإنه نص مهمل، والباقي شارات ملوّنة.
-    return { txt: tbT('rN').replace('{n}', r), col: TB_BLUE, bg: 'rgba(37,99,235,.13)', bd: 'rgba(37,99,235,.40)' };
+    const D = tbDark();
+    // [نص فاتح للغامق, نص غامق للفاتح, درجة الخلفية والحدود]
+    const mk = (txt, dk, lt, rgb) => ({
+      txt,
+      col: D ? dk : lt,
+      bg:  `rgba(${rgb},${D ? '.20' : '.16'})`,
+      bd:  `rgba(${rgb},${D ? '.60' : '.42'})`
+    });
+    if(r === 1) return mk(tbT('r1'), '#FBBF24', '#8A4A05', '217,119,6');      // ذهبي
+    if(r === 2) return mk(tbT('r2'), '#CBD5E1', '#475569', '148,163,184');    // فضي
+    if(r === 3) return mk(tbT('r3'), '#FDBA74', '#92400E', '234,138,60');     // برونزي
+    if(r > 3 && r === total)     return mk(tbT('rLast'),  '#FCA5A5', '#A81B1B', '220,38,38');
+    if(r > 3 && r === total - 1) return mk(tbT('rLast2'), '#FDBA74', '#9A3A08', '234,88,12');
+    // الترتيب في النص لازم يبقى ملوّن برضه — كان بيطلع رمادي بلا
+    // خلفية فيبان كإنه نص مهمل، والباقي شارات ملوّنة.
+    return mk(tbT('rN').replace('{n}', r), '#93C5FD', '#1D4ED8', '37,99,235');
   }
   const badge = (i, total) => {
     const b = tbRankLabel(i, total);
@@ -1429,10 +1446,10 @@ function renderTechBoard(){
         <th style="padding:7px 6px;">${tbT('returns')}</th>
       </tr>
       ${rows.map((r,i) => `
-      <tr style="border-top:1px solid var(--line);${r.t === ME ? 'background:rgba(37,99,235,.10);' : ''}">
+      <tr style="border-top:1px solid var(--line);${r.t === ME ? (tbDark()?'background:rgba(59,130,246,.16);':'background:rgba(37,99,235,.10);') : ''}">
         <td style="padding:9px 6px;color:var(--muted);">${i+1}</td>
         <td style="padding:9px 6px;font-weight:800;">${esc(r.t)}${r.t === ME ? badge(i, rows.length) : ''}</td>
-        <td style="padding:9px 6px;text-align:center;font-weight:900;color:${TB_BLUE};">${r.points}</td>
+        <td style="padding:9px 6px;text-align:center;font-weight:900;color:${tbDark()?'#93C5FD':TB_BLUE};">${r.points}</td>
         <td style="padding:9px 6px;text-align:center;">${r.count}</td>
         <td style="padding:9px 6px;text-align:center;color:var(--muted);">${fmtAvg(r.avg)}</td>
         <td style="padding:9px 6px;text-align:center;">${r.ret} <span style="color:var(--muted);font-size:11px;">(${r.rate}%)</span></td>
