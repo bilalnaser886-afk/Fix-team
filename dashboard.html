@@ -1184,7 +1184,8 @@
            الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
       <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
       <datalist id="custNameList"></datalist>
-      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" /></label>
+      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" /></label>
+      <datalist id="shopNameList"></datalist>
       <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
       <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
@@ -3127,6 +3128,8 @@ function openAddModal(){
   if(_sec && _back && _sec.parentElement !== _back) _back.appendChild(_sec);   // نضمن رجوعه لمكانه
   resetLock();
   buildCustPhoneMap();
+  const _shopDl = document.getElementById('shopNameList');
+  if(_shopDl) _shopDl.innerHTML = shopNamesForDatalist();
   setAddPayType('cash');
   setAddWholesale(false);
   togglePayTypeVisibility();
@@ -3600,7 +3603,8 @@ function renderDetail(){
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
+      <datalist id="shopNameListDetail">${shopNamesForDatalist()}</datalist>
     </div>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
@@ -6973,10 +6977,27 @@ function closeAccounts(){ document.getElementById('accountsOverlay').classList.a
 let accOpenShop = null;
 
 function shopNamesForDatalist(){
-  const s = new Set();
-  ledger.forEach(e => e.shop && s.add(e.shop));
-  devices.forEach(d => d.shopName && s.add(d.shopName.trim()));
-  return [...s].filter(Boolean).map(n => `<option value="${esc(n)}">`).join('');
+  // ⚠️ كانت Set على النص الخام: اسم الدفتر مش متقصوص، فـ"محل النور"
+  //    و"محل النور " كانوا بيطلعوا سطرين في القايمة. والترتيب كان
+  //    ترتيب الإدخال — يعني المحل اللي بتتعامل معاه كل يوم ممكن
+  //    يكون في آخر القايمة.
+  //
+  //    دلوقتي: دمج على مفتاح متقصوص (مسافات وحالة حروف بس — مفيش
+  //    تطبيع مرن عشان محلين بأسامي متقاربة ما يندمجوش)، والعرض
+  //    بأحدث صيغة اتكتبت، والترتيب بالأحدث استخداماً.
+  const seen = new Map();
+  const put = (raw, ts) => {
+    const n = String(raw||'').trim();
+    if(!n) return;
+    const k = n.toLowerCase().replace(/\s+/g, ' ');
+    const prev = seen.get(k);
+    if(!prev || ts > prev.ts) seen.set(k, { name: n, ts });
+  };
+  ledger.forEach(e => put(e.shop, new Date(e.date||0).getTime() || 0));
+  devices.forEach(d => put(d.shopName, new Date(d.intakeDate||0).getTime() || 0));
+  return [...seen.values()]
+    .sort((a,b) => b.ts - a.ts)
+    .map(x => `<option value="${esc(x.name)}">`).join('');
 }
 
 function shopStats(){
