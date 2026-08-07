@@ -1130,14 +1130,19 @@ let dpShops     = [];      // [{ name, ts }]
 function buildDpSuggest(){
   dpCustNames = []; dpPhoneMap = {}; dpShops = [];
   const nameSeen = new Map(), shopSeen = new Map();
+  // ⚠️ الأسامي هنا بتاعة adapt() مش بتاعة قاعدة البيانات:
+  //       customerName → customer · customerPhone → phone
+  //       shopName     → shop     · intakeDate    → intake
+  //    قراية d.customerName على الكائن المحوّل بترجّع undefined —
+  //    والقوايم بتطلع فاضية من غير أي خطأ يظهر.
   for(const d of devices){
-    const ts  = new Date(d.intakeDate||0).getTime() || 0;
+    const ts  = new Date(d.intake||0).getTime() || 0;
     // المعرّف 'dev_' + الوقت بالملي — فاصل التعادل لما التاريخ يتساوى
     // (خانة وقت الدخول دقتها دقيقة، فجهازين في نفس الدقيقة واردين)
     const seq = Number(String(d.id||'').replace(/^dev_/,'')) || 0;
 
-    const name = (d.customerName||'').trim();
-    const phone = (d.customerPhone||'').trim();
+    const name = (d.customer||'').trim();
+    const phone = (d.phone||'').trim();
     if(name){
       const k = dpKey(name);
       if(k){
@@ -1147,7 +1152,7 @@ function buildDpSuggest(){
       }
     }
 
-    const shop = (d.shopName||'').trim();
+    const shop = (d.shop||'').trim();
     if(shop){
       const sk = dpKey(shop);
       const prev = shopSeen.get(sk);
