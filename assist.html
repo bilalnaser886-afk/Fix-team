@@ -181,8 +181,55 @@
       <p>I Fix Team — ميدان سرور، دمياط</p>
     </div>
   </div>
+  <button type="button" id="acctBtn" class="acct" aria-label="حسابي">
+    <span id="acctIco">👤</span>
+  </button>
   <div class="stripe"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
 </header>
+
+<div id="acctSheet" class="sheet hidden" role="dialog" aria-label="حسابي">
+  <div class="sheet-in">
+    <div class="sh-head"><b id="shTitle">حسابي</b>
+      <button type="button" class="sh-x" id="shClose" aria-label="إقفال">✕</button></div>
+    <div id="shBody"></div>
+  </div>
+</div>
+
+<style>
+  /* زرار الحساب — جوه الهيدر، على الطرف المقابل للشعار */
+  .top{position:relative;}
+  .acct{position:absolute; inset-inline-end:14px; top:14px; width:38px; height:38px;
+    border-radius:12px; border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.12);
+    color:#fff; font-size:17px; line-height:1; cursor:pointer; display:flex;
+    align-items:center; justify-content:center;}
+  .acct:hover{background:rgba(255,255,255,.2);}
+  .acct.on{background:#fff; color:var(--ink,#17222E); border-color:#fff; font:900 13px/1 'Cairo',sans-serif;}
+
+  /* شيت الحساب */
+  .sheet{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.45);
+    display:flex; align-items:flex-end; justify-content:center;}
+  .sheet.hidden{display:none;}
+  .sheet-in{background:var(--card,#fff); width:100%; max-width:460px;
+    border-radius:18px 18px 0 0; padding:16px 16px 24px; max-height:82vh; overflow:auto;}
+  .sh-head{display:flex; align-items:center; margin-bottom:12px;}
+  .sh-head b{font:900 15px/1.4 'Cairo',sans-serif;}
+  .sh-x{margin-inline-start:auto; background:none; border:none; font-size:17px;
+    color:var(--muted,#6B7A8C); cursor:pointer; padding:4px 8px;}
+  .sh-f{display:block; margin-bottom:10px;}
+  .sh-f span{display:block; font-size:12px; color:var(--muted,#6B7A8C); margin-bottom:5px;}
+  .sh-f input{width:100%; box-sizing:border-box; padding:11px 12px; border-radius:11px;
+    border:1px solid var(--line,#E4E9EF); background:var(--paper,#F6F7F9);
+    color:var(--ink,#17222E); font:600 14px/1.4 inherit;}
+  .sh-save{width:100%; padding:13px; border:none; border-radius:12px; cursor:pointer;
+    background:#0891A8; color:#fff; font:900 14px/1 'Cairo',sans-serif; margin-top:4px;}
+  .sh-out{width:100%; padding:11px; border:1px solid var(--line,#E4E9EF); border-radius:12px;
+    cursor:pointer; background:none; color:#DC2626; font:800 13px/1 inherit; margin-top:9px;}
+  .sh-note{font-size:11.5px; color:var(--muted,#6B7A8C); line-height:1.8; margin-top:10px;}
+  /* زرار التثبيت — بيظهر لما المتصفح يسمح بس */
+  .c-app{display:block; text-align:center; padding:13px; border-radius:12px; margin-top:8px;
+    border:1px dashed var(--line,#E4E9EF); background:none; color:var(--ink,#17222E);
+    font:800 13.5px/1 inherit; cursor:pointer; width:100%;}
+</style>
 
 <main class="flow" id="flow" aria-live="polite"></main>
 
@@ -196,9 +243,15 @@
 // ============================================================
 const SHOP = {
   whatsapp: '201028794359',          // 01028794359 بصيغة دولية: صفر البداية بيتشال ويتحط 20
-  maps:     'https://maps.google.com/?q=ميدان+سرور+دمياط',
+  coords:   { lat: 31.4115841, lng: 31.8119856 },   // ميدان سرور، دمياط
   hours:    'مفتوح طول اليوم'
 };
+// ⚠️ اللينك بيتبني من الإحداثيات مش من نص بحث. النص كان بيوقع
+//    العميل على أي مكان اسمه قريب — والإحداثيات نقطة واحدة بالظبط.
+SHOP.maps = 'https://www.google.com/maps/search/?api=1&query=' +
+            SHOP.coords.lat + ',' + SHOP.coords.lng;
+SHOP.nav  = 'https://www.google.com/maps/dir/?api=1&destination=' +
+            SHOP.coords.lat + ',' + SHOP.coords.lng;
 
 // ============================================================
 // ⚠️ الأسعار مقفولة لحد ما تتملي
@@ -285,7 +338,99 @@ if(APP_ENV === "staging"){
 // حالة المحادثة
 // ============================================================
 const TOKEN_KEY = 'ifix_assist_token';
-const S = { token:'', brand:null, model:'', issue:null, phone:'', customer:'', msgs:[], saved:false };
+const PROFILE_KEY = 'ifix_assist_profile';
+const S = { token:'', brand:null, model:'', issue:null, phone:'', customer:'', email:'', msgs:[], saved:false };
+
+// ============================================================
+// حساب العميل
+// ------------------------------------------------------------
+// الاسم والرقم بيتحفظوا في المتصفح — العميل بيتسأل مرة واحدة بس
+// وبعدها البوت بينده عليه باسمه ويعدّي الأسئلة الشخصية.
+//
+// ⚠️ عن قصد **مش** Supabase Auth. الصفحة دي عامة بمفتاح anon،
+//    ولو العميل بقى مستخدم authenticated كان هيدخل تحت سياسات
+//    زي spare_parts_read اللي بتقول "to authenticated using (true)"
+//    — يعني أي عميل يسجّل يقرا مخزن قطع الغيار. البروفايل المحلي
+//    بيدّي نفس الراحة من غير أي سطح أمني جديد.
+var P = { name:'', phone:'', email:'' };
+
+function loadProfile(){
+  try{ var r = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+       P = { name:r.name||'', phone:r.phone||'', email:r.email||'' }; }catch(e){}
+  return P;
+}
+function saveProfile(){
+  try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(P)); }catch(e){}
+  S.customer = P.name; S.phone = P.phone; S.email = P.email;
+  paintAcct();
+}
+function hasProfile(){ return !!(P.name && P.phone); }
+function firstName(){ return (P.name||'').trim().split(/\s+/)[0] || ''; }
+
+function paintAcct(){
+  var b = document.getElementById('acctBtn'), i = document.getElementById('acctIco');
+  if(!b || !i) return;
+  if(hasProfile()){ b.classList.add('on'); i.textContent = firstName().slice(0,6); }
+  else { b.classList.remove('on'); i.textContent = '👤'; }
+}
+
+function openAcct(){
+  var sh = document.getElementById('acctSheet'), body = document.getElementById('shBody');
+  document.getElementById('shTitle').textContent = hasProfile() ? 'حسابي' : 'عرّفنا بنفسك';
+  body.innerHTML =
+    '<label class="sh-f"><span>الاسم</span><input id="pName" maxlength="40" value="'+esc(P.name)+'" placeholder="اسمك"></label>' +
+    '<label class="sh-f"><span>رقم التليفون</span><input id="pPhone" type="tel" inputmode="tel" maxlength="15" value="'+esc(P.phone)+'" placeholder="01xxxxxxxxx"></label>' +
+    '<label class="sh-f"><span>الإيميل (اختياري)</span><input id="pMail" type="email" maxlength="60" value="'+esc(P.email)+'" placeholder="مش مطلوب"></label>' +
+    '<button type="button" class="sh-save" id="pSave">حفظ</button>' +
+    (hasProfile() ? '<button type="button" class="sh-out" id="pOut">مسح بياناتي من الجهاز ده</button>' : '') +
+    '<button type="button" class="c-app hidden" id="pInstall">📲 ثبّت الصفحة كتطبيق</button>' +
+    '<div class="sh-note">بياناتك محفوظة على تليفونك انت — بنستخدمها عشان منسألكش كل مرة. ' +
+    'وبتتبعت للمحل مع طلبك بس.</div>';
+  sh.classList.remove('hidden');
+
+  document.getElementById('pSave').onclick = function(){
+    var n = document.getElementById('pName').value.trim();
+    var ph = document.getElementById('pPhone').value.replace(/\D/g,'');
+    var em = document.getElementById('pMail').value.trim();
+    if(!n){ document.getElementById('pName').focus(); return; }
+    if(ph.length < 10){ document.getElementById('pPhone').focus(); return; }
+    P.name = n; P.phone = ph; P.email = em;
+    saveProfile(); save(); closeAcct();
+  };
+  var out = document.getElementById('pOut');
+  if(out) out.onclick = function(){
+    P = { name:'', phone:'', email:'' };
+    try{ localStorage.removeItem(PROFILE_KEY); }catch(e){}
+    S.customer=''; S.phone=''; S.email='';
+    paintAcct(); closeAcct();
+  };
+  paintInstall();
+}
+function closeAcct(){ document.getElementById('acctSheet').classList.add('hidden'); }
+
+// ===== التثبيت كتطبيق =====
+// ⚠️ الزرار بيظهر لما المتصفح يقول إنه ممكن. سفاري على الأيفون
+//    مبيبعتش الحدث ده خالص — فبنوريه تعليمات بدل زرار مايشتغلش.
+var deferredPrompt = null;
+addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); deferredPrompt = e; paintInstall();
+});
+function isIOS(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
+function paintInstall(){
+  var b = document.getElementById('pInstall');
+  if(!b) return;
+  var standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if(standalone){ b.classList.add('hidden'); return; }
+  if(deferredPrompt){
+    b.classList.remove('hidden');
+    b.textContent = '📲 ثبّت الصفحة كتطبيق';
+    b.onclick = function(){ deferredPrompt.prompt(); deferredPrompt = null; b.classList.add('hidden'); };
+  } else if(isIOS()){
+    b.classList.remove('hidden');
+    b.textContent = '📲 للتثبيت: زرار المشاركة ← إضافة إلى الشاشة الرئيسية';
+    b.onclick = null;
+  } else b.classList.add('hidden');
+}
 
 const $flow = document.getElementById('flow');
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c =>
@@ -308,10 +453,17 @@ function save(){
   saveTimer = setTimeout(async () => {
     const row = {
       token: S.token,
+      // ⚠️ الإيميل مش عمود في الجدول. بنبعته جوه نص الرسالة بدل ما
+      //    نبعت عمود مش موجود — العملية كلها كانت هتفشل في صمت.
       brand: S.brand ? S.brand.n : '',
       model: S.model, phone: S.phone, customer: S.customer,
       issue: S.issue ? S.issue.n : '',
-      status: S.phone ? 'human' : 'bot',
+      // ⚠️ 'human' معناها "محتاج رد من موظف" — مش "معانا رقمه".
+      //    كانت S.phone ? 'human' : 'bot'، وده كان صح أيام ما الرقم
+      //    مكانش بيتاخد غير لما العميل يطلب حد يكلمه. دلوقتي بناخده
+      //    من أول الكلام، فالشرط ده كان هيعلّم **كل** محادثة إنها
+      //    محتاجة رد ويغرق طابور المحاسب.
+      status: S.wantHuman ? 'human' : 'bot',
       messages: S.msgs,
       updated_at: new Date().toISOString()
     };
@@ -392,11 +544,66 @@ function typing(ms, then){
 // المسار
 // ============================================================
 function start(){
+  if(hasProfile()){
+    // ⚠️ عارفينه — مفيش أي سؤال شخصي تاني. دي كل فايدة الحساب.
+    S.customer = P.name; S.phone = P.phone; S.email = P.email;
+    bubble('bot', 'أهلاً <b>' + esc(firstName()) + '</b> 👋<br>نبدأ؟ قولي جهازك نوعه إيه.');
+    typing(500, stepBrand);
+    return;
+  }
   bubble('bot', 'أهلاً بيك في <b>I Fix Team</b> 👋<br>هساعدك تعرف مشكلة جهازك والتكلفة التقريبية في أقل من دقيقة.');
-  typing(700, () => {
-    bubble('bot', 'جهازك نوعه إيه؟');
-    picks(BRANDS, b => { S.brand = b; save(); stepModel(); });
+  typing(700, askIdentity);
+}
+
+// بنسأل مرة واحدة في العمر — وبيتحفظ على التليفون
+function askIdentity(){
+  bubble('bot', 'قبل ما نبدأ، اسمك إيه؟');
+  askText('اسمك', 'تمام', function(v){
+    P.name = v.trim(); saveProfile();
+    typing(500, function(){
+      bubble('bot', 'تشرفنا يا ' + esc(firstName()) + ' 🤝<br>اكتب رقم تليفونك عشان نقدر نرجعلك.');
+      askText('01xxxxxxxxx', 'تمام', function(t){
+        var d = t.replace(/\D/g,'');
+        if(d.length < 10){ bubble('bot', 'الرقم شكله ناقص — اكتبه تاني من فضلك.'); return askPhoneOnly(); }
+        P.phone = d; saveProfile();
+        typing(500, askMail);
+      }, { tel:true });
+    });
   });
+}
+function askPhoneOnly(){
+  askText('01xxxxxxxxx', 'تمام', function(t){
+    var d = t.replace(/\D/g,'');
+    if(d.length < 10){ bubble('bot', 'محتاجين رقم صح عشان نوصلك.'); return askPhoneOnly(); }
+    P.phone = d; saveProfile(); typing(500, askMail);
+  }, { tel:true });
+}
+function askMail(){
+  bubble('bot', 'إيميلك؟ <b>اختياري</b> — تقدر تعدّيه.');
+  clearInputs();
+  var d = document.createElement('div');
+  d.className = 'ask';
+  d.innerHTML = '<input type="email" placeholder="مش مطلوب" maxlength="60">' +
+                '<button type="button">حفظ</button>';
+  var inp = d.querySelector('input'), btn = d.querySelector('button');
+  var skip = document.createElement('button');
+  skip.type = 'button'; skip.className = 'c-more'; skip.textContent = 'عدّي دي';
+  skip.style.marginTop = '8px';
+  var go = function(v){
+    if(v) bubble('me', esc(v)); else bubble('me', 'عدّي دي');
+    P.email = v || ''; saveProfile(); clearInputs();
+    typing(500, function(){ bubble('bot', 'تمام ✅ نبدأ بقى — جهازك نوعه إيه؟'); stepBrand(); });
+  };
+  btn.onclick = function(){ go(inp.value.trim()); };
+  inp.onkeydown = function(e){ if(e.key === 'Enter') go(inp.value.trim()); };
+  skip.onclick = function(){ go(''); };
+  d.appendChild(skip);
+  $flow.appendChild(d); toBottom();
+}
+
+function stepBrand(){
+  bubble('bot', 'جهازك نوعه إيه؟');
+  picks(BRANDS, function(b){ S.brand = b; save(); stepModel(); });
 }
 
 function stepModel(){
@@ -434,6 +641,8 @@ function result(){
       <div class="tk-in">
         <div class="tk-eyebrow">PRE-DIAGNOSIS</div>
         <h2>بطاقة كشف مبدئي</h2>
+        ${P.name ? `<div class="tk-line"><span class="tk-k">الاسم</span><span class="tk-v">${esc(P.name)}</span></div>` : ''}
+        ${P.phone ? `<div class="tk-line"><span class="tk-k">التليفون</span><span class="tk-v" style="direction:ltr;">${esc(P.phone)}</span></div>` : ''}
         <div class="tk-line"><span class="tk-k">الجهاز</span><span class="tk-v">${esc(S.brand.n)} ${esc(S.model)}</span></div>
         <div class="tk-line"><span class="tk-k">المشكلة</span><span class="tk-v">${esc(S.issue.n)}</span></div>
         <div class="tk-line"><span class="tk-k">المحل</span><span class="tk-v">ميدان سرور، دمياط</span></div>
@@ -459,6 +668,44 @@ function result(){
   });
 }
 
+// ============================================================
+// المسافة للمحل
+// ------------------------------------------------------------
+// هافرساين على كورة الأرض — دي مسافة الخط المستقيم، مش الطريق.
+// بنقولها كده صريح عشان محدش يستنى رقم العدّاد.
+// ============================================================
+function distanceKm(lat, lng){
+  var R = 6371, rad = function(d){ return d * Math.PI / 180; };
+  var dLat = rad(SHOP.coords.lat - lat), dLng = rad(SHOP.coords.lng - lng);
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+          Math.cos(rad(lat))*Math.cos(rad(SHOP.coords.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function showDistance(btn){
+  if(!navigator.geolocation){
+    btn.textContent = 'جهازك مش بيدعم تحديد الموقع'; btn.disabled = true; return;
+  }
+  btn.textContent = 'بندوّر على مكانك…'; btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var km = distanceKm(pos.coords.latitude, pos.coords.longitude);
+    var txt = km < 1 ? Math.round(km * 1000) + ' متر'
+            : (km < 10 ? km.toFixed(1) : Math.round(km)) + ' كيلو';
+    btn.outerHTML =
+      '<a class="c-map" href="' + SHOP.nav + '" target="_blank" rel="noopener">' +
+      '🧭 المحل على بعد <b>' + txt + '</b> منك — افتح الطريق</a>' +
+      '<div style="font-size:11px;color:var(--muted,#6B7A8C);text-align:center;margin-top:6px;">' +
+      'المسافة بالخط المستقيم — الطريق الفعلي بيطلع أطول شوية.</div>';
+  }, function(err){
+    // ⚠️ الرفض مش خطأ — العميل ممكن يكون مقفل الموقع عن قصد.
+    //    بنوريه الطريق على الخريطة بدل رسالة اعتذار.
+    btn.disabled = false;
+    btn.textContent = err && err.code === 1
+      ? 'الموقع مقفول — افتحه من إعدادات المتصفح وجرّب تاني'
+      : 'مقدرناش نحدد مكانك — جرّب تاني';
+  }, { enableHighAccuracy:false, timeout:9000, maximumAge:300000 });
+}
+
 function actions(){
   clearInputs();
   const msg = encodeURIComponent(
@@ -468,9 +715,47 @@ function actions(){
   d.innerHTML = `
     <a class="c-wa" href="https://wa.me/${SHOP.whatsapp}?text=${msg}" target="_blank" rel="noopener">💬 كلّمنا على واتساب</a>
     <a class="c-map" href="${SHOP.maps}" target="_blank" rel="noopener">📍 مكان المحل — ${esc(SHOP.hours)}</a>
+    <button type="button" class="c-more" id="howFar">🧭 المحل بعيد قد إيه عني؟</button>
+    <button type="button" class="c-more" id="wantDelivery">🛵 ابعتولي مندوب يستلم الجهاز</button>
     <button type="button" class="c-more" id="callMe">تحب حد من الفريق يكلمك؟</button>`;
   $flow.appendChild(d); toBottom();
   document.getElementById('callMe').onclick = () => { clearInputs(); leaveNumber(); };
+  document.getElementById('wantDelivery').onclick = () => { clearInputs(); askDelivery(); };
+  const hf = document.getElementById('howFar');
+  if(hf) hf.onclick = () => showDistance(hf);
+}
+
+// ============================================================
+// طلب مندوب
+// ------------------------------------------------------------
+// بيتكتب في نفس محادثة العميل بحالة 'human' — يعني "محتاج رد".
+// شاشة المحادثات في شريط الأدوات هي اللي هتعرضه للمحاسب.
+// ⚠️ من غير الشاشة دي الطلب بيوصل القاعدة ومحدش شايفه.
+// ============================================================
+function askDelivery(){
+  if(!hasProfile()){
+    bubble('bot', 'عشان نبعتلك مندوب محتاجين اسمك ورقمك الأول.');
+    return typing(400, askIdentity);
+  }
+  bubble('bot', 'تمام — المندوب هييجي فين؟ اكتب العنوان بالتفصيل.');
+  askText('الحي، الشارع، رقم العمارة، علامة مميزة', 'اطلب المندوب', function(addr){
+    S.delivery = { addr: addr, at: new Date().toISOString() };
+    S.msgs.push({ who:'me',
+      text: '🛵 طلب مندوب — ' + P.name + ' · ' + P.phone + '\nالعنوان: ' + addr +
+            (P.email ? '\nالإيميل: ' + P.email : '') +
+            '\nالجهاز: ' + (S.brand ? S.brand.n : '') + ' ' + S.model + ' — ' + (S.issue ? S.issue.n : ''),
+      at: new Date().toISOString() });
+    S.wantHuman = true;                 // بيخلي الحالة 'human' في الحفظ
+    save();
+    typing(700, function(){
+      bubble('bot', 'وصلنا الطلب ✅<br>هنكلمك على <b style="direction:ltr;display:inline-block;">' +
+                    esc(P.phone) + '</b> نأكد الميعاد قبل ما المندوب يتحرك.');
+      typing(500, function(){
+        bubble('bot', 'ولو مستعجل، ابعتلنا على واتساب وهنرد أسرع.');
+        actions();
+      });
+    });
+  });
 }
 
 function leaveNumber(){
@@ -481,7 +766,8 @@ function leaveNumber(){
       bubble('bot', 'الرقم شكله ناقص — اكتبه تاني من فضلك.');
       return leaveNumberRetry();
     }
-    S.phone = digits;
+    S.phone = digits; S.wantHuman = true;
+    if(!P.phone){ P.phone = digits; saveProfile(); }
     save();
     typing(500, () => {
       bubble('bot', 'وصلنا رقمك ✅ هنكلمك قريب.<br>ولو مستعجل، الواتساب أسرع.');
@@ -504,6 +790,16 @@ function leaveNumberRetry(){
     S.token = localStorage.getItem(TOKEN_KEY) || '';
     if(!S.token){ S.token = newToken(); localStorage.setItem(TOKEN_KEY, S.token); }
   }catch(e){ S.token = newToken(); }
+
+  loadProfile();
+  S.customer = P.name; S.phone = P.phone; S.email = P.email;
+  paintAcct();
+  var ab = document.getElementById('acctBtn');
+  if(ab) ab.onclick = openAcct;
+  var xb = document.getElementById('shClose');
+  if(xb) xb.onclick = closeAcct;
+  var sheet = document.getElementById('acctSheet');
+  if(sheet) sheet.addEventListener('click', function(e){ if(e.target === sheet) closeAcct(); });
 
   const mt = document.getElementById('tcMeta');
   if(mt) mt.setAttribute('content',
