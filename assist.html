@@ -320,7 +320,12 @@ const SUPABASE_ENVS = {
     key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
   }
 };
-const PROD_HOSTS = ["fix-team.pages.dev"];
+// ⚠️ أي دومين مش في القايمة دي بيشتغل على **staging** تلقائياً.
+//    دي حماية مقصودة (نشر تجريبي عمره ما يلمس بيانات حقيقية)،
+//    بس معناها إن دومين جديد ناسيينه هنا = محادثات العملاء
+//    الحقيقية بتروح لقاعدة تجريبية ومحدش شايفها، ومن غير أي
+//    خطأ يظهر. أي دومين عميل جديد لازم يتزوّد هنا.
+const PROD_HOSTS = ["fix-team.pages.dev", "assistant.fix-team.pages.dev"];
 const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
 const _cfg = SUPABASE_ENVS[APP_ENV];
 const sb = supabase.createClient(_cfg.url, _cfg.key);

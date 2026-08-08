@@ -7,6 +7,18 @@
   'use strict';
   if (!window.IFixDock) return;
 
+  // ⚠️ ماينفعش نستخدم window.sb — الداشبورد بيعرّفه بـ:
+  //        const sb = supabase.createClient(...)
+  //    و const على المستوى الأعلى بيعمل ربط في نطاق السكربتات مش
+  //    خاصية على window. يعني window.sb بيفضل undefined للأبد،
+  //    وأي شرط عليه بيفشل في صمت — القايمة تفضل فاضية والاشتراك
+  //    مايتعملش، من غير أي خطأ في الكونسول.
+  //    والمعرّف المجرّد بيشتغل لأن السكربت ده بيتحمّل قبله، والنداء
+  //    بيحصل بعد ما الصفحة تخلص.
+  function DB() {
+    try { return (typeof sb !== 'undefined' && sb) ? sb : null; } catch (e) { return null; }
+  }
+
   var esc = function (s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c];
@@ -78,11 +90,12 @@
   }
 
   async function load() {
-    if (!window.sb) { CH.err = 'مفيش اتصال بالسيرفر'; return; }
+    var db = DB();
+    if (!db) { CH.err = 'مفيش اتصال بالسيرفر'; return; }
     CH.loading = true; CH.err = ''; paint();
     try {
       // الأعمدة الخفيفة بس — messages بتتجاب لما تفتح محادثة
-      var r = await sb.from('assistant_chats')
+      var r = await db.from('assistant_chats')
         .select('id,token,customer,phone,brand,model,issue,status,updated_at')
         .order('updated_at', { ascending: false })
         .limit(80);
@@ -100,7 +113,8 @@
     var host = CH.host; if (!host) return;
     host.innerHTML = '<div class="ch-empty">بنفتح المحادثة…</div>';
     try {
-      var r = await sb.from('assistant_chats')
+      var db = DB(); if (!db) throw new Error();
+      var r = await db.from('assistant_chats')
         .select('token,customer,phone,brand,model,issue,status,messages,updated_at')
         .eq('token', token).maybeSingle();
       if (r.error || !r.data) throw (r.error || new Error());
@@ -112,7 +126,8 @@
 
   async function setStatus(token, status) {
     try {
-      await sb.from('assistant_chats').update({ status: status }).eq('token', token);
+      var db = DB(); if (!db) return;
+      await db.from('assistant_chats').update({ status: status }).eq('token', token);
       if (CH.open) CH.open.status = status;
       var row = CH.rows.filter(function (x) { return x.token === token; })[0];
       if (row) row.status = status;
@@ -185,6 +200,80 @@
     document.getElementById('chReload').onclick = load;
   }
 
+  // ============================================================
+  // الإشعارات اللحظية
+  // ------------------------------------------------------------
+  // ⚠️ ليه ريل تايم مش سحب دوري؟
+  //    السحب كل ثانية بيتضرب في عدد التابات المفتوحة طول اليوم —
+  //    ودي نفس الحفرة اللي كلّفت ٩٦ جيجا. الريل تايم بيبعت لما
+  //    يحصل تغيير بس، وقياس الاستهلاك عندك كان ٥٪ من حصته.
+  //
+  // ⚠️ محتاج الجدول يكون في نشرة الريل تايم:
+  //       alter publication supabase_realtime add table public.assistant_chats;
+  //    (في ملف 08-assist-realtime.sql). من غيرها الاشتراك بينجح
+  //    في صمت ومفيش أي حدث بيوصل — وده أسوأ من خطأ ظاهر.
+  //
+  // ⚠️ والـ RLS بتتطبق على الريل تايم كمان: سياسة assistant_staff_read
+  //    بتخلي الأحداث توصل للأدمن والمحاسب والديسباتشر بس.
+  // ============================================================
+  var chan = null;
+
+  function toast(txt) {
+    var t = document.createElement('div');
+    t.textContent = txt;
+    t.style.cssText = 'position:fixed;inset-inline-start:50%;transform:translateX(-50%);' +
+      'bottom:22px;z-index:99997;background:#DC2626;color:#fff;padding:12px 18px;' +
+      'border-radius:12px;font:800 13px/1.5 inherit;box-shadow:0 8px 24px rgba(0,0,0,.28);' +
+      'cursor:pointer;max-width:88vw;text-align:center;';
+    t.onclick = function () { try { IFixDock.open('assist'); } catch (e) {} t.remove(); };
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 9000);
+  }
+
+  function mergeRow(row) {
+    if (!row || !row.token) return;
+    // بنشيل messages من النسخة اللي في الذاكرة — القايمة مش
+    // محتاجاها، وبتتجاب لما تفتح المحادثة.
+    var slim = {
+      id: row.id, token: row.token, customer: row.customer, phone: row.phone,
+      brand: row.brand, model: row.model, issue: row.issue,
+      status: row.status, updated_at: row.updated_at
+    };
+    var i = -1;
+    for (var k = 0; k < CH.rows.length; k++) if (CH.rows[k].token === row.token) { i = k; break; }
+    if (i >= 0) CH.rows.splice(i, 1);
+    CH.rows.unshift(slim);
+    if (CH.rows.length > 80) CH.rows.length = 80;
+  }
+
+  function subscribeChats() {
+    var db = DB();
+    if (chan || !db) return;
+    try {
+      chan = db.channel('assist_chats_live')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'assistant_chats' },
+            function (payload) {
+              var row = payload.new || payload.old;
+              if (!row) return;
+              var was = CH.rows.filter(function (x) { return x.token === row.token; })[0];
+              var wasHuman = was && was.status === 'human';
+
+              if (payload.eventType === 'DELETE') {
+                CH.rows = CH.rows.filter(function (x) { return x.token !== row.token; });
+              } else mergeRow(row);
+
+              // إشعار لما محادثة تبقى "محتاج رد" وهي مكانتش كده
+              if (row.status === 'human' && !wasHuman) {
+                toast('🔔 ' + (row.customer || 'عميل') + ' محتاج رد — اضغط للفتح');
+              }
+              try { IFixDock.refresh(); } catch (e) {}
+              if (CH.host && !CH.open) paint();
+            })
+        .subscribe();
+    } catch (e) { /* الاشتراك مايوقفش أي حاجة */ }
+  }
+
   IFixDock.register({
     id: 'assist', icon: '💬', title: 'محادثات العملاء',
     badge: function () {
@@ -193,4 +282,18 @@
     render: function (h) { css(); CH.host = h; paint(); load(); },
     onShow: function () { if (!CH.rows.length && !CH.loading) load(); }
   });
+
+  // ⚠️ بنحمّل مرة واحدة عند الإقلاع من غير ما الأداة تتفتح — عشان
+  //    الرقم الأحمر على الأيقونة يبان من أول ثانية. من غير ده
+  //    الرقم مكانش هيظهر غير لما تفتح الأداة، يعني نفس مشكلة
+  //    "لازم أدخل أشوف".
+  var _tries = 0;
+  function bootChats() {
+    // بنستنى لحد ما العميل يتعرّف — السكربت ده بيتحمّل قبل ما
+    // الداشبورد يعمله، فالمحاولة الأولى غالباً بتلاقيه لسه فاضي.
+    if (!DB()) { if (_tries++ < 40) setTimeout(bootChats, 400); return; }
+    load(); subscribeChats();
+  }
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', bootChats);
+  else bootChats();
 })();
