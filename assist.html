@@ -262,14 +262,83 @@ SHOP.nav  = 'https://www.google.com/maps/dir/?api=1&destination=' +
 // لما تملاها، غيّر enabled لـ true. الأرقام بالجنيه.
 // المفتاح: نوع الجهاز → المشكلة → [من, إلى]
 // ============================================================
+// ============================================================
+// جدول الأسعار — مبني على أسعار أحدث ٩٠٠٠ جهاز دخلوا السيستم،
+// معدّلة بقواعد بلال. الأرقام بالجنيه: [من, إلى, (تنويه اختياري)].
+// المفتاح: فئة الجهاز → المشكلة.
+//
+// الفئات:
+//   apple_new = ايفون X وأحدث → أرضية ٧٠٠ لأي عطل (مفيش أقل من كده)
+//   apple_old = ايفون 6/7/8 وأقل → أرخص، حاجات محدودة تحت ٧٠٠
+//   android   = أي جهاز تاني → شاشات ٧٠٠–١٥٠٠ (السوبر أموليد أعلى)
+//
+// عطل من غير سعر واقعي (زي الميّة) بيرجّع null → البوت يقول "بعد الكشف".
+// ============================================================
 const PRICES = {
-  enabled: false,
+  enabled: true,
   table: {
-    apple:   { screen:[0,0], battery:[0,0], charge:[0,0], water:[0,0], software:[0,0], camera:[0,0], sound:[0,0], dead:[0,0] },
-    samsung: { screen:[0,0], battery:[0,0], charge:[0,0], water:[0,0], software:[0,0], camera:[0,0], sound:[0,0], dead:[0,0] },
-    other:   { screen:[0,0], battery:[0,0], charge:[0,0], water:[0,0], software:[0,0], camera:[0,0], sound:[0,0], dead:[0,0] }
+    apple_new: {
+      screen:  [700, 4000, 'الشاشة الأصلية أغلى من غير الأصلية'],
+      battery: [700, 1800],
+      charge:  [700, 2000],
+      software:[700, 1300],
+      camera:  [700, 2500],
+      sound:   [700, 1200],
+      dead:    [700, 3000],
+      water:   null
+    },
+    apple_old: {
+      screen:  [500, 1200],
+      battery: [500, 900],
+      charge:  [300, 1000],
+      software:[400, 1000],
+      camera:  [400, 900],
+      sound:   [400, 900],
+      dead:    [500, 1800],
+      water:   null
+    },
+    android: {
+      screen:  [700, 1500, 'لو الشاشة سوبر أموليد بتكون أعلى — حوالي ١٢٠٠ أو ٢٦٠٠ أو ٤٢٠٠ حسب الموديل'],
+      battery: [600, 1300],
+      charge:  [300, 1000],
+      software:[150, 600],
+      camera:  [400, 1400],
+      sound:   [300, 900],
+      dead:    [500, 1800],
+      water:   null
+    }
   }
 };
+
+// ------------------------------------------------------------
+// تحديد فئة السعر: للايفون نحلّل الموديل (فوق/تحت الإكس)، وأي حاجة
+// تانية = أندرويد. موديل ايفون مش واضح → نفترض الأحدث (أرضية ٧٠٠)
+// عشان التقدير ميبقاش أقل من الواقع ويضايق العميل.
+// ------------------------------------------------------------
+function normModel(m){
+  m = String(m || '').toLowerCase().trim();
+  m = m.replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); });
+  m = m.replace(/برو\s*ماكس|بروماكس/g, 'promax')
+       .replace(/ماكس/g, 'max').replace(/برو/g, 'pro')
+       .replace(/بلس|بلص|بلاس/g, 'plus');
+  m = m.replace(/ايفون|أيفون|iphone/g, '').replace(/\s+/g, '');
+  return m;
+}
+function appleTier(model){
+  var m = normModel(model);
+  var mt = m.match(/^(\d{1,2})/);
+  if(mt){
+    var n = parseInt(mt[1], 10);
+    if(n >= 11) return 'apple_new';           // 11 وأحدث
+    if(n >= 4 && n <= 8) return 'apple_old';   // 6/7/8 (و5 نادراً)
+  }
+  if(/^x/.test(m)) return 'apple_new';         // x / xr / xs / xmax / xsmax
+  return 'apple_new';                           // مش واضح → الأحدث (أأمن)
+}
+function resolveTier(){
+  if(S.brand && S.brand.k === 'apple') return appleTier(S.model);
+  return 'android';
+}
 
 const BRANDS = [
   { k:'apple',   n:'ايفون',    tier:'apple'   },
@@ -641,11 +710,12 @@ function stepIssue(){
 
 function priceLine(){
   if(!PRICES.enabled) return null;
-  const tier = (S.brand && S.brand.tier) || 'other';
-  const r = ((PRICES.table[tier] || {})[S.issue.k]) || null;
+  const tier = resolveTier();
+  const r = (PRICES.table[tier] || {})[S.issue.k];
   if(!r || (!r[0] && !r[1])) return null;
-  const f = n => n.toLocaleString('en-EG');
-  return r[0] === r[1] ? `${f(r[0])} ج.م` : `${f(r[0])} – ${f(r[1])} ج.م`;
+  const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[+d]);   // أرقام عربية
+  const range = r[0] === r[1] ? `${ar(r[0])} ج.م` : `من ${ar(r[0])} إلى ${ar(r[1])} ج.م`;
+  return { range: range, note: r[2] || '' };
 }
 
 function result(){
@@ -668,8 +738,9 @@ function result(){
         ${price ? `
           <div class="tk-price">
             <div class="k">التكلفة التقريبية</div>
-            <div class="v">${price}</div>
-            <div class="n">تقدير مبدئي حسب الموديل والعطل. السعر النهائي بعد الكشف.</div>
+            <div class="v">${price.range}</div>
+            ${price.note ? `<div class="n">${price.note}</div>` : ''}
+            <div class="n">الأسعار تقريبية — السعر الحقيقي بيظهر عند توجّهك للفرع بعد الكشف على الجهاز.</div>
           </div>`
         : `<div class="tk-price"><div class="k">التكلفة</div>
              <div class="v" style="font-size:17px;">بعد الكشف</div>
