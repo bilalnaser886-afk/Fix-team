@@ -286,24 +286,24 @@ const BRANDS = [
 // النصيحة هي أنفع حاجة في الصفحة: بتقول للعميل يعمل إيه دلوقتي
 // قبل ما يوصل، وساعات بتنقذ الجهاز فعلاً.
 const ISSUES = [
-  { k:'screen',   n:'الشاشة مكسورة أو مش شغالة',
+  { k:'screen',   n:'الشاشة مكسورة أو لا تعمل',
     tip:'لو الشاشة مكسورة وفيها قزاز مكسّر، متعدّيش صوابعك عليها. لفّها بشريط شفاف لحد ما توصّلها.' },
   { k:'battery',  n:'البطارية بتفصل بسرعة',
     tip:'لو البطارية بتسخن أو منفوخة، بطّل تشحنه — ده خطر حقيقي. هاته على طول.' },
-  { k:'charge',   n:'مش بيشحن',
-    tip:'جرّب شاحن وكابل تانيين قبل ما تيجي. أحياناً العطل في الكابل مش في الجهاز.' },
+  { k:'charge',   n:'لا يشحن',
+    tip:'جرّب شاحناً وكابلاً آخرين قبل حضورك. أحياناً يكون العطل في الكابل لا في الجهاز.' },
   { k:'water',    n:'وقع في ميه',
     tip:'متشحنوش ومتشغّلوش خالص، وسيبه مقفول. كل ساعة بتعدّي بتقلّل فرصة إنقاذه. هاته بسرعة.' },
   { k:'software', n:'بيهنّج أو بيقفل لوحده',
     tip:'لو فيه صور أو أرقام مهمة، خد نسخة احتياطية قبل ما تيجي لو الجهاز لسه بيشتغل.' },
   { k:'camera',   n:'الكاميرا',
-    tip:'صوّر بيها صورة قبل ما تيجي — تعرفنا العطل في العدسة ولا في السوفت.' },
+    tip:'التقط بها صورة قبل حضورك — تدلّنا إن كان العطل في العدسة أم في البرمجيات.' },
   { k:'sound',    n:'الصوت أو المايك',
     tip:'جرّب سماعة سلكية. لو الصوت طلع منها، العطل في السماعة الداخلية.' },
-  { k:'dead',     n:'مش بيفتح خالص',
-    tip:'حطّه على الشاحن ربع ساعة وجرّب تاني. لو مفيش أي علامة، هاته لنكشف عليه.' },
+  { k:'dead',     n:'لا يفتح نهائياً',
+    tip:'ضعه على الشاحن ربع ساعة ثم أعد المحاولة. إن لم تظهر أي علامة، أحضره لنفحصه.' },
   { k:'other',    n:'مشكلة تانية',
-    tip:'ابعتلنا التفاصيل على واتساب أو هاته المحل ونكشف عليه.' }
+    tip:'أرسل لنا التفاصيل على واتساب أو أحضره إلى المحل لنفحصه.' }
 ];
 
 // ============================================================
@@ -381,21 +381,20 @@ function paintAcct(){
 
 function openAcct(){
   var sh = document.getElementById('acctSheet'), body = document.getElementById('shBody');
-  document.getElementById('shTitle').textContent = hasProfile() ? 'حسابي' : 'عرّفنا بنفسك';
+  document.getElementById('shTitle').textContent = hasProfile() ? 'حسابي' : 'تعريف بك';
   body.innerHTML =
-    '<label class="sh-f"><span>الاسم</span><input id="pName" maxlength="40" value="'+esc(P.name)+'" placeholder="اسمك"></label>' +
+    '<label class="sh-f"><span>الاسم</span><input id="pName" maxlength="40" value="'+esc(P.name)+'" placeholder="الاسم"></label>' +
     '<label class="sh-f"><span>رقم التليفون</span><input id="pPhone" type="tel" inputmode="tel" maxlength="15" value="'+esc(P.phone)+'" placeholder="01xxxxxxxxx"></label>' +
-    '<label class="sh-f"><span>الإيميل (اختياري)</span><input id="pMail" type="email" maxlength="60" value="'+esc(P.email)+'" placeholder="مش مطلوب"></label>' +
+    '<label class="sh-f"><span>الإيميل (اختياري)</span><input id="pMail" type="email" maxlength="60" value="'+esc(P.email)+'" placeholder="اختياري"></label>' +
     '<button type="button" class="sh-save" id="pSave">حفظ</button>' +
-    (hasProfile() ? '<button type="button" class="sh-out" id="pOut">مسح بياناتي من الجهاز ده</button>' : '') +
+    (hasProfile() ? '<button type="button" class="sh-out" id="pOut">حذف البيانات</button>' : '') +
     '<button type="button" class="c-app hidden" id="pInstall">📲 ثبّت الصفحة كتطبيق</button>' +
-    '<div class="sh-note">بياناتك محفوظة على تليفونك انت — بنستخدمها عشان منسألكش كل مرة. ' +
-    'وبتتبعت للمحل مع طلبك بس.</div>';
+    '<div class="sh-note">بياناتك في أمان.</div>';
   sh.classList.remove('hidden');
 
   document.getElementById('pSave').onclick = function(){
     var n = document.getElementById('pName').value.trim();
-    var ph = document.getElementById('pPhone').value.replace(/\D/g,'');
+    var ph = onlyDigits(document.getElementById('pPhone').value);
     var em = document.getElementById('pMail').value.trim();
     if(!n){ document.getElementById('pName').focus(); return; }
     if(ph.length < 10){ document.getElementById('pPhone').focus(); return; }
@@ -432,12 +431,23 @@ function paintInstall(){
     b.onclick = function(){ deferredPrompt.prompt(); deferredPrompt = null; b.classList.add('hidden'); };
   } else if(isIOS()){
     b.classList.remove('hidden');
-    b.textContent = '📲 للتثبيت: زرار المشاركة ← إضافة إلى الشاشة الرئيسية';
+    b.textContent = '📲 للتثبيت: زر المشاركة ← إضافة إلى الشاشة الرئيسية';
     b.onclick = null;
   } else b.classList.add('hidden');
 }
 
 const $flow = document.getElementById('flow');
+// ⚠️ \D في جافاسكربت معناها "مش [0-9]" — فالأرقام العربية (٠-٩)
+//    والفارسية (۰-۹) كانت **بتتشال بالكامل** مش بتتحوّل. عميل يكتب
+//    ٠١٠١٢٣٤٥٦٧٨ كان يجد الخانة فارغة بلا سبب ظاهر.
+//    نحوّلها إلى إنجليزي أولاً ثم ننظّف.
+function enDigits(v){
+  return String(v == null ? '' : v)
+    .replace(/[\u0660-\u0669]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); })
+    .replace(/[\u06F0-\u06F9]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); });
+}
+function onlyDigits(v){ return enDigits(v).replace(/\D/g, ''); }
+
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -526,6 +536,10 @@ function askText(placeholder, cta, onDone, opts){
                    ${(opts&&opts.tel)?'inputmode="tel"':''} maxlength="60">
                  <button type="button">${esc(cta)}</button>`;
   const [inp, btn] = [d.querySelector('input'), d.querySelector('button')];
+  // الأرقام تتحوّل إلى إنجليزي أثناء الكتابة — ليرى العميل ما سيُسجَّل
+  if(opts && opts.tel){
+    inp.oninput = () => { const c = enDigits(inp.value); if(c !== inp.value) inp.value = c; };
+  }
   const go = () => {
     const v = inp.value.trim();
     if(!v) { inp.focus(); return; }
@@ -552,24 +566,24 @@ function start(){
   if(hasProfile()){
     // ⚠️ عارفينه — مفيش أي سؤال شخصي تاني. دي كل فايدة الحساب.
     S.customer = P.name; S.phone = P.phone; S.email = P.email;
-    bubble('bot', 'أهلاً <b>' + esc(firstName()) + '</b> 👋<br>نبدأ؟ قولي جهازك نوعه إيه.');
+    bubble('bot', 'أهلاً <b>' + esc(firstName()) + '</b> 👋<br>هل نبدأ؟ ما نوع جهازك؟');
     typing(500, stepBrand);
     return;
   }
-  bubble('bot', 'أهلاً بيك في <b>I Fix Team</b> 👋<br>هساعدك تعرف مشكلة جهازك والتكلفة التقريبية في أقل من دقيقة.');
+  bubble('bot', 'أهلاً بك في <b>I Fix Team</b> 👋<br>سأساعدك على معرفة مشكلة جهازك والتكلفة التقريبية في أقل من دقيقة.');
   typing(700, askIdentity);
 }
 
 // بنسأل مرة واحدة في العمر — وبيتحفظ على التليفون
 function askIdentity(){
-  bubble('bot', 'قبل ما نبدأ، اسمك إيه؟');
-  askText('اسمك', 'تمام', function(v){
+  bubble('bot', 'قبل ما نبدأ، الاسم إيه؟');
+  askText('الاسم', 'تمام', function(v){
     P.name = v.trim(); saveProfile();
     typing(500, function(){
-      bubble('bot', 'تشرفنا يا ' + esc(firstName()) + ' 🤝<br>اكتب رقم تليفونك عشان نقدر نرجعلك.');
+      bubble('bot', 'تشرفنا بك يا ' + esc(firstName()) + ' 🤝<br>اكتب رقم هاتفك حتى نتمكن من التواصل معك.');
       askText('01xxxxxxxxx', 'تمام', function(t){
-        var d = t.replace(/\D/g,'');
-        if(d.length < 10){ bubble('bot', 'الرقم شكله ناقص — اكتبه تاني من فضلك.'); return askPhoneOnly(); }
+        var d = onlyDigits(t);
+        if(d.length < 10){ bubble('bot', 'الرقم غير مكتمل — اكتبه مرة أخرى من فضلك.'); return askPhoneOnly(); }
         P.phone = d; saveProfile();
         typing(500, askMail);
       }, { tel:true });
@@ -578,26 +592,26 @@ function askIdentity(){
 }
 function askPhoneOnly(){
   askText('01xxxxxxxxx', 'تمام', function(t){
-    var d = t.replace(/\D/g,'');
-    if(d.length < 10){ bubble('bot', 'محتاجين رقم صح عشان نوصلك.'); return askPhoneOnly(); }
+    var d = onlyDigits(t);
+    if(d.length < 10){ bubble('bot', 'نحتاج رقماً صحيحاً حتى نصل إليك.'); return askPhoneOnly(); }
     P.phone = d; saveProfile(); typing(500, askMail);
   }, { tel:true });
 }
 function askMail(){
-  bubble('bot', 'إيميلك؟ <b>اختياري</b> — تقدر تعدّيه.');
+  bubble('bot', 'بريدك الإلكتروني؟ <b>اختياري</b> — يمكنك تخطيه.');
   clearInputs();
   var d = document.createElement('div');
   d.className = 'ask';
-  d.innerHTML = '<input type="email" placeholder="مش مطلوب" maxlength="60">' +
+  d.innerHTML = '<input type="email" placeholder="اختياري" maxlength="60">' +
                 '<button type="button">حفظ</button>';
   var inp = d.querySelector('input'), btn = d.querySelector('button');
   var skip = document.createElement('button');
-  skip.type = 'button'; skip.className = 'c-more'; skip.textContent = 'عدّي دي';
+  skip.type = 'button'; skip.className = 'c-more'; skip.textContent = 'تخطَّ';
   skip.style.marginTop = '8px';
   var go = function(v){
-    if(v) bubble('me', esc(v)); else bubble('me', 'عدّي دي');
+    if(v) bubble('me', esc(v)); else bubble('me', 'تخطَّ');
     P.email = v || ''; saveProfile(); clearInputs();
-    typing(500, function(){ bubble('bot', 'تمام ✅ نبدأ بقى — جهازك نوعه إيه؟'); stepBrand(); });
+    typing(500, function(){ bubble('bot', 'تمام ✅ لنبدأ — ما نوع جهازك؟'); stepBrand(); });
   };
   btn.onclick = function(){ go(inp.value.trim()); };
   inp.onkeydown = function(e){ if(e.key === 'Enter') go(inp.value.trim()); };
@@ -607,7 +621,7 @@ function askMail(){
 }
 
 function stepBrand(){
-  bubble('bot', 'جهازك نوعه إيه؟');
+  bubble('bot', 'ما نوع جهازك؟');
   picks(BRANDS, function(b){ S.brand = b; save(); stepModel(); });
 }
 
@@ -636,7 +650,7 @@ function priceLine(){
 
 function result(){
   typing(900, () => {
-    tip('اعمل إيه دلوقتي', S.issue.tip);
+    tip('ماذا أفعل الآن', S.issue.tip);
 
     const price = priceLine();
     const t = document.createElement('div');
@@ -689,25 +703,25 @@ function distanceKm(lat, lng){
 
 function showDistance(btn){
   if(!navigator.geolocation){
-    btn.textContent = 'جهازك مش بيدعم تحديد الموقع'; btn.disabled = true; return;
+    btn.textContent = 'جهازك لا يدعم تحديد الموقع'; btn.disabled = true; return;
   }
-  btn.textContent = 'بندوّر على مكانك…'; btn.disabled = true;
+  btn.textContent = 'جارٍ تحديد موقعك…'; btn.disabled = true;
   navigator.geolocation.getCurrentPosition(function(pos){
     var km = distanceKm(pos.coords.latitude, pos.coords.longitude);
     var txt = km < 1 ? Math.round(km * 1000) + ' متر'
             : (km < 10 ? km.toFixed(1) : Math.round(km)) + ' كيلو';
     btn.outerHTML =
       '<a class="c-map" href="' + SHOP.nav + '" target="_blank" rel="noopener">' +
-      '🧭 المحل على بعد <b>' + txt + '</b> منك — افتح الطريق</a>' +
+      '🧭 المحل يبعد عنك <b>' + txt + '</b> — افتح الطريق</a>' +
       '<div style="font-size:11px;color:var(--muted,#6B7A8C);text-align:center;margin-top:6px;">' +
-      'المسافة بالخط المستقيم — الطريق الفعلي بيطلع أطول شوية.</div>';
+      'المسافة بالخط المستقيم — الطريق الفعلي أطول قليلاً.</div>';
   }, function(err){
     // ⚠️ الرفض مش خطأ — العميل ممكن يكون مقفل الموقع عن قصد.
     //    بنوريه الطريق على الخريطة بدل رسالة اعتذار.
     btn.disabled = false;
     btn.textContent = err && err.code === 1
-      ? 'الموقع مقفول — افتحه من إعدادات المتصفح وجرّب تاني'
-      : 'مقدرناش نحدد مكانك — جرّب تاني';
+      ? 'الموقع مغلق — فعّله من إعدادات المتصفح ثم أعد المحاولة'
+      : 'تعذّر تحديد موقعك — أعد المحاولة';
   }, { enableHighAccuracy:false, timeout:9000, maximumAge:300000 });
 }
 
@@ -720,9 +734,9 @@ function actions(){
   d.innerHTML = `
     <a class="c-wa" href="https://wa.me/${SHOP.whatsapp}?text=${msg}" target="_blank" rel="noopener">💬 كلّمنا على واتساب</a>
     <a class="c-map" href="${SHOP.maps}" target="_blank" rel="noopener">📍 مكان المحل — ${esc(SHOP.hours)}</a>
-    <button type="button" class="c-more" id="howFar">🧭 المحل بعيد قد إيه عني؟</button>
-    <button type="button" class="c-more" id="wantDelivery">🛵 ابعتولي مندوب يستلم الجهاز</button>
-    <button type="button" class="c-more" id="callMe">تحب حد من الفريق يكلمك؟</button>`;
+    <button type="button" class="c-more" id="howFar">🧭 كم يبعد المحل عني؟</button>
+    <button type="button" class="c-more" id="wantDelivery">🛵 أرسلوا مندوباً لاستلام الجهاز</button>
+    <button type="button" class="c-more" id="callMe">هل تريد أن يتصل بك أحد من الفريق؟</button>`;
   $flow.appendChild(d); toBottom();
   document.getElementById('callMe').onclick = () => { clearInputs(); leaveNumber(); };
   document.getElementById('wantDelivery').onclick = () => { clearInputs(); askDelivery(); };
@@ -737,13 +751,44 @@ function actions(){
 // شاشة المحادثات في شريط الأدوات هي اللي هتعرضه للمحاسب.
 // ⚠️ من غير الشاشة دي الطلب بيوصل القاعدة ومحدش شايفه.
 // ============================================================
+// ⚠️ نسأل عن الرقم المحفوظ بدل أن نطلب رقماً جديداً.
+//    كان يطلب رقماً في كل مرة رغم أن العميل مسجَّل — وهذا يلغي
+//    الفائدة كلها من الحساب.
+function confirmPhone(label, next){
+  if(!P.phone) return next();
+  bubble('bot', label + '<br>الرقم المحفوظ: <b style="direction:ltr;display:inline-block;">' +
+                esc(P.phone) + '</b>');
+  clearInputs();
+  const d = document.createElement('div');
+  d.className = 'picks';
+  d.innerHTML = '<button type="button" data-k="same">نعم، نفس الرقم</button>' +
+                '<button type="button" data-k="new">رقم آخر</button>';
+  d.querySelector('[data-k=same]').onclick = () => {
+    bubble('me', 'نفس الرقم'); clearInputs(); next();
+  };
+  d.querySelector('[data-k=new]').onclick = () => {
+    bubble('me', 'رقم آخر'); clearInputs();
+    bubble('bot', 'اكتب الرقم الذي تريد التواصل عليه.');
+    askText('01xxxxxxxxx', 'تأكيد', function(t){
+      const dg = onlyDigits(t);
+      if(dg.length < 10){ bubble('bot', 'الرقم غير مكتمل — اكتبه مرة أخرى.'); return; }
+      P.phone = dg; saveProfile(); next();
+    }, { tel:true });
+  };
+  $flow.appendChild(d); toBottom();
+}
+
 function askDelivery(){
   if(!hasProfile()){
-    bubble('bot', 'عشان نبعتلك مندوب محتاجين اسمك ورقمك الأول.');
+    bubble('bot', 'لإرسال مندوب نحتاج اسمك ورقمك أولاً.');
     return typing(400, askIdentity);
   }
-  bubble('bot', 'تمام — المندوب هييجي فين؟ اكتب العنوان بالتفصيل.');
-  askText('الحي، الشارع، رقم العمارة، علامة مميزة', 'اطلب المندوب', function(addr){
+  confirmPhone('على أي رقم نتصل بك لتأكيد الموعد؟', askDeliveryAddress);
+}
+
+function askDeliveryAddress(){
+  bubble('bot', 'إلى أين يأتي المندوب؟ اكتب العنوان بالتفصيل.');
+  askText('الحي، الشارع، رقم العمارة، علامة مميزة', 'إرسال الطلب', function(addr){
     S.delivery = { addr: addr, at: new Date().toISOString() };
     S.msgs.push({ who:'me',
       text: '🛵 طلب مندوب — ' + P.name + ' · ' + P.phone + '\nالعنوان: ' + addr +
@@ -753,10 +798,10 @@ function askDelivery(){
     S.wantHuman = true;                 // بيخلي الحالة 'human' في الحفظ
     save();
     typing(700, function(){
-      bubble('bot', 'وصلنا الطلب ✅<br>هنكلمك على <b style="direction:ltr;display:inline-block;">' +
-                    esc(P.phone) + '</b> نأكد الميعاد قبل ما المندوب يتحرك.');
+      bubble('bot', 'وصلنا طلبك ✅<br>سنتصل بك على <b style="direction:ltr;display:inline-block;">' +
+                    esc(P.phone) + '</b> لتأكيد الموعد قبل تحرّك المندوب.');
       typing(500, function(){
-        bubble('bot', 'ولو مستعجل، ابعتلنا على واتساب وهنرد أسرع.');
+        bubble('bot', 'وإن كنت مستعجلاً، راسلنا على واتساب وسنرد أسرع.');
         actions();
       });
     });
@@ -764,26 +809,41 @@ function askDelivery(){
 }
 
 function leaveNumber(){
-  bubble('bot', 'اكتب رقمك وهنكلمك في أقرب وقت.');
-  askText('01xxxxxxxxx', 'ابعت', v => {
-    const digits = v.replace(/\D/g,'');
+  // نفس المنطق: إن كان الرقم محفوظاً نسأل بدل أن نطلبه من جديد
+  if(P.phone && !leaveNumber._asked){
+    leaveNumber._asked = true;
+    return confirmPhone('على أي رقم يتصل بك الفريق؟', function(){
+      S.phone = P.phone; S.wantHuman = true; save();
+      typing(600, function(){
+        bubble('bot', 'تمام ✅ سنتصل بك في أقرب وقت.');
+        actions();
+      });
+    });
+  }
+  return leaveNumberAsk();
+}
+
+function leaveNumberAsk(){
+  bubble('bot', 'اكتب رقمك وسنتصل بك في أقرب وقت.');
+  askText('01xxxxxxxxx', 'إرسال', v => {
+    const digits = onlyDigits(v);
     if(digits.length < 10){
-      bubble('bot', 'الرقم شكله ناقص — اكتبه تاني من فضلك.');
+      bubble('bot', 'الرقم غير مكتمل — اكتبه مرة أخرى من فضلك.');
       return leaveNumberRetry();
     }
     S.phone = digits; S.wantHuman = true;
     if(!P.phone){ P.phone = digits; saveProfile(); }
     save();
     typing(500, () => {
-      bubble('bot', 'وصلنا رقمك ✅ هنكلمك قريب.<br>ولو مستعجل، الواتساب أسرع.');
+      bubble('bot', 'وصلنا رقمك ✅ سنتصل بك قريباً.<br>ولو مستعجل، الواتساب أسرع.');
       actions();
     });
   }, { tel:true });
 }
 function leaveNumberRetry(){
-  askText('01xxxxxxxxx', 'ابعت', v => {
+  askText('01xxxxxxxxx', 'إرسال', v => {
     S.phone = v.replace(/\D/g,''); save();
-    typing(500, () => { bubble('bot', 'وصلنا رقمك ✅ هنكلمك قريب.'); actions(); });
+    typing(500, () => { bubble('bot', 'وصلنا رقمك ✅ سنتصل بك قريباً.'); actions(); });
   }, { tel:true });
 }
 

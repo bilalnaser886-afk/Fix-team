@@ -41,7 +41,35 @@
   //    فيه المحادثة كاملة، وسحبه لكل الصفوف في القايمة معناه
   //    تحميل كل الكلام عشان تعرض أول سطر منه.
   // ============================================================
-  var CH = { rows: [], open: null, filter: 'human', loading: false, err: '' };
+  var CH = { rows: [], open: null, loading: false, err: '' };
+
+  // ============================================================
+  // "شُوفت" — الرقم الأحمر بيتشال أول ما تفتح المحادثة
+  // ------------------------------------------------------------
+  // ⚠️ بنحفظ updated_at وقت الفتح مش مجرد علامة "شُوفت".
+  //    لو حفظنا علامة بس، العميل يبعت رسالة جديدة على نفس المحادثة
+  //    وتفضل متعلّمة مقروءة — وطلبه يضيع. المقارنة بالوقت بتخلي
+  //    أي تحديث جديد يرجّعها "مش مشوفة" تلقائياً.
+  var SEEN_KEY = 'ifix_chat_seen';
+  var SEEN = {};
+  try { SEEN = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (e) { SEEN = {}; }
+
+  function isSeen(c) {
+    return !!(c && SEEN[c.token] && SEEN[c.token] >= (c.updated_at || ''));
+  }
+  function markSeen(c) {
+    if (!c || !c.token) return;
+    SEEN[c.token] = c.updated_at || new Date().toISOString();
+    // بنقصّها على آخر ٣٠٠ محادثة عشان التخزين ما يكبرش للأبد
+    var ks = Object.keys(SEEN);
+    if (ks.length > 300) {
+      ks.sort(function (a, b) { return (SEEN[a] || '') < (SEEN[b] || '') ? -1 : 1; });
+      for (var i = 0; i < ks.length - 300; i++) delete SEEN[ks[i]];
+    }
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(SEEN)); } catch (e) {}
+  }
+  // محتاجة رد **ولسه ما اتشافتش** — دي اللي بيتعدّ عليها الرقم الأحمر
+  function needsEye(c) { return c && c.status === 'human' && !isSeen(c); }
 
   var STATUS = {
     human: { t: 'محتاج رد', c: '#DC2626', bg: 'rgba(220,38,38,.12)' },
@@ -63,16 +91,16 @@
     var s = document.createElement('style');
     s.id = 'dkChatCss';
     s.textContent = [
-      '.ch-tabs{display:flex;gap:6px;margin-bottom:10px;}',
-      '.ch-tab{flex:1;padding:7px 4px;border-radius:9px;border:1px solid var(--border);',
-      '  background:transparent;color:var(--muted);font:800 11.5px/1.3 inherit;cursor:pointer;}',
-      '.ch-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;}',
       '.ch-row{border:1px solid var(--border);border-radius:12px;padding:10px 11px;',
       '  margin-bottom:7px;cursor:pointer;background:var(--surface-2);}',
       '.ch-row:hover{border-color:var(--accent);}',
       '.ch-nm{font:900 13px/1.4 "Cairo",sans-serif;color:var(--ink);}',
       '.ch-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.7;}',
       '.ch-tag{display:inline-block;font:900 10px/1.6 inherit;border-radius:6px;padding:1px 6px;}',
+      '.ch-tag.hot{color:#DC2626;background:rgba(220,38,38,.13);border:1px solid rgba(220,38,38,.4);}',
+      '.ch-tag.done{color:#15803D;background:rgba(21,128,61,.13);}',
+      /* اللي محتاج رد له خط جانبي أحمر — يبان من طرف العين */
+      '.ch-row.hot{border-inline-start:3px solid #DC2626;background:var(--surface);}',
       '.ch-back{background:none;border:none;color:var(--accent);font:800 12px/1 inherit;',
       '  cursor:pointer;padding:4px 0;margin-bottom:10px;}',
       '.ch-msg{border-radius:11px;padding:8px 11px;margin-bottom:6px;font-size:12.5px;',
@@ -118,7 +146,10 @@
         .select('token,customer,phone,brand,model,issue,status,messages,updated_at')
         .eq('token', token).maybeSingle();
       if (r.error || !r.data) throw (r.error || new Error());
-      CH.open = r.data; paint();
+      CH.open = r.data;
+      markSeen(r.data);                       // ← الرقم الأحمر بيقل من هنا
+      paint();
+      try { IFixDock.refresh(); } catch (e) {}
     } catch (e) {
       host.innerHTML = '<div class="ch-empty">مقدرناش نفتح المحادثة دي</div>';
     }
@@ -165,25 +196,25 @@
       return;
     }
 
-    var tabs = [['human', 'محتاج رد'], ['bot', 'مع البوت'], ['all', 'الكل']];
-    var list = CH.filter === 'all' ? CH.rows
-             : CH.rows.filter(function (x) { return x.status === CH.filter; });
+    // ⚠️ قايمة واحدة من غير تبويبات. اللي محتاج رد بيتعلّم على
+    //    السطر نفسه ويتثبّت فوق — التبويب كان بيخبّي الحاجة المهمة
+    //    ورا ضغطة، والرقم الأحمر يقول "فيه حاجة" وانت مش شايفها.
+    var list = CH.rows.slice().sort(function (a, b) {
+      var d = (needsEye(b) ? 1 : 0) - (needsEye(a) ? 1 : 0);
+      if (d) return d;
+      return (b.updated_at || '') < (a.updated_at || '') ? -1 : 1;
+    });
 
     host.innerHTML =
-      '<div class="ch-tabs">' + tabs.map(function (t) {
-        var n = t[0] === 'all' ? CH.rows.length
-              : CH.rows.filter(function (x) { return x.status === t[0]; }).length;
-        return '<button class="ch-tab' + (CH.filter === t[0] ? ' on' : '') + '" data-f="' + t[0] + '">' +
-               t[1] + (n ? ' (' + n + ')' : '') + '</button>';
-      }).join('') + '</div>' +
       '<button class="ch-back" id="chReload">↻ تحديث</button>' +
       (CH.err ? '<div class="ch-empty">' + esc(CH.err) + '</div>'
        : CH.loading ? '<div class="ch-empty">بنجيب المحادثات…</div>'
        : list.length ? list.map(function (c) {
-          var st = STATUS[c.status] || STATUS.bot;
-          return '<div class="ch-row" data-t="' + esc(c.token) + '">' +
+          var eye = needsEye(c);
+          return '<div class="ch-row' + (eye ? ' hot' : '') + '" data-t="' + esc(c.token) + '">' +
             '<div class="ch-nm">' + esc(c.customer || 'عميل من غير اسم') +
-            ' <span class="ch-tag" style="color:' + st.c + ';background:' + st.bg + ';">' + st.t + '</span></div>' +
+            (eye ? ' <span class="ch-tag hot">🔴 محتاج رد</span>' : '') +
+            (c.status === 'done' ? ' <span class="ch-tag done">اتقفلت</span>' : '') + '</div>' +
             '<div class="ch-sub">' + esc([c.brand, c.model, c.issue].filter(Boolean).join(' · ') || 'لسه ما قالش المشكلة') + '</div>' +
             '<div class="ch-sub" style="direction:ltr;text-align:start;">' + esc(c.phone || '') +
             ' <span style="color:var(--muted-2);direction:rtl;display:inline-block;">' + when(c.updated_at) + '</span></div>' +
@@ -191,9 +222,6 @@
          }).join('')
        : '<div class="ch-empty">مفيش محادثات هنا</div>');
 
-    Array.prototype.forEach.call(host.querySelectorAll('.ch-tab'), function (b) {
-      b.onclick = function () { CH.filter = b.getAttribute('data-f'); paint(); };
-    });
     Array.prototype.forEach.call(host.querySelectorAll('.ch-row'), function (b) {
       b.onclick = function () { openChat(b.getAttribute('data-t')); };
     });
@@ -276,9 +304,7 @@
 
   IFixDock.register({
     id: 'assist', icon: '💬', title: 'محادثات العملاء',
-    badge: function () {
-      return CH.rows.filter(function (x) { return x.status === 'human'; }).length;
-    },
+    badge: function () { return CH.rows.filter(needsEye).length; },
     render: function (h) { css(); CH.host = h; paint(); load(); },
     onShow: function () { if (!CH.rows.length && !CH.loading) load(); }
   });
