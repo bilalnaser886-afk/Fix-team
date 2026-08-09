@@ -217,7 +217,8 @@ const SUPABASE_ENVS = {
   }
 };
 // نطاقات الإنتاج (زوّد الدومين المخصص لما تجيبه، زي ifixteam.com):
-const PROD_HOSTS = ["fix-team.pages.dev"];
+// نفس الملحوظة اللي في assist.html: دومين مش في القايمة = staging.
+const PROD_HOSTS = ["fix-team.pages.dev", "assistant.fix-team.pages.dev"];
 const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
 const _envCfg = SUPABASE_ENVS[APP_ENV];
 const sb = supabase.createClient(_envCfg.url, _envCfg.key);
