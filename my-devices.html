@@ -573,7 +573,7 @@ async function loadDevices(){
     const { data, error } = await sb
       .from('devices_safe')
       .select('id,data')
-      .in('status', ACTIVE)
+      .in('status', ACTIVE.concat(['returned']))
       .order('intake_date', { ascending:false })
       .limit(300);
     if(error) throw error;
@@ -896,10 +896,13 @@ function ticketHtml(d, canAct){
   const s = ST[d.status] || {c:'--muted'};
   const lock = d.lockText
     ? `<div class="tk-lock">🔒 <b>${esc(d.lockText)}</b></div>` : '';
+  // الجهاز المرتجع: نخفي "جاري العمل" بس. "تم الإصلاح" (خلصت) بتحوّله لـ done
+  // ويخرج من المرتجعات — وبيتعلّم عليه "كان مرتجع" في شاشة تم الصيانة (الداشبورد).
+  const isRet = d.status === 'returned';
   const actions = !canAct ? `<div class="assist-tag">🤝 ${t('tp.assistTag')} ${esc(d.tech)}</div>` : `
     <div class="tk-actions">
-      ${d.status!=='repairing' ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
-      ${d.status!=='done' ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
+      ${(!isRet && d.status!=='repairing') ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
+      ${(d.status!=='done') ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
       <button class="act act-prob" onclick="event.stopPropagation();reportProblem('${d.id}')" data-i18n="tp.problem">⚠️ مشكلة</button>
       <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🗄️ درج الرفض</button>
     </div>`;
@@ -911,6 +914,7 @@ function ticketHtml(d, canAct){
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
     <div class="tk-sub">${esc(d.customer)}${d.shop?`<span class="dot">•</span>${esc(d.shop)}`:''}</div>
     ${d.issue?`<div class="tk-issue"><span class="w">🛠️</span><span>${esc(d.issue)}</span></div>`:''}
+    ${d.status==='returned' ? `<div class="tk-issue" style="color:var(--returned);font-weight:800;"><span class="w">🔁</span><span>${(d._raw && (d._raw.returnComplaint || d._raw.discoveredFault)) ? esc('سبب الرجوع: ' + (d._raw.returnComplaint || d._raw.discoveredFault)) : 'الجهاز رجع — محتاج مراجعة'}</span></div>` : ''}
     ${lock}
     ${actions}
   </div>`;
@@ -934,6 +938,8 @@ function render(){
   };
   const mine   = devices.filter(d => d.tech===ME   && ACTIVE.includes(d.status) && match(d));
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
+  // المرتجعات: أي جهاز رجع والفني ده شغّال عليه — أساسي أو بديل
+  const returns = devices.filter(d => d.status==='returned' && (d.tech===ME || d.assist===ME) && match(d));
 
   const cards = (list,canAct) => list.length
     ? `<div class="grid">${list.map(d=>ticketHtml(d,canAct)).join('')}</div>`
@@ -941,6 +947,11 @@ function render(){
 
   $('app').innerHTML = `
     ${flash?`<div class="flash">✅ ${esc(flash)}</div>`:''}
+    ${returns.length ? `
+    <div class="sec">
+      <div class="sec-head"><span class="ic">🔁</span><h2>المرتجعات</h2><span class="n">${returns.length}</span><span class="rule"></span></div>
+      <div class="grid">${returns.map(d=>ticketHtml(d, d.tech===ME)).join('')}</div>
+    </div>` : ''}
     <div class="sec">
       <div class="sec-head"><span class="ic">🔧</span><h2 data-i18n="tp.myWork">شغلي دلوقتي</h2><span class="n">${mine.length}</span><span class="rule"></span></div>
       ${cards(mine,true)}
