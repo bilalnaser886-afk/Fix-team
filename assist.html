@@ -474,8 +474,17 @@ function openAcct(){
   if(out) out.onclick = function(){
     P = { name:'', phone:'', email:'' };
     try{ localStorage.removeItem(PROFILE_KEY); }catch(e){}
+    // حساب جديد = محادثة جديدة تماماً: توكن جديد + مسح الكلام والحالة.
+    // كده نفس الجهاز يبدأ صف جديد في assistant_chats، والمحادثة
+    // القديمة بتفضل عند المحاسب زي ما هي.
+    S.token = newToken();
+    try{ localStorage.setItem(TOKEN_KEY, S.token); }catch(e){}
+    S.saved = false; S.msgs = [];
+    S.brand = null; S.model = ''; S.issue = null; S.wantHuman = false;
     S.customer=''; S.phone=''; S.email='';
+    $flow.innerHTML = '';
     paintAcct(); closeAcct();
+    start();
   };
   paintInstall();
 }
