@@ -117,7 +117,15 @@
       '.ch-sec{font:900 11px/1.6 inherit;color:var(--muted);margin:16px 2px 8px;',
       '  display:flex;align-items:center;gap:7px;}',
       '.ch-cnt{background:var(--surface-3);color:var(--ink);border-radius:20px;',
-      '  min-width:18px;text-align:center;padding:1px 7px;font-size:10.5px;font-weight:900;}'
+      '  min-width:18px;text-align:center;padding:1px 7px;font-size:10.5px;font-weight:900;}',
+      /* رسالة العميل (متميزة عن البوت) + عنوان المرسِل + شريط رد الموظف */
+      '.ch-msg.cust{background:var(--surface-2);border:1px solid var(--border);color:var(--ink);}',
+      '.ch-cap{font:800 10px/1.5 inherit;color:var(--muted);margin:4px 2px 2px;}',
+      '.ch-send{display:flex;gap:6px;margin-top:12px;}',
+      '.ch-send input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);',
+      '  background:var(--surface-2);color:var(--ink);font:inherit;font-size:12.5px;}',
+      '.ch-send button{padding:10px 16px;border:none;border-radius:10px;background:var(--accent);',
+      '  color:#fff;font:800 12px/1 inherit;cursor:pointer;}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -171,6 +179,26 @@
     } catch (e) {}
   }
 
+  // إرسال رسالة من الموظف للعميل — إضافة ذرية عبر assist_append_msg
+  // (مبتدهسش لو العميل بيكتب في نفس اللحظة). العميل بيشوفها لو صفحته
+  // مفتوحة (بيسحبها بالتوكن)، ولو قافل بيشوفها أول ما يفتح تاني.
+  async function sendStaffMsg(token, text) {
+    text = String(text || '').trim();
+    if (!text) return;
+    var db = DB(); if (!db) return;
+    // رسم فوري متفائل — الريل تايم بعد كده بيأكّده لباقي الأجهزة
+    if (CH.open && CH.open.token === token) {
+      if (!Array.isArray(CH.open.messages)) CH.open.messages = [];
+      CH.open.messages.push({ who: 'staff', text: text, at: new Date().toISOString() });
+      if (CH.open.status !== 'done') CH.open.status = 'human';
+      CH.open.updated_at = new Date().toISOString();
+      markSeen(CH.open);
+      paint();
+    }
+    try { await db.rpc('assist_append_msg', { p_token: token, p_who: 'staff', p_text: text }); }
+    catch (e) {}
+  }
+
   function paint() {
     var host = CH.host; if (!host) return;
 
@@ -185,9 +213,16 @@
         '<div class="ch-sub">' + esc([c.brand, c.model, c.issue].filter(Boolean).join(' · ') || '—') + '</div>' +
         '<div style="margin:12px 0 10px;border-top:1px solid var(--border);"></div>' +
         (msgs.length ? msgs.map(function (m) {
-          return '<div class="ch-msg ' + (m.who === 'me' ? 'me' : 'bot') + '">' +
+          var w = m.who;
+          var cls = w === 'staff' ? 'me' : (w === 'me' ? 'cust' : 'bot');
+          var cap = w === 'staff' ? '<div class="ch-cap">🎧 موظف</div>'
+                  : w === 'me'    ? '<div class="ch-cap">العميل</div>' : '';
+          return cap + '<div class="ch-msg ' + cls + '">' +
                  esc(String(m.text || '').replace(/<[^>]*>/g, '')) + '</div>';
         }).join('') : '<div class="ch-empty">مفيش رسايل متسجّلة</div>') +
+        (c.status !== 'done'
+          ? '<div class="ch-send"><input id="chMsg" maxlength="500" placeholder="اكتب رسالة للعميل…"><button id="chSendBtn">إرسال</button></div>'
+          : '') +
         '<div class="ch-act">' +
           (wa ? '<a class="wa" href="' + wa + '" target="_blank" rel="noopener">💬 رد على واتساب</a>' : '') +
           (c.status !== 'done' ? '<button id="chDone">✓ خلصت</button>'
@@ -198,6 +233,12 @@
       if (dn) dn.onclick = function () { setStatus(c.token, 'done'); };
       var ro = document.getElementById('chReopen');
       if (ro) ro.onclick = function () { setStatus(c.token, 'human'); };
+      var mi = document.getElementById('chMsg'), sbtn = document.getElementById('chSendBtn');
+      if (mi && sbtn) {
+        var send = function () { var v = mi.value.trim(); if (!v) return; mi.value = ''; sendStaffMsg(c.token, v); };
+        sbtn.onclick = send;
+        mi.onkeydown = function (e) { if (e.key === 'Enter') send(); };
+      }
       return;
     }
 
