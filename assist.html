@@ -482,6 +482,10 @@ function openAcct(){
     S.saved = false; S.msgs = [];
     S.brand = null; S.model = ''; S.issue = null; S.wantHuman = false;
     S.customer=''; S.phone=''; S.email='';
+    // نظّف الشات الحي كمان
+    S.live = false; S.staffShown = 0;
+    try{ stopPolling(); }catch(e){}
+    var lb = document.getElementById('liveBar'); if(lb) lb.remove();
     $flow.innerHTML = '';
     paintAcct(); closeAcct();
     start();
@@ -542,6 +546,9 @@ function newToken(){
 // ============================================================
 let saveTimer = null;
 function save(){
+  // في الشات الحي مبنحفظش المصفوفة كلها — الرسايل بتتضاف بشكل ذري
+  // عبر assist_append_msg عشان محدش يدهس كلام حد.
+  if(S.live) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     const row = {
@@ -813,6 +820,7 @@ function actions(){
   d.className = 'cta';
   d.innerHTML = `
     <a class="c-wa" href="https://wa.me/${SHOP.whatsapp}?text=${msg}" target="_blank" rel="noopener">💬 كلّمنا على واتساب</a>
+    <button type="button" class="c-more" id="chatHere">💬 أو كلّم موظف هنا في الشات</button>
     <a class="c-map" href="${SHOP.maps}" target="_blank" rel="noopener">📍 مكان المحل — ${esc(SHOP.hours)}</a>
     <button type="button" class="c-more" id="howFar">🧭 كم يبعد المحل عني؟</button>
     <button type="button" class="c-more" id="wantDelivery">🛵 أرسلوا مندوباً لاستلام الجهاز</button>
@@ -820,6 +828,8 @@ function actions(){
   $flow.appendChild(d); toBottom();
   document.getElementById('callMe').onclick = () => { clearInputs(); leaveNumber(); };
   document.getElementById('wantDelivery').onclick = () => { clearInputs(); askDelivery(); };
+  var chH = document.getElementById('chatHere');
+  if(chH) chH.onclick = () => enterLive(false);
   const hf = document.getElementById('howFar');
   if(hf) hf.onclick = () => showDistance(hf);
 }
@@ -928,6 +938,140 @@ function leaveNumberRetry(){
 }
 
 // ============================================================
+// الشات الحي مع الموظف
+// ------------------------------------------------------------
+// العميل بمفتاح anon مالوش صلاحية قراءة على الجدول (عن قصد)، فبيقرا
+// محادثته عن طريق get_assist_chat بالتوكن السري، وبيبعت ردوده عن
+// طريق assist_append_msg (إضافة ذرية). الموظف بيتدخّل من شاشة
+// المحادثات ويبعت 'staff'. السحب بيقف لما التاب يتقفل أو المحادثة
+// تتقفل — وبيشتغل بس والعميل فاتح الصفحة.
+// ============================================================
+function injectLiveCss(){
+  if(document.getElementById('liveCss')) return;
+  var s = document.createElement('style'); s.id = 'liveCss';
+  s.textContent =
+    '.livebar{display:flex;gap:8px;margin:14px 0 8px;position:sticky;bottom:8px;z-index:5;}' +
+    '.livebar input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--border,#3a4a58);' +
+    '  background:var(--surface,#fff);color:var(--ink,#111);font:inherit;font-size:14px;}' +
+    '.livebar button{padding:12px 18px;border:none;border-radius:12px;background:#0891A8;color:#fff;' +
+    '  font:800 13px/1 inherit;cursor:pointer;}' +
+    '.live-cap{font:800 10.5px/1.6 inherit;color:var(--muted,#8aa);margin:0 2px 3px;}';
+  document.head.appendChild(s);
+}
+
+function addLiveBubble(kind, text){
+  var r = document.createElement('div');
+  r.className = 'row ' + (kind === 'me' ? 'me' : 'bot');
+  var cap = kind === 'staff' ? '<div class="live-cap">🎧 موظف I Fix Team</div>' : '';
+  r.innerHTML = cap + '<div class="bub">' + esc(String(text || '')) + '</div>';
+  $flow.appendChild(r);
+  var bar = document.getElementById('liveBar');
+  if(bar) $flow.appendChild(bar);   // خلّي شريط الكتابة آخر حاجة
+  toBottom();
+}
+
+function appendMsg(who, text){
+  try{ sb.rpc('assist_append_msg', { p_token: S.token, p_who: who, p_text: text }); }catch(e){}
+}
+
+function liveSend(){
+  var inp = document.getElementById('liveInp'); if(!inp) return;
+  var v = inp.value.trim(); if(!v) return;
+  inp.value = '';
+  addLiveBubble('me', v);
+  appendMsg('me', v);
+}
+
+function ensureLiveBar(){
+  injectLiveCss();
+  if(document.getElementById('liveBar')) return;
+  var bar = document.createElement('div');
+  bar.className = 'livebar'; bar.id = 'liveBar';
+  bar.innerHTML = '<input id="liveInp" maxlength="500" placeholder="اكتب رسالتك للموظف…">' +
+                  '<button type="button" id="liveSend">إرسال</button>';
+  $flow.appendChild(bar);
+  bar.querySelector('#liveSend').onclick = liveSend;
+  bar.querySelector('#liveInp').onkeydown = function(e){ if(e.key === 'Enter') liveSend(); };
+}
+
+function enterLive(fromStaff){
+  if(S.live) return;
+  S.live = true;
+  clearInputs();                          // شيل أي سؤال من البوت
+  if(!fromStaff){
+    bubble('bot', 'تمام ✅ طلبت تتكلم مع موظف. اكتب رسالتك وهيرد عليك هنا.');
+    // علّم المحادثة "محتاج رد" عشان الموظف يشوفها فوراً
+    try{ sb.from('assistant_chats').update({ status:'human', updated_at:new Date().toISOString() }).eq('token', S.token); }catch(e){}
+  }
+  ensureLiveBar();
+  startPolling();
+  toBottom();
+}
+
+function liveClosed(){
+  var bar = document.getElementById('liveBar');
+  if(bar){
+    var i = bar.querySelector('#liveInp'), b = bar.querySelector('#liveSend');
+    if(i) i.disabled = true; if(b) b.disabled = true;
+  }
+  bubble('bot', 'تم إنهاء المحادثة من فريق I Fix Team 🙏 لو محتاج حاجة تانية ابدأ محادثة جديدة أو راسلنا على واتساب.');
+}
+
+var pollTimer = null, pollBusy = false;
+function startPolling(){
+  if(pollTimer) return;
+  pollTimer = setInterval(pollOnce, 5000);
+  pollOnce();
+}
+function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
+
+async function pollOnce(){
+  if(pollBusy || document.hidden || !S.token) return;
+  pollBusy = true;
+  try{
+    var r = await sb.rpc('get_assist_chat', { p_token: S.token });
+    var row = Array.isArray(r.data) ? r.data[0] : r.data;
+    if(row){
+      var msgs  = Array.isArray(row.messages) ? row.messages : [];
+      var staff = msgs.filter(function(m){ return m && m.who === 'staff'; });
+      var shown = S.staffShown || 0;
+      if(staff.length > shown){
+        if(!S.live) enterLive(true);        // موظف بدأ الكلام → افتح الشات
+        for(var i = shown; i < staff.length; i++) addLiveBubble('staff', staff[i].text || '');
+        S.staffShown = staff.length;
+      }
+      if(row.status === 'done'){ stopPolling(); if(S.live) liveClosed(); }
+    }
+  }catch(e){}
+  pollBusy = false;
+}
+
+// لو فيه محادثة شغّالة مع موظف على نفس التوكن، نكمّلها بدل ما نبدأ بوت جديد
+async function resumeIfLive(){
+  if(!S.token) return false;
+  try{
+    var r = await sb.rpc('get_assist_chat', { p_token: S.token });
+    var row = Array.isArray(r.data) ? r.data[0] : r.data;
+    if(row && row.status === 'human'){
+      var msgs  = Array.isArray(row.messages) ? row.messages : [];
+      var staff = msgs.filter(function(m){ return m && m.who === 'staff'; });
+      if(staff.length){
+        S.saved = true;
+        bubble('bot', 'مرحباً بعودتك 👋 محادثتك مع موظف I Fix Team مكمّلة تحت.');
+        msgs.slice(-12).forEach(function(m){
+          if(m.who === 'staff') addLiveBubble('staff', m.text || '');
+          else if(m.who === 'me') addLiveBubble('me', m.text || '');
+        });
+        S.staffShown = staff.length;
+        enterLive(true);
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+
+// ============================================================
 // الإقلاع
 // ============================================================
 (function boot(){
@@ -950,7 +1094,15 @@ function leaveNumberRetry(){
   if(mt) mt.setAttribute('content',
     document.documentElement.getAttribute('data-theme') === 'dark' ? '#131E29' : '#F2F2F1');
 
-  start();
+  S.live = false; S.staffShown = 0;
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) pollOnce(); });
+
+  // لو فيه محادثة شغّالة مع موظف على نفس التوكن نكمّلها، وإلا نبدأ عادي.
+  // السحب بيشتغل في الحالتين عشان الموظف يقدر يتدخّل في أي وقت.
+  resumeIfLive().then(function(resumed){
+    startPolling();
+    if(!resumed) start();
+  });
 })();
 </script>
 </body>
