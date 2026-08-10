@@ -190,14 +190,23 @@
     var list = TOOLS.slice().sort(function (a, b) {
       return (b.id === openId ? 1 : 0) - (a.id === openId ? 1 : 0);
     });
+    var totalBadge = 0;
     rail.innerHTML = list.map(function (t) {
       var n = 0; try { n = t.badge ? (t.badge() || 0) : 0; } catch (e) {}
+      totalBadge += n;
       return '<button class="dk-ico' + (t.id === openId && expanded ? ' act' : '') + '"' +
              ' data-id="' + t.id + '" title="' + (t.title || '') + '"' +
              ' aria-label="' + (t.title || '') + '">' + (t.icon || '•') +
              (n > 0 ? '<span class="dk-badge">' + (n > 99 ? '99+' : n) + '</span>' : '') +
              '</button>';
     }).join('');
+    // بادچ نظام التشغيل على أيقونة التطبيق المثبّت (شغّال والتطبيق مفتوح أو في الخلفية)
+    try {
+      if (navigator.setAppBadge) {
+        if (totalBadge > 0) navigator.setAppBadge(totalBadge);
+        else if (navigator.clearAppBadge) navigator.clearAppBadge();
+      }
+    } catch (e) {}
     Array.prototype.forEach.call(rail.querySelectorAll('.dk-ico'), function (b) {
       b.addEventListener('click', function () {
         var id = b.getAttribute('data-id');

@@ -178,7 +178,7 @@
     <div class="mark"><img src="icon-192.png" alt=""></div>
     <div>
       <h1>مساعد الصيانة</h1>
-      <p>I Fix Team — ميدان سرور، دمياط · نسخة ٢ ✅</p>
+      <p>I Fix Team — ميدان سرور، دمياط</p>
     </div>
   </div>
   <button type="button" id="acctBtn" class="acct" aria-label="حسابي">
@@ -394,7 +394,7 @@ const SUPABASE_ENVS = {
 //    بس معناها إن دومين جديد ناسيينه هنا = محادثات العملاء
 //    الحقيقية بتروح لقاعدة تجريبية ومحدش شايفها، ومن غير أي
 //    خطأ يظهر. أي دومين عميل جديد لازم يتزوّد هنا.
-const PROD_HOSTS = ["fix-team.pages.dev", "assistant.fix-team.pages.dev"];
+const PROD_HOSTS = ["fix-team.pages.dev"];
 const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
 const _cfg = SUPABASE_ENVS[APP_ENV];
 const sb = supabase.createClient(_cfg.url, _cfg.key);
