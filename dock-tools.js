@@ -112,7 +112,12 @@
       '  font:800 12px/1 inherit;cursor:pointer;text-decoration:none;border:1px solid var(--border);',
       '  background:var(--surface-2);color:var(--ink);}',
       '.ch-act .wa{background:#16A34A;border-color:#16A34A;color:#fff;}',
-      '.ch-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:26px 10px;line-height:2;}'
+      '.ch-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:26px 10px;line-height:2;}',
+      /* عناوين قسمي المقروء وغير المقروء */
+      '.ch-sec{font:900 11px/1.6 inherit;color:var(--muted);margin:16px 2px 8px;',
+      '  display:flex;align-items:center;gap:7px;}',
+      '.ch-cnt{background:var(--surface-3);color:var(--ink);border-radius:20px;',
+      '  min-width:18px;text-align:center;padding:1px 7px;font-size:10.5px;font-weight:900;}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -196,31 +201,43 @@
       return;
     }
 
-    // ⚠️ قايمة واحدة من غير تبويبات. اللي محتاج رد بيتعلّم على
-    //    السطر نفسه ويتثبّت فوق — التبويب كان بيخبّي الحاجة المهمة
-    //    ورا ضغطة، والرقم الأحمر يقول "فيه حاجة" وانت مش شايفها.
-    var list = CH.rows.slice().sort(function (a, b) {
+    // قسمين: "غير مقروء" (فيه جديد من آخر ما فتحتها، ومش مقفولة) و"مقروء".
+    // جوه غير المقروء: محتاج رد الأول، وبعدين الأحدث. المقفولة بتروح "مقروء".
+    var unread = CH.rows.filter(function (c) { return c.status !== 'done' && !isSeen(c); });
+    var read   = CH.rows.filter(function (c) { return !(c.status !== 'done' && !isSeen(c)); });
+    unread.sort(function (a, b) {
       var d = (needsEye(b) ? 1 : 0) - (needsEye(a) ? 1 : 0);
       if (d) return d;
       return (b.updated_at || '') < (a.updated_at || '') ? -1 : 1;
     });
+    read.sort(function (a, b) {
+      return (b.updated_at || '') < (a.updated_at || '') ? -1 : 1;
+    });
+
+    function chRowHtml(c) {
+      var eye = needsEye(c);
+      return '<div class="ch-row' + (eye ? ' hot' : '') + '" data-t="' + esc(c.token) + '">' +
+        '<div class="ch-nm">' + esc(c.customer || 'عميل من غير اسم') +
+        (eye ? ' <span class="ch-tag hot">🔴 محتاج رد</span>' : '') +
+        (c.status === 'done' ? ' <span class="ch-tag done">اتقفلت</span>' : '') + '</div>' +
+        '<div class="ch-sub">' + esc([c.brand, c.model, c.issue].filter(Boolean).join(' · ') || 'لسه ما قالش المشكلة') + '</div>' +
+        '<div class="ch-sub" style="direction:ltr;text-align:start;">' + esc(c.phone || '') +
+        ' <span style="color:var(--muted-2);direction:rtl;display:inline-block;">' + when(c.updated_at) + '</span></div>' +
+        '</div>';
+    }
+    function chSection(title, arr) {
+      if (!arr.length) return '';
+      return '<div class="ch-sec">' + esc(title) + ' <span class="ch-cnt">' + arr.length + '</span></div>' +
+             arr.map(chRowHtml).join('');
+    }
 
     host.innerHTML =
       '<button class="ch-back" id="chReload">↻ تحديث</button>' +
       (CH.err ? '<div class="ch-empty">' + esc(CH.err) + '</div>'
        : CH.loading ? '<div class="ch-empty">بنجيب المحادثات…</div>'
-       : list.length ? list.map(function (c) {
-          var eye = needsEye(c);
-          return '<div class="ch-row' + (eye ? ' hot' : '') + '" data-t="' + esc(c.token) + '">' +
-            '<div class="ch-nm">' + esc(c.customer || 'عميل من غير اسم') +
-            (eye ? ' <span class="ch-tag hot">🔴 محتاج رد</span>' : '') +
-            (c.status === 'done' ? ' <span class="ch-tag done">اتقفلت</span>' : '') + '</div>' +
-            '<div class="ch-sub">' + esc([c.brand, c.model, c.issue].filter(Boolean).join(' · ') || 'لسه ما قالش المشكلة') + '</div>' +
-            '<div class="ch-sub" style="direction:ltr;text-align:start;">' + esc(c.phone || '') +
-            ' <span style="color:var(--muted-2);direction:rtl;display:inline-block;">' + when(c.updated_at) + '</span></div>' +
-            '</div>';
-         }).join('')
-       : '<div class="ch-empty">مفيش محادثات هنا</div>');
+       : (unread.length || read.length)
+          ? (chSection('غير مقروء', unread) + chSection('مقروء', read))
+          : '<div class="ch-empty">مفيش محادثات هنا</div>');
 
     Array.prototype.forEach.call(host.querySelectorAll('.ch-row'), function (b) {
       b.onclick = function () { openChat(b.getAttribute('data-t')); };
@@ -296,7 +313,17 @@
                 toast('🔔 ' + (row.customer || 'عميل') + ' محتاج رد — اضغط للفتح');
               }
               try { IFixDock.refresh(); } catch (e) {}
-              if (CH.host && !CH.open) paint();
+
+              // المحادثة المفتوحة تتحدّث لحظياً كمان — أي كلام جديد
+              // (من العميل أو من موظف) يظهر وانت فاتحها من غير تحديث.
+              // payload.new بيجي بكل الأعمدة بما فيها messages.
+              if (CH.open && CH.open.token === row.token) {
+                if (payload.eventType === 'DELETE') CH.open = null;
+                else { CH.open = row; markSeen(row); }
+                paint();
+              } else if (CH.host && !CH.open) {
+                paint();
+              }
             })
         .subscribe();
     } catch (e) { /* الاشتراك مايوقفش أي حاجة */ }
