@@ -5126,9 +5126,11 @@ function renderDayColumns(){
 function dayCardHtml(d){
   const s = statusInfo(d.status);
   // وسم أحمر واضح للمرتجع (محتاج إعادة فحص)، وباقي الحالات بلون حالتها
-  const badge = d.status === 'returned'
+  const wasRet = d.status !== 'returned' && hasRetData(d);
+  const badge = (d.status === 'returned'
     ? `<span class="status-tag" style="background:var(--danger-tint);color:var(--danger);font-weight:800;">🔁 ${t('ui.returnedBadge')}</span>`
-    : `<span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
+    : `<span class="status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`)
+    + (wasRet ? `<span class="status-tag" style="background:var(--danger-tint);color:var(--danger);font-weight:800;margin-inline-start:6px;">🔁 كان مرتجع</span>` : '');
   // مؤشّر رمز القفل عشان الفني يشوفه على طول
   const lock = (d.lockType==='text' && d.lockText)
     ? `<div style="margin-top:6px;font-size:12.5px;">🔒 <span style="font-family:monospace;font-weight:800;">${esc(d.lockText)}</span></div>`
@@ -5196,9 +5198,11 @@ function tpFlash(msg){
 // كارت جهاز في البوابة — من غير أي سعر/فلوس. canAct = يظهر أزرار تغيير الحالة
 function techCardHtml(d, canAct){
   const s = statusInfo(d.status);
-  const badge = d.status === 'returned'
+  const wasRet = d.status !== 'returned' && hasRetData(d);
+  const badge = (d.status === 'returned'
     ? `<span class="status-tag tp-status-tag" style="background:var(--danger-tint);color:var(--danger);font-weight:800;">🔁 ${t('ui.returnedBadge')}</span>`
-    : `<span class="status-tag tp-status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`;
+    : `<span class="status-tag tp-status-tag" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">${esc(fullStatusLabel(d))}</span>`)
+    + (wasRet ? `<span class="status-tag tp-status-tag" style="background:var(--danger-tint);color:var(--danger);font-weight:800;margin-inline-start:6px;">🔁 كان مرتجع</span>` : '');
   const lock = (d.lockType==='text' && d.lockText)
     ? `<div style="margin-top:6px;font-size:12.5px;">🔒 <span style="font-family:monospace;font-weight:800;">${esc(d.lockText)}</span></div>`
     : ((d.lockType==='pattern'||d.lockType==='image') && d.lockImage)
