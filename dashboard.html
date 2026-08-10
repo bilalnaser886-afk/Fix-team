@@ -3840,10 +3840,10 @@ const PTS_DATA = {
     {n:'فلاتة شحن', tiers:[{m:['X','XS','XS Max'],p:4},{m:['XR','11'],p:3},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{r:['15','16 Pro Max'],p:8},{p:10}]},
     {n:'جرس / سماعة تحت / خارجية', p:5},
     {n:'بطارية', tiers:[{r:['X','11 Pro Max'],p:3},{m:['14','14 Plus','15','15 Plus','15 Pro','15 Pro Max','16','16 Plus','16 Pro','16 Pro Max','17','17 Pro','17 Pro Max'],p:8},{p:5}]},
-    {n:'فلاتة / نرملة بطارية', p:8},
+    {n:'فلاتة / نرملة بطارية', tiers:[{r:['X','13 Pro Max'],p:4},{p:6}]},
     {n:'نقل ابروم بطارية', p:10},
-    {n:'تعديل نسبة بطارية', p:5},
-    {n:'برمجة فلاتة بطارية', p:5},
+    {n:'تعديل نسبة بطارية', p:0.5},
+    {n:'برمجة فلاتة بطارية', p:0.5},
     {n:'كاميرا خلفية', tiers:[{r:['X','11 Pro Max'],p:4},{r:['12 mini','14 Pro Max'],p:5},{p:8}]},
     {n:'نرملة كاميرا', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{p:7}]},
     {n:'فلاش', p:6},
@@ -3873,17 +3873,17 @@ const PTS_DATA = {
     {n:'باغة شاشة IPS',p:2},{n:'باغة شاشة Super AMOLED',p:4},{n:'شاشة IPS',p:1},{n:'شاشة Super AMOLED',p:2},
     {n:'فريم',p:2},{n:'عدل فريم',p:2.5},{n:'سوكت Micro',p:1},{n:'سوكت Type-C',p:2},{n:'مايك',p:1},
     {n:'جرس (سماعة خارجية)',p:1},{n:'بوردة شحن',p:1},{n:'بطارية',p:1},{n:'فلاتة باور',p:1},{n:'فلاتة فوليم',p:1},
-    {n:'بصمة',p:1},{n:'عطل في البوردة',p:5},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
+    {n:'بصمة',p:1},{n:'عطل في البوردة',p:7},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
   ],
   tab: [
     {n:'كاميرا امامية',p:1},{n:'سماعة مكالمات',p:1},{n:'سينسور',p:1},{n:'عزل سينسور',p:0.5},
     {n:'باغة شاشة IPS',p:3},{n:'باغة شاشة Super AMOLED',p:4},{n:'شاشة IPS',p:1},{n:'شاشة Super AMOLED',p:2},
     {n:'فريم',p:2},{n:'عدل فريم',p:2},{n:'سوكت Micro',p:1},{n:'سوكت Type-C',p:2},{n:'مايك',p:1.5},
     {n:'جرس (سماعة خارجية)',p:1},{n:'بوردة شحن',p:1},{n:'بطارية',p:1},{n:'فلاتة باور',p:1},{n:'فلاتة فوليم',p:1},
-    {n:'بصمة',p:1},{n:'عطل في البوردة',p:5},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
+    {n:'بصمة',p:1},{n:'عطل في البوردة',p:7},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
   ],
   software: [
-    {n:'سوفت اندرويد / فلاشة / FRP',p:1},{n:'سوفت ايفون / فلاشة',p:1},{n:'جتاج',p:3},{n:'ذاكرة',p:5},
+    {n:'سوفت اندرويد / فلاشة / FRP',p:2},{n:'سوفت ايفون / فلاشة',p:0.25},{n:'جتاج',p:3},{n:'ذاكرة',p:5},
     {n:'فك آي كلاود بدون شبكة',p:1},{n:'فك آي كلاود بشبكة',p:2},{n:'تخطي تاب مدرسة',p:1},
     {n:'سوفت تاب مدرسة',p:1},{n:'فلاشة كاملة لأندرويد',p:2},
   ],
@@ -3929,7 +3929,7 @@ function _guessModel(model){
   return 'X';
 }
 
-const _fmtPts = n => (Math.round(n*10)/10).toString();
+const _fmtPts = n => (Math.round(n*100)/100).toString();
 
 // ===== مطابقة العطل المكتوب بالأعطال المعروفة =====
 function _norm(s){
@@ -4016,7 +4016,7 @@ function autoCalcPoints(d){
     if(p != null){ total += p; names.push(f.n); }
   });
   const uncertain = rText.leftovers.filter(w => _closest(w, cat).length);
-  return { total: Math.round(total*10)/10, names, model, cat, uncertain, matchedCount: idxSet.size,
+  return { total: Math.round(total*100)/100, names, model, cat, uncertain, matchedCount: idxSet.size,
            fromText:[...fromText], fromParts:[...fromParts], fromAI:[...fromAI], allIdx:[...idxSet] };
 }
 
@@ -4035,7 +4035,7 @@ function computeAutoPointsValue(d){
     if(pts == null && auto.uncertain && auto.uncertain.length){ const idxs = _closest(auto.uncertain[0], cat); if(idxs.length) pts = ptsOf(idxs[0]); }
   }
   if(pts == null) pts = 1;   // نقاط افتراضية (عدّلها لو حبيت)
-  return Math.round(pts * 10) / 10;
+  return Math.round(pts * 100) / 100;
 }
 
 function autoPointsNote(d){
@@ -4167,7 +4167,7 @@ function _calcTotal(){
     const p = (_calcCat === 'iphone_x') ? faultPts(f, _calcModel) : f.p;
     if(p != null) total += p;
   });
-  return Math.round(total*10)/10;
+  return Math.round(total*100)/100;
 }
 
 function renderPtsCalc(){
@@ -4201,7 +4201,7 @@ function renderPtsCalc(){
     <div class="calc-label">🔎 مش متأكد من دول — دوس لو صح:</div>
     <div class="calc-sugg-wrap">${sugg.map(s => `<div class="calc-sugg"><span class="calc-sugg-w">«${esc(s.word)}»</span>${s.idxs.map(i => { const p=_ptsOf(i); if(p==null) return ''; return `<button type="button" class="calc-chip mini${_calcSel.has(i)?' on':''}" onclick="togglePtsFault(${i})"><span>${esc(faults[i].n)}</span><b>${_fmtPts(p)}</b></button>`; }).join('')}</div>`).join('')}</div>` : '';
 
-  total = Math.round(total*10)/10;
+  total = Math.round(total*100)/100;
 
   document.getElementById('ptsCalcModal').innerHTML = `
     <div class="calc-head"><span>🧮 حاسبة النقط</span><button type="button" onclick="closePtsCalc()">×</button></div>
