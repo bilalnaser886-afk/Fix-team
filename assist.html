@@ -970,8 +970,29 @@ function addLiveBubble(kind, text){
   toBottom();
 }
 
-function appendMsg(who, text){
-  try{ sb.rpc('assist_append_msg', { p_token: S.token, p_who: who, p_text: text }); }catch(e){}
+function liveError(msg){
+  var r = document.createElement('div');
+  r.className = 'row bot';
+  r.innerHTML = '<div class="bub" style="background:#7f1d1d;color:#fff;">⚠️ ' + esc(msg) + '</div>';
+  $flow.appendChild(r);
+  var bar = document.getElementById('liveBar'); if(bar) $flow.appendChild(bar);
+  toBottom();
+}
+
+async function appendMsg(who, text){
+  try{
+    const { error } = await sb.rpc('assist_append_msg', { p_token: S.token, p_who: who, p_text: text });
+    if(error){
+      console.error('assist_append_msg failed:', error);
+      liveError('لم تُرسل رسالتك: ' + (error.message || error.code || 'خطأ') + '. حاول تاني.');
+      return false;
+    }
+    return true;
+  }catch(e){
+    console.error('assist_append_msg threw:', e);
+    liveError('لم تُرسل رسالتك — تحقق من الاتصال بالإنترنت.');
+    return false;
+  }
 }
 
 function liveSend(){
@@ -1001,7 +1022,8 @@ function enterLive(fromStaff){
   if(!fromStaff){
     bubble('bot', 'تمام ✅ طلبت تتكلم مع موظف. اكتب رسالتك وهيرد عليك هنا.');
     // علّم المحادثة "محتاج رد" عشان الموظف يشوفها فوراً
-    try{ sb.from('assistant_chats').update({ status:'human', updated_at:new Date().toISOString() }).eq('token', S.token); }catch(e){}
+    sb.from('assistant_chats').update({ status:'human', updated_at:new Date().toISOString() }).eq('token', S.token)
+      .then(function(r){ if(r && r.error) console.error('status update failed:', r.error); });
   }
   ensureLiveBar();
   startPolling();

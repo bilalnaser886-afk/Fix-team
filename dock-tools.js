@@ -185,7 +185,7 @@
   async function sendStaffMsg(token, text) {
     text = String(text || '').trim();
     if (!text) return;
-    var db = DB(); if (!db) return;
+    var db = DB(); if (!db) { alert('مفيش اتصال بقاعدة البيانات'); return; }
     // رسم فوري متفائل — الريل تايم بعد كده بيأكّده لباقي الأجهزة
     if (CH.open && CH.open.token === token) {
       if (!Array.isArray(CH.open.messages)) CH.open.messages = [];
@@ -195,8 +195,17 @@
       markSeen(CH.open);
       paint();
     }
-    try { await db.rpc('assist_append_msg', { p_token: token, p_who: 'staff', p_text: text }); }
-    catch (e) {}
+    // Supabase مبيرميش خطأ — لازم نبصّ على .error ونوريه، مننساش ده تاني
+    try {
+      var res = await db.rpc('assist_append_msg', { p_token: token, p_who: 'staff', p_text: text });
+      if (res && res.error) {
+        console.error('assist_append_msg failed:', res.error);
+        alert('الرسالة ماوصلتش للعميل:\n' + (res.error.message || res.error.code || 'خطأ غير معروف'));
+      }
+    } catch (e) {
+      console.error('assist_append_msg threw:', e);
+      alert('الرسالة ماوصلتش — تحقق من الاتصال:\n' + (e && e.message ? e.message : String(e)));
+    }
   }
 
   function paint() {
