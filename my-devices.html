@@ -478,12 +478,14 @@ const ST = {
   diagnosing:{label:t('rp.stDiagnosing'),  c:'--diagnosing'},
   repairing: {label:t('rp.stRepairing'), c:'--repairing'},
   done:      {label:t('rp.stDone'),   c:'--done'},
+  delivered: {label:t('rp.stDelivered'), c:'--done'},
   returned:  {label:t('rp.stReturned'),    c:'--returned'},
   rejected:  {label:t('rp.stRejected'),    c:'--rejected'},
+  rejected_shop: {label:'درج الرفض',       c:'--rejected'},
 };
 const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
 // حالات "خلصت" — بتظهر في قسم "شغلي آخر يومين" بس (٤٨ ساعة)
-const DONE_STATES = ['done','delivered','rejected'];
+const DONE_STATES = ['done','delivered','rejected','rejected_shop'];
 const RECENT_MS = 48 * 60 * 60 * 1000;
 
 // بيتظبطوا بعد تسجيل الدخول (ME فاضي وقت تعريف البيانات التجريبية — عادي، مش مستخدمة)
@@ -897,9 +899,12 @@ function ticketHtml(d, canAct){
   // ويخرج من المرتجعات — وبيتعلّم عليه "كان مرتجع" في شاشة تم الصيانة (الداشبورد).
   const isRet = d.status === 'returned';
   // الأجهزة اللي خلصت (قسم آخر يومين) للعرض بس — لا أزرار ولا وسم مساعدة
+  // احتياطي: لو ظهرت حالة جديدة مالهاش ترجمة، منعرضش اسمها الإنجليزي
+  // الخام للفني — ده اللي كان بيخلّي "delivered" تبان زي ما هي.
+  const _stLabel = s => (ST[s] && ST[s].label) || t('rp.status') || 'الحالة';
   const isDone = DONE_STATES.includes(d.status);
   const actions = isDone
-    ? `<div class="assist-tag">${(ST[d.status]||{}).label || d.status}</div>`
+    ? `<div class="assist-tag">${_stLabel(d.status)}</div>`
     : !canAct ? `<div class="assist-tag">🤝 ${t('tp.assistTag')} ${esc(d.tech)}</div>` : `
     <div class="tk-actions">
       ${(!isRet && d.status!=='repairing') ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
