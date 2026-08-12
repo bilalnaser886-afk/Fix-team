@@ -597,7 +597,14 @@
       const i = document.createElement('input');
       i.type = 'file'; i.id = id; i.accept = accept; i.style.display = 'none';
       if (capture) i.setAttribute('capture', 'environment');
-      i.onchange = () => { if (i.files && i.files[0]) PUR.onFile(i.files[0]); i.value = ''; };
+      // ⚠️ بنفضّي الخانة **قبل** ما نبدأ القراءة. لو الحدث اتطلق مرتين
+      //    (بيحصل على أندرويد)، المرة التانية بتلاقيها فاضية فمتبعتش
+      //    طلب تاني لـ Gemini.
+      i.onchange = () => {
+        const f = i.files && i.files[0];
+        i.value = '';
+        if (f) PUR.onFile(f);
+      };
       document.body.appendChild(i);
     };
     mk('purCam', 'image/*', true);
@@ -1083,11 +1090,17 @@
     choose(id) { const el = $(id); if (el) el.click(); },
 
     async onFile(file) {
+      // 🔒 حارس التكرار: على بعض الأجهزة (خصوصاً أندرويد) حدث اختيار
+      //    الملف بيتطلق مرتين، فكانت الفاتورة الواحدة بتبعت طلبين لـ
+      //    Gemini في نفس الثانية وتحرق الحصة. القفل ده بيمنع أي قراءة
+      //    تانية طول ما فيه واحدة شغّالة.
+      if (S.busyParse) { console.warn('parse-invoice: طلب مكرر — اتجاهل'); return; }
       if (!online()) { toast(T('pur.errNet'), false); return; }
       const ok = /^image\//.test(file.type) || file.type === 'application/pdf';
       if (!ok) { toast(T('pur.errMime'), false); return; }
       if (file.size > 20 * 1024 * 1024) { toast(T('pur.errBig'), false); return; }
 
+      S.busyParse = true;
       S.aborted = false;
       S.view = 'busy'; render();
 
@@ -1142,6 +1155,8 @@
         S.view = 'home'; render();
         const m = (e && (e.message || e.error_description)) || 'خطأ غير معروف';
         toast(T('pur.errRead', { m: m }), false);
+      } finally {
+        S.busyParse = false;   // يتفتح دايماً — حتى لو حصل خطأ
       }
     },
 
