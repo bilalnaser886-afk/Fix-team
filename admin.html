@@ -18,6 +18,7 @@
 <link rel="icon" href="favicon32.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
 <script src="i18n.js"></script>
 <style>
   *{box-sizing:border-box;}
@@ -103,28 +104,8 @@
 
 <script>
 // ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
-const SUPABASE_ENVS = {
-  production: {
-    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-  },
-  staging: {
-    url: "https://farfaazxogpvxmujnedu.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
-  }
-};
-const PROD_HOSTS = ["fix-team.pages.dev"];
-const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
-const _envCfg = SUPABASE_ENVS[APP_ENV];
-const sb = supabase.createClient(_envCfg.url, _envCfg.key);
-if(APP_ENV === "staging"){
-  addEventListener("DOMContentLoaded", function(){
-    var b = document.createElement("div");
-    b.textContent = (window.I18N && I18N.has("app.stagingBar")) ? I18N.t("app.stagingBar") : "🧪 بيئة تجريبية — STAGING";
-    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:var(--warn);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
-    document.body.appendChild(b);
-  });
-}
+// الاتصال + تحديد البيئة + esc + شريط STAGING اتنقلوا لـ common.js
+// (بيتحمّل فوق قبل السكربت ده). ADMIN_EMAILS تحت لسه محلية عن قصد.
 
 // إيميلات الأدمن — حسب البيئة
 const ADMIN_EMAILS_BY_ENV = {
@@ -134,7 +115,7 @@ const ADMIN_EMAILS_BY_ENV = {
 const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
 
 let currentUser = { name:'', email:'' };
-const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// esc اتنقلت لـ common.js
 
 // ===== التخزين على app_data =====
 const storage = {

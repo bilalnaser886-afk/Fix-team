@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>
-/* المظهر قبل أي رسم. صفحة الدخول عامة — لو مفيش تفضيل محفوظ
-   بنتبع إعداد جهاز المستخدم بدل ما نفرض حاجة. */
+/* المظهر قبل أي رسم — صفحة عامة، فبتتبع جهاز العميل لو مفيش تفضيل محفوظ */
 (function(){
   try{
     var m = localStorage.getItem('ifix-theme'), d;
@@ -13,340 +12,840 @@
     else if(m === 'auto'){ var h = new Date().getHours(); d = (h >= 19 || h < 7); }
     else d = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
-    var mt = document.querySelector('meta[name="theme-color"]');
-    if(mt) mt.setAttribute('content', d ? '#131E29' : '#F2F2F1');
   }catch(e){}
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="I Fix Team">
-<meta name="theme-color" content="#F2F2F1">
-<link rel="manifest" href="manifest.json">
-<title>I Fix Team — تسجيل الدخول</title>
-<link rel="icon" type="image/x-icon" href="favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<meta name="theme-color" content="#F2F2F1" id="tcMeta">
+<title>مساعد الصيانة — I Fix Team</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="i18n.js"></script>
+<script src="common.js"></script>
 <style>
+  /* ============================================================
+     الألوان من لوجو المحل نفسه — التروس الحمرا والزرقا والدهبي.
+     مش لوحة جديدة: دي هوية موجودة في index.html و track.html،
+     والعميل جاي من صفحة فيسبوك فيها نفس اللوجو.
+     ============================================================ */
   :root{
-    --red:#E8321E;        /* أحمر اللوجو */
-    --red-dark:#C22513;
-    --blue:#2B1DE8;       /* أزرق الترس */
-    --gold:#BE8A1C;       /* ذهبي الترس */
-    --ink:#101014;        /* أسود الموبايل */
-    --paper:#F2F2F1;      /* رمادي الخلفية */
-    --card:rgba(255,255,255,.72); --card-bd:rgba(255,255,255,.9);
-    --sub:#6B7280; --field:#fff; --field-bd:#E3E4E8;
-    /* صندوق تجديد الاشتراك — بيظهر لما الاشتراك يخلص */
-    --renew-bg:#FFF8EC; --renew-bd:#EACB84; --renew-ink:#9A6A0C;
-    --wallet-bg:#FFFFFF; --wallet-bd:#BE8A1C;
-    --btn-off:#D2D4DA; --btn-off-ink:#6B7280;
-    --on-red:#FFFFFF;
+    --red:#E8321E; --red-dark:#C22513;
+    --blue:#2B1DE8; --gold:#BE8A1C;
+    --ink:#101014; --paper:#F2F2F1;
+    --card:#FFFFFF; --line:#E4E4E6;
+    --muted:#6B7280; --faint:#9CA3AF;
+    --on-color:#FFFFFF;
+    --bot-bg:#FFFFFF; --me-bg:#101014; --me-ink:#FFFFFF;
+    --tip-bg:#FFF8EC; --tip-bd:#EACB84; --tip-ink:#7A5309;
+    --shadow:rgba(16,16,20,.10);
   }
-
-  /* ===== الوضع الداكن ===== */
   html[data-theme="dark"]{
     color-scheme:dark;
-    --red:#F0554A; --red-dark:#D13B2E; --blue:#8B9BFF; --gold:#E3B85C;
+    --red:#F0554A; --red-dark:#D13B2E;
+    --blue:#8B9BFF; --gold:#E3B85C;
     --ink:#E9EFF5; --paper:#131E29;
-    --card:rgba(27,42,58,.88); --card-bd:rgba(255,255,255,.10);
-    --sub:#92A6B8; --field:#22323F; --field-bd:#2F4356;
-    --renew-bg:rgba(234,203,132,.13); --renew-bd:rgba(234,203,132,.38); --renew-ink:#F0CE84;
-    --wallet-bg:rgba(255,255,255,.06); --wallet-bd:#C9A24E;
-    --btn-off:#2F4356; --btn-off-ink:#92A6B8;
-    --on-red:#FFFFFF;
+    --card:#1B2A3A; --line:#2F4356;
+    --muted:#92A6B8; --faint:#71879B;
+    --on-color:#0E1721;
+    --bot-bg:#22323F; --me-bg:#E9EFF5; --me-ink:#0E1721;
+    --tip-bg:rgba(234,203,132,.12); --tip-bd:rgba(234,203,132,.38); --tip-ink:#F0CE84;
+    --shadow:rgba(0,0,0,.45);
   }
+
   *{box-sizing:border-box;}
   body{
-    margin:0; min-height:100vh; color:var(--ink);
-    font-family:'Tajawal','Segoe UI',sans-serif;
-    background:
-      radial-gradient(circle at 1.5px 1.5px, rgba(16,16,20,.055) 1.5px, transparent 1.6px) 0 0/18px 18px,
-      var(--paper);
-    display:flex; align-items:center; justify-content:center; padding:24px 16px;
-    overflow-x:hidden;
+    margin:0; min-height:100dvh; background:var(--paper); color:var(--ink);
+    font-family:'Tajawal','Segoe UI',sans-serif; font-size:16px; line-height:1.75;
+    display:flex; flex-direction:column;
+    padding-top:env(safe-area-inset-top);
   }
 
-  /* اللوجو فوق والكارت راكب على طرفه السفلي — متداخلين */
-  .stage{width:100%; max-width:400px; display:flex; flex-direction:column; align-items:center;}
-  .logo-hero{
-    width:min(340px, 82vw); height:auto; display:block;
-    margin-bottom:-84px;           /* التداخل مع الكارت */
-    filter:drop-shadow(0 10px 24px rgba(16,16,20,.10));
-    user-select:none; pointer-events:none;
-  }
-  .card{
-    position:relative; width:100%;
-    background:var(--card);
-    backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
-    border:1px solid var(--card-bd);
-    border-radius:18px; padding:88px 26px 26px;   /* مساحة فوق عشان اللوجو الداخل جواها */
-    box-shadow:0 18px 50px rgba(16,16,20,.14);
-  }
-  /* شريط بألوان تروس اللوجو أعلى الكارت */
-  .card::before{
-    content:""; position:absolute; top:0; right:0; left:0; height:5px;
-    border-radius:18px 18px 0 0;
-    background:linear-gradient(to left, var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);
-  }
+  /* ===== الهيدر: الشريط التلاتي هو توقيع المحل، موجود على الليبل المطبوع ===== */
+  .top{background:var(--card); border-bottom:1px solid var(--line); padding:14px 18px 0;}
+  .top-in{display:flex; align-items:center; gap:11px; max-width:560px; margin:0 auto; padding-bottom:12px;}
+  .mark{width:44px; height:44px; border-radius:12px; overflow:hidden; flex:none; box-shadow:0 3px 10px var(--shadow);}
+  .mark img{width:100%; height:100%; object-fit:cover; display:block;}
+  .top h1{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:0; letter-spacing:.2px;}
+  .top p{margin:1px 0 0; font-size:12.5px; color:var(--muted);}
+  .stripe{height:4px; display:flex;}
+  .stripe i{flex:1;} .s1{background:var(--blue);} .s2{background:var(--red);} .s3{background:var(--gold);}
 
-  h1{
-    font-family:'Cairo',sans-serif; font-weight:900; font-size:22px;
-    margin:0 0 2px; text-align:center; color:var(--ink); letter-spacing:.3px;
-  }
-  .sub{text-align:center; font-size:13px; color:var(--sub); margin:0 0 18px;}
+  /* ===== المحادثة ===== */
+  .flow{flex:1; width:100%; max-width:560px; margin:0 auto; padding:18px 16px 8px;}
+  .row{display:flex; margin-bottom:12px; animation:in .28s ease both;}
+  .row.me{justify-content:flex-start;}
+  .row.bot{justify-content:flex-end;}
+  @keyframes in{from{opacity:0; transform:translateY(7px);} to{opacity:1; transform:none;}}
+  @media (prefers-reduced-motion:reduce){ .row{animation:none;} }
 
-  #loginError{color:var(--red-dark); font-size:13.5px; min-height:20px; text-align:center; font-weight:500;}
+  .bub{
+    max-width:84%; padding:12px 15px; border-radius:17px; font-size:15.5px; line-height:1.8;
+    box-shadow:0 2px 7px var(--shadow);
+  }
+  .bot .bub{background:var(--bot-bg); border:1px solid var(--line); border-end-end-radius:6px;}
+  .me  .bub{background:var(--me-bg); color:var(--me-ink); border-end-start-radius:6px;}
+  .bub b{font-weight:700;}
 
-  .field{display:block; margin-bottom:12px;}
-  .field span{display:block; font-size:13px; color:var(--sub); margin-bottom:6px; font-weight:500;}
-  input{
-    font-size:16px;
-    width:100%; border:1.5px solid var(--field-bd); border-radius:11px; padding:12px 14px;
-    font-size:15px; font-family:inherit; color:var(--ink); background:var(--field);
-    transition:border-color .15s, box-shadow .15s;
+  /* نصيحة فورية — دي أكتر حاجة نافعة للعميل قبل ما يوصل المحل */
+  .tip{
+    background:var(--tip-bg); border:1px solid var(--tip-bd); color:var(--tip-ink);
+    border-radius:14px; padding:12px 15px; font-size:14.5px; line-height:1.85;
+    max-width:84%; margin:0 0 12px auto; box-shadow:0 2px 7px var(--shadow);
   }
-  input:focus{outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(43,29,232,.14);}
+  .tip .h{font-family:'Cairo',sans-serif; font-weight:800; display:block; margin-bottom:3px;}
 
-  button.login{
-    width:100%; margin-top:6px; padding:14px; border:none; border-radius:12px;
-    background:var(--red); color:#fff; font-family:'Cairo',sans-serif;
-    font-weight:800; font-size:16px; cursor:pointer;
-    box-shadow:0 6px 18px rgba(232,50,30,.32);
-    transition:background .15s, transform .1s;
+  /* ===== الاختيارات ===== */
+  .picks{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; margin:2px 0 16px;}
+  .pick{
+    font-family:inherit; font-size:14.5px; font-weight:700; cursor:pointer;
+    background:var(--card); color:var(--ink); border:1.5px solid var(--line);
+    border-radius:999px; padding:10px 17px; transition:border-color .15s, transform .1s;
   }
-  button.login:hover{background:var(--red-dark);}
-  button.login:active{transform:translateY(1px);}
-  button.login:disabled{background:var(--btn-off); color:var(--btn-off-ink); box-shadow:none; cursor:wait;}
-  button.login:focus-visible{outline:3px solid rgba(43,29,232,.4); outline-offset:2px;}
+  .pick:hover{border-color:var(--red);}
+  .pick:active{transform:scale(.97);}
+  .pick:focus-visible{outline:3px solid color-mix(in srgb, var(--red) 45%, transparent); outline-offset:2px;}
 
-  .renew-box{
-    display:none; background:var(--renew-bg); border:1px solid var(--renew-bd); border-radius:12px;
-    padding:14px; font-size:13.5px; line-height:1.9; margin-top:14px;
-    direction:ltr; text-align:left;
+  .ask{display:flex; gap:8px; margin:2px 0 16px;}
+  .ask input{
+    flex:1; font-family:inherit; font-size:16px; color:var(--ink);
+    background:var(--card); border:1.5px solid var(--line); border-radius:13px; padding:12px 14px;
   }
-  .renew-box b{color:var(--renew-ink);}
-  .wallet{
-    direction:ltr; display:inline-block; background:var(--wallet-bg); border:1.5px dashed var(--wallet-bd);
-    border-radius:6px; padding:3px 10px; font-weight:bold; font-family:monospace;
+  .ask input:focus{outline:none; border-color:var(--red);}
+  .ask button{
+    flex:none; font-family:'Cairo',sans-serif; font-weight:800; font-size:15px; cursor:pointer;
+    background:var(--red); color:var(--on-color); border:none; border-radius:13px; padding:0 20px;
   }
+  .ask button:active{background:var(--red-dark);}
 
-  @media (prefers-reduced-motion:no-preference){
-    .stage{animation:rise .5s ease both;}
-    @keyframes rise{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  /* ============================================================
+     التوقيع: بطاقة الكشف المبدئي
+     شكلها متعمّد إنه يشبه الليبل الحراري اللي المحل بيطبعه على
+     كل جهاز — نفس الشريط التلاتي ونفس الخط أحادي المسافة للرقم.
+     العميل بيصوّرها ويجي بيها، فبتبقى وصلة بين اللينك والمحل.
+     ============================================================ */
+  .ticket{
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    overflow:hidden; margin:6px 0 16px; box-shadow:0 8px 26px var(--shadow);
+    animation:in .4s ease both;
   }
+  .ticket .stripe{height:5px;}
+  .tk-in{padding:16px 18px 18px;}
+  .tk-eyebrow{
+    font-family:ui-monospace,'SFMono-Regular',Menlo,monospace;
+    font-size:11px; letter-spacing:.14em; color:var(--faint); text-transform:uppercase;
+  }
+  .tk-in h2{font-family:'Cairo',sans-serif; font-weight:900; font-size:19px; margin:3px 0 14px;}
+  .tk-line{display:flex; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px dashed var(--line);}
+  .tk-line:last-of-type{border-bottom:none;}
+  .tk-k{font-size:13.5px; color:var(--muted); flex:none;}
+  .tk-v{font-size:14.5px; font-weight:700; text-align:start;}
+  .tk-price{
+    margin-top:14px; padding:13px 15px; border-radius:13px;
+    background:color-mix(in srgb, var(--red) 8%, transparent);
+    border:1px solid color-mix(in srgb, var(--red) 30%, transparent);
+  }
+  .tk-price .k{font-size:12.5px; color:var(--muted);}
+  .tk-price .v{font-family:'Cairo',sans-serif; font-weight:900; font-size:22px; color:var(--red); margin-top:1px;}
+  .tk-price .n{font-size:12px; color:var(--muted); line-height:1.7; margin-top:5px;}
+
+  /* ===== الإجراءات ===== */
+  .cta{display:grid; gap:9px; margin:2px 0 20px;}
+  .cta a, .cta button{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-family:'Cairo',sans-serif; font-weight:800; font-size:15.5px;
+    padding:14px; border-radius:14px; border:none; cursor:pointer; text-decoration:none;
+  }
+  .c-wa{background:#25D366; color:#06301A;}
+  .c-map{background:var(--card); color:var(--ink); border:1.5px solid var(--line);}
+  .c-more{background:transparent; color:var(--muted); font-size:14px; font-weight:700; padding:8px;}
+
+  .foot{
+    text-align:center; font-size:12px; color:var(--faint); line-height:1.9;
+    padding:14px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .foot b{color:var(--red);}
+  .typing{display:inline-flex; gap:4px; align-items:center; padding:4px 0;}
+  .typing i{width:6px; height:6px; border-radius:50%; background:var(--faint); animation:bob 1s infinite;}
+  .typing i:nth-child(2){animation-delay:.15s;} .typing i:nth-child(3){animation-delay:.3s;}
+  @keyframes bob{0%,60%,100%{opacity:.3;} 30%{opacity:1;}}
+  @media (prefers-reduced-motion:reduce){ .typing i{animation:none; opacity:.6;} }
 </style>
 </head>
 <body>
 
-<div class="stage">
-  <img class="logo-hero" src="logo.jpg" alt="I Fix Team — for mobile services">
-  <div class="card">
-    <h1 data-i18n="login.title">تسجيل الدخول</h1>
-    <p class="sub" data-i18n="app.subtitle">نظام إدارة الصيانة</p>
-    <div id="loginError"></div>
-
-    <label class="field"><span data-i18n="login.email">البريد الإلكتروني</span>
-      <input type="email" id="email" autocomplete="email">
-    </label>
-    <label class="field"><span data-i18n="login.password">كلمة المرور</span>
-      <input type="password" id="password" autocomplete="current-password">
-    </label>
-    <button class="login" id="loginBtn" data-i18n="login.submit" onclick="login()">دخول</button>
-
-    <!-- تظهر فقط عند انتهاء اشتراك المحل -->
-    <div id="renewBox" class="renew-box">
-      <b>Your subscription has expired.</b><br>
-      Renewal cost: <b>$100 / month</b><br>
-      <span id="egpAmount">&asymp; EGP (calculating today's rate...)</span><br>
-      Payment method: <b>Vodafone Cash</b><br>
-      <span class="wallet">01055946677</span><br>
-      Your system will be reactivated as soon as the payment is confirmed.
+<header class="top">
+  <div class="top-in">
+    <div class="mark"><img src="icon-192.png" alt=""></div>
+    <div>
+      <h1>مساعد الصيانة</h1>
+      <p>I Fix Team — ميدان سرور، دمياط</p>
     </div>
+  </div>
+  <button type="button" id="acctBtn" class="acct" aria-label="حسابي">
+    <span id="acctIco">👤</span>
+  </button>
+  <div class="stripe"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+</header>
+
+<div id="acctSheet" class="sheet hidden" role="dialog" aria-label="حسابي">
+  <div class="sheet-in">
+    <div class="sh-head"><b id="shTitle">حسابي</b>
+      <button type="button" class="sh-x" id="shClose" aria-label="إقفال">✕</button></div>
+    <div id="shBody"></div>
   </div>
 </div>
 
-<script>
-    // ✅ المتغير اسمه sb وليس supabase (تسميته supabase تكسر المكتبة)
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(() => {}); }
+<style>
+  /* زرار الحساب — جوه الهيدر، على الطرف المقابل للشعار */
+  .top{position:relative;}
+  .acct{position:absolute; inset-inline-end:14px; top:14px; width:38px; height:38px;
+    border-radius:12px; border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.12);
+    color:#fff; font-size:17px; line-height:1; cursor:pointer; display:flex;
+    align-items:center; justify-content:center;}
+  .acct:hover{background:rgba(255,255,255,.2);}
+  .acct.on{background:#fff; color:var(--ink,#17222E); border-color:#fff; font:900 13px/1 'Cairo',sans-serif;}
 
-// ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
-// نطاق الإنتاج بس بيستخدم قاعدة الإنتاج. أي نطاق تاني (تجريبي/معاينة/لوكال) بيستخدم Staging تلقائياً
-// عشان مستحيل نشر تجريبي يلمس بيانات الإنتاج بالغلط.
-const SUPABASE_ENVS = {
-  production: {
-    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-  },
-  staging: {
-    // 🔴 بعد ما تعمل مشروع Supabase تجريبي، حط رابطه ومفتاح anon بتاعه هنا:
-    url: "https://farfaazxogpvxmujnedu.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
+  /* شيت الحساب */
+  .sheet{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.45);
+    display:flex; align-items:flex-end; justify-content:center;}
+  .sheet.hidden{display:none;}
+  .sheet-in{background:var(--card,#fff); width:100%; max-width:460px;
+    border-radius:18px 18px 0 0; padding:16px 16px 24px; max-height:82vh; overflow:auto;}
+  .sh-head{display:flex; align-items:center; margin-bottom:12px;}
+  .sh-head b{font:900 15px/1.4 'Cairo',sans-serif;}
+  .sh-x{margin-inline-start:auto; background:none; border:none; font-size:17px;
+    color:var(--muted,#6B7A8C); cursor:pointer; padding:4px 8px;}
+  .sh-f{display:block; margin-bottom:10px;}
+  .sh-f span{display:block; font-size:12px; color:var(--muted,#6B7A8C); margin-bottom:5px;}
+  .sh-f input{width:100%; box-sizing:border-box; padding:11px 12px; border-radius:11px;
+    border:1px solid var(--line,#E4E9EF); background:var(--paper,#F6F7F9);
+    color:var(--ink,#17222E); font:600 14px/1.4 inherit;}
+  .sh-save{width:100%; padding:13px; border:none; border-radius:12px; cursor:pointer;
+    background:#0891A8; color:#fff; font:900 14px/1 'Cairo',sans-serif; margin-top:4px;}
+  .sh-out{width:100%; padding:11px; border:1px solid var(--line,#E4E9EF); border-radius:12px;
+    cursor:pointer; background:none; color:#DC2626; font:800 13px/1 inherit; margin-top:9px;}
+  .sh-note{font-size:11.5px; color:var(--muted,#6B7A8C); line-height:1.8; margin-top:10px;}
+  /* زرار التثبيت — بيظهر لما المتصفح يسمح بس */
+  .c-app{display:block; text-align:center; padding:13px; border-radius:12px; margin-top:8px;
+    border:1px dashed var(--line,#E4E9EF); background:none; color:var(--ink,#17222E);
+    font:800 13.5px/1 inherit; cursor:pointer; width:100%;}
+</style>
+
+<main class="flow" id="flow" aria-live="polite"></main>
+
+<footer class="foot">
+  الأسعار هنا <b>تقديرية</b> — السعر النهائي بعد الكشف على الجهاز.
+</footer>
+
+<script>
+// ============================================================
+// إعدادات المحل — عدّلها من هنا
+// ============================================================
+const SHOP = {
+  whatsapp: '201028794359',          // 01028794359 بصيغة دولية: صفر البداية بيتشال ويتحط 20
+  coords:   { lat: 31.4115841, lng: 31.8119856 },   // ميدان سرور، دمياط
+  hours:    'مفتوح طول اليوم'
+};
+// ⚠️ اللينك بيتبني من الإحداثيات مش من نص بحث. النص كان بيوقع
+//    العميل على أي مكان اسمه قريب — والإحداثيات نقطة واحدة بالظبط.
+SHOP.maps = 'https://www.google.com/maps/search/?api=1&query=' +
+            SHOP.coords.lat + ',' + SHOP.coords.lng;
+SHOP.nav  = 'https://www.google.com/maps/dir/?api=1&destination=' +
+            SHOP.coords.lat + ',' + SHOP.coords.lng;
+
+// ============================================================
+// ⚠️ الأسعار مقفولة لحد ما تتملي
+// ------------------------------------------------------------
+// خليتها مقفولة عن قصد: صفحة عامة برقم غلط أسوأ من صفحة من غير
+// أرقام. العميل بييجي المحل بالرقم اللي شافه.
+//
+// لما تملاها، غيّر enabled لـ true. الأرقام بالجنيه.
+// المفتاح: نوع الجهاز → المشكلة → [من, إلى]
+// ============================================================
+const PRICES = {
+  enabled: false,
+  table: {
+    apple:   { screen:[0,0], battery:[0,0], charge:[0,0], water:[0,0], software:[0,0], camera:[0,0], sound:[0,0], dead:[0,0] },
+    samsung: { screen:[0,0], battery:[0,0], charge:[0,0], water:[0,0], software:[0,0], camera:[0,0], sound:[0,0], dead:[0,0] },
+    other:   { screen:[0,0], battery:[0,0], charge:[0,0], water:[0,0], software:[0,0], camera:[0,0], sound:[0,0], dead:[0,0] }
   }
 };
-// نطاقات الإنتاج (زوّد الدومين المخصص لما تجيبه، زي ifixteam.com):
-const PROD_HOSTS = ["fix-team.pages.dev"];
-const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
-const _envCfg = SUPABASE_ENVS[APP_ENV];
-const sb = supabase.createClient(_envCfg.url, _envCfg.key);
-// إيميلات الأدمن — الدخول بيها بيروح لوحة الأدمن مباشرة
-const ADMIN_EMAILS_BY_ENV = {
-  production: ['belal0@fix.com'],
-  staging:    ['belal0@fix.com']
-};
-const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
-const landingFor = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase()) ? 'admin.html' : 'dashboard.html';
+
+const BRANDS = [
+  { k:'apple',   n:'ايفون',    tier:'apple'   },
+  { k:'samsung', n:'سامسونج',  tier:'samsung' },
+  { k:'xiaomi',  n:'شاومي',    tier:'other'   },
+  { k:'oppo',    n:'أوبو',     tier:'other'   },
+  { k:'realme',  n:'ريلمي',    tier:'other'   },
+  { k:'infinix', n:'انفنكس',   tier:'other'   },
+  { k:'tecno',   n:'تكنو',     tier:'other'   },
+  { k:'huawei',  n:'هواوي',    tier:'other'   },
+  { k:'other',   n:'نوع تاني', tier:'other'   }
+];
+
+// النصيحة هي أنفع حاجة في الصفحة: بتقول للعميل يعمل إيه دلوقتي
+// قبل ما يوصل، وساعات بتنقذ الجهاز فعلاً.
+const ISSUES = [
+  { k:'screen',   n:'الشاشة مكسورة أو لا تعمل',
+    tip:'لو الشاشة مكسورة وفيها قزاز مكسّر، متعدّيش صوابعك عليها. لفّها بشريط شفاف لحد ما توصّلها.' },
+  { k:'battery',  n:'البطارية بتفصل بسرعة',
+    tip:'لو البطارية بتسخن أو منفوخة، بطّل تشحنه — ده خطر حقيقي. هاته على طول.' },
+  { k:'charge',   n:'لا يشحن',
+    tip:'جرّب شاحناً وكابلاً آخرين قبل حضورك. أحياناً يكون العطل في الكابل لا في الجهاز.' },
+  { k:'water',    n:'وقع في ميه',
+    tip:'متشحنوش ومتشغّلوش خالص، وسيبه مقفول. كل ساعة بتعدّي بتقلّل فرصة إنقاذه. هاته بسرعة.' },
+  { k:'software', n:'بيهنّج أو بيقفل لوحده',
+    tip:'لو فيه صور أو أرقام مهمة، خد نسخة احتياطية قبل ما تيجي لو الجهاز لسه بيشتغل.' },
+  { k:'camera',   n:'الكاميرا',
+    tip:'التقط بها صورة قبل حضورك — تدلّنا إن كان العطل في العدسة أم في البرمجيات.' },
+  { k:'sound',    n:'الصوت أو المايك',
+    tip:'جرّب سماعة سلكية. لو الصوت طلع منها، العطل في السماعة الداخلية.' },
+  { k:'dead',     n:'لا يفتح نهائياً',
+    tip:'ضعه على الشاحن ربع ساعة ثم أعد المحاولة. إن لم تظهر أي علامة، أحضره لنفحصه.' },
+  { k:'other',    n:'مشكلة تانية',
+    tip:'أرسل لنا التفاصيل على واتساب أو أحضره إلى المحل لنفحصه.' }
+];
 
 // ============================================================
-// تحويل حسب الدور — من هنا مباشرة، من غير ما نعدّي على الداشبورد
+// الاتصال بقاعدة البيانات — نفس منطق باقي الصفحات:
+// نطاق الإنتاج بس هو اللي بيوصل لقاعدة الإنتاج
+// ============================================================
+// الاتصال + تحديد البيئة + شريط STAGING اتنقلوا لـ common.js
+// (بيتحمّل فوق قبل السكربت ده).
+
+// ============================================================
+// حالة المحادثة
+// ============================================================
+const TOKEN_KEY = 'ifix_assist_token';
+const PROFILE_KEY = 'ifix_assist_profile';
+const S = { token:'', brand:null, model:'', issue:null, phone:'', customer:'', email:'', msgs:[], saved:false };
+
+// ============================================================
+// حساب العميل
 // ------------------------------------------------------------
-// قبل كده كل الموظفين كانوا بيروحوا dashboard.html، وهو اللي بيحوّل
-// الفني والديسباتشر لصفحاتهم. النتيجة إن المستخدم كان يشوف لمحة من
-// أيقونة وواجهة النظام قبل ما يوصل صفحته.
+// الاسم والرقم بيتحفظوا في المتصفح — العميل بيتسأل مرة واحدة بس
+// وبعدها البوت بينده عليه باسمه ويعدّي الأسئلة الشخصية.
 //
-// دلوقتي بنقرا الدور هنا (نفس منطق roleOf في الداشبورد) وبنروح على
-// طول. وبنحفظ الدور محلياً كمان — فحتى لو دخل الداشبورد بعدين،
-// التحويل السريع بتاعه هيشتغل من أول لحظة.
-//
-// أي فشل → بنرجع لسلوك زمان (dashboard.html). الدخول ممنوع يتعطّل
-// عشان استعلام إضافي.
-// ============================================================
-async function landingByRole(email){
-  const e = (email || '').toLowerCase();
-  if(ADMIN_EMAILS.includes(e)) return 'admin.html';
-  if(!ADMIN_EMAILS.length)     return 'dashboard.html';   // الإعداد لسه ماتعملش
+// ⚠️ عن قصد **مش** Supabase Auth. الصفحة دي عامة بمفتاح anon،
+//    ولو العميل بقى مستخدم authenticated كان هيدخل تحت سياسات
+//    زي spare_parts_read اللي بتقول "to authenticated using (true)"
+//    — يعني أي عميل يسجّل يقرا مخزن قطع الغيار. البروفايل المحلي
+//    بيدّي نفس الراحة من غير أي سطح أمني جديد.
+var P = { name:'', phone:'', email:'' };
 
-  let role = 'accountant';
-  try{
-    const q = sb.from('app_data').select('value').eq('key', 'user-roles').maybeSingle();
-    const res = await Promise.race([q, new Promise(r => setTimeout(() => r(null), 4000))]);
-    if(res && res.data && res.data.value){
-      const map = JSON.parse(res.data.value) || {};
-      const v = map[e];
-      const found = (typeof v === 'string') ? v : (v && v.role);
-      if(['super_admin','accountant','dispatcher','technician'].includes(found)) role = found;
-    }
-  }catch(err){ /* نكمّل بالافتراضي */ }
-
-  try{
-    localStorage.setItem('ifix-last-role', role);
-    localStorage.setItem('ifix-last-email', e);
-    sessionStorage.removeItem('ifix-bounced');
-  }catch(err){}
-
-  if(role === 'technician') return 'my-devices.html';
-  if(role === 'dispatcher') return 'dispatch.html';
-  return 'dashboard.html';
+function loadProfile(){
+  try{ var r = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+       P = { name:r.name||'', phone:r.phone||'', email:r.email||'' }; }catch(e){}
+  return P;
 }
-if(APP_ENV === "staging"){
-  addEventListener("DOMContentLoaded", function(){
-    var b = document.createElement("div");
-    b.textContent = (window.I18N && I18N.has("app.stagingBar")) ? I18N.t("app.stagingBar") : "🧪 بيئة تجريبية — STAGING";
-    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
-    document.body.appendChild(b);
+function saveProfile(){
+  try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(P)); }catch(e){}
+  S.customer = P.name; S.phone = P.phone; S.email = P.email;
+  paintAcct();
+}
+function hasProfile(){ return !!(P.name && P.phone); }
+function firstName(){ return (P.name||'').trim().split(/\s+/)[0] || ''; }
+
+function paintAcct(){
+  var b = document.getElementById('acctBtn'), i = document.getElementById('acctIco');
+  if(!b || !i) return;
+  if(hasProfile()){ b.classList.add('on'); i.textContent = firstName().slice(0,6); }
+  else { b.classList.remove('on'); i.textContent = '👤'; }
+}
+
+function openAcct(){
+  var sh = document.getElementById('acctSheet'), body = document.getElementById('shBody');
+  document.getElementById('shTitle').textContent = hasProfile() ? 'حسابي' : 'تعريف بك';
+  body.innerHTML =
+    '<label class="sh-f"><span>الاسم</span><input id="pName" maxlength="40" value="'+esc(P.name)+'" placeholder="الاسم"></label>' +
+    '<label class="sh-f"><span>رقم التليفون</span><input id="pPhone" type="tel" inputmode="tel" maxlength="15" value="'+esc(P.phone)+'" placeholder="01xxxxxxxxx"></label>' +
+    '<label class="sh-f"><span>الإيميل (اختياري)</span><input id="pMail" type="email" maxlength="60" value="'+esc(P.email)+'" placeholder="اختياري"></label>' +
+    '<button type="button" class="sh-save" id="pSave">حفظ</button>' +
+    (hasProfile() ? '<button type="button" class="sh-out" id="pOut">حذف البيانات</button>' : '') +
+    '<button type="button" class="c-app hidden" id="pInstall">📲 ثبّت الصفحة كتطبيق</button>' +
+    '<div class="sh-note">بياناتك في أمان.</div>';
+  sh.classList.remove('hidden');
+
+  document.getElementById('pSave').onclick = function(){
+    var n = document.getElementById('pName').value.trim();
+    var ph = onlyDigits(document.getElementById('pPhone').value);
+    var em = document.getElementById('pMail').value.trim();
+    if(!n){ document.getElementById('pName').focus(); return; }
+    if(ph.length < 10){ document.getElementById('pPhone').focus(); return; }
+    P.name = n; P.phone = ph; P.email = em;
+    saveProfile(); save(); closeAcct();
+  };
+  var out = document.getElementById('pOut');
+  if(out) out.onclick = function(){
+    P = { name:'', phone:'', email:'' };
+    try{ localStorage.removeItem(PROFILE_KEY); }catch(e){}
+    S.customer=''; S.phone=''; S.email='';
+    paintAcct(); closeAcct();
+  };
+  paintInstall();
+}
+function closeAcct(){ document.getElementById('acctSheet').classList.add('hidden'); }
+
+// ===== التثبيت كتطبيق =====
+// ⚠️ الزرار بيظهر لما المتصفح يقول إنه ممكن. سفاري على الأيفون
+//    مبيبعتش الحدث ده خالص — فبنوريه تعليمات بدل زرار مايشتغلش.
+var deferredPrompt = null;
+addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); deferredPrompt = e; paintInstall();
+});
+function isIOS(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
+function paintInstall(){
+  var b = document.getElementById('pInstall');
+  if(!b) return;
+  var standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if(standalone){ b.classList.add('hidden'); return; }
+  if(deferredPrompt){
+    b.classList.remove('hidden');
+    b.textContent = '📲 ثبّت الصفحة كتطبيق';
+    b.onclick = function(){ deferredPrompt.prompt(); deferredPrompt = null; b.classList.add('hidden'); };
+  } else if(isIOS()){
+    b.classList.remove('hidden');
+    b.textContent = '📲 للتثبيت: زر المشاركة ← إضافة إلى الشاشة الرئيسية';
+    b.onclick = null;
+  } else b.classList.add('hidden');
+}
+
+const $flow = document.getElementById('flow');
+// ⚠️ \D في جافاسكربت معناها "مش [0-9]" — فالأرقام العربية (٠-٩)
+//    والفارسية (۰-۹) كانت **بتتشال بالكامل** مش بتتحوّل. عميل يكتب
+//    ٠١٠١٢٣٤٥٦٧٨ كان يجد الخانة فارغة بلا سبب ظاهر.
+//    نحوّلها إلى إنجليزي أولاً ثم ننظّف.
+function enDigits(v){
+  return String(v == null ? '' : v)
+    .replace(/[\u0660-\u0669]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); })
+    .replace(/[\u06F0-\u06F9]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); });
+}
+function onlyDigits(v){ return enDigits(v).replace(/\D/g, ''); }
+
+// esc اتنقلت لـ common.js
+
+function newToken(){
+  try{ return crypto.randomUUID().replace(/-/g,''); }
+  catch(e){ return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,10); }
+}
+
+// ============================================================
+// الحفظ
+// ------------------------------------------------------------
+// بيشتغل في الخلفية ومبيوقفش المحادثة أبداً. لو النت وقع، العميل
+// بيكمّل عادي — الحفظ يفشل بصمت وهو أهون من محادثة بتقف.
+// ============================================================
+let saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const row = {
+      token: S.token,
+      // ⚠️ الإيميل مش عمود في الجدول. بنبعته جوه نص الرسالة بدل ما
+      //    نبعت عمود مش موجود — العملية كلها كانت هتفشل في صمت.
+      brand: S.brand ? S.brand.n : '',
+      model: S.model, phone: S.phone, customer: S.customer,
+      issue: S.issue ? S.issue.n : '',
+      // ⚠️ 'human' معناها "محتاج رد من موظف" — مش "معانا رقمه".
+      //    كانت S.phone ? 'human' : 'bot'، وده كان صح أيام ما الرقم
+      //    مكانش بيتاخد غير لما العميل يطلب حد يكلمه. دلوقتي بناخده
+      //    من أول الكلام، فالشرط ده كان هيعلّم **كل** محادثة إنها
+      //    محتاجة رد ويغرق طابور المحاسب.
+      status: S.wantHuman ? 'human' : 'bot',
+      messages: S.msgs,
+      updated_at: new Date().toISOString()
+    };
+    try{
+      if(!S.saved){
+        const { error } = await sb.from('assistant_chats').insert(row);
+        if(!error) S.saved = true;
+      }else{
+        await sb.from('assistant_chats').update(row).eq('token', S.token);
+      }
+    }catch(e){ /* الحفظ مش بيوقف المحادثة */ }
+  }, 700);
+}
+
+// ============================================================
+// الرسم
+// ============================================================
+function bubble(who, html){
+  const r = document.createElement('div');
+  r.className = 'row ' + who;
+  r.innerHTML = `<div class="bub">${html}</div>`;
+  $flow.appendChild(r);
+  S.msgs.push({ who, text: r.textContent.trim(), at: new Date().toISOString() });
+  toBottom();
+}
+function tip(title, body){
+  const d = document.createElement('div');
+  d.className = 'tip';
+  d.innerHTML = `<span class="h">${esc(title)}</span>${esc(body)}`;
+  $flow.appendChild(d);
+  S.msgs.push({ who:'bot', text: title + ' — ' + body, at: new Date().toISOString() });
+  toBottom();
+}
+function clearInputs(){ $flow.querySelectorAll('.picks, .ask, .cta').forEach(e => e.remove()); }
+function toBottom(){ requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior:'smooth' })); }
+
+function picks(items, onPick){
+  clearInputs();
+  const d = document.createElement('div');
+  d.className = 'picks';
+  items.forEach(it => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pick'; b.textContent = it.n;
+    b.onclick = () => { bubble('me', esc(it.n)); clearInputs(); onPick(it); };
+    d.appendChild(b);
+  });
+  $flow.appendChild(d); toBottom();
+}
+
+function askText(placeholder, cta, onDone, opts){
+  clearInputs();
+  const d = document.createElement('div');
+  d.className = 'ask';
+  d.innerHTML = `<input type="${(opts&&opts.tel)?'tel':'text'}" placeholder="${esc(placeholder)}"
+                   ${(opts&&opts.tel)?'inputmode="tel"':''} maxlength="60">
+                 <button type="button">${esc(cta)}</button>`;
+  const [inp, btn] = [d.querySelector('input'), d.querySelector('button')];
+  // الأرقام تتحوّل إلى إنجليزي أثناء الكتابة — ليرى العميل ما سيُسجَّل
+  if(opts && opts.tel){
+    inp.oninput = () => { const c = enDigits(inp.value); if(c !== inp.value) inp.value = c; };
+  }
+  const go = () => {
+    const v = inp.value.trim();
+    if(!v) { inp.focus(); return; }
+    bubble('me', esc(v)); clearInputs(); onDone(v);
+  };
+  btn.onclick = go;
+  inp.onkeydown = e => { if(e.key === 'Enter') go(); };
+  $flow.appendChild(d); toBottom();
+  setTimeout(() => inp.focus(), 120);
+}
+
+function typing(ms, then){
+  const r = document.createElement('div');
+  r.className = 'row bot';
+  r.innerHTML = `<div class="bub"><span class="typing"><i></i><i></i><i></i></span></div>`;
+  $flow.appendChild(r); toBottom();
+  setTimeout(() => { r.remove(); then(); }, ms);
+}
+
+// ============================================================
+// المسار
+// ============================================================
+function start(){
+  if(hasProfile()){
+    // ⚠️ عارفينه — مفيش أي سؤال شخصي تاني. دي كل فايدة الحساب.
+    S.customer = P.name; S.phone = P.phone; S.email = P.email;
+    bubble('bot', 'أهلاً <b>' + esc(firstName()) + '</b> 👋<br>هل نبدأ؟ ما نوع جهازك؟');
+    typing(500, stepBrand);
+    return;
+  }
+  bubble('bot', 'أهلاً بك في <b>I Fix Team</b> 👋<br>سأساعدك على معرفة مشكلة جهازك والتكلفة التقريبية في أقل من دقيقة.');
+  typing(700, askIdentity);
+}
+
+// بنسأل مرة واحدة في العمر — وبيتحفظ على التليفون
+function askIdentity(){
+  bubble('bot', 'قبل ما نبدأ، الاسم إيه؟');
+  askText('الاسم', 'تمام', function(v){
+    P.name = v.trim(); saveProfile();
+    typing(500, function(){
+      bubble('bot', 'تشرفنا بك يا ' + esc(firstName()) + ' 🤝<br>اكتب رقم هاتفك حتى نتمكن من التواصل معك.');
+      askText('01xxxxxxxxx', 'تمام', function(t){
+        var d = onlyDigits(t);
+        if(d.length < 10){ bubble('bot', 'الرقم غير مكتمل — اكتبه مرة أخرى من فضلك.'); return askPhoneOnly(); }
+        P.phone = d; saveProfile();
+        typing(500, askMail);
+      }, { tel:true });
+    });
+  });
+}
+function askPhoneOnly(){
+  askText('01xxxxxxxxx', 'تمام', function(t){
+    var d = onlyDigits(t);
+    if(d.length < 10){ bubble('bot', 'نحتاج رقماً صحيحاً حتى نصل إليك.'); return askPhoneOnly(); }
+    P.phone = d; saveProfile(); typing(500, askMail);
+  }, { tel:true });
+}
+function askMail(){
+  bubble('bot', 'بريدك الإلكتروني؟ <b>اختياري</b> — يمكنك تخطيه.');
+  clearInputs();
+  var d = document.createElement('div');
+  d.className = 'ask';
+  d.innerHTML = '<input type="email" placeholder="اختياري" maxlength="60">' +
+                '<button type="button">حفظ</button>';
+  var inp = d.querySelector('input'), btn = d.querySelector('button');
+  var skip = document.createElement('button');
+  skip.type = 'button'; skip.className = 'c-more'; skip.textContent = 'تخطَّ';
+  skip.style.marginTop = '8px';
+  var go = function(v){
+    if(v) bubble('me', esc(v)); else bubble('me', 'تخطَّ');
+    P.email = v || ''; saveProfile(); clearInputs();
+    typing(500, function(){ bubble('bot', 'تمام ✅ لنبدأ — ما نوع جهازك؟'); stepBrand(); });
+  };
+  btn.onclick = function(){ go(inp.value.trim()); };
+  inp.onkeydown = function(e){ if(e.key === 'Enter') go(inp.value.trim()); };
+  skip.onclick = function(){ go(''); };
+  d.appendChild(skip);
+  $flow.appendChild(d); toBottom();
+}
+
+function stepBrand(){
+  bubble('bot', 'ما نوع جهازك؟');
+  picks(BRANDS, function(b){ S.brand = b; save(); stepModel(); });
+}
+
+function stepModel(){
+  typing(500, () => {
+    bubble('bot', 'موديل إيه بالظبط؟ <span style="color:var(--muted)">(لو مش متأكد اكتب تقريبي)</span>');
+    askText('مثلاً: 13 برو ماكس', 'تمام', v => { S.model = v; save(); stepIssue(); });
   });
 }
 
-    const $ = (id) => document.getElementById(id);
+function stepIssue(){
+  typing(600, () => {
+    bubble('bot', 'المشكلة إيه؟');
+    picks(ISSUES, i => { S.issue = i; save(); result(); });
+  });
+}
 
-    // فحص اشتراك المحل (صف واحد في جدول shop — بيسري على كل الموظفين)
-    async function shopActive() {
-        const { data, error } = await sb
-            .from('shop')
-            .select('paid_until')
-            .eq('id', 1)
-            .single();
-        if (error || !data) return null;
-        return new Date(data.paid_until) > new Date();
-    }
+function priceLine(){
+  if(!PRICES.enabled) return null;
+  const tier = (S.brand && S.brand.tier) || 'other';
+  const r = ((PRICES.table[tier] || {})[S.issue.k]) || null;
+  if(!r || (!r[0] && !r[1])) return null;
+  const f = n => n.toLocaleString('en-EG');
+  return r[0] === r[1] ? `${f(r[0])} ج.م` : `${f(r[0])} – ${f(r[1])} ج.م`;
+}
 
-    // ------- حساب مقابل الـ 30 دولار بالجنيه بسعر اليوم -------
-    const PRICE_USD = 100;
-    const FALLBACK_RATE = 50; // سعر احتياطي لو الـ API وقع — عدّله لسعر معقول
+function result(){
+  typing(900, () => {
+    tip('ماذا أفعل الآن', S.issue.tip);
 
-    async function showEgpEquivalent() {
-        let rate = null;
-        try {
-            const res = await fetch('https://open.er-api.com/v6/latest/USD');
-            const j = await res.json();
-            if (j && j.result === 'success' && j.rates && j.rates.EGP) rate = j.rates.EGP;
-        } catch (e) { /* هنستخدم السعر الاحتياطي */ }
-        const usedRate = rate || FALLBACK_RATE;
-        const egp = Math.ceil((PRICE_USD * usedRate) / 5) * 5;
-        $('egpAmount').innerHTML =
-            `&asymp; <b>EGP ${egp.toLocaleString('en-EG')}</b> at today's exchange rate` +
-            (rate ? '' : ' (approx.)');
-    }
+    const price = priceLine();
+    const t = document.createElement('div');
+    t.className = 'ticket';
+    t.innerHTML = `
+      <div class="stripe"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+      <div class="tk-in">
+        <div class="tk-eyebrow">PRE-DIAGNOSIS</div>
+        <h2>بطاقة كشف مبدئي</h2>
+        ${P.name ? `<div class="tk-line"><span class="tk-k">الاسم</span><span class="tk-v">${esc(P.name)}</span></div>` : ''}
+        ${P.phone ? `<div class="tk-line"><span class="tk-k">التليفون</span><span class="tk-v" style="direction:ltr;">${esc(P.phone)}</span></div>` : ''}
+        <div class="tk-line"><span class="tk-k">الجهاز</span><span class="tk-v">${esc(S.brand.n)} ${esc(S.model)}</span></div>
+        <div class="tk-line"><span class="tk-k">المشكلة</span><span class="tk-v">${esc(S.issue.n)}</span></div>
+        <div class="tk-line"><span class="tk-k">المحل</span><span class="tk-v">ميدان سرور، دمياط</span></div>
+        ${price ? `
+          <div class="tk-price">
+            <div class="k">التكلفة التقريبية</div>
+            <div class="v">${price}</div>
+            <div class="n">تقدير مبدئي حسب الموديل والعطل. السعر النهائي بعد الكشف.</div>
+          </div>`
+        : `<div class="tk-price"><div class="k">التكلفة</div>
+             <div class="v" style="font-size:17px;">بعد الكشف</div>
+             <div class="n">الأعطال بتختلف من جهاز للتاني — بنكشف الأول وبنقولك السعر قبل ما نبدأ.</div>
+           </div>`}
+      </div>`;
+    $flow.appendChild(t);
+    S.msgs.push({ who:'bot', text:'بطاقة كشف مبدئي: ' + S.brand.n + ' ' + S.model + ' — ' + S.issue.n, at:new Date().toISOString() });
+    save(); toBottom();
 
-    function showRenewBox() {
-        $('renewBox').style.display = 'block';
-        showEgpEquivalent();
-    }
-
-    async function login() {
-        const email = $('email').value.trim();
-        const password = $('password').value;
-        const btn = $('loginBtn');
-
-        $('loginError').textContent = '';
-        $('renewBox').style.display = 'none';
-
-        if (!email || !password) {
-            $('loginError').textContent = 'من فضلك أدخل البريد وكلمة المرور';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'جارٍ الدخول...';
-
-        try {
-            const { error } = await sb.auth.signInWithPassword({ email, password });
-            if (error) {
-                if (error.message.includes('Email not confirmed')) {
-                    $('loginError').textContent = 'الحساب غير مؤكد — فعّله من لوحة تحكم Supabase';
-                } else if (error.message.includes('Invalid login credentials')) {
-                    $('loginError').textContent = t('login.badCreds');
-                } else {
-                    $('loginError').textContent = 'خطأ: ' + error.message;
-                }
-                return;
-            }
-
-            const active = await shopActive();
-
-            if (active === null) {
-                $('loginError').textContent = 'تعذر التحقق من الاشتراك، حاول مرة أخرى';
-                await sb.auth.signOut();
-                return;
-            }
-
-            if (active) {
-                window.location.href = await landingByRole(email);
-            } else {
-                await sb.auth.signOut();
-                showRenewBox();
-            }
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'دخول';
-        }
-    }
-
-    $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
-    $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('password').focus(); });
-
-    // لو عنده جلسة سارية بالفعل → تخطي صفحة الدخول
-    sb.auth.getSession().then(async ({ data: { session } }) => {
-        if (!session) return;
-        const active = await shopActive();
-        if (active) window.location.href = await landingByRole(session.user.email);
+    typing(700, () => {
+      bubble('bot', 'صوّر البطاقة دي وهاتها معاك — هتوفّر عليك وقت الشرح.');
+      actions();
     });
+  });
+}
+
+// ============================================================
+// المسافة للمحل
+// ------------------------------------------------------------
+// هافرساين على كورة الأرض — دي مسافة الخط المستقيم، مش الطريق.
+// بنقولها كده صريح عشان محدش يستنى رقم العدّاد.
+// ============================================================
+function distanceKm(lat, lng){
+  var R = 6371, rad = function(d){ return d * Math.PI / 180; };
+  var dLat = rad(SHOP.coords.lat - lat), dLng = rad(SHOP.coords.lng - lng);
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+          Math.cos(rad(lat))*Math.cos(rad(SHOP.coords.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function showDistance(btn){
+  if(!navigator.geolocation){
+    btn.textContent = 'جهازك لا يدعم تحديد الموقع'; btn.disabled = true; return;
+  }
+  btn.textContent = 'جارٍ تحديد موقعك…'; btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var km = distanceKm(pos.coords.latitude, pos.coords.longitude);
+    var txt = km < 1 ? Math.round(km * 1000) + ' متر'
+            : (km < 10 ? km.toFixed(1) : Math.round(km)) + ' كيلو';
+    btn.outerHTML =
+      '<a class="c-map" href="' + SHOP.nav + '" target="_blank" rel="noopener">' +
+      '🧭 المحل يبعد عنك <b>' + txt + '</b> — افتح الطريق</a>' +
+      '<div style="font-size:11px;color:var(--muted,#6B7A8C);text-align:center;margin-top:6px;">' +
+      'المسافة بالخط المستقيم — الطريق الفعلي أطول قليلاً.</div>';
+  }, function(err){
+    // ⚠️ الرفض مش خطأ — العميل ممكن يكون مقفل الموقع عن قصد.
+    //    بنوريه الطريق على الخريطة بدل رسالة اعتذار.
+    btn.disabled = false;
+    btn.textContent = err && err.code === 1
+      ? 'الموقع مغلق — فعّله من إعدادات المتصفح ثم أعد المحاولة'
+      : 'تعذّر تحديد موقعك — أعد المحاولة';
+  }, { enableHighAccuracy:false, timeout:9000, maximumAge:300000 });
+}
+
+function actions(){
+  clearInputs();
+  const msg = encodeURIComponent(
+    `السلام عليكم، جهازي ${S.brand.n} ${S.model}\nالمشكلة: ${S.issue.n}`);
+  const d = document.createElement('div');
+  d.className = 'cta';
+  d.innerHTML = `
+    <a class="c-wa" href="https://wa.me/${SHOP.whatsapp}?text=${msg}" target="_blank" rel="noopener">💬 كلّمنا على واتساب</a>
+    <a class="c-map" href="${SHOP.maps}" target="_blank" rel="noopener">📍 مكان المحل — ${esc(SHOP.hours)}</a>
+    <button type="button" class="c-more" id="howFar">🧭 كم يبعد المحل عني؟</button>
+    <button type="button" class="c-more" id="wantDelivery">🛵 أرسلوا مندوباً لاستلام الجهاز</button>
+    <button type="button" class="c-more" id="callMe">هل تريد أن يتصل بك أحد من الفريق؟</button>`;
+  $flow.appendChild(d); toBottom();
+  document.getElementById('callMe').onclick = () => { clearInputs(); leaveNumber(); };
+  document.getElementById('wantDelivery').onclick = () => { clearInputs(); askDelivery(); };
+  const hf = document.getElementById('howFar');
+  if(hf) hf.onclick = () => showDistance(hf);
+}
+
+// ============================================================
+// طلب مندوب
+// ------------------------------------------------------------
+// بيتكتب في نفس محادثة العميل بحالة 'human' — يعني "محتاج رد".
+// شاشة المحادثات في شريط الأدوات هي اللي هتعرضه للمحاسب.
+// ⚠️ من غير الشاشة دي الطلب بيوصل القاعدة ومحدش شايفه.
+// ============================================================
+// ⚠️ نسأل عن الرقم المحفوظ بدل أن نطلب رقماً جديداً.
+//    كان يطلب رقماً في كل مرة رغم أن العميل مسجَّل — وهذا يلغي
+//    الفائدة كلها من الحساب.
+function confirmPhone(label, next){
+  if(!P.phone) return next();
+  bubble('bot', label + '<br>الرقم المحفوظ: <b style="direction:ltr;display:inline-block;">' +
+                esc(P.phone) + '</b>');
+  clearInputs();
+  const d = document.createElement('div');
+  d.className = 'picks';
+  d.innerHTML = '<button type="button" data-k="same">نعم، نفس الرقم</button>' +
+                '<button type="button" data-k="new">رقم آخر</button>';
+  d.querySelector('[data-k=same]').onclick = () => {
+    bubble('me', 'نفس الرقم'); clearInputs(); next();
+  };
+  d.querySelector('[data-k=new]').onclick = () => {
+    bubble('me', 'رقم آخر'); clearInputs();
+    bubble('bot', 'اكتب الرقم الذي تريد التواصل عليه.');
+    askText('01xxxxxxxxx', 'تأكيد', function(t){
+      const dg = onlyDigits(t);
+      if(dg.length < 10){ bubble('bot', 'الرقم غير مكتمل — اكتبه مرة أخرى.'); return; }
+      P.phone = dg; saveProfile(); next();
+    }, { tel:true });
+  };
+  $flow.appendChild(d); toBottom();
+}
+
+function askDelivery(){
+  if(!hasProfile()){
+    bubble('bot', 'لإرسال مندوب نحتاج اسمك ورقمك أولاً.');
+    return typing(400, askIdentity);
+  }
+  confirmPhone('على أي رقم نتصل بك لتأكيد الموعد؟', askDeliveryAddress);
+}
+
+function askDeliveryAddress(){
+  bubble('bot', 'إلى أين يأتي المندوب؟ اكتب العنوان بالتفصيل.');
+  askText('الحي، الشارع، رقم العمارة، علامة مميزة', 'إرسال الطلب', function(addr){
+    S.delivery = { addr: addr, at: new Date().toISOString() };
+    S.msgs.push({ who:'me',
+      text: '🛵 طلب مندوب — ' + P.name + ' · ' + P.phone + '\nالعنوان: ' + addr +
+            (P.email ? '\nالإيميل: ' + P.email : '') +
+            '\nالجهاز: ' + (S.brand ? S.brand.n : '') + ' ' + S.model + ' — ' + (S.issue ? S.issue.n : ''),
+      at: new Date().toISOString() });
+    S.wantHuman = true;                 // بيخلي الحالة 'human' في الحفظ
+    save();
+    typing(700, function(){
+      bubble('bot', 'وصلنا طلبك ✅<br>سنتصل بك على <b style="direction:ltr;display:inline-block;">' +
+                    esc(P.phone) + '</b> لتأكيد الموعد قبل تحرّك المندوب.');
+      typing(500, function(){
+        bubble('bot', 'وإن كنت مستعجلاً، راسلنا على واتساب وسنرد أسرع.');
+        actions();
+      });
+    });
+  });
+}
+
+function leaveNumber(){
+  // نفس المنطق: إن كان الرقم محفوظاً نسأل بدل أن نطلبه من جديد
+  if(P.phone && !leaveNumber._asked){
+    leaveNumber._asked = true;
+    return confirmPhone('على أي رقم يتصل بك الفريق؟', function(){
+      S.phone = P.phone; S.wantHuman = true; save();
+      typing(600, function(){
+        bubble('bot', 'تمام ✅ سنتصل بك في أقرب وقت.');
+        actions();
+      });
+    });
+  }
+  return leaveNumberAsk();
+}
+
+function leaveNumberAsk(){
+  bubble('bot', 'اكتب رقمك وسنتصل بك في أقرب وقت.');
+  askText('01xxxxxxxxx', 'إرسال', v => {
+    const digits = onlyDigits(v);
+    if(digits.length < 10){
+      bubble('bot', 'الرقم غير مكتمل — اكتبه مرة أخرى من فضلك.');
+      return leaveNumberRetry();
+    }
+    S.phone = digits; S.wantHuman = true;
+    if(!P.phone){ P.phone = digits; saveProfile(); }
+    save();
+    typing(500, () => {
+      bubble('bot', 'وصلنا رقمك ✅ سنتصل بك قريباً.<br>ولو مستعجل، الواتساب أسرع.');
+      actions();
+    });
+  }, { tel:true });
+}
+function leaveNumberRetry(){
+  askText('01xxxxxxxxx', 'إرسال', v => {
+    S.phone = v.replace(/\D/g,''); save();
+    typing(500, () => { bubble('bot', 'وصلنا رقمك ✅ سنتصل بك قريباً.'); actions(); });
+  }, { tel:true });
+}
+
+// ============================================================
+// الإقلاع
+// ============================================================
+(function boot(){
+  try{
+    S.token = localStorage.getItem(TOKEN_KEY) || '';
+    if(!S.token){ S.token = newToken(); localStorage.setItem(TOKEN_KEY, S.token); }
+  }catch(e){ S.token = newToken(); }
+
+  loadProfile();
+  S.customer = P.name; S.phone = P.phone; S.email = P.email;
+  paintAcct();
+  var ab = document.getElementById('acctBtn');
+  if(ab) ab.onclick = openAcct;
+  var xb = document.getElementById('shClose');
+  if(xb) xb.onclick = closeAcct;
+  var sheet = document.getElementById('acctSheet');
+  if(sheet) sheet.addEventListener('click', function(e){ if(e.target === sheet) closeAcct(); });
+
+  const mt = document.getElementById('tcMeta');
+  if(mt) mt.setAttribute('content',
+    document.documentElement.getAttribute('data-theme') === 'dark' ? '#131E29' : '#F2F2F1');
+
+  start();
+})();
 </script>
 </body>
 </html>

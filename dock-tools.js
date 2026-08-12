@@ -169,14 +169,22 @@
   }
 
   async function setStatus(token, status) {
+    var db = DB(); if (!db) return;
     try {
-      var db = DB(); if (!db) return;
-      await db.from('assistant_chats').update({ status: status }).eq('token', token);
+      var res = await db.from('assistant_chats').update({ status: status }).eq('token', token);
+      if (res && res.error) {
+        console.error('setStatus failed:', res.error);
+        alert('محصلش تغيير الحالة:\n' + (res.error.message || 'خطأ'));
+        return;   // ما نحدّثش الشاشة لأن الحفظ فشل فعلاً
+      }
       if (CH.open) CH.open.status = status;
       var row = CH.rows.filter(function (x) { return x.token === token; })[0];
       if (row) row.status = status;
       paint(); try { IFixDock.refresh(); } catch (e) {}
-    } catch (e) {}
+    } catch (e) {
+      console.error('setStatus threw:', e);
+      alert('محصلش تغيير الحالة — تحقق من الاتصال');
+    }
   }
 
   // إرسال رسالة من الموظف للعميل — إضافة ذرية عبر assist_append_msg
@@ -237,7 +245,7 @@
           (c.status !== 'done' ? '<button id="chDone">✓ خلصت</button>'
                                : '<button id="chReopen">↩ ارجعها</button>') +
         '</div>';
-      document.getElementById('chBack').onclick = function () { CH.open = null; paint(); };
+      document.getElementById('chBack').onclick = function () { CH.open = null; paint(); load(); };
       var dn = document.getElementById('chDone');
       if (dn) dn.onclick = function () { setStatus(c.token, 'done'); };
       var ro = document.getElementById('chReopen');
@@ -341,9 +349,17 @@
     if (CH.rows.length > 80) CH.rows.length = 80;
   }
 
-  function subscribeChats() {
+  async function subscribeChats() {
     var db = DB();
     if (chan || !db) return;
+    // ⚠️ اتصال الريل تايم لازم يكون مصادق عليه بتوكن الموظف — من غير
+    //    كده الـ RLS بيحجب الأحداث (anon مالوش SELECT على الجدول)،
+    //    فالقايمة والمحادثة مبيتحدّثوش لحظياً رغم إن الجدول منشور.
+    try {
+      var _s = await db.auth.getSession();
+      var _tok = _s && _s.data && _s.data.session && _s.data.session.access_token;
+      if (_tok && db.realtime && db.realtime.setAuth) db.realtime.setAuth(_tok);
+    } catch (e) {}
     try {
       chan = db.channel('assist_chats_live')
         .on('postgres_changes',
@@ -375,7 +391,12 @@
                 paint();
               }
             })
-        .subscribe();
+        .subscribe(function (st) {
+          // لو الاشتراك مشتغلش، هيبان هنا بدل ما يفشل في صمت
+          if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
+            console.warn('assist realtime status:', st);
+          }
+        });
     } catch (e) { /* الاشتراك مايوقفش أي حاجة */ }
   }
 
@@ -383,7 +404,7 @@
     id: 'assist', icon: '💬', title: 'محادثات العملاء',
     badge: function () { return CH.rows.filter(needsEye).length; },
     render: function (h) { css(); CH.host = h; paint(); load(); },
-    onShow: function () { if (!CH.rows.length && !CH.loading) load(); }
+    onShow: function () { if (!CH.loading) load(); }
   });
 
   // ⚠️ بنحمّل مرة واحدة عند الإقلاع من غير ما الأداة تتفتح — عشان
@@ -391,11 +412,39 @@
   //    الرقم مكانش هيظهر غير لما تفتح الأداة، يعني نفس مشكلة
   //    "لازم أدخل أشوف".
   var _tries = 0;
+  // ============================================================
+  // سحب احتياطي للمحادثة المفتوحة — صف واحد بس، كل ٤ ثواني، وبس
+  // والشات مفتوح والتاب ظاهر. ده بيضمن إن ردود العميل توصل حتى لو
+  // الريل تايم اتعطّل. مفيش سحب للقايمة كلها (عشان النقل) — القايمة
+  // بتترافرش لما تفتح الشاشة أو ترجع لها + الريل تايم.
+  // ============================================================
+  var _openPoll = null;
+  function startOpenPoll() {
+    if (_openPoll) return;
+    _openPoll = setInterval(function () {
+      if (document.hidden || !CH.open || !CH.host) return;   // مفيش نداء غير لما يكون فيه شات مفتوح
+      var db = DB(); if (!db) return;
+      var tok = CH.open.token;
+      db.from('assistant_chats')
+        .select('token,customer,phone,brand,model,issue,status,messages,updated_at')
+        .eq('token', tok).maybeSingle()
+        .then(function (r) {
+          if (!r || r.error || !r.data) return;
+          if (!CH.open || CH.open.token !== tok) return;      // العميل قفل أو بدّل الشات
+          var oldLen = Array.isArray(CH.open.messages) ? CH.open.messages.length : 0;
+          var newLen = Array.isArray(r.data.messages) ? r.data.messages.length : 0;
+          if (newLen !== oldLen || r.data.status !== CH.open.status) {
+            CH.open = r.data; markSeen(r.data); paint();
+          }
+        });
+    }, 4000);
+  }
+
   function bootChats() {
     // بنستنى لحد ما العميل يتعرّف — السكربت ده بيتحمّل قبل ما
     // الداشبورد يعمله، فالمحاولة الأولى غالباً بتلاقيه لسه فاضي.
     if (!DB()) { if (_tries++ < 40) setTimeout(bootChats, 400); return; }
-    load(); subscribeChats();
+    load(); subscribeChats(); startOpenPoll();
   }
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', bootChats);
   else bootChats();

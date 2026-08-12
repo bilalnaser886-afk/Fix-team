@@ -25,6 +25,7 @@
 <meta name="apple-mobile-web-app-title" content="أجهزتي">
 <meta name="theme-color" content="#1B2A3A">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
@@ -454,20 +455,8 @@
       أو مفتاح هناك، غيّره هنا كمان.
    ============================================================ */
 
-// ===== إعداد البيئة (مطابق لـ dashboard.html) =====
-const SUPABASE_ENVS = {
-  production: {
-    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-  },
-  staging: {
-    url: "https://farfaazxogpvxmujnedu.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
-  }
-};
-const PROD_HOSTS = ["fix-team.pages.dev"];
-const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
-const sb = supabase.createClient(SUPABASE_ENVS[APP_ENV].url, SUPABASE_ENVS[APP_ENV].key);
+// الاتصال + تحديد البيئة + esc + شريط STAGING اتنقلوا لـ common.js
+// (بيتحمّل فوق قبل السكربت ده).
 
 const CACHE_KEY = 'ifix_tech_cache';
 let offline = false, booted = false, loadError = '';
@@ -838,12 +827,7 @@ function finish(disp){
   if(nm) nm.textContent = disp || ME;
   render();
   $('veil').classList.add('gone');
-  if(APP_ENV === 'staging'){
-    const b = document.createElement('div');
-    b.textContent = t('app.stagingBar');
-    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--waiting);color:var(--on-color);text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;';
-    document.body.appendChild(b);
-  }
+  // شريط STAGING بقى في common.js (موحّد في كل الصفحات)
 }
 
 /* ============================================================
@@ -879,7 +863,7 @@ function notesForSave(d, extraNote){
 
 /* ============================================================ */
 const $ = id => document.getElementById(id);
-const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// esc اتنقلت لـ common.js (النسخة الأأمن اللي بتأمّن ' كمان)
 const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
 const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
   // التاريخ يتبع اللغة المختارة — عربي مصري أو إنجليزي بريطاني
