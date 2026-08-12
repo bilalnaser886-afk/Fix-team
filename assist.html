@@ -22,6 +22,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
 <style>
   /* ============================================================
      الألوان من لوجو المحل نفسه — التروس الحمرا والزرقا والدهبي.
@@ -379,34 +380,8 @@ const ISSUES = [
 // الاتصال بقاعدة البيانات — نفس منطق باقي الصفحات:
 // نطاق الإنتاج بس هو اللي بيوصل لقاعدة الإنتاج
 // ============================================================
-const SUPABASE_ENVS = {
-  production: {
-    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-  },
-  staging: {
-    url: "https://farfaazxogpvxmujnedu.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
-  }
-};
-// ⚠️ أي دومين مش في القايمة دي بيشتغل على **staging** تلقائياً.
-//    دي حماية مقصودة (نشر تجريبي عمره ما يلمس بيانات حقيقية)،
-//    بس معناها إن دومين جديد ناسيينه هنا = محادثات العملاء
-//    الحقيقية بتروح لقاعدة تجريبية ومحدش شايفها، ومن غير أي
-//    خطأ يظهر. أي دومين عميل جديد لازم يتزوّد هنا.
-const PROD_HOSTS = ["fix-team.pages.dev"];
-const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
-const _cfg = SUPABASE_ENVS[APP_ENV];
-const sb = supabase.createClient(_cfg.url, _cfg.key);
-
-if(APP_ENV === "staging"){
-  addEventListener("DOMContentLoaded", function(){
-    var b = document.createElement("div");
-    b.textContent = "🧪 بيئة تجريبية — STAGING";
-    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
-    document.body.appendChild(b);
-  });
-}
+// الاتصال + تحديد البيئة + esc + شريط STAGING اتنقلوا لـ common.js
+// (بيتحمّل فوق قبل السكربت ده).
 
 // ============================================================
 // حالة المحادثة
@@ -530,8 +505,7 @@ function enDigits(v){
 }
 function onlyDigits(v){ return enDigits(v).replace(/\D/g, ''); }
 
-const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c =>
-  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// esc اتنقلت لـ common.js
 
 function newToken(){
   try{ return crypto.randomUUID().replace(/-/g,''); }
@@ -571,10 +545,12 @@ function save(){
       if(!S.saved){
         const { error } = await sb.from('assistant_chats').insert(row);
         if(!error) S.saved = true;
+        else console.error('assist insert failed:', error);
       }else{
-        await sb.from('assistant_chats').update(row).eq('token', S.token);
+        const { error } = await sb.from('assistant_chats').update(row).eq('token', S.token);
+        if(error) console.error('assist update failed:', error);
       }
-    }catch(e){ /* الحفظ مش بيوقف المحادثة */ }
+    }catch(e){ console.error('assist save threw:', e); /* الحفظ مش بيوقف المحادثة */ }
   }, 700);
 }
 

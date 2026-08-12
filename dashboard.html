@@ -92,6 +92,9 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<script src="points.js"></script>
+<script src="statuses.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1464,30 +1467,8 @@ if('serviceWorker' in navigator){
 // ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
 // نطاق الإنتاج بس بيستخدم قاعدة الإنتاج. أي نطاق تاني (تجريبي/معاينة/لوكال) بيستخدم Staging تلقائياً
 // عشان مستحيل نشر تجريبي يلمس بيانات الإنتاج بالغلط.
-const SUPABASE_ENVS = {
-  production: {
-    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
-  },
-  staging: {
-    // 🔴 بعد ما تعمل مشروع Supabase تجريبي، حط رابطه ومفتاح anon بتاعه هنا:
-    url: "https://farfaazxogpvxmujnedu.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
-  }
-};
-// نطاقات الإنتاج (زوّد الدومين المخصص لما تجيبه، زي ifixteam.com):
-const PROD_HOSTS = ["fix-team.pages.dev"];
-const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
-const _envCfg = SUPABASE_ENVS[APP_ENV];
-const sb = supabase.createClient(_envCfg.url, _envCfg.key);
-if(APP_ENV === "staging"){
-  addEventListener("DOMContentLoaded", function(){
-    var b = document.createElement("div");
-    b.textContent = (window.I18N && I18N.has("app.stagingBar")) ? I18N.t("app.stagingBar") : "🧪 بيئة تجريبية — STAGING";
-    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
-    document.body.appendChild(b);
-  });
-}
+// الاتصال + تحديد البيئة + esc + شريط STAGING اتنقلوا لـ common.js
+// (بيتحمّل فوق قبل السكربت ده). ADMIN_EMAILS تحت لسه محلية عن قصد.
 
 // المستخدم الحالي — عشان نسجل مين عمل إيه
 let currentUser = { name: '', email: '' };
@@ -2007,17 +1988,7 @@ function startRealtimeSync(){
 }
 
 // حالات العرض/الفلترة — "تم التسليم" اتقسمت لحالتين حسب حالة الدفع
-const STATUSES = [
-  { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
-  { key: "diagnosing", label: "جاري الكشف", labelKey:"status.diagnosing", varname:"diagnosing" },
-  { key: "repairing", label: "جاري الصيانة", labelKey:"status.repairing", varname:"repairing" },
-  { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
-  { key: "delivered_paid", label: "تم التسليم والدفع", labelKey:"status.delivered_paid", varname:"delivered_paid" },
-  { key: "delivered_unpaid", label: "تم التسليم بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
-  { key: "rejected_shop", label: "درج الرفض", labelKey:"status.rejected_shop", varname:"rejected_shop" },
-  { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
-  { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
-];
+// STATUSES اتنقلت لـ statuses.js
 // اسم الحالة حسب اللغة الحالية
 function stLabel(s){ return s ? (typeof t === 'function' && s.labelKey ? t(s.labelKey) : s.label) : ''; }
 
@@ -2035,15 +2006,7 @@ function histLabel(hEntry){
   return stLabel(statusInfo(hEntry.status));
 }
 // حالات الأزرار (الإجراءات) — التسليم زرار واحد، والنظام بيحدد الخانة حسب الدفع
-const ACTION_STATUSES = [
-  { key: "waiting", label: "قيد الانتظار", labelKey:"status.waiting", varname:"waiting" },
-  { key: "diagnosing", label: "جاري الكشف", labelKey:"status.diagnosing", varname:"diagnosing" },
-  { key: "repairing", label: "جاري الصيانة", labelKey:"status.repairing", varname:"repairing" },
-  { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
-  { key: "delivered", label: "تم التسليم", labelKey:"status.delivered", varname:"delivered" },
-  { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
-  { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
-];
+// ACTION_STATUSES اتنقلت لـ statuses.js
 
 // هل الجهاز محاسَب عليه فعلاً؟
 function getLocale(){ return (typeof I18N!=='undefined' && I18N.getLang()==='en') ? 'en-GB' : 'ar-EG'; }
@@ -2063,7 +2026,7 @@ let currentColumn = null;
 function accent(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key).trim(); }
 function accentBg(key){ return getComputedStyle(document.documentElement).getPropertyValue('--'+key+'-bg').trim(); }
 function statusInfo(key){ return STATUSES.find(s => s.key === key) || ACTION_STATUSES.find(s => s.key === key); }
-function esc(str){ const d=document.createElement('div'); d.innerText = str==null?'':str; return d.innerHTML; }
+// esc اتنقلت لـ common.js (النسخة الأأمن اللي بتأمّن " و ' كمان)
 function daysSince(dateStr){ return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000); }
 function formatDateTime(iso){
   const d = new Date(iso);
@@ -3793,109 +3756,9 @@ function renderDetail(){
 // النقط بتتحسب من الأعطال؛ آيفون-من-X بتختلف حسب الموديل.
 // الناتج بيتكتب في حقل النقط ويفضل قابل للتعديل.
 // ============================================================
-const IPHONE_X_ORDER = [
-  'X','XR','XS','XS Max','11','11 Pro','11 Pro Max',
-  '12 mini','12','12 Pro','12 Pro Max',
-  '13 mini','13','13 Pro','13 Pro Max',
-  '14','14 Plus','14 Pro','14 Pro Max',
-  '15','15 Plus','15 Pro','15 Pro Max',
-  '16','16 Plus','16 Pro','16 Pro Max',
-  '17','17 Pro','17 Pro Max'
-];
-const _mIdx = m => IPHONE_X_ORDER.indexOf(m);
+// بيانات النقاط (IPHONE_X_ORDER · _mIdx · faultPts · PTS_DATA) اتنقلت لـ points.js
 
-// عطل: p (ثابت) أو tiers (متدرّج). rule: m=موديلات صريحة، r=[من,لـ] مدى، بدون م/ر = افتراضي.
-// na = موديلات لا ينطبق عليها العطل.
-function faultPts(f, model){
-  if(f.na && f.na.includes(model)) return null;
-  if(f.tiers){
-    const mi = _mIdx(model);
-    for(const rule of f.tiers){
-      if(rule.m){ if(rule.m.includes(model)) return rule.p; }
-      else if(rule.r){ if(mi >= _mIdx(rule.r[0]) && mi <= _mIdx(rule.r[1])) return rule.p; }
-      else return rule.p;
-    }
-    return null;
-  }
-  return f.p;
-}
-
-const PTS_DATA = {
-  iphone_x: [
-    {n:'فلاتة السماعة', tiers:[{r:['X','12 Pro Max'],p:5},{p:3}]},
-    {n:'كاميرا امامية', p:7},
-    {n:'سينسور', tiers:[{r:['X','12 Pro Max'],p:5},{p:3}]},
-    {n:'F-id (فيس)', tiers:[{m:['X','XR','XS','XS Max','11'],p:5},{r:['11 Pro','12 Pro Max'],p:6},{m:['13 mini','13'],p:7},{p:8}]},
-    {n:'شاشة', p:4},
-    {n:'باغة', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Plus'],p:7},{r:['14 Pro','14 Pro Max'],p:8},{r:['15','16 Pro Max'],p:9},{p:10}]},
-    {n:'تاتش', tiers:[{r:['X','11 Pro Max'],p:6},{r:['12 mini','14 Pro Max'],p:8},{r:['15','16 Pro Max'],p:10},{p:11}]},
-    {n:'بوليش / خرابيش الشاشة', p:5},
-    {n:'فريم الشاشة', na:['11'], tiers:[{m:['X','XR','XS','XS Max'],p:4},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','13 Pro Max'],p:6},{r:['14','14 Pro Max'],p:7},{p:9}]},
-    {n:'لزق فريم الشاشة', na:['11'], tiers:[{m:['X','XR','XS','XS Max'],p:4},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','13 Pro Max'],p:6},{r:['14','14 Pro Max'],p:7},{p:9}]},
-    {n:'اصلاح فلاتة شاشة', p:10},
-    {n:'تغيير فلاتة شاشة', p:10},
-    {n:'نقل IC شاشة', p:10},
-    {n:'نرملة شاشة', p:10},
-    {n:'بابل', p:0},
-    {n:'فلاتة شحن', tiers:[{m:['X','XS','XS Max'],p:4},{m:['XR','11'],p:3},{m:['11 Pro','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{r:['15','16 Pro Max'],p:8},{p:10}]},
-    {n:'جرس / سماعة تحت / خارجية', p:5},
-    {n:'بطارية', tiers:[{r:['X','11 Pro Max'],p:3},{m:['14','14 Plus','15','15 Plus','15 Pro','15 Pro Max','16','16 Plus','16 Pro','16 Pro Max','17','17 Pro','17 Pro Max'],p:8},{p:5}]},
-    {n:'فلاتة / نرملة بطارية', tiers:[{r:['X','13 Pro Max'],p:4},{p:6}]},
-    {n:'نقل ابروم بطارية', p:10},
-    {n:'تعديل نسبة بطارية', p:0.5},
-    {n:'برمجة فلاتة بطارية', p:0.5},
-    {n:'كاميرا خلفية', tiers:[{r:['X','11 Pro Max'],p:4},{r:['12 mini','14 Pro Max'],p:5},{p:8}]},
-    {n:'نرملة كاميرا', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{p:7}]},
-    {n:'فلاش', p:6},
-    {n:'مايك الفيديو', tiers:[{r:['X','11 Pro Max'],p:6},{p:7}]},
-    {n:'فايبريشن', p:3},
-    {n:'زرار السايلنت', p:7},
-    {n:'فلاتة باور', p:7},
-    {n:'فلاتة فوليم', p:7},
-    {n:'ضهر', tiers:[{r:['X','11 Pro Max'],p:6},{p:7}]},
-    {n:'شاسيه', p:7},
-    {n:'ووتر', p:6},
-    {n:'تنضيف / تنضيف كاميرا', tiers:[{r:['X','11 Pro Max'],p:3},{r:['12 mini','12 Pro Max'],p:4},{r:['13 mini','14 Pro Max'],p:6},{p:9}]},
-    {n:'تنضيف سماعات / سوكت', p:1},
-    {n:'مشكلة في البوردة', p:10},
-    {n:'بطع الكاميرا', tiers:[{r:['X','11 Pro Max'],p:5},{r:['12 mini','14 Pro Max'],p:6},{p:7}]},
-  ],
-  iphone_pre: [
-    {n:'فلاتة السماعة',p:1},{n:'كاميرا امامية',p:1},{n:'سينسور',p:1},{n:'شاشة',p:1},
-    {n:'تاتش',p:5},{n:'باغة',p:5},{n:'هوم',p:3},{n:'بصمة',p:3},{n:'فلاتة شحن',p:3},
-    {n:'جرس / سماعة تحت / خارجية',p:1},{n:'بطارية',p:1},{n:'كاميرا خلفية',p:2},{n:'فلاش',p:5},
-    {n:'فايبريشن',p:1},{n:'زرار السايلنت',p:5},{n:'فلاتة باور',p:5},{n:'فلاتة فوليم',p:5},
-    {n:'ضهر',p:5},{n:'شاسيه',p:5},{n:'تنضيف / تنضيف كاميرا',p:1},{n:'تنضيف سماعات / سوكت',p:1},
-    {n:'مشكلة في البوردة',p:7},
-  ],
-  android: [
-    {n:'كاميرا امامية',p:1},{n:'سماعة مكالمات',p:1},{n:'سينسور',p:1},{n:'عزل سينسور',p:0.5},
-    {n:'باغة شاشة IPS',p:2},{n:'باغة شاشة Super AMOLED',p:4},{n:'شاشة IPS',p:1},{n:'شاشة Super AMOLED',p:2},
-    {n:'فريم',p:2},{n:'عدل فريم',p:2.5},{n:'سوكت Micro',p:1},{n:'سوكت Type-C',p:2},{n:'مايك',p:1},
-    {n:'جرس (سماعة خارجية)',p:1},{n:'بوردة شحن',p:1},{n:'بطارية',p:1},{n:'فلاتة باور',p:1},{n:'فلاتة فوليم',p:1},
-    {n:'بصمة',p:1},{n:'عطل في البوردة',p:7},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
-  ],
-  tab: [
-    {n:'كاميرا امامية',p:1},{n:'سماعة مكالمات',p:1},{n:'سينسور',p:1},{n:'عزل سينسور',p:0.5},
-    {n:'باغة شاشة IPS',p:3},{n:'باغة شاشة Super AMOLED',p:4},{n:'شاشة IPS',p:1},{n:'شاشة Super AMOLED',p:2},
-    {n:'فريم',p:2},{n:'عدل فريم',p:2},{n:'سوكت Micro',p:1},{n:'سوكت Type-C',p:2},{n:'مايك',p:1.5},
-    {n:'جرس (سماعة خارجية)',p:1},{n:'بوردة شحن',p:1},{n:'بطارية',p:1},{n:'فلاتة باور',p:1},{n:'فلاتة فوليم',p:1},
-    {n:'بصمة',p:1},{n:'عطل في البوردة',p:7},{n:'كاميرا خلفية',p:1},{n:'فلاش',p:1},{n:'ضهر',p:1},
-  ],
-  software: [
-    {n:'سوفت اندرويد / فلاشة / FRP',p:2},{n:'سوفت ايفون / فلاشة',p:0.25},{n:'جتاج',p:3},{n:'ذاكرة',p:5},
-    {n:'فك آي كلاود بدون شبكة',p:1},{n:'فك آي كلاود بشبكة',p:2},{n:'تخطي تاب مدرسة',p:1},
-    {n:'سوفت تاب مدرسة',p:1},{n:'فلاشة كاملة لأندرويد',p:2},
-  ],
-};
-
-const PTS_CATS = [
-  {k:'iphone_x',   label:'آيفون (X وطالع)'},
-  {k:'iphone_pre', label:'آيفون (قبل X)'},
-  {k:'android',    label:'أندرويد موبايل'},
-  {k:'tab',        label:'تاب أندرويد'},
-  {k:'software',   label:'سوفت وير'},
-];
+// PTS_CATS اتنقلت لـ points.js
 
 // ===== تخمين الفئة والموديل من نوع/موديل الجهاز =====
 function _guessCat(type, model){

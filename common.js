@@ -1,0 +1,56 @@
+// ============================================================
+// I Fix Team — كود مشترك بين كل الصفحات (common.js)
+// ------------------------------------------------------------
+// الفكرة ببساطة: الحاجات اللي كانت متكرّرة في كل ملف (الاتصال بقاعدة
+// البيانات، تحديد البيئة، شريط التجربة، تأمين النصوص) بنكتبها هنا
+// **مرة واحدة بس**. أي تعديل هنا بيسري على كل الصفحات على طول.
+//
+// ⚠️ الترتيب مهم — لازم يتحمّل بعد مكتبة supabase-js وقبل كود الصفحة:
+//     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+//     <script src="common.js"></script>
+//     <script> ...كود الصفحة... </script>
+//
+// ⚠️ أي صفحة بتضيف common.js لازم **تشيل** من كودها التعريفات دي:
+//     SUPABASE_ENVS · PROD_HOSTS · APP_ENV · sb · esc  (+ شريط STAGING)
+//     لو فضلت متعرّفة في الصفحة كمان، المتصفح هيقول
+//     "Identifier already declared" والصفحة **كلها هتقع**.
+// ============================================================
+
+// ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
+// نطاق الإنتاج بس بيستخدم قاعدة الإنتاج. أي نطاق تاني (تجريبي/معاينة/
+// لوكال) بيستخدم Staging تلقائياً — عشان مستحيل نشر تجريبي يلمس
+// بيانات الإنتاج بالغلط.
+const SUPABASE_ENVS = {
+  production: {
+    url: "https://ujpnewqqdkmiedtwvdsy.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcG5ld3FxZGttaWVkdHd2ZHN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MzI0ODEsImV4cCI6MjEwMDAwODQ4MX0.PVreBU_ONzAsHO58AJgXVUhuZjvz0quJU8OTxEVcjDc"
+  },
+  staging: {
+    url: "https://farfaazxogpvxmujnedu.supabase.co",
+    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhcmZhYXp4b2dwdnhtdWpuZWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNDc2MzQsImV4cCI6MjEwMDYyMzYzNH0.uCWokM2rtM20PPCVGCfsW5X0WkDYi2Bl3jcqiogBsME"
+  }
+};
+
+// نطاقات الإنتاج بس. أي دومين مش في القايمة = staging.
+// ⚠️ عن قصد مش بنحط دومين المعاينة (assistant.fix-team.pages.dev) هنا،
+//    عشان النسخة القديمة عليه ما تلمسش قاعدة الإنتاج بالغلط.
+//    لو جبت دومين مخصص (زي ifixteam.com) زوّده هنا.
+const PROD_HOSTS = ["fix-team.pages.dev"];
+const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
+const sb = supabase.createClient(SUPABASE_ENVS[APP_ENV].url, SUPABASE_ENVS[APP_ENV].key);
+
+// شريط أصفر تحت الشاشة لو إحنا على بيئة التجربة — عشان تفرّق بسرعة
+// إنك مش على الإنتاج.
+if (APP_ENV === "staging") {
+  addEventListener("DOMContentLoaded", function () {
+    var b = document.createElement("div");
+    b.textContent = "🧪 بيئة تجريبية — STAGING";
+    b.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;text-align:center;font:700 12px/1.7 system-ui,sans-serif;padding:5px;";
+    document.body.appendChild(b);
+  });
+}
+
+// ===== تأمين النصوص قبل عرضها في الصفحة =====
+// النسخة الأأمن: بتأمّن ٥ رموز (بما فيها ' المفردة) — بتمنع أي حقن HTML.
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
