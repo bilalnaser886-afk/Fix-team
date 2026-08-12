@@ -482,6 +482,9 @@ const ST = {
   rejected:  {label:t('rp.stRejected'),    c:'--rejected'},
 };
 const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
+// حالات "خلصت" — بتظهر في قسم "شغلي آخر يومين" بس (٤٨ ساعة)
+const DONE_STATES = ['done','delivered','rejected'];
+const RECENT_MS = 48 * 60 * 60 * 1000;
 
 // بيتظبطوا بعد تسجيل الدخول (ME فاضي وقت تعريف البيانات التجريبية — عادي، مش مستخدمة)
 let ME = '';
@@ -516,7 +519,14 @@ function adapt(d){
     assist:    (d.assistTechnician || '').trim(),
     assistPct: d.assistPercent || '',
     intake:    d.intakeDate || '',
-    lockText:  d.lockType === 'text' ? (d.lockText || '') : '',
+    touched:   d.lastModifiedAt || d.intakeDate || '',   // آخر لمسة — لحساب الـ ٤٨ ساعة
+    // ⚠️ لازم نمرّر أنواع القفل التلاتة (نص/نمط/صورة). قبل كده كان
+    //    بيمرّر النص بس، فلو المحاسب عدّل الرمز لنمط أو صورة بعد
+    //    الاستلام، الفني كان بيشوف "اتعدّل رمز القفل" من غير الرمز.
+    lockType:    d.lockType || '',
+    lockText:    d.lockType === 'text' ? (d.lockText || '') : '',
+    lockPattern: d.lockPattern || '',
+    lockImage:   d.lockImage || '',
     notes:     (d.activityNotes || []).map(n => ({
                  by: n.by || '', role: n.role || '', at: n.at || '', text: n.text || ''
                })),
@@ -562,7 +572,7 @@ async function loadDevices(){
     const { data, error } = await sb
       .from('devices_safe')
       .select('id,data')
-      .in('status', ACTIVE.concat(['returned']))
+      .in('status', ACTIVE.concat(['returned'], DONE_STATES))
       .order('intake_date', { ascending:false })
       .limit(300);
     if(error) throw error;
@@ -879,11 +889,18 @@ function statusPill(st){
 function ticketHtml(d, canAct){
   const s = ST[d.status] || {c:'--muted'};
   const lock = d.lockText
-    ? `<div class="tk-lock">🔒 <b>${esc(d.lockText)}</b></div>` : '';
+    ? `<div class="tk-lock">🔒 <b>${esc(d.lockText)}</b></div>`
+    : ((d.lockType === 'pattern' || d.lockType === 'image') && d.lockImage)
+      ? `<div class="tk-lock">🔒 <img src="${d.lockImage}" onclick="event.stopPropagation();openLockImg('${d.id}')" style="cursor:pointer;">${d.lockPattern ? ` <b>${esc(d.lockPattern)}</b>` : ''}</div>`
+      : '';
   // الجهاز المرتجع: نخفي "جاري العمل" بس. "تم الإصلاح" (خلصت) بتحوّله لـ done
   // ويخرج من المرتجعات — وبيتعلّم عليه "كان مرتجع" في شاشة تم الصيانة (الداشبورد).
   const isRet = d.status === 'returned';
-  const actions = !canAct ? `<div class="assist-tag">🤝 ${t('tp.assistTag')} ${esc(d.tech)}</div>` : `
+  // الأجهزة اللي خلصت (قسم آخر يومين) للعرض بس — لا أزرار ولا وسم مساعدة
+  const isDone = DONE_STATES.includes(d.status);
+  const actions = isDone
+    ? `<div class="assist-tag">${(ST[d.status]||{}).label || d.status}</div>`
+    : !canAct ? `<div class="assist-tag">🤝 ${t('tp.assistTag')} ${esc(d.tech)}</div>` : `
     <div class="tk-actions">
       ${(!isRet && d.status!=='repairing') ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
       ${(d.status!=='done') ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
@@ -910,6 +927,17 @@ function reindexSearch(){
   try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.issue, d.tech], true); }catch(e){}
 }
 
+// عارض صورة القفل (نمط أو صورة) — دوس على الصورة تكبر
+function openLockImg(id){
+  const d = (devices || []).find(x => x.id === id);
+  if(!d || !d.lockImage) return;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML = `<img src="${d.lockImage}" style="max-width:92vw;max-height:82vh;border-radius:14px;">`;
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+
 function render(){
   const q = ($('q').value||'').trim();
   // بحث مرن — نفس منطق الداشبورد
@@ -924,6 +952,15 @@ function render(){
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
   // المرتجعات: أي جهاز رجع والفني ده شغّال عليه — أساسي أو بديل
   const returns = devices.filter(d => d.status==='returned' && (d.tech===ME || d.assist===ME) && match(d));
+  // شغلي آخر يومين: أي جهاز دخل عليّ مهما كانت حالته (خلص/اتسلّم/اترفض)
+  // خلال آخر ٤٨ ساعة. الأجهزة اللي لسه شغّالة موجودة فوق، فمنكررهاش هنا.
+  const _cut = Date.now() - RECENT_MS;
+  const recent = devices.filter(d =>
+    (d.tech===ME || d.assist===ME) &&
+    (DONE_STATES.includes(d.status)) &&
+    d.touched && new Date(d.touched).getTime() >= _cut &&
+    match(d)
+  ).sort((a,b) => new Date(b.touched) - new Date(a.touched));
 
   const cards = (list,canAct) => list.length
     ? `<div class="grid">${list.map(d=>ticketHtml(d,canAct)).join('')}</div>`
@@ -943,7 +980,12 @@ function render(){
     <div class="sec">
       <div class="sec-head"><span class="ic">🤝</span><h2 data-i18n="tp.assisting">بشارك في صيانتها</h2><span class="n">${assist.length}</span><span class="rule"></span></div>
       ${cards(assist,false)}
-    </div>`;
+    </div>
+    ${recent.length ? `
+    <div class="sec">
+      <div class="sec-head"><span class="ic">🗂️</span><h2>شغلي آخر يومين</h2><span class="n">${recent.length}</span><span class="rule"></span></div>
+      <div class="grid">${recent.map(d=>ticketHtml(d,false)).join('')}</div>
+    </div>` : ''}`;
 }
 
 /* ===== أكشنز ===== */
@@ -1069,6 +1111,7 @@ function renderSheet(){
           <span class="k" data-i18n="rp.shop">المحل</span><span class="v">${esc(d.shop)||'—'}</span>
           <span class="k" data-i18n="rp.intakeDate">تاريخ الاستلام</span><span class="v">${fmtDate(d.intake)}</span>
           ${d.lockText?`<span class="k" data-i18n="rp.lockCode">رمز القفل</span><span class="v" style="font-family:var(--mono);letter-spacing:2px;">${esc(d.lockText)}</span>`:''}
+          ${(!d.lockText && (d.lockType==='pattern'||d.lockType==='image') && d.lockImage)?`<span class="k">رمز القفل</span><span class="v"><img src="${d.lockImage}" onclick="openLockImg('${d.id}')" style="width:110px;height:110px;border-radius:10px;border:1px solid var(--line);object-fit:cover;cursor:pointer;">${d.lockPattern?`<div style="font-family:var(--mono);font-weight:700;margin-top:4px;">${esc(d.lockPattern)}</div>`:''}</span>`:''}
           <span class="k" data-i18n="rp.issue">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
         </div>
       </div>
