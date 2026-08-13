@@ -1131,7 +1131,6 @@
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
-    <button id="partsReviewMenuBtn" class="hidden" onclick="openPartsReview()">🔩 مراجعة قطع الغيار</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
     <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:var(--danger);">تسجيل الخروج</button>
@@ -8855,10 +8854,26 @@ function prCanUse(){
   return false;
 }
 
+// الزرار بيتعمل ديناميكياً عشان يفضل **آخر واحد** في القايمة —
+// تحت "مخزن قطع الغيار" (اللي ai-invoice.js بيضيفه قبل تسجيل الخروج).
 function prSyncMenu(){
-  const b = document.getElementById('partsReviewMenuBtn');
-  if(b) b.classList.toggle('hidden', !prCanUse());
+  const dd = document.getElementById('menuDropdown');
+  if(!dd) return;
+  let b = document.getElementById('partsReviewMenuBtn');
+  if(!prCanUse()){ if(b) b.remove(); return; }
+  if(!b){
+    b = document.createElement('button');
+    b.id = 'partsReviewMenuBtn';
+    b.textContent = '🔩 مراجعة قطع الغيار';
+    b.onclick = openPartsReview;
+  }
+  // نحطه دايماً قبل "تسجيل الخروج" مباشرة = آخر عنصر فعلي في القايمة
+  const out = dd.querySelector('button[onclick="logout()"]') || dd.querySelector('.logout-menu-item');
+  if(out) dd.insertBefore(b, out); else dd.appendChild(b);
 }
+// ai-invoice.js بيضيف أزراره (الفواتير/مخزن قطع الغيار) بعدنا وبيحطهم
+// قبل تسجيل الخروج — فبنعيد ترتيب زرارنا بعدها عشان يفضل تحتهم.
+addEventListener('load', () => { setTimeout(() => { try{ prSyncMenu(); }catch(e){} }, 1200); });
 
 function prDayKey(iso){
   if(!iso) return '';
