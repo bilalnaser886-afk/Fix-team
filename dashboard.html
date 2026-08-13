@@ -7312,6 +7312,26 @@ async function exportShopExcel(shop){
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
 
+  // ملخّص علوي (صف 3) — نفس ترتيب كروت الـ PDF:
+  // إجمالي الآجل · إجمالي المدفوع · المتبقي — عشان تشوف الرصيد فوراً
+  // من غير ما تنزل لآخر الكشف.
+  ws.getCell('A3').value = 'إجمالي الآجل (عليه)';
+  ws.getCell('B3').value = debit;
+  ws.getCell('C3').value = 'إجمالي المدفوع (له)';
+  ws.getCell('D3').value = credit;
+  ws.getCell('E3').value = 'المتبقي على المحل: ' + Number(balance||0).toLocaleString('en-EG') + ' ج.م';
+  ws.getRow(3).height = 20;
+  ws.getCell('B3').numFmt = money;
+  ws.getCell('D3').numFmt = money;
+  [['A3','FFB45309'], ['B3','FFB45309'], ['C3','FF16A34A'], ['D3','FF16A34A'],
+   ['E3', (Number(balance)||0) > 0 ? 'FFDC2626' : 'FF2563EB']].forEach(([ref,color]) => {
+    const c = ws.getCell(ref);
+    c.font = { bold:true, color:{argb:'FFFFFFFF'}, size:11 };
+    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:color} };
+    c.alignment = { horizontal:'center', vertical:'middle' };
+    c.border = border;
+  });
+
   // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
   const head = ws.getRow(4);
   // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
