@@ -1051,6 +1051,39 @@
   .calc-auto.ai{background:rgba(37,99,235,.10);color:var(--info);margin-top:5px;font-weight:600;}
   .calc-auto.ai-maybe{background:var(--surface-3);color:var(--muted);margin-top:5px;}
   .calc-auto-m{opacity:.75;}
+
+  /* ===== 🔩 مراجعة قطع الغيار ===== */
+  .pr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .pr-quick{display:flex;gap:6px;}
+  .pr-q{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);
+    border-radius:10px;padding:8px 14px;font:800 12.5px/1 inherit;cursor:pointer;}
+  .pr-q.on{background:var(--accent);color:#fff;border-color:transparent;}
+  .pr-dates{display:flex;gap:8px;flex-wrap:wrap;}
+  .pr-dates label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+  .pr-dates input{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);
+    border-radius:9px;padding:7px 9px;font:inherit;font-size:12.5px;}
+  .pr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+  .pr-tech{text-align:start;border:1px solid var(--border);background:var(--surface-2);
+    border-radius:14px;padding:14px;cursor:pointer;color:var(--ink);font:inherit;
+    transition:transform .12s,box-shadow .12s;}
+  .pr-tech:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.12);}
+  .pr-tech-n{font-weight:800;font-size:14px;margin-bottom:5px;}
+  .pr-tech-s{font-size:12px;color:var(--muted);}
+  .pr-tech-s .ok{color:var(--done);font-weight:700;}
+  .pr-back{border:none;background:none;color:var(--accent);font:800 13px/1 inherit;
+    cursor:pointer;padding:6px 0;margin-bottom:8px;}
+  .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
+  .pr-n{background:var(--surface-3);border-radius:20px;padding:2px 9px;font-size:12px;}
+  .pr-dev{border:1px solid var(--border);background:var(--surface-2);border-radius:13px;
+    padding:12px;margin-bottom:10px;cursor:pointer;}
+  .pr-dev:hover{border-color:var(--accent);}
+  .pr-dev-t{display:flex;justify-content:space-between;gap:10px;font-weight:800;font-size:13.5px;}
+  .pr-dev-s{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;}
+  .pr-dev-i{color:var(--muted);font-size:12.5px;margin-top:3px;}
+  .pr-cm{margin-top:8px;background:var(--surface-3);border-radius:9px;padding:8px 10px;
+    font-size:13px;font-weight:700;line-height:1.7;}
+  .pr-cm.none{color:var(--muted-2);font-weight:400;font-style:italic;background:none;padding:6px 0;}
+  .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
 </style>
 </head>
 <body>
@@ -1098,6 +1131,7 @@
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button id="partsReviewMenuBtn" class="hidden" onclick="openPartsReview()">🔩 مراجعة قطع الغيار</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
     <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:var(--danger);">تسجيل الخروج</button>
@@ -1126,6 +1160,16 @@
 <div id="board" class="board"><div class="loading" data-i18n="app.loading">جارٍ التحميل...</div></div>
 
 <!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
+<div id="partsReviewOverlay" class="overlay hidden" style="align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>🔩 مراجعة قطع الغيار</h2>
+      <button class="close-btn" onclick="closePartsReview()">×</button>
+    </div>
+    <div id="prBody" style="padding:12px 20px 48px;"></div>
+  </div>
+</div>
+
 <div id="annOverlay" class="overlay hidden">
   <div class="modal" style="max-width:420px;">
     <div style="text-align:center; padding:10px 6px;">
@@ -1586,6 +1630,7 @@ function applyRoleVisibility(){
     document.body.classList.toggle('no-money', !canSeeMoney());
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
+  try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
   // ============================================================
   // التوجيه لصفحات مستقلة
   // ------------------------------------------------------------
@@ -1631,6 +1676,7 @@ const KNOWN_FLAGS = [
   { key:'silent_label_print',  desc:'طباعة الليبل مباشرة من غير نافذة الطباعة' },
   { key:'device_lock_codes',   desc:'رمز قفل الجهاز (رقم / نمط / صورة)' },
   { key:'live_broadcasts',     desc:'الإشعارات اللحظية من الأدمن' },
+  { key:'parts_review',        desc:'مراجعة قطع الغيار (كومنت الفني) — للمحاسب والديسباتشر' },
 ];
 let featureFlags = {};   // { feature_key: { is_enabled, description, updated_at } }
 
@@ -8773,7 +8819,7 @@ requireAccess().then(ok => {
   //    كانت بتتنادى فوراً، فبتلاقي featureFlags لسه فاضية وتخرج
   //    من أول سطر — والإشعارات مبتوصلش أبداً. وكمان بتحتاج
   //    myRole() عشان تعرف تقرا أنهي مفتاح.
-  loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(loadAudit)
+  loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(() => { try{ prSyncMenu(); }catch(e){} }).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
     .then(applyRoleVisibility)
     .then(() => { try{ loadBroadcast(); }catch(e){} });
@@ -8789,6 +8835,132 @@ requireAccess().then(ok => {
   claimSession();
   setInterval(checkSessionStillMine, 20000); // فحص كل ٢٠ ثانية
 });
+// ============================================================
+// 🔩 مراجعة قطع الغيار
+// ------------------------------------------------------------
+// كارت لكل فني فيه أجهزته في الفترة المختارة. تدوس على الفني →
+// تشوف أجهزته، وكل كارت جهاز عليه كومنت قطع الغيار **ظاهر من برا**
+// (اللي الفني كتبه من صفحته). تدوس على الجهاز → بتفتح تفاصيله،
+// وشاشة قطع الغيار بتظهر جواها زي ما هي عشان تربط القطع.
+//
+// الصلاحية: الأدمن والمحاسب تلقائياً. الديسباتشر لازم الأدمن يفعّل
+// مفتاح الميزة 'parts_review' من الإعدادات.
+// ============================================================
+const PR = { from: '', to: '', tech: null, quick: 'today' };
+
+function prCanUse(){
+  const r = myRole();
+  if(r === 'super_admin' || r === 'accountant') return true;
+  if(r === 'dispatcher') return isFeatureEnabled('parts_review');
+  return false;
+}
+
+function prSyncMenu(){
+  const b = document.getElementById('partsReviewMenuBtn');
+  if(b) b.classList.toggle('hidden', !prCanUse());
+}
+
+function prDayKey(iso){
+  if(!iso) return '';
+  const dt = new Date(iso);
+  if(isNaN(dt)) return '';
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+function prToday(){ return prDayKey(new Date().toISOString()); }
+
+function prSetQuick(q){
+  PR.quick = q;
+  const now = new Date();
+  const end = prToday();
+  let start = end;
+  if(q === 'week')  start = prDayKey(new Date(now.getTime() - 6*86400000).toISOString());
+  if(q === 'month') start = prDayKey(new Date(now.getTime() - 29*86400000).toISOString());
+  PR.from = start; PR.to = end;
+  PR.tech = null;
+  prRender();
+}
+
+// الأجهزة داخل الفترة — بنعتمد على آخر لمسة (lastModifiedAt) وإلا تاريخ الاستلام
+function prInRange(d){
+  const k = prDayKey(d.lastModifiedAt || d.intakeDate);
+  if(!k) return false;
+  return (!PR.from || k >= PR.from) && (!PR.to || k <= PR.to);
+}
+
+function prTechOf(d){ return (d.technician || '').trim(); }
+
+function openPartsReview(){
+  if(!prCanUse()){ toast('الميزة دي مقفولة — الأدمن بيفعّلها من الإعدادات'); return; }
+  const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
+  if(!PR.from) prSetQuick('today'); else prRender();
+  document.getElementById('partsReviewOverlay').classList.remove('hidden');
+}
+function closePartsReview(){
+  const o = document.getElementById('partsReviewOverlay');
+  if(o) o.classList.add('hidden');
+  PR.tech = null;
+}
+
+function prRender(){
+  const host = document.getElementById('prBody');
+  if(!host) return;
+  const rows = (devices || []).filter(prInRange).filter(d => prTechOf(d));
+
+  // تجميع حسب الفني
+  const byTech = {};
+  rows.forEach(d => { const t = prTechOf(d); (byTech[t] = byTech[t] || []).push(d); });
+  const techs = Object.keys(byTech).sort((a,b) => byTech[b].length - byTech[a].length);
+
+  const bar = `
+    <div class="pr-bar">
+      <div class="pr-quick">
+        <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
+        <button class="pr-q${PR.quick==='week'?' on':''}"  onclick="prSetQuick('week')">أسبوع</button>
+        <button class="pr-q${PR.quick==='month'?' on':''}" onclick="prSetQuick('month')">شهر</button>
+      </div>
+      <div class="pr-dates">
+        <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
+        <label>إلى <input type="date" value="${PR.to}" onchange="PR.to=this.value;PR.quick='';PR.tech=null;prRender()"></label>
+      </div>
+    </div>`;
+
+  // (١) عرض أجهزة فني محدد
+  if(PR.tech){
+    const list = (byTech[PR.tech] || []).slice()
+      .sort((a,b) => new Date(b.lastModifiedAt||b.intakeDate||0) - new Date(a.lastModifiedAt||a.intakeDate||0));
+    host.innerHTML = bar + `
+      <button class="pr-back" onclick="PR.tech=null;prRender()">‹ رجوع لكل الفنيين</button>
+      <div class="pr-th">🔧 ${esc(PR.tech)} <span class="pr-n">${list.length}</span></div>
+      ${list.length ? list.map(d => {
+        const cm = (d.partsComment || '').trim();
+        return `
+        <div class="pr-dev" onclick="closePartsReview();openDetail('${d.id}')">
+          <div class="pr-dev-t">
+            <span>${esc(d.model || d.deviceType || 'جهاز')} · ${esc(d.customerName || '')}</span>
+            <span class="pr-dev-s">${esc(fullStatusLabel(d))}</span>
+          </div>
+          <div class="pr-dev-i">${esc(d.reportedIssue || '')}</div>
+          ${cm ? `<div class="pr-cm">🔩 ${esc(cm)}</div>`
+               : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
+        </div>`;
+      }).join('') : `<div class="pr-empty">مفيش أجهزة للفني ده في الفترة دي</div>`}`;
+    return;
+  }
+
+  // (٢) كروت الفنيين
+  host.innerHTML = bar + (techs.length ? `
+    <div class="pr-grid">
+      ${techs.map(t => {
+        const l = byTech[t];
+        const withCm = l.filter(d => (d.partsComment||'').trim()).length;
+        return `
+        <button class="pr-tech" onclick="PR.tech='${esc(t).replace(/'/g,"\\'")}';prRender()">
+          <div class="pr-tech-n">🔧 ${esc(t)}</div>
+          <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
+        </button>`;
+      }).join('')}
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
+}
 </script>
 </body>
 </html>
