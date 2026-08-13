@@ -1398,6 +1398,14 @@
   // openId = الجهاز المفتوح حالياً (بنمسكه بنفسنا لأن selectedId في dashboard
   // متغير lexical مش خاصية على window، فمش هنقدر نقراه من هنا مباشرة).
   const DP = { openId: null, deviceId: null, rows: [], loading: false };
+  // قطع الاختيار لجهاز + البحث فيها
+  const DPICK = { rows: [] };
+  function dpPickListHtml(rows) {
+    return (rows && rows.length)
+      ? rows.map(p => `<button type="button" class="dp-pick-opt" onclick="INV.linkToDevice('${esc(p.id)}')">
+          <span>${esc(p.name)}</span><span class="dp-pick-cost">${money(p.total_cost)} ج.م</span></button>`).join('')
+      : `<div class="dp-empty">${esc(T('inv.noStock'))}</div>`;
+  }
 
   // ---------- الستايل ----------
   function injectInvCss() {
@@ -1852,8 +1860,11 @@
         });
     },
     async openPickForDevice() {
-      const id = DP.openId;
-      if (!id) return;
+      // الصفحة المضيفة ممكن تحدد الجهاز صراحةً (زي صفحة مراجعة قطع
+      // الغيار عند الديسباتشر) — وإلا بنجيبه من الجهاز المفتوح.
+      const id = DP.openId || openDeviceId();
+      if (!id) { toast(T('inv.errGeneric', { m: 'مفيش جهاز محدد' }), false); return; }
+      DP.openId = id;
       if (!online()) { toast(T('inv.errNet'), false); return; }
       let rows = [];
       try {
@@ -1869,16 +1880,30 @@
         ov.className = 'overlay hidden';
         document.body.appendChild(ov);
       }
-      const list = rows.length
-        ? rows.map(p => `<button type="button" class="dp-pick-opt" onclick="INV.linkToDevice('${esc(p.id)}')">
-            <span>${esc(p.name)}</span><span class="dp-pick-cost">${money(p.total_cost)} ج.م</span></button>`).join('')
-        : `<div class="dp-empty">${esc(T('inv.noStock'))}</div>`;
+      DPICK.rows = rows;                       // نحتفظ بيهم للبحث
       ov.innerHTML = `<div class="modal" style="max-width:460px;">
         <div class="modal-head"><h2>${esc(T('inv.pickPartTitle'))}</h2>
           <button class="close-btn" onclick="INV.closePick()">×</button></div>
-        <div class="dp-pick-list">${list}</div>
+        <div style="padding:10px 14px 0;">
+          <input id="dpPickQ" placeholder="ابحث عن قطعة…" oninput="INV.pickSearch(this.value)"
+            style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border,#334155);
+                   background:var(--surface-2,#0f172a);color:var(--ink,#e2e8f0);font:inherit;font-size:13.5px;">
+        </div>
+        <div class="dp-pick-list" id="dpPickList">${dpPickListHtml(rows)}</div>
       </div>`;
       ov.classList.remove('hidden');
+    },
+    // بحث حي جوه القطع غير الموجهة — الخانة نفسها ما بتتلمسش عشان
+    // الكيبورد ما تقفلش بعد كل حرف
+    pickSearch(v) {
+      const q = String(v || '').trim();
+      const rows = !q ? DPICK.rows : DPICK.rows.filter(p => {
+        const name = String(p.name || '');
+        if (window.IFixSearch) return IFixSearch.match(q, [name]);
+        return name.includes(q);
+      });
+      const host = $('dpPickList');
+      if (host) host.innerHTML = dpPickListHtml(rows);
     },
     closePick() { const ov = $('dpPickOverlay'); if (ov) ov.classList.add('hidden'); },
     linkToDevice(partId) {
@@ -1893,6 +1918,8 @@
         INV.closePick();
         DP.deviceId = null; injectDeviceParts();
         if (isInvOpen()) INV.loadParts();
+        // لو صفحة "مراجعة قطع الغيار" مفتوحة، تتحدّث على طول
+        try { if (typeof window.prOnPartsChanged === 'function') window.prOnPartsChanged(); } catch (e) {}
       });
     },
 

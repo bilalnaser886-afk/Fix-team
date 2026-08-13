@@ -128,6 +128,19 @@
       '<div class="dk-head"><span class="dk-t" id="dkTitle"></span>' +
       '<button class="dk-x" id="dkClose" title="إقفال" aria-label="إقفال">✕</button></div>' +
       '<div class="dk-body" id="dkBody"></div>';
+    // ⚠️ حارس ضروري: dock-tools.js بينده register فور تحميله، ولو ده
+    //    حصل قبل ما <body> يتكوّن كان document.body بيطلع null والسطر
+    //    اللي تحت يرمي خطأ يوقّف الشريط كله (المحادثات كانت بتختفي
+    //    يوم ويوم لأ حسب سرعة التحميل — أوضح على أندرويد).
+    //    دلوقتي بنستنى الـ body وبنعيد المحاولة بدل ما نقع.
+    if (!document.body) {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', build, { once: true });
+      } else {
+        setTimeout(build, 50);
+      }
+      return;
+    }
     document.body.appendChild(panel);
     document.body.appendChild(rail);
     document.getElementById('dkClose').addEventListener('click', close);

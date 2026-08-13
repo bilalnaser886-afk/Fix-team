@@ -378,6 +378,43 @@
   .flash{background:var(--done-bg); border:1px solid #BBE6C8; color:var(--done); font-weight:700; font-size:13px; border-radius:11px; padding:11px 14px; margin:0 0 15px; display:flex; align-items:center; gap:8px;}
 
   /* شارة عرض تجريبي */
+  /* ===== خانة + نافذة "شغلي آخر ٥ أيام" ===== */
+  .rw-tile{display:flex;align-items:center;gap:12px;width:100%;margin:18px 0 6px;
+    padding:14px 16px;border-radius:14px;border:1px solid var(--line);
+    background:var(--card);cursor:pointer;text-align:start;font:inherit;color:var(--ink);
+    transition:transform .12s, box-shadow .12s;}
+  .rw-tile:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(23,34,46,.10);}
+  .rw-ic{font-size:22px;}
+  .rw-tx{flex:1;display:flex;flex-direction:column;gap:2px;}
+  .rw-tx b{font-size:14.5px;}
+  .rw-tx small{color:var(--muted);font-size:12px;}
+  .rw-arrow{color:var(--muted);font-size:20px;font-weight:800;}
+  .rw-ov{position:fixed;inset:0;z-index:9000;background:rgba(10,16,22,.55);
+    display:flex;align-items:flex-end;justify-content:center;}
+  .rw-sheet{width:100%;max-width:560px;max-height:88vh;overflow-y:auto;
+    background:var(--bg);border-radius:18px 18px 0 0;padding:14px 14px 40px;}
+  .rw-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .rw-head h3{margin:0;font-size:15.5px;flex:1;}
+  .rw-x{border:none;background:var(--card);color:var(--ink);width:34px;height:34px;
+    border-radius:10px;font-size:16px;cursor:pointer;}
+  .rw-days{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;}
+  .rw-day{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:10px;padding:8px 12px;font:700 12px/1.4 inherit;cursor:pointer;white-space:nowrap;}
+  .rw-day.on{background:var(--accent,#0891A8);color:#fff;border-color:transparent;}
+  .rw-card{border:1px solid var(--line);background:var(--card);border-radius:14px;
+    padding:12px;margin-bottom:10px;}
+  .rw-card .t{display:flex;justify-content:space-between;gap:8px;font-weight:800;font-size:13.5px;}
+  .rw-card .s{color:var(--muted);font-size:12px;margin-top:2px;}
+  .rw-st{font-size:11px;font-weight:800;color:var(--muted);}
+  .rw-cm{margin-top:8px;}
+  .rw-cm textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:10px;
+    background:var(--bg);color:var(--ink);font:inherit;font-size:13px;padding:8px 10px;resize:vertical;}
+  .rw-cm .row{display:flex;gap:8px;margin-top:6px;align-items:center;}
+  .rw-save{border:none;border-radius:10px;background:var(--accent,#0891A8);color:#fff;
+    font:800 12px/1 inherit;padding:9px 16px;cursor:pointer;}
+  .rw-save:disabled{opacity:.55;cursor:default;}
+  .rw-hint{color:var(--muted);font-size:11.5px;}
+  .rw-empty{color:var(--muted);text-align:center;padding:26px 8px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -484,9 +521,9 @@ const ST = {
   rejected_shop: {label:'درج الرفض',       c:'--rejected'},
 };
 const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
-// حالات "خلصت" — بتظهر في قسم "شغلي آخر يومين" بس (٤٨ ساعة)
+// حالات "خلصت" — بتظهر في نافذة "شغلي آخر ٥ أيام" بس
 const DONE_STATES = ['done','delivered','rejected','rejected_shop'];
-const RECENT_MS = 48 * 60 * 60 * 1000;
+const RECENT_MS = 5 * 24 * 60 * 60 * 1000;   // آخر ٥ أيام
 
 // بيتظبطوا بعد تسجيل الدخول (ME فاضي وقت تعريف البيانات التجريبية — عادي، مش مستخدمة)
 let ME = '';
@@ -522,6 +559,7 @@ function adapt(d){
     assistPct: d.assistPercent || '',
     intake:    d.intakeDate || '',
     touched:   d.lastModifiedAt || d.intakeDate || '',   // آخر لمسة — لحساب الـ ٤٨ ساعة
+    partsComment: d.partsComment || '',                  // كومنت قطع الغيار (الفني بيكتبه)
     // ⚠️ لازم نمرّر أنواع القفل التلاتة (نص/نمط/صورة). قبل كده كان
     //    بيمرّر النص بس، فلو المحاسب عدّل الرمز لنمط أو صورة بعد
     //    الاستلام، الفني كان بيشوف "اتعدّل رمز القفل" من غير الرمز.
@@ -932,6 +970,110 @@ function reindexSearch(){
   try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.issue, d.tech], true); }catch(e){}
 }
 
+// ============================================================
+// نافذة "شغلي آخر ٥ أيام" — عرض باليوم + كتابة كومنت قطع الغيار
+// ------------------------------------------------------------
+// الفني بيختار يوم من آخر ٥ أيام، بيشوف كل الأجهزة اللي اتلمست
+// في اليوم ده (مهما كانت حالتها)، ويكتب على كل جهاز قطع الغيار
+// اللي جابها له. الحفظ عبر device_patch (بيتأكد من الخطأ دايماً).
+// ============================================================
+let RW = { day: '', open: false };
+
+function rwDevices(){
+  const cut = Date.now() - RECENT_MS;
+  return devices.filter(d =>
+    (d.tech===ME || d.assist===ME) &&
+    d.touched && new Date(d.touched).getTime() >= cut
+  ).sort((a,b) => new Date(b.touched) - new Date(a.touched));
+}
+
+// مفتاح اليوم بالتوقيت المحلي (مش UTC — عشان جهاز الساعة ١١ بليل ميروحش يوم تاني)
+function rwDayKey(iso){
+  const dt = new Date(iso);
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+function rwDayLabel(key){
+  const today = rwDayKey(new Date().toISOString());
+  const yest  = rwDayKey(new Date(Date.now() - 86400000).toISOString());
+  if(key === today) return 'النهاردة';
+  if(key === yest)  return 'إمبارح';
+  const [y,m,dd] = key.split('-');
+  return dd + '/' + m;
+}
+
+function openRecentWork(){
+  RW.open = true;
+  const all = rwDevices();
+  // أيام فيها شغل فعلاً، بالأحدث الأول — واليوم المختار افتراضياً أحدثهم
+  const days = [...new Set(all.map(d => rwDayKey(d.touched)))];
+  if(!RW.day || !days.includes(RW.day)) RW.day = days[0] || '';
+  rwPaint();
+}
+function closeRecentWork(){
+  RW.open = false;
+  const ov = document.getElementById('rwOv'); if(ov) ov.remove();
+}
+
+function rwPaint(){
+  let ov = document.getElementById('rwOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'rwOv'; ov.className = 'rw-ov';
+    ov.onclick = e => { if(e.target === ov) closeRecentWork(); };
+    document.body.appendChild(ov);
+  }
+  const all  = rwDevices();
+  const days = [...new Set(all.map(d => rwDayKey(d.touched)))];
+  const list = all.filter(d => rwDayKey(d.touched) === RW.day);
+
+  ov.innerHTML = `
+    <div class="rw-sheet" dir="rtl">
+      <div class="rw-head">
+        <h3>🗂️ شغلي آخر ٥ أيام</h3>
+        <button type="button" class="rw-x" onclick="closeRecentWork()">✕</button>
+      </div>
+      <div class="rw-days">
+        ${days.map(k => `<button type="button" class="rw-day${k===RW.day?' on':''}" onclick="RW.day='${k}';rwPaint()">${rwDayLabel(k)} <small>(${all.filter(d=>rwDayKey(d.touched)===k).length})</small></button>`).join('')}
+      </div>
+      ${list.length ? list.map(d => `
+        <div class="rw-card">
+          <div class="t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer || '')}</span>
+            <span class="rw-st">${(ST[d.status]&&ST[d.status].label)||''}</span></div>
+          <div class="s">${esc(d.issue || '')}</div>
+          <div class="rw-cm">
+            <textarea id="rwc_${d.id}" maxlength="600" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(d.partsComment || '')}</textarea>
+            <div class="row">
+              <button type="button" class="rw-save" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
+              <span class="rw-hint" id="rwh_${d.id}">${d.partsComment ? 'متسجّل ✅' : ''}</span>
+            </div>
+          </div>
+        </div>`).join('')
+      : `<div class="rw-empty">مفيش أجهزة في اليوم ده</div>`}
+    </div>`;
+}
+
+async function rwSave(id){
+  const ta  = document.getElementById('rwc_' + id);
+  const btn = document.getElementById('rws_' + id);
+  const hint= document.getElementById('rwh_' + id);
+  if(!ta) return;
+  const val = ta.value.trim();
+  if(btn) btn.disabled = true;
+  const ok = await save(id, {
+    partsComment: val,
+    lastModifiedAt: new Date().toISOString(),
+    lastModifiedBy: ME
+  });
+  if(btn) btn.disabled = false;
+  if(ok){
+    const d = devices.find(x => x.id === id);
+    if(d){ d.partsComment = val; if(d._raw) d._raw.partsComment = val; }
+    if(hint) hint.textContent = val ? 'اتحفظ ✅' : 'اتمسح ✅';
+    toast('تم حفظ قطع الغيار ✅');
+  }
+  // لو فشل، save() نفسها بتطلّع رسالة الخطأ الحقيقية — مفيش فشل صامت
+}
+
 // عارض صورة القفل (نمط أو صورة) — دوس على الصورة تكبر
 function openLockImg(id){
   const d = (devices || []).find(x => x.id === id);
@@ -987,10 +1129,14 @@ function render(){
       ${cards(assist,false)}
     </div>
     ${recent.length ? `
-    <div class="sec">
-      <div class="sec-head"><span class="ic">🗂️</span><h2>شغلي آخر يومين</h2><span class="n">${recent.length}</span><span class="rule"></span></div>
-      <div class="grid">${recent.map(d=>ticketHtml(d,false)).join('')}</div>
-    </div>` : ''}`;
+    <button type="button" class="rw-tile" onclick="openRecentWork()">
+      <span class="rw-ic">🗂️</span>
+      <span class="rw-tx">
+        <b>شغلي آخر ٥ أيام</b>
+        <small>${recent.length} جهاز — دوس للعرض وكتابة قطع الغيار</small>
+      </span>
+      <span class="rw-arrow">‹</span>
+    </button>` : ''}`;
 }
 
 /* ===== أكشنز ===== */
@@ -1116,6 +1262,7 @@ function renderSheet(){
           <span class="k" data-i18n="rp.shop">المحل</span><span class="v">${esc(d.shop)||'—'}</span>
           <span class="k" data-i18n="rp.intakeDate">تاريخ الاستلام</span><span class="v">${fmtDate(d.intake)}</span>
           ${d.lockText?`<span class="k" data-i18n="rp.lockCode">رمز القفل</span><span class="v" style="font-family:var(--mono);letter-spacing:2px;">${esc(d.lockText)}</span>`:''}
+          ${d.partsComment?`<span class="k">🔩 قطع الغيار</span><span class="v">${esc(d.partsComment)}</span>`:''}
           ${(!d.lockText && (d.lockType==='pattern'||d.lockType==='image') && d.lockImage)?`<span class="k">رمز القفل</span><span class="v"><img src="${d.lockImage}" onclick="openLockImg('${d.id}')" style="width:110px;height:110px;border-radius:10px;border:1px solid var(--line);object-fit:cover;cursor:pointer;">${d.lockPattern?`<div style="font-family:var(--mono);font-weight:700;margin-top:4px;">${esc(d.lockPattern)}</div>`:''}</span>`:''}
           <span class="k" data-i18n="rp.issue">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
         </div>

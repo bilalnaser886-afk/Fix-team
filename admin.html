@@ -405,7 +405,10 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher'] }   // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    forRoles:['dispatcher'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+  { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
+    hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
+    forRoles:['dispatcher'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 
