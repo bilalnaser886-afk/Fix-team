@@ -143,7 +143,6 @@ const KNOWN_FLAGS = [
   { key:'silent_label_print', desc:'طباعة الليبل مباشرة من غير نافذة الطباعة' },
   { key:'device_lock_codes',  desc:'رمز قفل الجهاز (رقم / نمط / صورة)' },
   { key:'live_broadcasts',    desc:'الإشعارات اللحظية من الأدمن' },
-  { key:'parts_review',       desc:'مراجعة قطع الغيار (كومنت الفني) — للمحاسب والديسباتشر' },
 ];
 
 function trialDaysLeft(){
@@ -406,7 +405,10 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher'] }   // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    forRoles:['dispatcher'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+  { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
+    hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
+    forRoles:['dispatcher'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 

@@ -1575,8 +1575,8 @@ async function saveUserRoles(){
 // بيقرا الشكلين — النص القديم والكائن الجديد
 function roleEntry(email){
   const v = userRoles[(email || '').toLowerCase()];
-  if(typeof v === 'string') return { role: v, techName: '' };
-  if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '' };
+  if(typeof v === 'string') return { role: v, techName: '', caps: [] };
+  if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '', caps: Array.isArray(v.caps) ? v.caps : [] };
   return null;
 }
 
@@ -1590,6 +1590,15 @@ function roleOf(email){
 }
 
 function myRole(){ return roleOf(currentUser.email); }
+// صلاحية ممنوحة لمستخدم معيّن (نفس منطق has_cap على السيرفر):
+// الأدمن والمحاسب عندهم كل حاجة ضمنياً، وباقي الأدوار محتاجة منحة صريحة
+// من لوحة الأدمن (بتتخزّن في caps جوه user-roles).
+function myCap(cap){
+  const r = myRole();
+  if(r === 'super_admin' || r === 'accountant') return true;
+  const en = roleEntry(currentUser.email);
+  return !!(en && (en.caps || []).includes(cap));
+}
 function isSuperAdmin(){ return myRole() === 'super_admin'; }
 function isAccountant(){ return myRole() === 'accountant'; }
 function isDispatcher(){ return myRole() === 'dispatcher'; }
@@ -1675,7 +1684,6 @@ const KNOWN_FLAGS = [
   { key:'silent_label_print',  desc:'طباعة الليبل مباشرة من غير نافذة الطباعة' },
   { key:'device_lock_codes',   desc:'رمز قفل الجهاز (رقم / نمط / صورة)' },
   { key:'live_broadcasts',     desc:'الإشعارات اللحظية من الأدمن' },
-  { key:'parts_review',        desc:'مراجعة قطع الغيار (كومنت الفني) — للمحاسب والديسباتشر' },
 ];
 let featureFlags = {};   // { feature_key: { is_enabled, description, updated_at } }
 
@@ -8847,12 +8855,9 @@ requireAccess().then(ok => {
 // ============================================================
 const PR = { from: '', to: '', tech: null, quick: 'today' };
 
-function prCanUse(){
-  const r = myRole();
-  if(r === 'super_admin' || r === 'accountant') return true;
-  if(r === 'dispatcher') return isFeatureEnabled('parts_review');
-  return false;
-}
+// الصلاحية: الأدمن والمحاسب تلقائياً. أي ديسباتشر لازم الأدمن يمنحه
+// صلاحية 'parts_review' من لوحة الأدمن (سويتش تحت اسمه).
+function prCanUse(){ return myCap('parts_review'); }
 
 // الزرار بيتعمل ديناميكياً عشان يفضل **آخر واحد** في القايمة —
 // تحت "مخزن قطع الغيار" (اللي ai-invoice.js بيضيفه قبل تسجيل الخروج).

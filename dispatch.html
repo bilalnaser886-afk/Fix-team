@@ -373,6 +373,37 @@
   @media (max-width:520px){ .grid{grid-template-columns:1fr;} .tab{font-size:11.5px;} }
   @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
 
+
+  /* ===== 🔩 مراجعة قطع الغيار ===== */
+  .pr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .pr-quick{display:flex;gap:6px;}
+  .pr-q{border:1px solid var(--line);background:var(--paper);color:var(--ink);
+    border-radius:10px;padding:8px 14px;font:800 12.5px/1 inherit;cursor:pointer;}
+  .pr-q.on{background:var(--brand,#0891A8);color:#fff;border-color:transparent;}
+  .pr-dates{display:flex;gap:8px;flex-wrap:wrap;}
+  .pr-dates label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+  .pr-dates input{border:1px solid var(--line);background:var(--paper);color:var(--ink);
+    border-radius:9px;padding:7px 9px;font:inherit;font-size:12.5px;}
+  .pr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+  .pr-tech{text-align:start;border:1px solid var(--line);background:var(--paper);
+    border-radius:14px;padding:14px;cursor:pointer;color:var(--ink);font:inherit;}
+  .pr-tech:active{transform:scale(.99);}
+  .pr-tech-n{font-weight:800;font-size:14px;margin-bottom:5px;}
+  .pr-tech-s{font-size:12px;color:var(--muted);}
+  .pr-tech-s .ok{color:var(--green,#16a34a);font-weight:700;}
+  .pr-back{border:none;background:none;color:var(--brand,#0891A8);font:800 13px/1 inherit;
+    cursor:pointer;padding:6px 0;margin-bottom:8px;}
+  .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
+  .pr-n{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:12px;}
+  .pr-dev{border:1px solid var(--line);background:var(--paper);border-radius:13px;
+    padding:12px;margin-bottom:10px;cursor:pointer;}
+  .pr-dev-t{display:flex;justify-content:space-between;gap:10px;font-weight:800;font-size:13.5px;}
+  .pr-dev-s{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;}
+  .pr-dev-i{color:var(--muted);font-size:12.5px;margin-top:3px;}
+  .pr-cm{margin-top:8px;background:var(--bg);border-radius:9px;padding:8px 10px;
+    font-size:13px;font-weight:700;line-height:1.7;}
+  .pr-cm.none{color:var(--muted);font-weight:400;font-style:italic;background:none;padding:6px 0;}
+  .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
 </style>
 </head>
 <body>
@@ -393,6 +424,7 @@
       <div class="sep"></div>
       <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
       <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
+      <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
       <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -448,6 +480,15 @@
     <div class="sh-row"><div class="sh-title" id="actTitle"></div><button class="sh-x" onclick="closeAct()">×</button></div>
   </div>
   <div class="sh-body" id="actBody"></div>
+</div>
+
+<div class="sheet-bg" id="prBg" onclick="closePartsReview()"></div>
+<div class="sheet" id="prOverlay" style="max-height:90vh;">
+  <div class="sheet-head">
+    <div class="grab"></div>
+    <div class="sh-row"><div class="sh-title">🔩 مراجعة قطع الغيار</div><button class="sh-x" onclick="closePartsReview()">×</button></div>
+  </div>
+  <div class="sh-body" id="prBody"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -866,6 +907,17 @@ async function boot(){
     document.querySelectorAll('.cap-purchases').forEach(el => el.style.display = '');
   }
 
+  // صلاحية "مراجعة قطع الغيار" — مستقلة، الأدمن بيمنحها لكل ديسباتشر لوحده
+  try{
+    const { data } = await sb.rpc('has_cap', { p_cap: 'parts_review' });
+    CAN_PARTS_REVIEW = (data === true);
+  }catch(e){ CAN_PARTS_REVIEW = false; }
+  if(CAN_PARTS_REVIEW){
+    // بيحتاج موديول قطع الغيار عشان الربط يشتغل من جوه تفاصيل الجهاز
+    if(!CAN_PURCHASES) loadPurchasesModule();
+    document.querySelectorAll('.cap-partsreview').forEach(el => el.style.display = '');
+  }
+
   // الاسم: من ملف الحساب، وإلا الجزء الأول من الإيميل
   ME = MY_EMAIL.split('@')[0];
   try{
@@ -1250,6 +1302,7 @@ function actDevBlock(d){
 // ============================================================
 let userRoles = {};
 let CAN_PURCHASES = false;
+let CAN_PARTS_REVIEW = false;
 
 // الموديول بيتحمّل عند الحاجة بس — مايتنزّلش على جهاز ديسباتشر
 // مقفولة عليه الميزة أصلاً
@@ -1260,7 +1313,7 @@ function loadPurchasesModule(){
     devicesFn:      () => devices.map(d => d._raw).filter(Boolean),
     openDeviceIdFn: () => sheetId || null,
     meNameFn:       () => ME,
-    flagFn:         () => CAN_PURCHASES === true
+    flagFn:         () => (CAN_PURCHASES === true || CAN_PARTS_REVIEW === true)
   };
   const sc = document.createElement('script');
   sc.src = 'ai-invoice.js';
@@ -1534,6 +1587,112 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSett
     }
   });
 })();
+
+// ============================================================
+// 🔩 مراجعة قطع الغيار (نفس صفحة المحاسب بالظبط)
+// ------------------------------------------------------------
+// كارت لكل فني → أجهزته في الفترة → الكومنت ظاهر على الكارت من برا.
+// تدوس على الجهاز → بتفتح شاشة قطع الغيار (INV) عشان تربط القطع.
+// ============================================================
+const PR = { from:'', to:'', tech:null, quick:'today' };
+
+function prDayKey(iso){
+  if(!iso) return '';
+  const dt = new Date(iso);
+  if(isNaN(dt)) return '';
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+function prToday(){ return prDayKey(new Date().toISOString()); }
+
+function prSetQuick(q){
+  PR.quick = q;
+  const now = new Date(), end = prToday();
+  let start = end;
+  if(q==='week')  start = prDayKey(new Date(now.getTime() - 6*86400000).toISOString());
+  if(q==='month') start = prDayKey(new Date(now.getTime() - 29*86400000).toISOString());
+  PR.from = start; PR.to = end; PR.tech = null;
+  prRender();
+}
+function prInRange(d){
+  const k = prDayKey((d._raw && d._raw.lastModifiedAt) || d.intake);
+  if(!k) return false;
+  return (!PR.from || k >= PR.from) && (!PR.to || k <= PR.to);
+}
+
+function openPartsReview(){
+  if(!CAN_PARTS_REVIEW){ toast('الميزة دي مقفولة عندك'); return; }
+  if(!PR.from) prSetQuick('today'); else prRender();
+  $('prOverlay').classList.add('on');
+  $('prBg').classList.add('on');
+}
+function closePartsReview(){
+  $('prOverlay').classList.remove('on');
+  $('prBg').classList.remove('on');
+  PR.tech = null;
+}
+
+function prRender(){
+  const host = $('prBody');
+  if(!host) return;
+  const rows = devices.filter(prInRange).filter(d => (d.tech||'').trim());
+  const byTech = {};
+  rows.forEach(d => { const k=(d.tech||'').trim(); (byTech[k]=byTech[k]||[]).push(d); });
+  const techs = Object.keys(byTech).sort((a,b)=>byTech[b].length-byTech[a].length);
+
+  const bar = `
+    <div class="pr-bar">
+      <div class="pr-quick">
+        <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
+        <button class="pr-q${PR.quick==='week'?' on':''}"  onclick="prSetQuick('week')">أسبوع</button>
+        <button class="pr-q${PR.quick==='month'?' on':''}" onclick="prSetQuick('month')">شهر</button>
+      </div>
+      <div class="pr-dates">
+        <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
+        <label>إلى <input type="date" value="${PR.to}" onchange="PR.to=this.value;PR.quick='';PR.tech=null;prRender()"></label>
+      </div>
+    </div>`;
+
+  if(PR.tech){
+    const list = (byTech[PR.tech]||[]).slice()
+      .sort((a,b)=> new Date((b._raw&&b._raw.lastModifiedAt)||b.intake||0) - new Date((a._raw&&a._raw.lastModifiedAt)||a.intake||0));
+    host.innerHTML = bar + `
+      <button class="pr-back" onclick="PR.tech=null;prRender()">‹ رجوع لكل الفنيين</button>
+      <div class="pr-th">🔧 ${esc(PR.tech)} <span class="pr-n">${list.length}</span></div>
+      ${list.length ? list.map(d => {
+        const cm = ((d._raw && d._raw.partsComment) || '').trim();
+        return `
+        <div class="pr-dev" onclick="prOpenDevice('${d.id}')">
+          <div class="pr-dev-t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</span>
+            <span class="pr-dev-s">${(ST[d.status]&&ST[d.status].label)||''}</span></div>
+          <div class="pr-dev-i">${esc(d.issue||'')}</div>
+          ${cm ? `<div class="pr-cm">🔩 ${esc(cm)}</div>`
+               : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
+        </div>`;
+      }).join('') : `<div class="pr-empty">مفيش أجهزة للفني ده في الفترة دي</div>`}`;
+    return;
+  }
+
+  host.innerHTML = bar + (techs.length ? `
+    <div class="pr-grid">
+      ${techs.map(tn => {
+        const l = byTech[tn];
+        const withCm = l.filter(d => ((d._raw&&d._raw.partsComment)||'').trim()).length;
+        return `<button class="pr-tech" onclick="PR.tech='${esc(tn).replace(/'/g,"\\'")}';prRender()">
+          <div class="pr-tech-n">🔧 ${esc(tn)}</div>
+          <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
+        </button>`;
+      }).join('')}
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
+}
+
+// فتح شاشة قطع الغيار الخاصة بالجهاز — نفس طريقة الربط الموجودة
+// (ai-invoice بيقرا الجهاز المفتوح من openDeviceIdFn → sheetId)
+let sheetId = null;
+function prOpenDevice(id){
+  sheetId = id;
+  if(window.INV && typeof INV.open === 'function') INV.open();
+  else toast('شاشة قطع الغيار لسه بتحمّل — جرّب تاني بعد ثانية');
+}
 
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
