@@ -7388,12 +7388,12 @@ function exportShopPdf(shop){
   const rowsHtml = entries.map((e,i) => {
     const issue = stmtIssue(e);
     return `
-    <tr style="background:${i%2 ? 'var(--surface-2)' : 'var(--surface)'};">
+    <tr style="background:${i%2 ? '#F8FAFC' : '#FFFFFF'};">
       <td>${new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
-      <td style="text-align:right; color:var(--ink-2);">${issue ? esc(issue) : '—'}</td>
-      <td style="color:var(--warn); font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
-      <td style="color:var(--success); font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
+      <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
+      <td style="color:#B45309; font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
+      <td style="color:#16A34A; font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
     </tr>`;
   }).join('');
 
@@ -7426,7 +7426,7 @@ function exportShopPdf(shop){
     <div class="totals">
       <div class="tcard" style="background:#B45309;"><div class="lbl">إجمالي الآجل (عليه)</div><div class="num">${debit.toLocaleString('en-EG')} ج.م</div></div>
       <div class="tcard" style="background:#16A34A;"><div class="lbl">إجمالي المدفوع (له)</div><div class="num">${credit.toLocaleString('en-EG')} ج.م</div></div>
-      <div class="tcard" style="background:${balance>0 ? 'var(--danger)' : 'var(--info)'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
+      <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
       <tr><th style="width:20%;">تاريخ التسليم</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
