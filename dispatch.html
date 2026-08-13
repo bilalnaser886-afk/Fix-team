@@ -1685,14 +1685,75 @@ function prRender(){
     </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
 }
 
-// فتح شاشة قطع الغيار الخاصة بالجهاز — نفس طريقة الربط الموجودة
-// (ai-invoice بيقرا الجهاز المفتوح من openDeviceIdFn → sheetId)
+// فتح شاشة ربط قطع الغيار للجهاز — نفس آلية الربط الموجودة
+// (بنظبط DP.openId عن طريق openDeviceIdFn، وبنفتح شاشة الاختيار
+//  اللي بتعرض القطع غير الموجهة + خانة بحث)
 let sheetId = null;
-function prOpenDevice(id){
-  sheetId = id;
-  if(window.INV && typeof INV.open === 'function') INV.open();
-  else toast('شاشة قطع الغيار لسه بتحمّل — جرّب تاني بعد ثانية');
+let prPickingId = null;
+
+async function prOpenDevice(id){
+  if(!window.INV || typeof INV.openPickForDevice !== 'function'){
+    toast('شاشة قطع الغيار لسه بتحمّل — جرّب تاني بعد ثانية'); return;
+  }
+  sheetId = id;            // ai-invoice بيقرا الجهاز المفتوح من هنا
+  prPickingId = id;
+  await prShowDeviceParts(id);
 }
+
+// كارت الجهاز: القطع المربوطة حالياً + زرار "اربط قطعة"
+async function prShowDeviceParts(id){
+  const d = devices.find(x => x.id === id);
+  const host = $('prBody');
+  if(!host || !d) return;
+  host.innerHTML = `
+    <button class="pr-back" onclick="prPickingId=null;prRender()">‹ رجوع لأجهزة الفني</button>
+    <div class="pr-th">📱 ${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</div>
+    ${((d._raw&&d._raw.partsComment)||'').trim()
+      ? `<div class="pr-cm">🔩 ${esc(d._raw.partsComment)}</div>` : ''}
+    <div id="prLinked" class="pr-empty">بنجيب القطع المربوطة…</div>
+    <button class="pr-q on" style="width:100%;margin-top:10px;padding:12px;"
+      onclick="prPickParts()">➕ اربط قطعة غيار بالجهاز</button>`;
+
+  try{
+    const { data, error } = await sb.from('spare_parts')
+      .select('id,name,total_cost').eq('device_id', id);
+    if(error) throw error;
+    const box = $('prLinked');
+    if(!box) return;
+    box.className = '';
+    box.innerHTML = (data && data.length)
+      ? `<div style="font-weight:800;margin:10px 0 6px;">القطع المربوطة (${data.length})</div>` +
+        data.map(p => `<div class="pr-dev" style="cursor:default;">
+          <div class="pr-dev-t"><span>🔩 ${esc(p.name)}</span>
+            <span class="pr-dev-s">${Number(p.total_cost||0).toLocaleString()} ج.م</span></div>
+          <button class="pr-back" style="margin:6px 0 0;" onclick="prUnlink('${p.id}')">✕ فك الربط</button>
+        </div>`).join('')
+      : `<div class="pr-empty">مفيش قطع مربوطة بالجهاز ده لسه</div>`;
+  }catch(e){
+    const box = $('prLinked');
+    if(box){ box.className=''; box.innerHTML = `<div class="pr-empty">تعذّر جلب القطع: ${esc(e.message||e)}</div>`; }
+  }
+}
+
+function prPickParts(){
+  if(window.INV && typeof INV.openPickForDevice === 'function') INV.openPickForDevice();
+  else toast('شاشة قطع الغيار لسه بتحمّل');
+}
+
+async function prUnlink(partId){
+  try{
+    const { error } = await sb.from('spare_parts')
+      .update({ category:'unallocated', device_id:null, device_label:null }).eq('id', partId);
+    if(error) throw error;
+    toast('اتفك الربط ✅');
+    if(prPickingId) prShowDeviceParts(prPickingId);
+  }catch(e){ toast('فشل فك الربط: ' + (e.message||e)); }
+}
+
+// ai-invoice بينده دي بعد أي ربط عشان الشاشة تتحدّث
+window.prOnPartsChanged = function(){
+  if(prPickingId) prShowDeviceParts(prPickingId);
+};
 
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
