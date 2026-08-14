@@ -1315,8 +1315,12 @@
 
         // قطع الغيار (Part 6): كل بند مشترى بيتحوّل لصف قطعة في المخزن.
         // الحالة من الوجهة: لوازم → لوازم | موجهة(+جهاز) → مربوطة بجهاز | غير كده → مخزن عام.
+        // ⚠️ البند اللي **من غير سعر** بيتساب كمان (بسعر صفر) — كتير من
+        //    فواتير المحل بتكتب الأصناف والأسعار بتتحط بعدين. قبل كده كان
+        //    بيتشال خالص فمكانش ينفع يتربط بجهاز أصلاً. السعر بيتعدّل
+        //    لاحقاً من مخزن قطع الغيار.
         const partsRows = items
-          .filter(it => it.item_name && (num(it.total_price) > 0 || num(it.unit_cost_price) > 0))
+          .filter(it => it.item_name)
           .map(it => {
             const alloc = it.target === 'allocated' && it.device_id;
             const qty = num(it.quantity) || 1;
@@ -1403,7 +1407,7 @@
   function dpPickListHtml(rows) {
     return (rows && rows.length)
       ? rows.map(p => `<button type="button" class="dp-pick-opt" onclick="INV.linkToDevice('${esc(p.id)}')">
-          <span>${esc(p.name)}</span><span class="dp-pick-cost">${money(p.total_cost)} ج.م</span></button>`).join('')
+          <span>${esc(p.name)}</span><span class="dp-pick-cost">${Number(p.total_cost) ? money(p.total_cost) + ' ج.م' : 'من غير سعر'}</span></button>`).join('')
       : `<div class="dp-empty">${esc(T('inv.noStock'))}</div>`;
   }
 
@@ -1588,13 +1592,16 @@
         <button class="inv-btn del" onclick="INV.del('${esc(p.id)}')">${esc(T('inv.delete'))}</button>`;
     }
 
-    return `<div class="inv-card">
+    const noPrice = !num(p.total_cost);
+    return `<div class="inv-card"${noPrice ? ' style="border-color:#B45309;"' : ''}>
       <div class="inv-card-top">
         <div class="inv-card-name">${esc(p.name)}</div>
-        <div class="inv-card-cost">${money(p.total_cost)} ج.م</div>
+        <div class="inv-card-cost"${noPrice ? ' style="color:#B45309;"' : ''}>${noPrice ? 'من غير سعر' : money(p.total_cost) + ' ج.م'}</div>
       </div>
       <div class="inv-card-meta">${meta.join(' — ')}</div>
-      <div class="inv-actions">${actions}</div>
+      <div class="inv-actions">
+        <button class="inv-btn" onclick="INV.editCost('${esc(p.id)}')">${noPrice ? '💰 اكتب السعر' : '✏️ عدّل السعر'}</button>
+        ${actions}</div>
     </div>`;
   }
 
@@ -1807,6 +1814,18 @@
 
     // إعادة التصنيف وإلغاء الربط (من شاشة المخزن)
     unlink(id) { updatePart(id, { category: 'unallocated', device_id: null, device_label: null }, 'inv.unlinked'); },
+    // تعديل سعر القطعة — مهم للقطع اللي دخلت من فاتورة من غير سعر
+    editCost(id) {
+      const p = IS.list.find(x => x.id === id);
+      if (!p) return;
+      const qty = num(p.quantity) || 1;
+      const cur = num(p.unit_cost) || (qty ? +(num(p.total_cost) / qty).toFixed(2) : 0);
+      const v = prompt(`سعر الوحدة لـ "${p.name}" (الكمية: ${money(qty)})`, cur || '');
+      if (v === null) return;                    // اتلغى
+      const unit = num(String(v).replace(/[^\d.\-]/g, ''));
+      if (!(unit >= 0)) { toast('اكتب رقم صحيح', false); return; }
+      updatePart(id, { unit_cost: unit, total_cost: +(qty * unit).toFixed(2) }, 'inv.saved');
+    },
     toSupplies(id) { updatePart(id, { category: 'supplies', device_id: null, device_label: null }, 'inv.movedSupplies'); },
     toStock(id) { updatePart(id, { category: 'unallocated', device_id: null, device_label: null }, 'inv.movedStock'); },
 
