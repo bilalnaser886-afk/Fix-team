@@ -50,6 +50,24 @@ if (APP_ENV === "staging") {
   });
 }
 
+// ===== خطط الاشتراك =====
+// ⚠️ الأسعار وسعر الصرف هنا **مرة واحدة بس**. بيظهروا في المنشور،
+//    وفي صفحة "حسابي"، وفي لوحة الأدمن.
+//
+// 🔧 عايز تغيّر سعر الدولار؟ غيّر الرقم اللي تحت وارفع common.js. خلاص.
+//    وعايز تغيّر سعر خطة؟ غيّر رقم usd بتاعها هنا.
+const USD_RATE = 50;   // ← سعر الدولار بالجنيه (غيّره من هنا لما يتغيّر)
+const PLANS = [
+  { key:'monthly', label:'شهري',   months:1, usd:270,  off:0  },
+  { key:'quarter', label:'٣ شهور', months:3, usd:770,  off:5  },
+  { key:'half',    label:'٦ شهور', months:6, usd:1458, off:10 },
+];
+// تنسيق السعر: بالدولار وجنبه ما يعادله بالمصري
+function planPrice(p){
+  const egp = Math.round(p.usd * USD_RATE);
+  return '$' + p.usd.toLocaleString('en-US') + ' (ما يعادل ' + egp.toLocaleString('en-US') + ' ج.م)';
+}
+
 // ===== تأمين النصوص قبل عرضها في الصفحة =====
 // النسخة الأأمن: بتأمّن ٥ رموز (بما فيها ' المفردة) — بتمنع أي حقن HTML.
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>

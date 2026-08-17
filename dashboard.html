@@ -1084,6 +1084,27 @@
     font-size:13px;font-weight:700;line-height:1.7;}
   .pr-cm.none{color:var(--muted-2);font-weight:400;font-style:italic;background:none;padding:6px 0;}
   .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
+
+  /* ===== 👤 حسابي ===== */
+  .acc-card{border:1px solid var(--border);background:var(--surface-2);border-radius:14px;
+    padding:14px;margin-bottom:12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;}
+  .acc-card.ok{border-color:#16A34A;}
+  .acc-card.warn{border-color:#B45309;}
+  .acc-card.ok,.acc-card.warn{display:block;}
+  .acc-k{color:var(--muted);font-size:12.5px;}
+  .acc-v{font-weight:800;font-size:13.5px;}
+  .acc-t{font-weight:800;font-size:14.5px;}
+  .acc-big{font-size:26px;font-weight:900;color:#B45309;margin:6px 0;}
+  .acc-hint{color:var(--muted);font-size:12.5px;line-height:1.9;}
+  .acc-plan{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    border:1px solid var(--border);background:var(--surface-2);border-radius:12px;
+    padding:12px 14px;margin-bottom:8px;}
+  .acc-price{font-weight:800;font-size:13.5px;white-space:nowrap;}
+  .acc-off{background:#16A34A;color:#fff;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:800;}
+  .acc-in{width:100%;padding:11px 13px;border-radius:11px;border:1px solid var(--border);
+    background:var(--surface-2);color:var(--ink);font:inherit;font-size:13.5px;margin-bottom:8px;}
+  .acc-save{width:100%;padding:13px;border:none;border-radius:12px;background:var(--accent);
+    color:#fff;font:800 14px/1 inherit;cursor:pointer;margin-top:4px;}
 </style>
 </head>
 <body>
@@ -1130,6 +1151,7 @@
     <button class="tech-only-menu" data-i18n="menu.myDevices" onclick="openTechPortal()">📱 أجهزتي</button>
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
+    <button onclick="openAccount()">👤 حسابي</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
@@ -1159,6 +1181,16 @@
 <div id="board" class="board"><div class="loading" data-i18n="app.loading">جارٍ التحميل...</div></div>
 
 <!-- نافذة تنبيه (بيتا / فترة مجانية) — مرة واحدة -->
+<div id="accountOverlay" class="overlay hidden" style="align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>👤 حسابي</h2>
+      <button class="close-btn" onclick="closeAccount()">×</button>
+    </div>
+    <div id="accBody" style="padding:12px 20px 48px;max-width:620px;margin:0 auto;"></div>
+  </div>
+</div>
+
 <div id="partsReviewOverlay" class="overlay hidden" style="align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;">
   <div class="summaries-page">
     <div class="modal-head" style="padding:16px 20px;">
@@ -1530,7 +1562,7 @@ const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase
 const ADMIN_EMAIL = ADMIN_EMAILS[0] || '';
 
 const SYSTEM_CONFIG_KEY = 'system-config';
-let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
+let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:7, trialAnnId:null };
 
 async function loadSystemConfig(){
   try{
@@ -1730,7 +1762,7 @@ async function addAudit(action){
 }
 function trialDaysLeft(){
   if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
-  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||30)*86400000;
+  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||7)*86400000;
   return Math.max(0, Math.ceil((end - Date.now())/86400000));
 }
 
@@ -1768,7 +1800,7 @@ function maybeShowAnnouncement(kind){
     const left = trialDaysLeft();
     document.getElementById('annIcon').textContent = '🎁';
     document.getElementById('annTitle').textContent = t('sys.trialTitle');
-    document.getElementById('annBody').textContent = t('sys.trialBody',{d:(systemConfig.trialDays||30), n:left});
+    document.getElementById('annBody').textContent = t('sys.trialBody',{d:(systemConfig.trialDays||7), n:left});
   }
   o.setAttribute('data-seen-key', seenKey);
   o.classList.remove('hidden');
@@ -1805,10 +1837,14 @@ let currentBroadcast = null;
 let bcQueue = [];          // منشورات مستنية العرض (عام + دور)
 
 // مفتاح مستقل لكل جمهور، فمنشور لدور مايمسحش منشور دور تاني.
-// المستخدم بيشوف اتنين بالكتير: آخر منشور عام + آخر منشور لدوره.
+// المستخدم بيشوف بالكتير تلاتة: منشور عام + منشور لدوره + منشور شخصي ليه هو.
 function myBroadcastKeys(){
   const r = myRole();
-  return (r && r !== 'super_admin') ? [BROADCAST_KEY, BROADCAST_KEY + ':' + r] : [BROADCAST_KEY];
+  const me = (currentUser.email || '').toLowerCase();
+  const keys = [BROADCAST_KEY];
+  if(r && r !== 'super_admin') keys.push(BROADCAST_KEY + ':' + r);
+  if(me) keys.push(BROADCAST_KEY + ':user:' + me);
+  return keys;
 }
 
 async function loadBroadcast(){
@@ -9000,6 +9036,89 @@ function prRender(){
         </button>`;
       }).join('')}
     </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
+}
+// ============================================================
+// 👤 حسابي — بيانات المستخدم والاشتراك
+// ------------------------------------------------------------
+// بيوري المستخدم اسمه ودوره وحالة الاشتراك والأيام المتبقية،
+// وخطط الاشتراك بالأسعار (من common.js)، ونموذج تسجيل بيانات
+// التواصل عشان طرق الدفع تتبعت على الإيميل.
+// ============================================================
+const SUBINFO_KEY = 'subscription-info';
+let subInfo = {};
+
+async function openAccount(){
+  const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
+  try{
+    const r = await window.storage.get(SUBINFO_KEY);
+    if(r && r.value) subInfo = JSON.parse(r.value) || {};
+  }catch(e){ subInfo = {}; }
+  renderAccount();
+  document.getElementById('accountOverlay').classList.remove('hidden');
+}
+function closeAccount(){
+  document.getElementById('accountOverlay').classList.add('hidden');
+}
+
+function renderAccount(){
+  const host = document.getElementById('accBody');
+  if(!host) return;
+  const left = trialDaysLeft();
+  const onTrial = systemConfig.mode === 'trial' && left > 0;
+
+  host.innerHTML = `
+    <div class="acc-card">
+      <div class="acc-k">الاسم</div><div class="acc-v">${esc(currentUser.name || currentUser.email || '—')}</div>
+      <div class="acc-k">البريد الإلكتروني</div><div class="acc-v" dir="ltr">${esc(currentUser.email || '—')}</div>
+      <div class="acc-k">الصلاحية</div><div class="acc-v">${esc(currentRoleLabel())}</div>
+    </div>
+
+    <div class="acc-card ${onTrial ? 'warn' : 'ok'}">
+      <div class="acc-t">${onTrial ? '🎁 فترة تجريبية' : '✅ الاشتراك'}</div>
+      ${onTrial
+        ? `<div class="acc-big">${left} ${left === 1 ? 'يوم' : 'أيام'} متبقية</div>
+           <div class="acc-hint">برجاء الاشتراك قبل انتهاء المدة لضمان استمرار الخدمة.</div>`
+        : `<div class="acc-hint">الخدمة مفعّلة.</div>`}
+    </div>
+
+    <div class="acc-t" style="margin:18px 0 8px;">📦 خطط الاشتراك</div>
+    ${PLANS.map(p => `
+      <div class="acc-plan">
+        <div><b>${esc(p.label)}</b>${p.off ? ` <span class="acc-off">وفّر ${p.off}%</span>` : ''}</div>
+        <div class="acc-price">${esc(planPrice(p))}</div>
+      </div>`).join('')}
+    <div class="acc-hint" style="margin-top:8px;">💳 سيتم إرسال طرق الدفع المتاحة على بريدكم الإلكتروني بعد تسجيل البيانات.</div>
+
+    <div class="acc-t" style="margin:18px 0 8px;">📝 بيانات التواصل للاشتراك</div>
+    <input id="siName"  class="acc-in" placeholder="الاسم"            value="${esc(subInfo.name||'')}">
+    <input id="siPhone" class="acc-in" placeholder="رقم الهاتف" dir="ltr" value="${esc(subInfo.phone||'')}">
+    <input id="siEmail" class="acc-in" placeholder="البريد الإلكتروني" dir="ltr" value="${esc(subInfo.email||'')}">
+    <select id="siPlan" class="acc-in">
+      <option value="">— الخطة المطلوبة (اختياري) —</option>
+      ${PLANS.map(p => `<option value="${esc(p.label)}"${subInfo.plan===p.label?' selected':''}>${esc(p.label)}</option>`).join('')}
+    </select>
+    <button class="acc-save" onclick="saveSubInfo()">💾 حفظ البيانات</button>
+    ${subInfo.at ? `<div class="acc-hint" style="margin-top:6px;">آخر تحديث: ${new Date(subInfo.at).toLocaleString('ar-EG')}</div>` : ''}`;
+}
+
+async function saveSubInfo(){
+  const name  = (document.getElementById('siName').value||'').trim();
+  const phone = (document.getElementById('siPhone').value||'').trim();
+  const email = (document.getElementById('siEmail').value||'').trim();
+  const plan  = document.getElementById('siPlan').value || '';
+  if(!name || !phone || !email){ toast('اكتب الاسم والرقم والإيميل'); return; }
+  if(!/^\S+@\S+\.\S+$/.test(email)){ toast('الإيميل مش مظبوط'); return; }
+
+  const payload = { name, phone, email, plan, at:new Date().toISOString(), by:(currentUser.email||'') };
+  try{
+    await window.storage.set(SUBINFO_KEY, JSON.stringify(payload));
+    subInfo = payload;
+    renderAccount();
+    toast('اتحفظت ✅ — هيتم إرسال طرق الدفع على بريدك');
+  }catch(e){
+    console.error('saveSubInfo failed:', e);
+    toast('فشل الحفظ: ' + (e.message || e));
+  }
 }
 </script>
 </body>

@@ -666,7 +666,8 @@ async function loadNotices(){
   try{
     const { data, error } = await sb.from('app_data')
       .select('key,value')
-      .in('key', ['system-config','feature-flags','broadcast','broadcast:dispatcher']);
+      .in('key', ['system-config','feature-flags','broadcast','broadcast:dispatcher',
+                  'broadcast:user:' + (MY_EMAIL||'').toLowerCase()]);
     if(error) throw error;
 
     const map = {};
@@ -700,10 +701,10 @@ async function loadNotices(){
     // المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه داخل
     // أول مرة. الـ id هو وقت الإرسال، فبنحسب عمره منه.
     const MAX_AGE = 14 * 86400000;
-    ntQueue = ['broadcast', 'broadcast:dispatcher']
+    ntQueue = ['broadcast', 'broadcast:dispatcher', 'broadcast:user:' + (MY_EMAIL||'').toLowerCase()]
       .map(k => map[k])
       .filter(bc => bc && bc.id && (Date.now() - Number(bc.id)) < MAX_AGE)
-      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'dispatcher'; })
+      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'dispatcher' || a === 'user'; })
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0))   // الأقدم الأول
       .map(bc => ({
         icon:    bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢'),

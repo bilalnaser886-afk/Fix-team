@@ -723,7 +723,8 @@ async function loadNotices(){
   try{
     const { data, error } = await sb.from('app_data')
       .select('key,value')
-      .in('key', ['system-config','feature-flags','broadcast','broadcast:technician','tech-board']);
+      .in('key', ['system-config','feature-flags','broadcast','broadcast:technician','tech-board',
+                  'broadcast:user:' + (MY_EMAIL||'').toLowerCase()]);
     if(error) throw error;
 
     const map = {};
@@ -763,10 +764,10 @@ async function loadNotices(){
     // المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه داخل
     // أول مرة. الـ id هو وقت الإرسال، فبنحسب عمره منه.
     const MAX_AGE = 14 * 86400000;
-    ntQueue = ['broadcast', 'broadcast:technician']
+    ntQueue = ['broadcast', 'broadcast:technician', 'broadcast:user:' + (MY_EMAIL||'').toLowerCase()]
       .map(k => map[k])
       .filter(bc => bc && bc.id && (Date.now() - Number(bc.id)) < MAX_AGE)
-      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'technician'; })
+      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'technician' || a === 'user'; })
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0))   // الأقدم الأول
       .map(bc => ({
         icon:    bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢'),
