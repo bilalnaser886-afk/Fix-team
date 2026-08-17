@@ -8892,7 +8892,7 @@ requireAccess().then(ok => {
   loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(() => { try{ prSyncMenu(); }catch(e){} }).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
     .then(applyRoleVisibility)
-    .then(() => { try{ loadBroadcast(); }catch(e){} });
+    .then(() => { try{ loadBroadcast(); }catch(e){} try{ syncAccountMenu(); }catch(e){} });
   injectAdminMenu();
   loadDevices();
   loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
@@ -9059,17 +9059,25 @@ let subInfo = {};
 // مش بيظهّرها.
 async function syncAccountMenu(){
   const btn = document.getElementById('accountMenuBtn');
-  if(!btn) return;
+  if(!btn){ console.warn('[حسابي] الزرار مش موجود في الصفحة'); return; }
   const me = (currentUser.email || '').toLowerCase();
-  if(!me){ btn.classList.add('hidden'); return; }
+  if(!me){ console.warn('[حسابي] الإيميل لسه فاضي — الفحص اتأجّل'); btn.classList.add('hidden'); return; }
+  const key = BROADCAST_KEY + ':user:' + me;
   try{
-    const r = await window.storage.get(BROADCAST_KEY + ':user:' + me);
+    const r = await window.storage.get(key);
     let show = false;
     if(r && r.value){
-      try{ show = JSON.parse(r.value).subPlan === true; }catch(e){ show = false; }
+      try{ show = JSON.parse(r.value).subPlan === true; }catch(e){}
+      if(!show) console.info('[حسابي] فيه منشور شخصي بس مش منشور أسعار (subPlan مش true)');
+    }else{
+      console.info('[حسابي] مفيش منشور شخصي على المفتاح:', key);
     }
     btn.classList.toggle('hidden', !show);
-  }catch(e){ btn.classList.add('hidden'); }
+  }catch(e){
+    // مهم: لو الـ RLS رفضت القراءة، هتبان هنا بدل ما تفشل في صمت
+    console.error('[حسابي] فشلت قراءة المنشور:', e);
+    btn.classList.add('hidden');
+  }
 }
 
 async function openAccount(){
