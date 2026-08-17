@@ -219,6 +219,9 @@
     font-family:inherit; color:var(--ink);
   }
   .menu-dropdown button:hover{background:var(--surface-3);}
+  /* ⚠️ .menu-dropdown button فيها display:block، وكانت بتتغلب على
+     .hidden فالأزرار المخفية كانت بتفضل ظاهرة. القاعدة دي بتحسمها. */
+  .menu-dropdown button.hidden{display:none !important;}
   /* قايمة اختيار الفني — شكلها زي حقول الإدخال بالظبط عشان
      الواجهة ما تبانش متفككة بعد التحويل من input لـ select */
   .tech-select{
@@ -1671,6 +1674,9 @@ function applyRoleVisibility(){
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
   try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
+  // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
+  // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
+  try{ syncAccountMenu(); }catch(e){}
   // ============================================================
   // التوجيه لصفحات مستقلة
   // ------------------------------------------------------------
@@ -1863,7 +1869,6 @@ async function loadBroadcast(){
       .filter(Boolean)
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0));   // الأقدم الأول
     showNextBroadcast();
-    try{ syncAccountMenu(); }catch(e){}
   }catch(e){}
 }
 
@@ -9105,6 +9110,7 @@ function renderAccount(){
     <div class="acc-hint" style="margin-top:8px;">💳 سيتم إرسال طرق الدفع المتاحة على بريدكم الإلكتروني بعد تسجيل البيانات.</div>
 
     <div class="acc-t" style="margin:18px 0 8px;">📝 بيانات التواصل للاشتراك</div>
+    <div class="acc-hint" style="margin-bottom:8px;">تقدر تعدّلها في أي وقت — التعديل بيوصل للإدارة على طول.</div>
     <input id="siName"  class="acc-in" placeholder="الاسم"            value="${esc(subInfo.name||'')}">
     <input id="siPhone" class="acc-in" placeholder="رقم الهاتف" dir="ltr" value="${esc(subInfo.phone||'')}">
     <input id="siEmail" class="acc-in" placeholder="البريد الإلكتروني" dir="ltr" value="${esc(subInfo.email||'')}">

@@ -247,7 +247,8 @@ function render(){
 
     <div class="sec">
       <div class="sec-title">💳 بيانات الاشتراك المسجّلة</div>
-      <p class="hint">اللي بيتكتب من صفحة «حسابي» — ابعت طرق الدفع على الإيميل ده.</p>
+      <p class="hint">اللي بيتكتب من صفحة «حسابي» — ابعت طرق الدفع على الإيميل ده. المستخدم يقدر يعدّلها في أي وقت والتعديل بيظهر هنا.</p>
+      <div style="margin-bottom:8px;"><button class="mini" onclick="refreshSubInfo()">↻ تحديث البيانات</button></div>
       ${subInfo && (subInfo.email || subInfo.phone || subInfo.name) ? `
         <div style="line-height:2;">
           <div>👤 <b>${esc(subInfo.name||'—')}</b></div>
@@ -561,6 +562,16 @@ function fillSubTemplate(){
   document.getElementById('bcBody').value  = subAnnouncementBody();
   document.getElementById('bcType').value  = 'warning';
   toast('اتكتب النص ✅ — اختار مين يوصله وابعت');
+}
+
+// إعادة قراءة بيانات الاشتراك — عشان الأدمن يشوف تعديلات المستخدم فوراً
+async function refreshSubInfo(){
+  try{
+    const r = await storage.get(SUBINFO_KEY);
+    subInfo = (r && r.value) ? (JSON.parse(r.value) || {}) : {};
+    render();
+    toast('اتحدّثت ✅');
+  }catch(e){ toast('فشل التحديث: ' + (e.message||e), false); }
 }
 
 async function sendBroadcast(){
