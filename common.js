@@ -68,6 +68,41 @@ function planPrice(p){
   return '$' + p.usd.toLocaleString('en-US') + ' (ما يعادل ' + egp.toLocaleString('en-US') + ' ج.م)';
 }
 
+// ===== شاشة إيقاف الخدمة =====
+// بتظهر لما الفترة المجانية تخلص والاشتراك مش مفعّل. رسالة واحدة
+// لكل الصفحات، وأول ما يدوس "فهمت" بيتسجّل خروج ويتقفل.
+//
+// 🔧 لو رجعت تستخدم صفحة الدفع بعدين: نادي showServiceStopped(true)
+//    وهتوديه لـ checkout.html بدل الخروج.
+function showServiceStopped(toCheckout){
+  if (document.getElementById('svcStopOv')) return;
+  const ov = document.createElement('div');
+  ov.id = 'svcStopOv';
+  ov.style.cssText =
+    'position:fixed;inset:0;z-index:2147483647;background:#0B1220;color:#fff;' +
+    'display:flex;align-items:center;justify-content:center;padding:24px;' +
+    'font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;';
+  ov.innerHTML =
+    '<div dir="rtl" style="max-width:420px;text-align:center;">' +
+      '<div style="font-size:52px;margin-bottom:10px;">⛔</div>' +
+      '<h2 style="margin:0 0 10px;font-size:21px;font-weight:900;">تم إيقاف الخدمة</h2>' +
+      '<p style="margin:0 0 22px;font-size:15px;line-height:2;opacity:.9;">' +
+        'انتهت مدة الاشتراك الحالية.<br>برجاء الاشتراك لاستئناف الخدمة.' +
+      '</p>' +
+      '<button id="svcStopOk" style="width:100%;padding:14px;border:none;border-radius:12px;' +
+        'background:#0891A8;color:#fff;font:900 15px/1 inherit;cursor:pointer;">فهمت</button>' +
+    '</div>';
+  document.body.appendChild(ov);
+  document.getElementById('svcStopOk').onclick = async function(){
+    this.disabled = true;
+    this.textContent = 'جاري الإغلاق…';
+    if (toCheckout) { window.location.href = 'checkout.html'; return; }
+    try { await sb.auth.signOut(); } catch (e) {}
+    try { window.close(); } catch (e) {}          // بيقفل التطبيق المثبّت
+    window.location.href = 'index.html';          // احتياطي لو ما اتقفلش
+  };
+}
+
 // ===== تأمين النصوص قبل عرضها في الصفحة =====
 // النسخة الأأمن: بتأمّن ٥ رموز (بما فيها ' المفردة) — بتمنع أي حقن HTML.
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>

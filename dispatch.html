@@ -682,10 +682,12 @@ async function loadNotices(){
           'ifix_seen_ann_beta_' + cfg.betaAnnId);
       }
     } else if(cfg.mode === 'trial'){
-      const days = cfg.trialDays || 30;
+      const days = cfg.trialDays || 7;
       const left = cfg.trialStart
         ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
         : days;
+      // خلصت الفترة المجانية → رسالة إيقاف ثم قفل (نفس رسالة الداشبورد)
+      if(left <= 0){ try{ showServiceStopped(false); }catch(e){} return; }
       ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
         ntShow('🎁', t('sys.trialTitle'), t('sys.trialBody', { d: days, n: left }),

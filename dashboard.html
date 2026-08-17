@@ -1151,7 +1151,7 @@
     <button class="tech-only-menu" data-i18n="menu.myDevices" onclick="openTechPortal()">📱 أجهزتي</button>
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
-    <button onclick="openAccount()">👤 حسابي</button>
+    <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
@@ -1863,6 +1863,7 @@ async function loadBroadcast(){
       .filter(Boolean)
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0));   // الأقدم الأول
     showNextBroadcast();
+    try{ syncAccountMenu(); }catch(e){}
   }catch(e){}
 }
 
@@ -1951,8 +1952,9 @@ async function requireAccess(){
     const trialActive = systemConfig.mode === 'trial' && trialDaysLeft() > 0;
     if(!(paidActive || betaActive || trialActive)){
       if(systemConfig.mode === 'trial'){
-        // خلصت الفترة المجانية والاشتراك مش مفعّل → صفحة الاشتراك والدفع
-        window.location.href = 'checkout.html';
+        // خلصت الفترة المجانية والاشتراك مش مفعّل → رسالة إيقاف ثم قفل.
+        // 🔧 لو رجعت تستخدم صفحة الدفع: showServiceStopped(true)
+        showServiceStopped(false);
         return false;
       }
       await sb.auth.signOut();
@@ -9046,6 +9048,19 @@ function prRender(){
 // ============================================================
 const SUBINFO_KEY = 'subscription-info';
 let subInfo = {};
+
+// خانة "حسابي" بتظهر **بس** للشخص اللي الأدمن بعتله منشور شخصي
+// (يعني المسؤول عن الدفع) — الباقي مش بيشوفوها خالص.
+async function syncAccountMenu(){
+  const btn = document.getElementById('accountMenuBtn');
+  if(!btn) return;
+  const me = (currentUser.email || '').toLowerCase();
+  if(!me){ btn.classList.add('hidden'); return; }
+  try{
+    const r = await window.storage.get(BROADCAST_KEY + ':user:' + me);
+    btn.classList.toggle('hidden', !(r && r.value));
+  }catch(e){ btn.classList.add('hidden'); }
+}
 
 async function openAccount(){
   const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
