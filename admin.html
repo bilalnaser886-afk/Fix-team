@@ -288,6 +288,7 @@ function render(){
       </select>
       <div style="margin:8px 0;">
         <button class="mini" onclick="fillSubTemplate()">📄 استخدم نص "بدء خطة الاشتراك"</button>
+        ${bcIsSubPlan ? `<span class="badge" style="background:var(--success-bg);color:var(--success);margin-inline-start:8px;">● منشور أسعار — هيفتح «حسابي» للمستلم</span>` : ''}
       </div>
       <button class="btn" onclick="sendBroadcast()">${t('adm.bcSend')}</button>
     </div>
@@ -532,6 +533,11 @@ const BC_AUDIENCE = {
   dispatcher: 'مسؤولي الحركة بس'
 };
 
+// علامة إن المنشور اللي هيتبعت هو منشور خطط الاشتراك تحديداً.
+// خانة «حسابي» بتظهر عند المستلم **بس** لو المنشور معلّم بالعلامة دي —
+// يعني لو الأدمن كتب منشور شخصي عادي، الخانة مش هتظهر.
+let bcIsSubPlan = false;
+
 // إظهار قايمة الأشخاص لما يختار "شخص بعينه"
 function bcAudienceChanged(){
   const a = document.getElementById('bcAudience').value;
@@ -558,6 +564,8 @@ ${rest}
 }
 
 function fillSubTemplate(){
+  bcIsSubPlan = true;                       // ← علامة إن ده منشور الأسعار
+  render();                                 // نعيد الرسم عشان علامة التأكيد تبان
   document.getElementById('bcTitle').value = 'بدء خطة الاشتراك';
   document.getElementById('bcBody').value  = subAnnouncementBody();
   document.getElementById('bcType').value  = 'warning';
@@ -591,9 +599,11 @@ async function sendBroadcast(){
     const bcKey = audience === 'all' ? BROADCAST_KEY
                 : audience === 'user' ? (BROADCAST_KEY + ':user:' + target.toLowerCase())
                 : (BROADCAST_KEY + ':' + audience);
-    await storage.set(bcKey, JSON.stringify({ id:Date.now(), title, body, type, audience, target }));
+    await storage.set(bcKey, JSON.stringify({ id:Date.now(), title, body, type, audience, target, subPlan: !!bcIsSubPlan }));
     await addAudit(`بعت إشعار (${who}): ` + (title||body).slice(0,60));
     document.getElementById('bcTitle').value=''; document.getElementById('bcBody').value='';
+    bcIsSubPlan = false;                      // نصفّرها عشان اللي بعده ما ياخدهاش بالغلط
+    render();
     toast(`اتبعت لـ ${who} ✅`);
   }catch(e){ toast('فشل الإرسال: ' + (e.message||e), false); }
 }

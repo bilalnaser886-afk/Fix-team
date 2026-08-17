@@ -9054,8 +9054,9 @@ function prRender(){
 const SUBINFO_KEY = 'subscription-info';
 let subInfo = {};
 
-// خانة "حسابي" بتظهر **بس** للشخص اللي الأدمن بعتله منشور شخصي
-// (يعني المسؤول عن الدفع) — الباقي مش بيشوفوها خالص.
+// خانة "حسابي" بتظهر **بس** للشخص اللي الأدمن بعتله **منشور خطط
+// الاشتراك** تحديداً (المعلّم بـ subPlan). أي منشور شخصي عادي
+// مش بيظهّرها.
 async function syncAccountMenu(){
   const btn = document.getElementById('accountMenuBtn');
   if(!btn) return;
@@ -9063,7 +9064,11 @@ async function syncAccountMenu(){
   if(!me){ btn.classList.add('hidden'); return; }
   try{
     const r = await window.storage.get(BROADCAST_KEY + ':user:' + me);
-    btn.classList.toggle('hidden', !(r && r.value));
+    let show = false;
+    if(r && r.value){
+      try{ show = JSON.parse(r.value).subPlan === true; }catch(e){ show = false; }
+    }
+    btn.classList.toggle('hidden', !show);
   }catch(e){ btn.classList.add('hidden'); }
 }
 
