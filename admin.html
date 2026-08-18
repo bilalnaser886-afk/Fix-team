@@ -243,6 +243,12 @@ function render(){
            <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
         : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
       <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||7})</button></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line,#334155);">
+        <div style="font-weight:800;margin-bottom:4px;">💳 تفعيل اشتراك مدفوع</div>
+        <p class="hint">بعد ما المسؤول يدفع — اضغط واختار المدة، والخدمة هتشتغل فوراً لكل الموظفين.</p>
+        <button class="btn" onclick="activatePaid()">✅ تفعيل الاشتراك بعد الدفع</button>
+        <div class="hint" id="paidUntilLbl" style="margin-top:6px;"></div>
+      </div>
     </div>
 
     <div class="sec">
@@ -368,6 +374,7 @@ function render(){
       <button class="btn ghost" onclick="doLogout()">${t('adm.logout')}</button>
     </div>
   `;
+  try{ showPaidUntil(); }catch(e){}   // تاريخ نهاية الاشتراك تحت الزرار
 }
 
 // ===== العمليات =====
@@ -387,6 +394,65 @@ async function setMode(kind){
     render(); toast('تم الحفظ ✅');
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
+// ============================================================
+// 💳 تفعيل الاشتراك بعد الدفع
+// ------------------------------------------------------------
+// بيكتب تاريخ نهاية الاشتراك في جدول shop (عمود paid_until).
+// كل الصفحات بتفحصه أول ما تفتح — فالخدمة بترجع فوراً لكل
+// الموظفين من غير ما تعمل أي حاجة تانية.
+// ============================================================
+async function activatePaid(){
+  const v = prompt('مدة الاشتراك بالشهور؟\n1 = شهر · 3 = ثلاثة شهور · 6 = ستة شهور', '1');
+  if(v === null) return;
+  const months = parseInt(v, 10);
+  if(!(months > 0)){ toast('اكتب رقم صحيح', false); return; }
+
+  // بنبدأ من تاريخ النهاية الحالي لو لسه سارياً (تمديد)، وإلا من النهاردة
+  let start = new Date();
+  try{
+    const { data } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
+    if(data && data.paid_until && new Date(data.paid_until) > start) start = new Date(data.paid_until);
+  }catch(e){}
+
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + months);
+  if(!confirm(`تفعيل الاشتراك لمدة ${months} شهر؟\nالخدمة هتشتغل لحد: ${end.toLocaleDateString('ar-EG')}`)) return;
+
+  try{
+    const { error } = await sb.from('shop')
+      .upsert({ id:1, paid_until: end.toISOString() });
+    if(error) throw error;
+
+    // نرجّع الوضع العادي عشان بانر التجربة يختفي
+    systemConfig.mode = 'normal';
+    systemConfig.trialStart = null; systemConfig.trialAnnId = null;
+    await saveConfig();
+
+    await addAudit(`فعّل اشتراك مدفوع ${months} شهر — لحد ${end.toISOString().slice(0,10)}`);
+    render();
+    showPaidUntil();
+    toast('✅ الاشتراك اتفعّل — الخدمة رجعت لكل الموظفين');
+  }catch(e){
+    toast('فشل التفعيل: ' + (e.message||e), false);
+  }
+}
+
+// بيوري تاريخ نهاية الاشتراك الحالي تحت الزرار
+async function showPaidUntil(){
+  const el = document.getElementById('paidUntilLbl');
+  if(!el) return;
+  try{
+    const { data } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
+    if(data && data.paid_until){
+      const d = new Date(data.paid_until);
+      const on = d > new Date();
+      el.textContent = (on ? '🟢 مشترك لحد: ' : '🔴 انتهى في: ') + d.toLocaleDateString('ar-EG');
+    }else{
+      el.textContent = 'مفيش اشتراك مدفوع مسجّل.';
+    }
+  }catch(e){ el.textContent = ''; }
+}
+
 async function changeTrialDays(){
   const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||7));
   if(v===null) return;
