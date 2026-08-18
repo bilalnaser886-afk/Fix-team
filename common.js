@@ -132,9 +132,13 @@ async function syncAccountShared(email, name, roleLabel){
       console.info('[حسابي] مفيش منشور شخصي على المفتاح:', key);
     }
     btn.classList.toggle('hidden', !show);
+    // مش بنعتمد على الـ CSS لوحده — بنقفل العرض مباشرة كمان،
+    // عشان لو الصفحة مفيهاش قاعدة .hidden يفضل الإخفاء شغّال.
+    btn.style.display = show ? '' : 'none';
   }catch(e){
     console.error('[حسابي] فشلت قراءة المنشور:', e);
     btn.classList.add('hidden');
+    btn.style.display = 'none';
   }
 }
 

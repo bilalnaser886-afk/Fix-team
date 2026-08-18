@@ -197,6 +197,10 @@
     padding:12px 13px; border-radius:9px; cursor:pointer;
   }
   .kebab-menu button:active{background:var(--paper);}
+  /* ⚠️ الصفحة دي مفيهاش قاعدة .hidden عامة — و.kebab-menu button فيها
+     display:block، فالزرار المخفي كان بيفضل ظاهر. القاعدة دي بتحسمها. */
+  .kebab-menu button.hidden{display:none !important;}
+
   .kebab-menu .sep{height:1px; background:var(--line); margin:5px 8px;}
   .kebab-menu .danger{color:var(--red);}
   /* درع بيقفل القايمة لو دوست بره */
@@ -432,7 +436,7 @@
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="openTechBoard()" >🏆 ترتيب الفنيين</button>
-      <button id="accountMenuBtn" class="hidden" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+      <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
