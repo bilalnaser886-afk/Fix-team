@@ -692,7 +692,16 @@ async function loadNotices(){
         ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
         : days;
       // خلصت الفترة المجانية → رسالة إيقاف ثم قفل (نفس رسالة الداشبورد)
-      if(left <= 0){ try{ showServiceStopped(false); }catch(e){} return; }
+      // ⚠️ بس بنتأكد الأول من الاشتراك المدفوع — لو المحل مشترك فعلاً
+      //    (paid_until في المستقبل) الخدمة بتفضل شغّالة زي الداشبورد.
+      if(left <= 0){
+        let paidActive = false;
+        try{
+          const { data:sh } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
+          paidActive = !!(sh && sh.paid_until && new Date(sh.paid_until) > new Date());
+        }catch(e){}
+        if(!paidActive){ try{ showServiceStopped(false); }catch(e){} return; }
+      }
       ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
         ntShow('🎁', t('sys.trialTitle'), t('sys.trialBody', { d: days, n: left }),

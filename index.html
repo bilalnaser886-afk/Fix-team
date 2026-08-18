@@ -162,12 +162,9 @@
 
     <!-- تظهر فقط عند انتهاء اشتراك المحل -->
     <div id="renewBox" class="renew-box">
-      <b>Your subscription has expired.</b><br>
-      Renewal cost: <b>$100 / month</b><br>
-      <span id="egpAmount">&asymp; EGP (calculating today's rate...)</span><br>
-      Payment method: <b>Vodafone Cash</b><br>
-      <span class="wallet">01055946677</span><br>
-      Your system will be reactivated as soon as the payment is confirmed.
+      <b>تم إيقاف الخدمة</b><br>
+      انتهت مدة الاشتراك الحالية.<br>
+      برجاء التواصل مع الإدارة لاستئناف الخدمة.
     </div>
   </div>
 </div>
@@ -266,27 +263,11 @@ if(APP_ENV === "staging"){
         return new Date(data.paid_until) > new Date();
     }
 
-    // ------- حساب مقابل الـ 30 دولار بالجنيه بسعر اليوم -------
-    const PRICE_USD = 100;
-    const FALLBACK_RATE = 50; // سعر احتياطي لو الـ API وقع — عدّله لسعر معقول
-
-    async function showEgpEquivalent() {
-        let rate = null;
-        try {
-            const res = await fetch('https://open.er-api.com/v6/latest/USD');
-            const j = await res.json();
-            if (j && j.result === 'success' && j.rates && j.rates.EGP) rate = j.rates.EGP;
-        } catch (e) { /* هنستخدم السعر الاحتياطي */ }
-        const usedRate = rate || FALLBACK_RATE;
-        const egp = Math.ceil((PRICE_USD * usedRate) / 5) * 5;
-        $('egpAmount').innerHTML =
-            `&asymp; <b>EGP ${egp.toLocaleString('en-EG')}</b> at today's exchange rate` +
-            (rate ? '' : ' (approx.)');
-    }
+    // ملحوظة: الأسعار وطرق الدفع اتشالت من هنا عن قصد — بتتبعت
+    // على إيميل المسؤول عن الدفع، مش بتتعرض في صفحة الدخول.
 
     function showRenewBox() {
         $('renewBox').style.display = 'block';
-        showEgpEquivalent();
     }
 
     async function login() {
@@ -318,6 +299,12 @@ if(APP_ENV === "staging"){
                 return;
             }
 
+            const isAdmin = ADMIN_EMAILS.includes((email || '').toLowerCase());
+
+            // 🔑 الأدمن بيعدّي دايماً — حتى لو الاشتراك منتهي.
+            //    من غير كده بتتحبس بره ومش هتقدر تفعّل الاشتراك بعد الدفع.
+            if (isAdmin) { window.location.href = await landingByRole(email); return; }
+
             const active = await shopActive();
 
             if (active === null) {
@@ -344,8 +331,12 @@ if(APP_ENV === "staging"){
     // لو عنده جلسة سارية بالفعل → تخطي صفحة الدخول
     sb.auth.getSession().then(async ({ data: { session } }) => {
         if (!session) return;
+        const em = (session.user.email || '').toLowerCase();
+        // الأدمن بيعدّي دايماً — حتى لو الاشتراك منتهي
+        if (ADMIN_EMAILS.includes(em)) { window.location.href = await landingByRole(em); return; }
         const active = await shopActive();
-        if (active) window.location.href = await landingByRole(session.user.email);
+        if (active) window.location.href = await landingByRole(em);
+        else showRenewBox();          // يشوف سبب التوقف بدل صفحة صامتة
     });
 </script>
 </body>

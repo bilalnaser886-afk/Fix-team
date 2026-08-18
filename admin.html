@@ -134,8 +134,9 @@ const storage = {
 // ===== الحالة =====
 const PENDING_TECHS_KEY='pending-technicians';
 const SYSTEM_CONFIG_KEY='system-config', ROLES_KEY='user-roles', FLAGS_KEY='feature-flags',
-      AUDIT_KEY='audit-log', BROADCAST_KEY='broadcast';
-let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:30, trialAnnId:null };
+      AUDIT_KEY='audit-log', BROADCAST_KEY='broadcast';   // SUBINFO_KEY في common.js
+let subInfo = {};
+let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:7, trialAnnId:null };
 let userRoles = {}, featureFlags = {}, auditLog = [];
 
 const KNOWN_FLAGS = [
@@ -147,7 +148,7 @@ const KNOWN_FLAGS = [
 
 function trialDaysLeft(){
   if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
-  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||30)*86400000;
+  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||7)*86400000;
   return Math.max(0, Math.ceil((end - Date.now())/86400000));
 }
 function isFeatureEnabled(key){ const f = featureFlags[key]; return !!(f && f.is_enabled); }
@@ -200,6 +201,7 @@ async function loadAll(){
   try{ const r = await storage.get(ROLES_KEY); if(r&&r.value) userRoles = JSON.parse(r.value)||{}; }catch(e){}
   try{ const r = await storage.get(FLAGS_KEY); if(r&&r.value) featureFlags = JSON.parse(r.value)||{}; }catch(e){}
   try{ const r = await storage.get(AUDIT_KEY); if(r&&r.value) auditLog = JSON.parse(r.value)||[]; }catch(e){}
+  try{ const r = await storage.get(SUBINFO_KEY); if(r&&r.value) subInfo = JSON.parse(r.value)||{}; }catch(e){}
   await loadPendingTechs();
   let changed = false;
   for(const f of KNOWN_FLAGS){
@@ -235,12 +237,34 @@ function render(){
 
     <div class="sec">
       <div class="sec-title">🎁 ${t('adm.trialSection')}</div>
-      <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||30)})}</p>
+      <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||7)})}</p>
       ${m==='trial'
         ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
            <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
         : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
-      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||30})</button></div>
+      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||7})</button></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line,#334155);">
+        <div style="font-weight:800;margin-bottom:4px;">💳 تفعيل اشتراك مدفوع</div>
+        <p class="hint">بعد ما المسؤول يدفع — اضغط واختار المدة، والخدمة هتشتغل فوراً لكل الموظفين.</p>
+        <button class="btn" onclick="activatePaid()">✅ تفعيل الاشتراك بعد الدفع</button>
+        <div class="hint" id="paidUntilLbl" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">💳 بيانات الاشتراك المسجّلة</div>
+      <p class="hint">اللي بيتكتب من صفحة «حسابي» — ابعت طرق الدفع على الإيميل ده. المستخدم يقدر يعدّلها في أي وقت والتعديل بيظهر هنا.</p>
+      <div style="margin-bottom:8px;"><button class="mini" onclick="refreshSubInfo()">↻ تحديث البيانات</button></div>
+      ${subInfo && (subInfo.email || subInfo.phone || subInfo.name) ? `
+        <div style="line-height:2;">
+          <div>👤 <b>${esc(subInfo.name||'—')}</b></div>
+          <div>📞 <span dir="ltr">${esc(subInfo.phone||'—')}</span></div>
+          <div>✉️ <span dir="ltr">${esc(subInfo.email||'—')}</span></div>
+          ${subInfo.plan ? `<div>📦 الخطة المطلوبة: <b>${esc(subInfo.plan)}</b></div>` : ''}
+          ${subInfo.at ? `<div class="hint">اتسجّلت: ${new Date(subInfo.at).toLocaleString('ar-EG')}</div>` : ''}
+          ${subInfo.by ? `<div class="hint">بواسطة: ${esc(subInfo.by)}</div>` : ''}
+        </div>`
+      : `<p class="hint">لسه محدش سجّل بيانات.</p>`}
     </div>
 
     <div class="sec">
@@ -248,17 +272,30 @@ function render(){
       <p class="hint">${t('adm.bcHint')}</p>
       <input id="bcTitle" placeholder="${t('adm.bcTitlePh')}" />
       <textarea id="bcBody" rows="2" placeholder="${t('adm.bcBodyPh')}"></textarea>
-      <select id="bcAudience">
+      <select id="bcAudience" onchange="bcAudienceChanged()">
         <option value="all">📢 للكل</option>
         <option value="accountant">💼 المحاسبين بس</option>
         <option value="technician">🔧 الفنيين بس</option>
         <option value="dispatcher">🚦 مسؤولي الحركة بس</option>
+        <option value="user">👤 شخص بعينه…</option>
+      </select>
+      <select id="bcUser" style="display:none;">
+        ${Object.keys(userRoles).sort().map(em => {
+          const en = userRoles[em];
+          const rl = (typeof en === 'string') ? en : (en && en.role) || '';
+          const nm = (en && en.techName) ? en.techName : em;
+          return `<option value="${esc(em)}">${esc(nm)} — ${esc(roleLabel(rl))}</option>`;
+        }).join('')}
       </select>
       <select id="bcType">
         <option value="info">📢 ${t('adm.bcInfo')}</option>
         <option value="warning">⚠️ ${t('adm.bcWarn')}</option>
         <option value="success">✅ ${t('adm.bcGood')}</option>
       </select>
+      <div style="margin:8px 0;">
+        <button class="mini" onclick="fillSubTemplate()">📄 استخدم نص "بدء خطة الاشتراك"</button>
+        ${bcIsSubPlan ? `<span class="badge" style="background:var(--success-bg);color:var(--success);margin-inline-start:8px;">● منشور أسعار — هيفتح «حسابي» للمستلم</span>` : ''}
+      </div>
       <button class="btn" onclick="sendBroadcast()">${t('adm.bcSend')}</button>
     </div>
 
@@ -337,12 +374,13 @@ function render(){
       <button class="btn ghost" onclick="doLogout()">${t('adm.logout')}</button>
     </div>
   `;
+  try{ showPaidUntil(); }catch(e){}   // تاريخ نهاية الاشتراك تحت الزرار
 }
 
 // ===== العمليات =====
 async function setMode(kind){
   const texts = {
-    beta:'تفعيل وضع البيتا؟', trial:`تحويل لوضع التجربة المجانية (${systemConfig.trialDays||30} يوم)؟`,
+    beta:'تفعيل وضع البيتا؟', trial:`تحويل لوضع التجربة المجانية (${systemConfig.trialDays||7} يوم)؟`,
     cancelBeta:'إلغاء وضع البيتا والرجوع للوضع العادي؟', cancelTrial:'إلغاء الوضع المجاني والرجوع للوضع العادي؟'
   };
   if(!confirm(texts[kind])) return;
@@ -356,8 +394,67 @@ async function setMode(kind){
     render(); toast('تم الحفظ ✅');
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
+// ============================================================
+// 💳 تفعيل الاشتراك بعد الدفع
+// ------------------------------------------------------------
+// بيكتب تاريخ نهاية الاشتراك في جدول shop (عمود paid_until).
+// كل الصفحات بتفحصه أول ما تفتح — فالخدمة بترجع فوراً لكل
+// الموظفين من غير ما تعمل أي حاجة تانية.
+// ============================================================
+async function activatePaid(){
+  const v = prompt('مدة الاشتراك بالشهور؟\n1 = شهر · 3 = ثلاثة شهور · 6 = ستة شهور', '1');
+  if(v === null) return;
+  const months = parseInt(v, 10);
+  if(!(months > 0)){ toast('اكتب رقم صحيح', false); return; }
+
+  // بنبدأ من تاريخ النهاية الحالي لو لسه سارياً (تمديد)، وإلا من النهاردة
+  let start = new Date();
+  try{
+    const { data } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
+    if(data && data.paid_until && new Date(data.paid_until) > start) start = new Date(data.paid_until);
+  }catch(e){}
+
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + months);
+  if(!confirm(`تفعيل الاشتراك لمدة ${months} شهر؟\nالخدمة هتشتغل لحد: ${end.toLocaleDateString('ar-EG')}`)) return;
+
+  try{
+    const { error } = await sb.from('shop')
+      .upsert({ id:1, paid_until: end.toISOString() });
+    if(error) throw error;
+
+    // نرجّع الوضع العادي عشان بانر التجربة يختفي
+    systemConfig.mode = 'normal';
+    systemConfig.trialStart = null; systemConfig.trialAnnId = null;
+    await saveConfig();
+
+    await addAudit(`فعّل اشتراك مدفوع ${months} شهر — لحد ${end.toISOString().slice(0,10)}`);
+    render();
+    showPaidUntil();
+    toast('✅ الاشتراك اتفعّل — الخدمة رجعت لكل الموظفين');
+  }catch(e){
+    toast('فشل التفعيل: ' + (e.message||e), false);
+  }
+}
+
+// بيوري تاريخ نهاية الاشتراك الحالي تحت الزرار
+async function showPaidUntil(){
+  const el = document.getElementById('paidUntilLbl');
+  if(!el) return;
+  try{
+    const { data } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
+    if(data && data.paid_until){
+      const d = new Date(data.paid_until);
+      const on = d > new Date();
+      el.textContent = (on ? '🟢 مشترك لحد: ' : '🔴 انتهى في: ') + d.toLocaleDateString('ar-EG');
+    }else{
+      el.textContent = 'مفيش اشتراك مدفوع مسجّل.';
+    }
+  }catch(e){ el.textContent = ''; }
+}
+
 async function changeTrialDays(){
-  const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||30));
+  const v = prompt('عدد أيام الفترة المجانية:', String(systemConfig.trialDays||7));
   if(v===null) return;
   const n = parseInt(v)||0;
   if(n<=0){ toast('اكتب رقم صحيح', false); return; }
@@ -502,26 +599,77 @@ const BC_AUDIENCE = {
   dispatcher: 'مسؤولي الحركة بس'
 };
 
+// علامة إن المنشور اللي هيتبعت هو منشور خطط الاشتراك تحديداً.
+// خانة «حسابي» بتظهر عند المستلم **بس** لو المنشور معلّم بالعلامة دي —
+// يعني لو الأدمن كتب منشور شخصي عادي، الخانة مش هتظهر.
+let bcIsSubPlan = false;
+
+// إظهار قايمة الأشخاص لما يختار "شخص بعينه"
+function bcAudienceChanged(){
+  const a = document.getElementById('bcAudience').value;
+  const u = document.getElementById('bcUser');
+  if(u) u.style.display = (a === 'user') ? '' : 'none';
+}
+
+// نص منشور بدء الاشتراك (بالفصحى) — الأسعار بتتقرا من common.js
+// فلو غيّرت USD_RATE أو أسعار الخطط، النص بيتحدّث لوحده.
+function subAnnouncementBody(){
+  const m = PLANS[0];
+  const egp = Math.round(m.usd * USD_RATE).toLocaleString('en-US');
+  const rest = PLANS.slice(1).map(p =>
+    `• ${p.label}: ${planPrice(p)}${p.off ? ` — بخصم ${p.off}%` : ''}`).join('\n');
+  return (
+`حرصًا على استمرار الخدمة وضمان التطوير والتحديث المستمر، تقرر بدء العمل بخطة اشتراك بقيمة ${m.usd} دولارًا شهريًا، أو ما يعادلها بالجنيه المصري (${egp} جنيهًا).
+
+كما تتوفر الخطط التالية:
+${rest}
+
+وسيتم التواصل معكم بشأن طرق الدفع المتاحة حاليًا.
+
+برجاء تسجيل بيانات التواصل (الاسم ورقم الهاتف والبريد الإلكتروني) من صفحة «حسابي» ليتم إرسال طرق الدفع على بريدكم الإلكتروني.`);
+}
+
+function fillSubTemplate(){
+  bcIsSubPlan = true;                       // ← علامة إن ده منشور الأسعار
+  render();                                 // نعيد الرسم عشان علامة التأكيد تبان
+  document.getElementById('bcTitle').value = 'بدء خطة الاشتراك';
+  document.getElementById('bcBody').value  = subAnnouncementBody();
+  document.getElementById('bcType').value  = 'warning';
+  toast('اتكتب النص ✅ — اختار مين يوصله وابعت');
+}
+
+// إعادة قراءة بيانات الاشتراك — عشان الأدمن يشوف تعديلات المستخدم فوراً
+async function refreshSubInfo(){
+  try{
+    const r = await storage.get(SUBINFO_KEY);
+    subInfo = (r && r.value) ? (JSON.parse(r.value) || {}) : {};
+    render();
+    toast('اتحدّثت ✅');
+  }catch(e){ toast('فشل التحديث: ' + (e.message||e), false); }
+}
+
 async function sendBroadcast(){
   const title    = (document.getElementById('bcTitle').value||'').trim();
   const body     = (document.getElementById('bcBody').value||'').trim();
   const type     = document.getElementById('bcType').value || 'info';
   const audience = document.getElementById('bcAudience').value || 'all';
+  const target   = (document.getElementById('bcUser')||{}).value || '';
   if(!title && !body){ toast('اكتب عنوان أو نص الإشعار', false); return; }
+  if(audience === 'user' && !target){ toast('اختار الشخص الأول', false); return; }
 
-  const who = BC_AUDIENCE[audience] || 'كل المستخدمين';
+  const who = audience === 'user' ? ('👤 ' + target) : (BC_AUDIENCE[audience] || 'كل المستخدمين');
   if(!confirm(`تبعت الإشعار ده لـ ${who} دلوقتي؟`)) return;
 
   try{
-    // audience: 'all' أو دور واحد. الصفحات بتقارنه بدور المستخدم
-    // وبتتجاهل الإشعار لو مش ليه.
-    // ⚠️ مفتاح مستقل لكل جمهور — قبل كده كلهم كانوا في مفتاح واحد،
-    // فمنشور للفنيين كان بيمسح منشور المحاسبين اللي قبله.
-    // 'all' بيفضل في المفتاح القديم عشان المنشورات الموجودة ماتضيعش.
-    const bcKey = audience === 'all' ? BROADCAST_KEY : (BROADCAST_KEY + ':' + audience);
-    await storage.set(bcKey, JSON.stringify({ id:Date.now(), title, body, type, audience }));
+    // مفتاح مستقل لكل جمهور — و للشخص الواحد: broadcast:user:<الإيميل>
+    const bcKey = audience === 'all' ? BROADCAST_KEY
+                : audience === 'user' ? (BROADCAST_KEY + ':user:' + target.toLowerCase())
+                : (BROADCAST_KEY + ':' + audience);
+    await storage.set(bcKey, JSON.stringify({ id:Date.now(), title, body, type, audience, target, subPlan: !!bcIsSubPlan }));
     await addAudit(`بعت إشعار (${who}): ` + (title||body).slice(0,60));
     document.getElementById('bcTitle').value=''; document.getElementById('bcBody').value='';
+    bcIsSubPlan = false;                      // نصفّرها عشان اللي بعده ما ياخدهاش بالغلط
+    render();
     toast(`اتبعت لـ ${who} ✅`);
   }catch(e){ toast('فشل الإرسال: ' + (e.message||e), false); }
 }
