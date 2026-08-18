@@ -210,7 +210,11 @@ async function saveAccountShared(){
     const ov = document.getElementById('accSharedOv'); if(ov) ov.remove();
   }catch(e){
     console.error('saveAccountShared failed:', e);
-    alert('فشل الحفظ: ' + (e.message || e));
+    // 42501 = الصلاحية رفضت الكتابة (RLS) — رسالة واضحة بدل كود غامض
+    const perm = e && (e.code === '42501' || /row-level security/i.test(e.message || ''));
+    alert(perm
+      ? 'الحفظ اترفض من الصلاحيات — بلّغ الأدمن يشغّل ملف 15-subinfo-write.sql'
+      : 'فشل الحفظ: ' + (e.message || e));
   }
 }
 
