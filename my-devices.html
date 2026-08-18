@@ -197,6 +197,10 @@
     padding:12px 13px; border-radius:9px; cursor:pointer;
   }
   .kebab-menu button:active{background:var(--paper);}
+  /* ⚠️ الصفحة دي مفيهاش قاعدة .hidden عامة — و.kebab-menu button فيها
+     display:block، فالزرار المخفي كان بيفضل ظاهر. القاعدة دي بتحسمها. */
+  .kebab-menu button.hidden{display:none !important;}
+
   .kebab-menu .sep{height:1px; background:var(--line); margin:5px 8px;}
   .kebab-menu .danger{color:var(--red);}
   /* درع بيقفل القايمة لو دوست بره */
@@ -432,6 +436,7 @@
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="openTechBoard()" >🏆 ترتيب الفنيين</button>
+      <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -723,7 +728,8 @@ async function loadNotices(){
   try{
     const { data, error } = await sb.from('app_data')
       .select('key,value')
-      .in('key', ['system-config','feature-flags','broadcast','broadcast:technician','tech-board']);
+      .in('key', ['system-config','feature-flags','broadcast','broadcast:technician','tech-board',
+                  'broadcast:user:' + (MY_EMAIL||'').toLowerCase()]);
     if(error) throw error;
 
     const map = {};
@@ -744,10 +750,12 @@ async function loadNotices(){
           'ifix_seen_ann_beta_' + cfg.betaAnnId);
       }
     } else if(cfg.mode === 'trial'){
-      const days = cfg.trialDays || 30;
+      const days = cfg.trialDays || 7;
       const left = cfg.trialStart
         ? Math.max(0, Math.ceil((new Date(cfg.trialStart).getTime() + days*86400000 - Date.now())/86400000))
         : days;
+      // خلصت الفترة المجانية → رسالة إيقاف ثم قفل (نفس رسالة الداشبورد)
+      if(left <= 0){ try{ showServiceStopped(false); }catch(e){} return; }
       ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
         ntShow('🎁', t('sys.trialTitle'), t('sys.trialBody', { d: days, n: left }),
@@ -763,10 +771,10 @@ async function loadNotices(){
     // المنشور "لحظي" — منشور من شهر مالوش لازمة لحساب لسه داخل
     // أول مرة. الـ id هو وقت الإرسال، فبنحسب عمره منه.
     const MAX_AGE = 14 * 86400000;
-    ntQueue = ['broadcast', 'broadcast:technician']
+    ntQueue = ['broadcast', 'broadcast:technician', 'broadcast:user:' + (MY_EMAIL||'').toLowerCase()]
       .map(k => map[k])
       .filter(bc => bc && bc.id && (Date.now() - Number(bc.id)) < MAX_AGE)
-      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'technician'; })
+      .filter(bc => { const a = bc.audience || 'all'; return a === 'all' || a === 'technician' || a === 'user'; })
       .sort((a,b) => (Number(a.id)||0) - (Number(b.id)||0))   // الأقدم الأول
       .map(bc => ({
         icon:    bc.type === 'warning' ? '⚠️' : (bc.type === 'success' ? '✅' : '📢'),
@@ -842,6 +850,9 @@ async function boot(){
     if(typeof ent === 'string') role = ent;
     else if(ent && typeof ent === 'object'){ role = ent.role || 'accountant'; techName = (ent.techName || '').trim(); }
   }catch(e){}
+
+  // 👤 خانة "حسابي" — بتظهر بس لو وصله منشور خطط الاشتراك
+  try{ syncAccountShared(MY_EMAIL, techName || ME, 'فني'); }catch(e){}
 
   if(role !== 'technician'){ location.replace('dashboard.html'); return; }
 
