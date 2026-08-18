@@ -253,14 +253,33 @@ if(APP_ENV === "staging"){
     const $ = (id) => document.getElementById(id);
 
     // فحص اشتراك المحل (صف واحد في جدول shop — بيسري على كل الموظفين)
+    // ⚠️ لازم نفحص نفس الشروط التلاتة اللي الداشبورد بيفحصها:
+    //    اشتراك مدفوع · وضع بيتا · فترة مجانية فيها أيام.
+    //    قبل كده كانت بتفحص paid_until بس — فحتى والتجربة شغّالة
+    //    كانت بتمنع الموظفين من الدخول أصلاً.
     async function shopActive() {
-        const { data, error } = await sb
-            .from('shop')
-            .select('paid_until')
-            .eq('id', 1)
-            .single();
-        if (error || !data) return null;
-        return new Date(data.paid_until) > new Date();
+        // (١) اشتراك مدفوع ساري؟
+        let paidActive = false;
+        try {
+            const { data } = await sb.from('shop').select('paid_until').eq('id', 1).maybeSingle();
+            paidActive = !!(data && data.paid_until && new Date(data.paid_until) > new Date());
+        } catch (e) { return null; }
+        if (paidActive) return true;
+
+        // (٢) وضع بيتا أو فترة مجانية لسه فيها أيام؟
+        try {
+            const { data: cfgRow } = await sb.from('app_data')
+                .select('value').eq('key', 'system-config').maybeSingle();
+            const cfg = (cfgRow && cfgRow.value) ? JSON.parse(cfgRow.value) : {};
+            if (cfg.mode === 'beta') return true;
+            if (cfg.mode === 'trial' && cfg.trialStart) {
+                const days = cfg.trialDays || 7;
+                const end  = new Date(cfg.trialStart).getTime() + days * 86400000;
+                if (end > Date.now()) return true;
+            }
+        } catch (e) { /* لو تعذّر القراءة، بنعتمد على المدفوع بس */ }
+
+        return false;
     }
 
     // ملحوظة: الأسعار وطرق الدفع اتشالت من هنا عن قصد — بتتبعت
