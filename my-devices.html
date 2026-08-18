@@ -432,6 +432,7 @@
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="openTechBoard()" >🏆 ترتيب الفنيين</button>
+      <button id="accountMenuBtn" class="hidden" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -845,6 +846,9 @@ async function boot(){
     if(typeof ent === 'string') role = ent;
     else if(ent && typeof ent === 'object'){ role = ent.role || 'accountant'; techName = (ent.techName || '').trim(); }
   }catch(e){}
+
+  // 👤 خانة "حسابي" — بتظهر بس لو وصله منشور خطط الاشتراك
+  try{ syncAccountShared(MY_EMAIL, techName || ME, 'فني'); }catch(e){}
 
   if(role !== 'technician'){ location.replace('dashboard.html'); return; }
 

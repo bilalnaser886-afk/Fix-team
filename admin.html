@@ -134,7 +134,7 @@ const storage = {
 // ===== الحالة =====
 const PENDING_TECHS_KEY='pending-technicians';
 const SYSTEM_CONFIG_KEY='system-config', ROLES_KEY='user-roles', FLAGS_KEY='feature-flags',
-      AUDIT_KEY='audit-log', BROADCAST_KEY='broadcast', SUBINFO_KEY='subscription-info';
+      AUDIT_KEY='audit-log', BROADCAST_KEY='broadcast';   // SUBINFO_KEY في common.js
 let subInfo = {};
 let systemConfig = { mode:'normal', betaAnnId:null, trialStart:null, trialDays:7, trialAnnId:null };
 let userRoles = {}, featureFlags = {}, auditLog = [];

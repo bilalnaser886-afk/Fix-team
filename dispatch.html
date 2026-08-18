@@ -425,6 +425,7 @@
       <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
       <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
       <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
+      <button id="accountMenuBtn" class="hidden" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -888,6 +889,9 @@ async function boot(){
     if(typeof ent === 'string') role = ent;
     else if(ent && typeof ent === 'object') role = ent.role || 'accountant';
   }catch(e){}
+
+  // 👤 خانة "حسابي" — بتظهر بس لو وصله منشور خطط الاشتراك
+  try{ syncAccountShared(MY_EMAIL, ME, 'مسؤول حركة'); }catch(e){}
 
   if(role !== 'dispatcher'){ location.replace('dashboard.html'); return; }
 
