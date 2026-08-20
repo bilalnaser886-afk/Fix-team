@@ -694,13 +694,18 @@ async function loadNotices(){
       // خلصت الفترة المجانية → رسالة إيقاف ثم قفل (نفس رسالة الداشبورد)
       // ⚠️ بس بنتأكد الأول من الاشتراك المدفوع — لو المحل مشترك فعلاً
       //    (paid_until في المستقبل) الخدمة بتفضل شغّالة زي الداشبورد.
+      // ملحوظة: القفل الحقيقي بقى في بوابة الاشتراك أول boot —
+      // الجزء ده للبانر بس. سايبينه كحزام أمان تاني.
       if(left <= 0){
-        let paidActive = false;
+        let stillOn = false;
         try{
-          const { data:sh } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
-          paidActive = !!(sh && sh.paid_until && new Date(sh.paid_until) > new Date());
+          const { data:sh } = await sb.from('shop')
+            .select('paid_until, trial_until').eq('id',1).maybeSingle();
+          const nowT = new Date();
+          stillOn = !!(sh && ((sh.paid_until  && new Date(sh.paid_until)  > nowT)
+                           || (sh.trial_until && new Date(sh.trial_until) > nowT)));
         }catch(e){}
-        if(!paidActive){ try{ showServiceStopped(false); }catch(e){} return; }
+        if(!stillOn){ try{ showServiceStopped(false); }catch(e){} return; }
       }
       ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
@@ -891,6 +896,26 @@ async function boot(){
 
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ location.replace('index.html'); return; }
+
+  // ═══════════════════════════════════════════════════════════
+  // بوابة الاشتراك
+  // -----------------------------------------------------------
+  // ⚠️ لازم تكون هنا، مش جوه الكود اللي بيقرا app_data تحت.
+  //    لأن app_data نفسه بيتقفل مع انتهاء المدة، فالفحص اللي
+  //    جواه مكانش بيشتغل أصلاً — والصفحة كانت هتفضل فاضية
+  //    من غير ما الموظف يعرف السبب.
+  //    جدول shop بيتقرا دايماً، فهو المكان الصح للفحص.
+  // ═══════════════════════════════════════════════════════════
+  try{
+    const { data:sh } = await sb.from('shop')
+      .select('paid_until, trial_until').eq('id',1).maybeSingle();
+    if(sh){
+      const nowT = new Date();
+      const okPaid  = !!(sh.paid_until  && new Date(sh.paid_until)  > nowT);
+      const okTrial = !!(sh.trial_until && new Date(sh.trial_until) > nowT);
+      if(!okPaid && !okTrial){ try{ showServiceStopped(false); }catch(e){} return; }
+    }
+  }catch(e){ console.error('[الاشتراك] فشل فحص المدة:', e); }
   MY_EMAIL = (session.user.email || '').toLowerCase();
 
   let role = 'accountant';

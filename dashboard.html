@@ -1951,13 +1951,22 @@ async function requireAccess(){
     try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
 
     await loadSystemConfig();
-    const { data, error } = await sb.from('shop').select('paid_until').eq('id', 1).single();
-    const paidActive  = data && data.paid_until && new Date(data.paid_until) > new Date();
+    // ══ الاشتراك والتجربة الاتنين بيتقروا من جدول shop ══
+    // ليه مش من الإعدادات (app_data)؟ لأن app_data نفسه بيتقفل مع
+    // انتهاء المدة (سياساته فيها subscription_active)، فالصفحة
+    // مش هتعرف تقرا منه إن كان فيه تجربة أصلاً — وهتطلع المستخدم
+    // بره من غير أي رسالة. جدول shop بيتقرا دايماً.
+    //
+    // ودي نفس القاعدة اللي قاعدة البيانات بتطبّقها في
+    // subscription_active() — مصدر واحد للحقيقة.
+    const { data } = await sb.from('shop').select('paid_until, trial_until').eq('id', 1).maybeSingle();
+    const nowT = new Date();
+    const paidActive  = !!(data && data.paid_until  && new Date(data.paid_until)  > nowT);
+    const trialActive = !!(data && data.trial_until && new Date(data.trial_until) > nowT);
     const betaActive  = systemConfig.mode === 'beta';
-    const trialActive = systemConfig.mode === 'trial' && trialDaysLeft() > 0;
     if(!(paidActive || betaActive || trialActive)){
-      if(systemConfig.mode === 'trial'){
-        // خلصت الفترة المجانية والاشتراك مش مفعّل → رسالة إيقاف ثم قفل.
+      if(data){
+        // المحل متسجّل بس المدة خلصت → رسالة إيقاف ثم قفل.
         // 🔧 لو رجعت تستخدم صفحة الدفع: showServiceStopped(true)
         showServiceStopped(false);
         return false;
