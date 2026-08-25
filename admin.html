@@ -268,31 +268,21 @@ function render(){
       <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ ${t('adm.openDashboard')}</button>
     </div>
 
+    <!-- ⚠️ قسم «وضع البيتا» وقسم «الفترة المجانية» اتشالوا بالكامل
+         (أغسطس ٢٠٢٦) بناءً على طلب المالك: العميل بيدفع اشتراك عادي،
+         والفترة المجانية والبيتا مالهمش لازمة.
+         الدوال setMode / changeTrialDays لسه موجودة تحت في الكود بس
+         مفيش أي زرار بيناديها — سايبينها عشان لو احتجناها يوم نرجّع
+         الزراير بس، من غير ما نعيد كتابة منطق كامل. -->
     <div class="sec">
-      <div class="sec-title">🛠️ ${t('adm.betaSection')}</div>
-      <p class="hint">${t('adm.betaHint')}</p>
-      ${m==='beta'
-        ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.betaOn')}</div>
-           <button class="btn danger" onclick="setMode('cancelBeta')">🛑 ${t('adm.betaCancel')}</button>`
-        : `<button class="btn" onclick="setMode('beta')">${t('adm.betaEnable')}</button>`}
-    </div>
-
-    <div class="sec">
-      <div class="sec-title">🎁 ${t('adm.trialSection')}</div>
-      <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||7)})}</p>
-      ${m==='trial'
-        ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
-           <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
-        : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
-      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||7})</button></div>
-      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line,#334155);">
-        <div style="font-weight:800;margin-bottom:4px;">💳 تفعيل اشتراك مدفوع</div>
+      <div>
+        <div class="sec-title">💳 تفعيل اشتراك مدفوع</div>
         <p class="hint">بعد ما المسؤول يدفع — اضغط واختار المدة، والخدمة هتشتغل فوراً لكل الموظفين.</p>
         <button class="btn" onclick="activatePaid()">✅ تفعيل الاشتراك بعد الدفع</button>
         <div class="hint" id="paidUntilLbl" style="margin-top:6px;"></div>
         ${paidActive() ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line,#334155);">
-          <p class="hint" style="margin-top:0;">لإلغاء الاشتراك فوراً — الخدمة هتتقفل عند كل الموظفين إلا لو فيه فترة مجانية سارية.</p>
+          <p class="hint" style="margin-top:0;">لإلغاء الاشتراك فوراً — الخدمة هتتقفل عند كل الموظفين على طول.</p>
           <button class="btn danger" onclick="cancelPaid()">🛑 إلغاء الاشتراك المدفوع</button>
         </div>` : ''}
       </div>
