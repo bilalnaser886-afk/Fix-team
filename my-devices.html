@@ -1261,14 +1261,117 @@ function scanFind(text){
 
 function scanWithCamera(){
   if(!window.IFixScan) return;
-  IFixScan.open(text => {
+  IFixScan.open(async text => {
     const hit = scanFind(text);
     if(hit) return openSheet(hit.id);
-    // مفيش نتيجة؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
+    // ⚠️ مش في قايمتي — ممكن يكون جهاز فني تاني.
+    //    الفني بيشوف أجهزته هو بس (is_my_device في المنظور)، فمفيش
+    //    طريقة نلاقيه بالقراءة العادية. بنسأل السيرفر عن الجهاز ده
+    //    بالتحديد عن طريق دالة بترجّع بيانات تعريفه بس.
+    if(await tryClaimScan(text)) return;
+    // ولا ده ولا ده؟ نحط النص في البحث بدل ما نسيب المستخدم في اللاشيء
     const box = document.getElementById('q');
     if(box){ box.value = text; render(); box.focus(); }
     toast(t('scan.notFound'));
   });
+}
+
+// ============================================================
+// مسحت جهاز مش بتاعي
+// ------------------------------------------------------------
+// بنسأل السيرفر عنه، ولو موجود بنعرض اختيارين:
+//   🤝 مساعد (٢٥٪)   ·   🔄 استلام كامل
+//
+// ⚠️ الاستلام بيتم من غير تأكيد من الفني الأساسي — ده قرار مقصود.
+//    الحماية إن كل حركة بتتسجّل في سجل الجهاز باسم اللي عملها
+//    ووقتها ومين كان ماسكه قبلها.
+// ============================================================
+function scanIdFrom(text){
+  const raw = String(text || '').trim();
+  // الباركود بيبقى معرّف الجهاز كامل، والبحث اليدوي ممكن يبقى رقم التذكرة
+  const m = raw.match(/dev_\d{10,}/i);
+  return m ? m[0] : raw.replace(/^#/, '');
+}
+
+async function tryClaimScan(text){
+  const id = scanIdFrom(text);
+  if(!id) return false;
+  try{
+    const { data, error } = await sb.rpc('tech_scan_device', { p_id: id });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    const dev = Array.isArray(data) ? data[0] : data;
+    if(!dev) return false;
+    openClaim(dev);
+    return true;
+  }catch(e){
+    console.error('tech_scan_device failed:', e);
+    return false;
+  }
+}
+
+function openClaim(dev){
+  const busy = (dev.technician || '').trim();
+  const isMine = busy === ME;
+  let ov = document.getElementById('claimOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'claimOv';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(8,14,20,.62);'
+      + 'display:flex;align-items:flex-end;justify-content:center;';
+    ov.onclick = e => { if(e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML =
+    '<div dir="rtl" style="width:100%;max-width:520px;background:var(--card);color:var(--ink);'
+    + 'border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));'
+    + 'font-family:inherit;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
+      + '<h3 style="margin:0;flex:1;font-size:16px;">📷 جهاز مش في قايمتك</h3>'
+      + '<button onclick="document.getElementById(\'claimOv\').remove()" '
+        + 'style="border:none;background:var(--paper);color:var(--ink);width:34px;height:34px;'
+        + 'border-radius:10px;font-size:17px;cursor:pointer;">✕</button>'
+    + '</div>'
+    + '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;line-height:2;margin-bottom:14px;">'
+      + '<div><b>' + esc((dev.device_type || '') + ' ' + (dev.model || '')) + '</b></div>'
+      + '<div style="font-size:13px;color:var(--muted);">'
+        + 'الفني الحالي: <b>' + esc(busy || '—') + '</b></div>'
+      + (dev.assist_technician
+          ? '<div style="font-size:13px;color:var(--muted);">مساعد: ' + esc(dev.assist_technician) + '</div>'
+          : '')
+    + '</div>'
+    + (isMine
+      ? '<div style="text-align:center;color:var(--muted);font-size:13.5px;line-height:2;padding:10px;">'
+        + 'الجهاز ده معاك بالفعل — اقفل واعمل تحديث للصفحة.</div>'
+      : '<button onclick="doClaim(\'' + esc(dev.id) + '\',\'assist\')" '
+        + 'style="width:100%;border:none;border-radius:13px;padding:15px;margin-bottom:9px;'
+        + 'background:#0891A8;color:#fff;font:800 15px/1 inherit;cursor:pointer;">'
+        + '🤝 سجّلني مساعد (٢٥٪)</button>'
+      + '<button onclick="doClaim(\'' + esc(dev.id) + '\',\'full\')" '
+        + 'style="width:100%;border:none;border-radius:13px;padding:15px;'
+        + 'background:#B45309;color:#fff;font:800 15px/1 inherit;cursor:pointer;">'
+        + '🔄 استلم الجهاز بالكامل</button>'
+      + '<div style="font-size:12px;color:var(--muted);line-height:1.9;margin-top:11px;text-align:center;">'
+        + 'النسبة مبدئية والمحاسب بيعدّلها · كل حركة بتتسجّل في سجل الجهاز</div>')
+    + '</div>';
+}
+
+async function doClaim(id, mode){
+  if(mode === 'full' && !confirm('هتستلم الجهاز بالكامل والفني الحالي هيخرج منه.\nمتأكد؟')) return;
+  const ov = document.getElementById('claimOv');
+  try{
+    const { error } = await sb.rpc('tech_claim_device',
+      { p_id: id, p_mode: mode, p_tech_name: ME });
+    if(error) throw error;
+    if(ov) ov.remove();
+    toast(mode === 'full' ? 'الجهاز بقى معاك ✅' : 'اتسجّلت مساعد (٢٥٪) ✅');
+    await loadDevices();
+    render();
+    openSheet(id);
+  }catch(e){
+    console.error('tech_claim_device failed:', e);
+    toast('فشل الاستلام: ' + esc(e.message || e));
+  }
 }
 
 function mountScanBtn(){
@@ -1279,6 +1382,45 @@ function mountScanBtn(){
     const b = box && box.parentElement && box.parentElement.querySelector('.ifs-btn');
     if(b) b.onclick = e => { e.preventDefault(); scanWithCamera(); };
   }catch(e){}
+}
+
+// الفني الأساسي بس هو اللي يصحّح العطل.
+// ⚠️ المساعد لأ — عشان اتنين ما يغيّروش نفس النص ورا بعض من غير
+//    ما حد ياخد باله. ولو الجهاز خلص، بيتقفل عن الاتنين.
+function canActOn(d){
+  return !!d && d.tech === ME && !DONE_STATES.includes(d.status);
+}
+
+// ============================================================
+// تصحيح العطل
+// ------------------------------------------------------------
+// ⚠️ النص القديم **مش بيضيع**. بيتسجّل في سجل الجهاز قبل الكتابة،
+//    فأي حد يفتح السجل يشوف: كان كذا وبقى كذا ومين غيّره وإمتى.
+//    ده الفرق بين "تعديل" و"مسح".
+// ============================================================
+async function saveIssue(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const box = document.getElementById('issueTxt'); if(!box) return;
+  const neu = (box.value || '').trim();
+  const old = (d.issue || '').trim();
+  if(!neu){ toast('اكتب العطل الأول'); return; }
+  if(neu === old){ toast('مفيش تغيير'); return; }
+
+  const txt  = 'العطل اتعدّل: «' + (old || '—') + '» ← «' + neu + '»';
+  const note = mkNote(txt, 'note.issueEdit', { from: old || '—', to: neu });
+  const patch = {
+    reportedIssue: neu,
+    activityNotes: notesForSave(d, note),
+    lastModifiedAt: nowIso(),
+    lastModifiedBy: ME
+  };
+  if(!(await save(id, patch))) return;
+
+  d.issue = neu;
+  if(d._raw){ d._raw.reportedIssue = neu; d._raw.activityNotes = patch.activityNotes; }
+  d.notes = patch.activityNotes.map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'', kind:n.kind, args:n.args }));
+  toast('العطل اتحدّث ✅');
+  render(); renderSheetKeepNote();
 }
 
 function openSheet(id){ sheetId=id; handOn=false; handMode=''; handTarget=''; renderSheet(); $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); }
@@ -1313,6 +1455,20 @@ function renderSheet(){
           ${(!d.lockText && (d.lockType==='pattern'||d.lockType==='image') && d.lockImage)?`<span class="k">رمز القفل</span><span class="v"><img src="${d.lockImage}" onclick="openLockImg('${d.id}')" style="width:110px;height:110px;border-radius:10px;border:1px solid var(--line);object-fit:cover;cursor:pointer;">${d.lockPattern?`<div style="font-family:var(--mono);font-weight:700;margin-top:4px;">${esc(d.lockPattern)}</div>`:''}</span>`:''}
           <span class="k" data-i18n="rp.issue">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
         </div>
+        ${canActOn(d) ? `
+        <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;">
+          <div style="font-size:12.5px;color:var(--muted);line-height:1.8;margin-bottom:7px;">
+            🛠️ لقيت العطل غير المكتوب؟ صحّحه — القديم بيتسجّل في السجل.
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input id="issueTxt" value="${esc(d.issue)}" placeholder="العطل الحقيقي"
+              style="flex:1;min-width:0;border:1px solid var(--line);background:var(--card);
+                     color:var(--ink);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;">
+            <button onclick="saveIssue('${d.id}')"
+              style="flex:none;border:none;background:var(--blue,#2B6CB0);color:#fff;border-radius:10px;
+                     padding:10px 14px;font-family:inherit;font-weight:800;cursor:pointer;">💾</button>
+          </div>
+        </div>` : ''}
       </div>
 
       <div class="panel">
