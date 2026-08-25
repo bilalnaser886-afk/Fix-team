@@ -550,6 +550,9 @@
       'adm.logout': 'تسجيل الخروج',
       'adm.roleSuper': 'Super Admin',
       'adm.roleAcc': 'محاسب',
+      'adm.roleDisp': 'مسؤول الحركة',
+      'adm.roleTech': 'فني',
+      'adm.roleHr': 'شؤون العاملين (HR)',
       'adm.delete': 'حذف',
 
       /* صفحة الاشتراك */
@@ -1205,6 +1208,9 @@
       'adm.logout': 'Sign Out',
       'adm.roleSuper': 'Super Admin',
       'adm.roleAcc': 'Accountant',
+      'adm.roleDisp': 'Dispatcher',
+      'adm.roleTech': 'Technician',
+      'adm.roleHr': 'HR',
       'adm.delete': 'Delete',
 
       /* Checkout page */

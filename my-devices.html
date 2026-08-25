@@ -26,6 +26,7 @@
 <meta name="theme-color" content="#1B2A3A">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>
+<script src="attendance.js"></script>
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
@@ -437,6 +438,7 @@
     <div id="kebabMenu" class="kebab-menu hidden">
       <button onclick="openTechBoard()" >🏆 ترتيب الفنيين</button>
       <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+      <button class="att-menu-btn" style="display:none;" onclick="closeKebab(); openAttendance()">⏰ المواعيد</button>
       <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -1756,5 +1758,8 @@ document.addEventListener('DOMContentLoaded', function(){
   try{ mountScanBtn(); }catch(e){}
 });
 </script>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
 </body>
 </html>

@@ -239,6 +239,10 @@ async function landingByRole(email){
 
   if(role === 'technician') return 'my-devices.html';
   if(role === 'dispatcher') return 'dispatch.html';
+  // ⚠️ شؤون العاملين ليها صفحتها لوحدها. من غير السطر ده كانت
+  //    هتروح للداشبورد وتشوف الأجهزة والفلوس والتقارير كلها —
+  //    وهي المفروض تشوف سجل المواعيد وبس.
+  if(role === 'hr')         return 'hr.html';
   return 'dashboard.html';
 }
 if(APP_ENV === "staging"){

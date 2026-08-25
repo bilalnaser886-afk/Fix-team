@@ -162,6 +162,80 @@ const KNOWN_FLAGS = [
 // ============================================================
 let shopSub = { paid_until:null, trial_until:null };
 
+// ============================================================
+// المواعيد — لوكيشن المحل
+// ------------------------------------------------------------
+// الإحداثيات بتتخزّن في جدول hr_settings، والسيرفر هو اللي
+// بيقارن بيها وقت التسجيل. الصفحة دي بتكتب بس.
+// ============================================================
+let hrSet = { lat:null, lng:null, radius_m:75 };
+
+async function loadHrSettings(){
+  try{
+    const { data, error } = await sb.from('hr_settings')
+      .select('lat,lng,radius_m').eq('id',1).maybeSingle();
+    if(error) throw error;
+    if(data) hrSet = data;
+  }catch(e){ console.error('loadHrSettings failed:', e); }
+  renderHrLoc();
+}
+
+function renderHrLoc(){
+  const l = document.getElementById('hrLocLbl');
+  const r = document.getElementById('hrRadLbl');
+  if(r) r.textContent = hrSet.radius_m || 75;
+  if(!l) return;
+  l.innerHTML = (hrSet.lat == null || hrSet.lng == null)
+    ? '🔴 <b>اللوكيشن لسه مش متحدد</b> — الموظفين مش هيقدروا يسجّلوا حضور.'
+    : '🟢 متحدد: <span dir="ltr">' + Number(hrSet.lat).toFixed(6) + ', '
+      + Number(hrSet.lng).toFixed(6) + '</span>';
+}
+
+async function hrSetLocation(){
+  if(!navigator.geolocation){ toast('جهازك مش بيدعم تحديد الموقع', false); return; }
+  toast('⏳ بنحدد مكانك…');
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const { latitude:lat, longitude:lng, accuracy:acc } = pos.coords;
+    // ⚠️ بنوري الدقة عشان الأدمن يقرر. لو الدقة ٥٠٠ متر يبقى
+    //    المكان ده مش موثوق ولازم يعيد وهو بره أو جنب شباك.
+    if(!confirm('المكان اللي لقيناه:\n' + lat.toFixed(6) + ', ' + lng.toFixed(6)
+      + '\nدقة القراءة: ' + Math.round(acc) + ' متر\n\nنحفظه كموقع المحل؟')) return;
+    try{
+      const { error } = await sb.from('hr_settings')
+        .upsert({ id:1, lat, lng, updated_at:new Date().toISOString() });
+      if(error) throw error;
+      hrSet.lat = lat; hrSet.lng = lng;
+      renderHrLoc();
+      await addAudit('حدد لوكيشن المحل للمواعيد');
+      toast('اتحفظ ✅');
+    }catch(e){
+      console.error('hrSetLocation failed:', e);
+      toast('فشل الحفظ: ' + (e.message||e), false);
+    }
+  }, (e) => {
+    toast(e.code === 1 ? 'لازم تسمح بالوصول لموقعك' : 'مقدرناش نحدد مكانك', false);
+  }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+}
+
+async function hrSetRadius(){
+  const v = prompt('نص القطر المسموح بالمتر:', String(hrSet.radius_m || 75));
+  if(v === null) return;
+  const n = parseInt(v, 10);
+  if(!n || n < 20 || n > 2000){ toast('اكتب رقم بين ٢٠ و ٢٠٠٠', false); return; }
+  try{
+    const { error } = await sb.from('hr_settings')
+      .upsert({ id:1, radius_m:n, updated_at:new Date().toISOString() });
+    if(error) throw error;
+    hrSet.radius_m = n;
+    renderHrLoc();
+    await addAudit('غيّر نص قطر المواعيد لـ ' + n + ' متر');
+    toast('اتحفظ ✅');
+  }catch(e){
+    console.error('hrSetRadius failed:', e);
+    toast('فشل الحفظ: ' + (e.message||e), false);
+  }
+}
+
 async function loadShopSub(){
   try{
     const { data, error } = await sb.from('shop')
@@ -236,6 +310,8 @@ async function loadAll(){
   //    لكن جدول shop بيتقرا دايماً، فحالة الاشتراك بتفضل معروفة
   //    ولوحة الأدمن تفضل قادرة تفعّل.
   await loadShopSub();
+  // hr_settings زي shop: جدول مستقل مفيهوش شرط اشتراك، فبيتقرا دايماً
+  await loadHrSettings();
   try{ const r = await storage.get(SYSTEM_CONFIG_KEY); if(r&&r.value) systemConfig = Object.assign(systemConfig, JSON.parse(r.value)); }catch(e){}
   try{ const r = await storage.get(ROLES_KEY); if(r&&r.value) userRoles = JSON.parse(r.value)||{}; }catch(e){}
   try{ const r = await storage.get(FLAGS_KEY); if(r&&r.value) featureFlags = JSON.parse(r.value)||{}; }catch(e){}
@@ -286,6 +362,17 @@ function render(){
           <button class="btn danger" onclick="cancelPaid()">🛑 إلغاء الاشتراك المدفوع</button>
         </div>` : ''}
       </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">⏰ المواعيد — لوكيشن المحل</div>
+      <p class="hint">الموظفين مش هيقدروا يسجّلوا حضور إلا وهما جوه الدايرة دي.
+        <b>قف في المحل</b> ودوس «حدد مكاني دلوقتي».</p>
+      <div id="hrLocLbl" class="hint" style="margin-bottom:8px;">…</div>
+      <button class="btn" onclick="hrSetLocation()">📍 حدد مكاني دلوقتي كموقع المحل</button>
+      <div style="margin-top:10px;"><button class="mini" onclick="hrSetRadius()">📏 نص القطر المسموح (<span id="hrRadLbl">—</span> متر)</button></div>
+      <p class="hint" style="margin-top:10px;">⚠️ دقة الـ GPS جوه المبنى بتوصل ٥٠ متر.
+        لو حطيت رقم صغير أوي، هترفض ناس موجودة فعلاً في المحل.</p>
     </div>
 
     <div class="sec">
@@ -412,6 +499,10 @@ function render(){
     </div>
   `;
   try{ showPaidUntil(); }catch(e){}   // تاريخ نهاية الاشتراك تحت الزرار
+  // ⚠️ render() بيعيد بناء الـ HTML كله، فالعناصر اللي كتبنا فيها
+  //    قبل كده بتتمسح وتترسم من جديد فاضية. لازم نعيد ملّاها بعد
+  //    كل رسمة — من غير السطر ده حالة اللوكيشن هتفضل "…".
+  try{ renderHrLoc(); }catch(e){}
 }
 
 // ===== العمليات =====
@@ -591,12 +682,15 @@ async function toggleFlag(key){
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
 // الأدوار المتاحة — لازم تفضل زي اللي في dashboard.html
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician'];
+// ⚠️ hr = مسؤول شؤون العاملين. بيشوف سجل مواعيد كل الموظفين
+//    وبس — مالوش أي علاقة بالأجهزة ولا الفلوس.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
   dispatcher:  'adm.roleDisp',
-  technician:  'adm.roleTech'
+  technician:  'adm.roleTech',
+  hr:          'adm.roleHr'
 };
 function roleLabel(r){ const k = ROLE_LABEL_KEYS[r]; try{ return k ? t(k) : r; }catch(e){ return r; } }
 

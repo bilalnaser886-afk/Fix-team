@@ -96,6 +96,7 @@
 <script src="points.js"></script>
 <script src="statuses.js"></script>
 <script src="accounts.js"></script>
+<script src="attendance.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1156,6 +1157,7 @@
     <button class="money-menu-item" data-i18n="menu.analytics" onclick="openAnalytics()">الملخص المالي</button>
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
+      <button class="att-menu-btn" style="display:none;" onclick="openAttendance()">⏰ المواعيد</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
@@ -8779,5 +8781,8 @@ async function saveSubInfo(){
   }
 }
 </script>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
 </body>
 </html>

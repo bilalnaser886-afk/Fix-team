@@ -30,6 +30,7 @@
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
 <script src="accounts.js"></script>
+<script src="attendance.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -534,6 +535,7 @@
       <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
       <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">🧾 الحسابات</button>
       <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+      <button class="att-menu-btn" style="display:none;" onclick="closeKebab(); openAttendance()">⏰ المواعيد</button>
       <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -1967,5 +1969,8 @@ document.addEventListener('DOMContentLoaded', function(){
   try{ mountScanBtn(); }catch(e){}
 });
 </script>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
 </body>
 </html>
