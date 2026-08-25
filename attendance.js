@@ -379,40 +379,58 @@ function closeAttendance(){
   if(document.getElementById('attCss')) return;
   const s = document.createElement('style');
   s.id = 'attCss';
+  // ⚠️ الشاشة دي بتشتغل في ٤ صفحات، وكل صفحة سمّية متغيراتها
+  //    باسم مختلف: الداشبورد بيقول --surface وصفحة الفني بتقول
+  //    --card. أول نسخة كانت بتقرا الأسماء الجديدة بس، فصفحة
+  //    الفني رجعت للألوان الفاتحة الاحتياطية والكلام اختفى.
+  //
+  //    الحل: الشاشة **بتعرّف ألوانها بنفسها** من data-theme اللي
+  //    كل الصفحات بتحطه على <html>. مش بتعتمد على أي متغير من
+  //    الصفحة خالص — فأي صفحة جديدة هتشتغل صح من غير أي تعديل.
   s.textContent = `
-  #attOverlay{position:fixed; inset:0; z-index:9400; background:var(--bg,#F1F5F9); overflow-y:auto;}
+  #attOverlay{
+    --a-bg:#F1F5F9; --a-card:#FFFFFF; --a-line:#E2E8F0;
+    --a-ink:#101014; --a-ink2:#334155; --a-mut:#64748B;
+  }
+  html[data-theme="dark"] #attOverlay{
+    --a-bg:#131E29; --a-card:#1B2A3A; --a-line:#2F4356;
+    --a-ink:#E9EFF5; --a-ink2:#C3D2DF; --a-mut:#92A6B8;
+  }
+
+  #attOverlay{position:fixed; inset:0; z-index:9400; background:var(--a-bg);
+    overflow-y:auto; color:var(--a-ink);}
   #attOverlay.hidden{display:none;}
   .att-page{min-height:100%;}
   /* env(safe-area-inset-top) = النتش وشريط الساعة في الأيفون */
   .att-head{display:flex; align-items:center; gap:10px;
     padding:calc(14px + env(safe-area-inset-top)) 18px 14px;
-    background:var(--surface,#fff); border-bottom:1px solid var(--border,#E2E8F0);
+    background:var(--a-card); border-bottom:1px solid var(--a-line);
     position:sticky; top:0; z-index:2;}
   .att-head h2{flex:1; min-width:0; margin:0; font-family:'Cairo',sans-serif; font-size:18px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink,#101014);}
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--a-ink);}
   .att-close{flex:none; width:38px; height:38px; border:none; border-radius:10px;
-    background:var(--surface-2,#F8FAFC); color:var(--ink,#101014); font-size:20px; cursor:pointer;}
+    background:var(--a-bg); color:var(--a-ink); font-size:20px; cursor:pointer;}
   .att-body{padding:16px 18px 40px;}
-  .att-status{background:var(--surface,#fff); border:1px solid var(--border,#E2E8F0);
+  .att-status{background:var(--a-card); border:1px solid var(--a-line);
     border-radius:12px; padding:14px; font-weight:800; font-size:15px; text-align:center;
-    color:var(--ink,#101014);}
-  .att-busy{margin-top:10px; text-align:center; font-size:13px; color:var(--muted,#64748B);}
+    color:var(--a-ink);}
+  .att-busy{margin-top:10px; text-align:center; font-size:13px; color:var(--a-mut);}
   .att-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
   .att-btn{padding:18px 10px; border:none; border-radius:14px; font-family:inherit;
     font-size:15px; font-weight:800; color:#fff; cursor:pointer;}
   .att-btn:disabled{opacity:.35; cursor:not-allowed;}
   .att-in{background:#16A34A;} .att-out{background:#DC2626;}
   .att-break{background:#B45309;} .att-resume{background:#0891A8;}
-  .att-note{font-size:12.5px; line-height:1.9; color:var(--muted,#64748B); text-align:center;}
+  .att-note{font-size:12.5px; line-height:1.9; color:var(--a-mut); text-align:center;}
   .att-log-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
-    margin:20px 0 10px; color:var(--ink,#101014);}
-  .att-log-head input{border:1px solid var(--border,#E2E8F0); border-radius:9px; padding:8px 10px;
-    font-family:inherit; background:var(--surface,#fff); color:var(--ink,#101014);}
-  .att-day{background:var(--surface,#fff); border:1px solid var(--border,#E2E8F0);
+    margin:20px 0 10px; color:var(--a-ink);}
+  .att-log-head input{border:1px solid var(--a-line); border-radius:9px; padding:8px 10px;
+    font-family:inherit; background:var(--a-card); color:var(--a-ink);}
+  .att-day{background:var(--a-card); border:1px solid var(--a-line);
     border-radius:12px; padding:12px 14px; margin-bottom:10px;}
-  .att-day-h{font-weight:800; font-size:13.5px; margin-bottom:8px; color:var(--ink,#101014);}
+  .att-day-h{font-weight:800; font-size:13.5px; margin-bottom:8px; color:var(--a-ink);}
   .att-row{display:flex; justify-content:space-between; font-size:13.5px; padding:5px 0;
-    color:var(--ink-2,#334155);}
-  .att-empty{text-align:center; color:var(--muted,#64748B); padding:24px; font-size:13.5px;}`;
+    color:var(--a-ink2);}
+  .att-empty{text-align:center; color:var(--a-mut); padding:24px; font-size:13.5px;}`;
   (document.head || document.documentElement).appendChild(s);
 })();
