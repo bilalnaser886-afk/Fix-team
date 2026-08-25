@@ -433,6 +433,12 @@
     --success-bg:rgba(74,222,128,.13);
   }
 
+  /* ⚠️ التوب بار z-index:31 وشريط "جهاز جديد" z-index:30 — والاتنين
+     sticky يعني بيفضلوا بانيين. الأوفرلاي العام z-index:30 فكان
+     بيتحط تحتيهم وهما بيركبوا على الشاشة.
+     بنرفع الشاشة دي فوقهم، وتحت الحاجات اللي المفروض تغطي كل حاجة
+     (شاشة الإعدادات 70 · القفل 9500 · شاشة التحميل 9999). */
+  #accountsOverlay{z-index:69;}
   .acc-page{min-height:100%; background:var(--bg); padding-bottom:40px;}
   .acc-head{display:flex; align-items:center; justify-content:space-between;
     gap:10px; padding:16px 20px; border-bottom:1px solid var(--border); background:var(--surface);
@@ -440,9 +446,6 @@
   .acc-head h2{font-family:'Cairo',sans-serif; font-size:18px; margin:0;}
   .acc-close{border:none; background:var(--surface-2); color:var(--ink); width:34px; height:34px;
     border-radius:10px; font-size:19px; cursor:pointer; line-height:1;}
-  .acc-readonly-note{margin:12px 20px 0; padding:10px 13px; border-radius:10px; font-size:12.5px;
-    line-height:1.8; background:var(--warn-tint); color:var(--warn);
-    border:1px solid var(--border);}
 
   .acc-shop{background:var(--surface); border:1px solid var(--border); border-radius:14px; margin-bottom:12px; overflow:hidden;}
   .acc-shop-head{width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px;
@@ -522,7 +525,7 @@
       <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
       <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
       <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
-      <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">🧾 الحسابات — آجل المحلات</button>
+      <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">🧾 الحسابات</button>
       <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
@@ -541,12 +544,8 @@
 <div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="acc-page">
     <div class="acc-head">
-      <h2>🧾 الحسابات — آجل المحلات</h2>
+      <h2>🧾 الحسابات</h2>
       <button class="acc-close" onclick="closeAccounts()">×</button>
-    </div>
-    <div class="acc-readonly-note">
-      👁️ عرض فقط — تقدر تدوّر وتشوف كشف أي محل وتطبعه PDF.
-      تسجيل الدفعات والخصومات من المحاسب.
     </div>
     <div style="padding:12px 20px 8px;">
       <div class="modal-search"><input id="accSearch" oninput="renderAccounts()" placeholder="ابحث باسم المحل..." /></div>

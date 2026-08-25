@@ -414,6 +414,54 @@ function shopStatementRows(shop){
   return { entries, debit, credit, balance: debit - credit };
 }
 
+
+// ============================================================
+// الطباعة — من جوه الصفحة، مش في تاب جديد
+// ------------------------------------------------------------
+// ⚠️ الطريقة القديمة كانت window.open('','_blank') وبعدين
+//    document.write. ودي بتفتح **صفحة جديدة**، ولما التطبيق
+//    مثبّت على الأيفون (standalone) مفيش زرار رجوع أصلاً —
+//    فالمستخدم بيتحبس ومضطر يقفل التطبيق ويفتحه تاني.
+//
+//    دلوقتي بنرسم الكشف في إطار مخفي (iframe) جوه نفس الصفحة
+//    وبنطبع منه. الصفحة **ما بتتحركش من مكانها خالص** — فحتى
+//    لو نافذة الطباعة اتقفلت أو فشلت، المستخدم لسه في مكانه.
+// ============================================================
+function accPrint(html, title){
+  // إطار قديم من طباعة سابقة؟ نشيله عشان ما يتكدّسوش
+  const old = document.getElementById('accPrintFrame');
+  if(old) old.remove();
+
+  const f = document.createElement('iframe');
+  f.id = 'accPrintFrame';
+  f.setAttribute('aria-hidden', 'true');
+  f.title = title || 'print';
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;';
+  document.body.appendChild(f);
+
+  const go = () => {
+    try{
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    }catch(e){
+      console.error('الطباعة فشلت:', e);
+      alert('مقدرناش نفتح نافذة الطباعة. جرّب تاني.');
+    }
+  };
+
+  try{
+    const d = f.contentWindow.document;
+    d.open(); d.write(html); d.close();
+    // 500 مللي عشان الخطوط تنزّل الأول — من غيرها الكشف بيطلع
+    // بخط النظام الافتراضي
+    setTimeout(go, 500);
+  }catch(e){
+    console.error('تجهيز الطباعة فشل:', e);
+    f.remove();
+    alert('مقدرناش نجهّز الكشف للطباعة.');
+  }
+}
+
 function exportShopPdf(shop){
   const { entries, debit, credit, balance } = shopStatementRows(shop);
   const rowsHtml = entries.map((e,i) => {
@@ -428,8 +476,7 @@ function exportShopPdf(shop){
     </tr>`;
   }).join('');
 
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+  accPrint(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
   <title>كشف حساب — ${esc(shop)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -464,7 +511,5 @@ function exportShopPdf(shop){
       ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
-    <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
-  </body></html>`);
-  w.document.close();
+  </body></html>`, 'كشف حساب — ' + shop);
 }

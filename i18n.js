@@ -399,7 +399,7 @@
       'det.returnPriceNo': 'العميل رفض السعر الجديد',
 
       /* شاشة الحسابات */
-      'acc.title': 'الحسابات — آجل المحلات',
+      'acc.title': 'الحسابات',
       'acc.recordPayment': 'تسجيل دفعة من محل',
       'acc.shopNamePh': 'اسم المحل',
       'acc.amountPh': 'المبلغ بالجنيه',
@@ -1054,7 +1054,7 @@
       'det.returnPriceNo': 'Customer declined the new price',
 
       /* Accounts screen */
-      'acc.title': 'Accounts — Store Credit',
+      'acc.title': 'Accounts',
       'acc.recordPayment': 'Record a store payment',
       'acc.shopNamePh': 'Store name',
       'acc.amountPh': 'Amount in EGP',
