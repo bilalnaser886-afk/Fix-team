@@ -57,9 +57,11 @@
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr')){
       sessionStorage.setItem('ifix-bounced', '1');
-      location.replace(last === 'dispatcher' ? 'dispatch.html' : 'my-devices.html');
+      location.replace(last === 'dispatcher' ? 'dispatch.html'
+                     : last === 'hr'         ? 'hr.html'
+                     : 'my-devices.html');
       return;
     }
   }catch(e){}
@@ -1597,7 +1599,7 @@ function isAdmin(){ return isSuperAdmin(); }
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician'];
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr'];
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
@@ -1691,6 +1693,9 @@ function applyRoleVisibility(){
   // ============================================================
   if(isTechnician()){ location.replace('my-devices.html'); return; }
   if(isDispatcher()){ location.replace('dispatch.html');   return; }
+  // ⚠️ شؤون العاملين مالهاش أي علاقة بالأجهزة ولا الفلوس.
+  //    لو وصلت هنا بأي طريقة، بنحوّلها لصفحتها.
+  if(myRole() === 'hr'){ location.replace('hr.html');       return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{

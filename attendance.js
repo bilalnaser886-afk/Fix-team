@@ -41,12 +41,35 @@ function attIsPhone(){
   }catch(e){ return false; }
 }
 
-// بتتنده بعد تسجيل الدخول — بتظهر زرار المواعيد لو الجهاز موبايل
+// بتظهر زرار المواعيد لو الجهاز موبايل
 function attSyncMenu(){
   const btns = document.querySelectorAll('.att-menu-btn');
   const show = attIsPhone();
   btns.forEach(b => { b.style.display = show ? '' : 'none'; });
 }
+
+// ============================================================
+// ⚠️ الملف بينده نفسه — مش مستني الصفحة تفتكر.
+// ------------------------------------------------------------
+// أول نسخة كانت مستنية كل صفحة تنده attSyncMenu() بعد الدخول.
+// كتبتها في hr.html ونسيتها في التلات صفحات التانية، فالزرار
+// فضل مخفي عند الكل — دالة مكتوبة صح ومحدش بيندهها.
+//
+// دلوقتي الملف مسؤول عن نفسه. أي صفحة تحمّله وتحط الكلاس
+// att-menu-btn على زرار، الزرار هيشتغل — من غير أي سطر إضافي.
+//
+// بننده مرتين عن قصد: مرة أول ما الصفحة تجهز، ومرة بعد ثانية
+// عشان الصفحات اللي بتبني قايمتها بعد ما تقرا الأدوار من
+// السيرفر (الزرار ساعتها بيبقى لسه ماتعملش).
+// ============================================================
+(function attBoot(){
+  const go = () => { try{ attSyncMenu(); }catch(e){} };
+  if(document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', go, { once:true });
+  else go();
+  setTimeout(go, 1200);
+  setTimeout(go, 3000);
+})();
 
 let _attState = { last_kind:null, last_at:null, work_date:null, punches:0 };
 let _attSettings = { radius_m:75, lat:null, lng:null };
