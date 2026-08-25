@@ -439,26 +439,31 @@ function accPrint(html, title){
   f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;';
   document.body.appendChild(f);
 
-  const go = () => {
-    try{
-      f.contentWindow.focus();
-      f.contentWindow.print();
-    }catch(e){
-      console.error('الطباعة فشلت:', e);
-      alert('مقدرناش نفتح نافذة الطباعة. جرّب تاني.');
-    }
-  };
-
+  // ⚠️⚠️ الطباعة لازم تتنده **في نفس اللحظة** اللي المستخدم دس فيها.
+  //
+  //    الأيفون بيعتبر أي print() بيتأخر (setTimeout / انتظار
+  //    تحميل) إنها "طباعة تلقائية" من الموقع، وبيطلّع رسالة:
+  //        "This website has been blocked from automatically printing"
+  //    وبيخليك تدوس Allow كل مرة.
+  //
+  //    تشبيه: كإنك طلبت حاجة من موظف، وبعدين اتلهيت ثانية، وبعدين
+  //    قلت "هات" — هو مش عارف إنت اللي طلبت ولا حد تاني. لازم
+  //    الطلب يبقى ملزّق بالضغطة.
+  //
+  //    عشان كده: مفيش setTimeout ومفيش انتظار خالص. الاستايل جوه
+  //    الصفحة نفسها (<style>) فبيتقرا فوراً، وشكل الكشف بيطلع
+  //    مظبوط. الخط الخارجي (Cairo/Tajawal) هو اللي ممكن ما يلحقش
+  //    ينزّل، وساعتها بيطلع بخط النظام — والعربي بيبان كويس برضه.
+  //    خط أقل جمالاً أرحم بكتير من رسالة إذن كل مرة.
   try{
     const d = f.contentWindow.document;
     d.open(); d.write(html); d.close();
-    // 500 مللي عشان الخطوط تنزّل الأول — من غيرها الكشف بيطلع
-    // بخط النظام الافتراضي
-    setTimeout(go, 500);
+    f.contentWindow.focus();
+    f.contentWindow.print();
   }catch(e){
-    console.error('تجهيز الطباعة فشل:', e);
+    console.error('الطباعة فشلت:', e);
     f.remove();
-    alert('مقدرناش نجهّز الكشف للطباعة.');
+    alert('مقدرناش نفتح نافذة الطباعة. جرّب تاني.');
   }
 }
 
@@ -480,15 +485,17 @@ function exportShopPdf(shop){
   <title>كشف حساب — ${esc(shop)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    body{font-family:'Tajawal',sans-serif; color:#1A2332; margin:0; padding:28px;}
+    /* خط النظام مكتوب صراحةً بعد الخط الخارجي — عشان لو ما لحقش
+       ينزّل، العربي يطلع بخط نضيف مش بخط افتراضي وحش */
+    body{font-family:'Tajawal',-apple-system,'SF Arabic','Segoe UI',Tahoma,sans-serif; color:#1A2332; margin:0; padding:28px;}
     .head{background:linear-gradient(135deg,#E8321E,#C22513); color:#fff; border-radius:14px; padding:22px 26px; display:flex; justify-content:space-between; align-items:center;}
-    .head h1{font-family:'Cairo',sans-serif; font-size:26px; margin:0;}
+    .head h1{font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-size:26px; margin:0;}
     .head .sub{font-size:13px; opacity:.9; margin-top:4px;}
-    .head .brand{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; text-align:left;}
+    .head .brand{font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:900; font-size:18px; text-align:left;}
     .totals{display:flex; gap:14px; margin:18px 0;}
     .tcard{flex:1; border-radius:12px; padding:14px 18px; color:#fff;}
     .tcard .lbl{font-size:13px; opacity:.92;}
-    .tcard .num{font-family:'Cairo',sans-serif; font-size:26px; font-weight:900; margin-top:2px;}
+    .tcard .num{font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-size:26px; font-weight:900; margin-top:2px;}
     table{width:100%; border-collapse:collapse; font-size:13.5px;}
     th{background:#101014; color:#fff; padding:11px 8px; font-size:13px;}
     td{padding:10px 8px; border-bottom:1px solid #E5E7EB; text-align:center;}
