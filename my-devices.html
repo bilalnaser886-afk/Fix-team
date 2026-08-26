@@ -994,7 +994,7 @@ function ticketHtml(d, canAct){
     <div class="tk-actions">
       ${(!isRet && d.status!=='repairing') ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
       ${(d.status!=='done') ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
-      <button class="act act-prob" onclick="event.stopPropagation();reportProblem('${d.id}')" data-i18n="tp.problem">⚠️ مشكلة</button>
+      <button class="act act-prob" onclick="event.stopPropagation();editIssue('${d.id}')" data-i18n="tp.editIssue">🛠️ تعديل العطل</button>
       <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🗄️ درج الرفض</button>
     </div>`;
   return `<div class="ticket ${canAct?'':'assist'}" style="--sp:var(${s.c});" onclick="openSheet('${d.id}')">
@@ -1221,16 +1221,40 @@ async function setStatus(id, st){
   } else { render(); if(sheetId===id) renderSheet(); }
   toast(st==='repairing'?t('tp.startedWork'):t('rp.okDone'));
 }
-async function reportProblem(id){
+// ============================================================
+// تعديل العطل — من زرار الكارت مباشرة
+// ------------------------------------------------------------
+// الفني بيكتشف إن المشكلة الحقيقية غير اللي اتكتب وقت الاستلام،
+// فبيصحّحها من غير ما يفتح الجهاز.
+//
+// ⚠️ النص القديم **مش بيضيع**. بيتسجّل في سجل الجهاز قبل الكتابة،
+//    فأي حد يفتح السجل يشوف: كان كذا وبقى كذا ومين غيّره وإمتى.
+//    ده الفرق بين "تعديل" و"مسح".
+//
+// ⚠️ الخانة بتفتح **والعطل الحالي مكتوب فيها** — عشان الفني
+//    يعدّل كلمة بدل ما يعيد كتابة السطر كله ويغلط.
+// ============================================================
+async function editIssue(id){
   const d = devices.find(x=>x.id===id); if(!d) return;
-  const txt = (prompt(t('tp.problemPh'))||'').trim(); if(!txt) return;
-  const note = mkNote(t('note.problem', { txt }), 'note.problem', { txt });
-  const all  = notesForSave(d, note);
-  if(!(await save(id, { activityNotes:all, lastModifiedAt:nowIso(), lastModifiedBy:ME }))) return;
-  if(d._raw) d._raw.activityNotes = all;
-  d.notes = all.map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
+  const old = (d.issue || '').trim();
+  const neu = (prompt(t('tp.editIssuePh'), old) || '').trim();
+  if(!neu) return;                       // اتلغى أو فاضي
+  if(neu === old){ toast(t('tp.noChange')); return; }
+
+  const _args = { from: old || '—', to: neu };
+  const note  = mkNote(t('note.issueEdit', _args), 'note.issueEdit', _args);
+  const all   = notesForSave(d, note);
+  const patch = { reportedIssue: neu, activityNotes: all,
+                  lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  if(!(await save(id, patch))) return;
+
+  d.issue = neu;
+  if(d._raw){ d._raw.reportedIssue = neu; d._raw.activityNotes = all; }
+  d.notes = all.map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'',
+                            text:n.text||'', kind:n.kind, args:n.args }));
+  render();
   if(sheetId===id) renderSheet();
-  toast(t('tp.problemSaved'));
+  toast(t('tp.issueSaved'));
 }
 
 /* ===== شيت التفاصيل ===== */
@@ -1384,45 +1408,6 @@ function mountScanBtn(){
   }catch(e){}
 }
 
-// الفني الأساسي بس هو اللي يصحّح العطل.
-// ⚠️ المساعد لأ — عشان اتنين ما يغيّروش نفس النص ورا بعض من غير
-//    ما حد ياخد باله. ولو الجهاز خلص، بيتقفل عن الاتنين.
-function canActOn(d){
-  return !!d && d.tech === ME && !DONE_STATES.includes(d.status);
-}
-
-// ============================================================
-// تصحيح العطل
-// ------------------------------------------------------------
-// ⚠️ النص القديم **مش بيضيع**. بيتسجّل في سجل الجهاز قبل الكتابة،
-//    فأي حد يفتح السجل يشوف: كان كذا وبقى كذا ومين غيّره وإمتى.
-//    ده الفرق بين "تعديل" و"مسح".
-// ============================================================
-async function saveIssue(id){
-  const d = devices.find(x => x.id === id); if(!d) return;
-  const box = document.getElementById('issueTxt'); if(!box) return;
-  const neu = (box.value || '').trim();
-  const old = (d.issue || '').trim();
-  if(!neu){ toast('اكتب العطل الأول'); return; }
-  if(neu === old){ toast('مفيش تغيير'); return; }
-
-  const txt  = 'العطل اتعدّل: «' + (old || '—') + '» ← «' + neu + '»';
-  const note = mkNote(txt, 'note.issueEdit', { from: old || '—', to: neu });
-  const patch = {
-    reportedIssue: neu,
-    activityNotes: notesForSave(d, note),
-    lastModifiedAt: nowIso(),
-    lastModifiedBy: ME
-  };
-  if(!(await save(id, patch))) return;
-
-  d.issue = neu;
-  if(d._raw){ d._raw.reportedIssue = neu; d._raw.activityNotes = patch.activityNotes; }
-  d.notes = patch.activityNotes.map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'', kind:n.kind, args:n.args }));
-  toast('العطل اتحدّث ✅');
-  render(); renderSheetKeepNote();
-}
-
 function openSheet(id){ sheetId=id; handOn=false; handMode=''; handTarget=''; renderSheet(); $('sheet').classList.add('on'); $('sheetBg').classList.add('on'); }
 function closeSheet(){ sheetId=''; $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
 
@@ -1455,20 +1440,6 @@ function renderSheet(){
           ${(!d.lockText && (d.lockType==='pattern'||d.lockType==='image') && d.lockImage)?`<span class="k">رمز القفل</span><span class="v"><img src="${d.lockImage}" onclick="openLockImg('${d.id}')" style="width:110px;height:110px;border-radius:10px;border:1px solid var(--line);object-fit:cover;cursor:pointer;">${d.lockPattern?`<div style="font-family:var(--mono);font-weight:700;margin-top:4px;">${esc(d.lockPattern)}</div>`:''}</span>`:''}
           <span class="k" data-i18n="rp.issue">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
         </div>
-        ${canActOn(d) ? `
-        <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;">
-          <div style="font-size:12.5px;color:var(--muted);line-height:1.8;margin-bottom:7px;">
-            🛠️ لقيت العطل غير المكتوب؟ صحّحه — القديم بيتسجّل في السجل.
-          </div>
-          <div style="display:flex;gap:8px;">
-            <input id="issueTxt" value="${esc(d.issue)}" placeholder="العطل الحقيقي"
-              style="flex:1;min-width:0;border:1px solid var(--line);background:var(--card);
-                     color:var(--ink);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;">
-            <button onclick="saveIssue('${d.id}')"
-              style="flex:none;border:none;background:var(--blue,#2B6CB0);color:#fff;border-radius:10px;
-                     padding:10px 14px;font-family:inherit;font-weight:800;cursor:pointer;">💾</button>
-          </div>
-        </div>` : ''}
       </div>
 
       <div class="panel">
