@@ -125,7 +125,12 @@
 
       // مخزن قطع الغيار
       'inv.menu': 'مخزن قطع الغيار',
-      'inv.title': '🧰 مخزن قطع الغيار',
+      // ⚠️ الاسم parts.title مش inv.title.
+      //    inv.title متعرّف في i18n.js بـ"الجرد"، والملف ده كان
+      //    بيدهسه — فشاشة الجرد في الداشبورد كانت بتفتح بعنوان
+      //    "مخزن قطع الغيار". مفتاحين بنفس الاسم في ملفين، واللي
+      //    بيتحمّل بعدين بيكسب.
+      'parts.title': '🧰 مخزن قطع الغيار',
       'inv.tab.unallocated': 'قطع غيار غير موجهة',
       'inv.tab.allocated': 'قطع غيار موجهة',
       'inv.tab.supplies': 'لوازم الصيانة',
@@ -248,7 +253,7 @@
       'pur.itemDeviceNone': 'No device → goes to general stock',
 
       'inv.menu': 'Spare-parts store',
-      'inv.title': '🧰 Spare-parts store',
+      'parts.title': '🧰 Spare-parts store',
       'inv.tab.unallocated': 'Unallocated parts',
       'inv.tab.allocated': 'Allocated parts',
       'inv.tab.supplies': 'Maintenance supplies',
@@ -1552,7 +1557,7 @@
     o.innerHTML = `
       <div class="summaries-page">
         <div class="modal-head" style="padding:16px 20px;">
-          <h2 data-i18n="inv.title">${esc(T('inv.title'))}</h2>
+          <h2 data-i18n="parts.title">${esc(T('parts.title'))}</h2>
           <button class="close-btn" onclick="INV.close()">×</button>
         </div>
         <div id="invBody" style="padding:12px 20px 48px;"></div>
