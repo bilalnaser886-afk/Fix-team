@@ -71,12 +71,43 @@ function lblFixDigits(el){
   if(typeof fixDigitsInput === 'function') return fixDigitsInput(el);
   if(el) el.value = lblEnDigits(el.value);
 }
-// ⚠️ لو الصفحة مش عارفة تسأل عن المفتاح، بنفترض **مقفول** — يعني
-//    الطباعة الصامتة مش هتشتغل والمستخدم ياخد نافذة الطباعة
-//    العادية. الافتراض المقفول أأمن من المفتوح.
+// ============================================================
+// مفاتيح المميزات
+// ------------------------------------------------------------
+// ⚠️ الديسباتشر معندهوش isFeatureEnabled (دي في الداشبورد بس)،
+//    فالنسخة الأولى كانت بترجّع false على طول — يعني الطباعة
+//    الصامتة مبتشتغلش عنده أبداً وبتفتح نافذة الطباعة العادية،
+//    ووكيل الطباعة في المحل مبيتندهش خالص.
+//
+//    الحل: الملف يقرا المفاتيح بنفسه من app_data (نفس المفتاح
+//    اللي الأدمن بيكتب فيه). القراءة مسموحة لكل الموظفين.
+//
+// ⚠️ القراءة **مرة واحدة** وبتتخزّن — مش مع كل طباعة، عشان
+//    ما نضربش السيرفر مع كل ليبل.
+// ============================================================
+let _lblFlags = null;
+
+async function lblLoadFlags(){
+  if(_lblFlags) return _lblFlags;
+  try{
+    const { data, error } = await sb.from('app_data')
+      .select('value').eq('key', 'feature-flags').maybeSingle();
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    _lblFlags = (data && data.value) ? (JSON.parse(data.value) || {}) : {};
+  }catch(e){
+    console.error('[ليبل] فشلت قراءة مفاتيح المميزات:', e);
+    _lblFlags = {};
+  }
+  return _lblFlags;
+}
+
+// النسخة المتزامنة — بتستخدم اللي اتقرا خلاص
 function lblFeature(k){
-  try{ return (typeof isFeatureEnabled === 'function') ? isFeatureEnabled(k) : false; }
-  catch(e){ return false; }
+  // الداشبورد عنده الدالة بتاعته ومحمّلة خلاص — نستخدمها
+  try{ if(typeof isFeatureEnabled === 'function') return isFeatureEnabled(k); }catch(e){}
+  const f = _lblFlags && _lblFlags[k];
+  return !!(f && f.is_enabled);
 }
 function lblShortDate(iso){
   if(typeof shortDateTime === 'function') return shortDateTime(iso);
@@ -606,6 +637,10 @@ function showPrintBusy(msg){
 
 async function printLabel(){
   const dv = lblDevice();
+  // ⚠️ لازم نحمّل المفاتيح قبل القرار. من غير السطر ده، أول ضغطة
+  //    في صفحة الديسباتشر هتلاقي المفاتيح فاضية وتنزل لنافذة
+  //    الطباعة العادية — والوكيل مايتندهش.
+  await lblLoadFlags();
   if(dv && lblFeature('silent_label_print')){
     saveLabelSize();
     lblErr('');
