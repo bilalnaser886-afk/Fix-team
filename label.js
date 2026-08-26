@@ -85,6 +85,18 @@ function lblShortDate(iso){
   return d.toLocaleDateString('ar-EG', { day:'numeric', month:'short' })
        + ' · ' + d.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
 }
+// رقم التذكرة المختصر — آخر ٥ خانات من معرّف الجهاز.
+// ⚠️ devRef معرّفة في dashboard.html بس (سطر واحد)، والديسباتشر
+//    عنده ticketNo بصيغة تانية. بنعرّفها هنا بنفس منطق الداشبورد
+//    بالحرف عشان **الليبل يطلع نفسه في الصفحتين** — لو ورّينا رقم
+//    مختلف حسب مين طبع، الباركود يبقى مش قابل للمطابقة بالعين.
+function lblRef(d){
+  try{
+    if(typeof devRef === 'function') return devRef(d);
+  }catch(e){}
+  return '#' + String((d && d.id) || '').slice(-5).toUpperCase();
+}
+
 function lblErr(msg){
   try{ if(typeof showError === 'function') return showError(msg); }catch(e){}
   if(msg) alert(msg);
@@ -566,7 +578,7 @@ async function trySilentPrintCloud(image, sz, ref, jobId){
 
 async function trySilentPrint(d, sz, qrDataUrl){
   const image = await renderLabelImage(d, sz, qrDataUrl);
-  const ref = devRef(d);
+  const ref = lblRef(d);
   // رقم واحد للمحاولتين — لو المحلية طبعت والرد ضاع، الوكيل
   // بيعرف من الرقم إن الأمر السحابي نفس الليبل ويتجاهله. طبقة تانية.
   const jobId = 'lb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -672,7 +684,7 @@ function browserPrintLabel(){
   //    دلوقتي الصفحة ما بتتحركش من مكانها، والطباعة بتتنده في
   //    نفس لحظة الضغط.
   lblPrintHtml(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
-<title>ليبل ${esc(devRef(d))}</title>
+<title>ليبل ${esc(lblRef(d))}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
 <style>
   @page{ size: ${sz.w}mm ${sz.h}mm; margin: 0; }
