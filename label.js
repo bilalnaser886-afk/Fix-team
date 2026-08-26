@@ -42,7 +42,7 @@
     background:#fff; color:#101014; border:2px dashed var(--border,var(--line,#CBD5E1));
     border-radius:10px; padding:16px; width:270px; margin:0 auto 16px; text-align:center;
   }
-  .label-row-title{font-weight:800; font-family:'Cairo',sans-serif; font-size:15px; margin-bottom:4px;}
+  .label-row-title{font-weight:800; font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-size:15px; margin-bottom:4px;}
   .label-row{font-size:12px; color:#334155; margin-bottom:2px;}
   .label-row.mono{font-family:monospace; font-size:11px;}
   .label-id{font-size:10px; color:#94A3B8; margin-top:8px; font-family:monospace;}
@@ -129,7 +129,7 @@ function renderLabelInto(containerId, d){
         : (d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : '')}
       <div class="label-row">${esc(lblShortDate(d.intakeDate))}</div>
       <div id="qrHolder"></div>
-      <div style="font-family:'Cairo',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
+      <div style="font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
       ${d.conditionNotes ? `<div style="border-top:1px solid var(--border-strong); margin-top:8px; padding-top:6px; font-size:${d.conditionNotes.length > 60 ? 9 : d.conditionNotes.length > 30 ? 10 : 11}px; font-weight:700; line-height:1.5; text-align:right;">${esc(d.conditionNotes)}</div>` : ''}
     </div>
     <div class="label-size-row">
@@ -644,10 +644,16 @@ function browserPrintLabel(){
     fCond = Math.min(sz.h * 0.078, Math.max(0.95, ideal)).toFixed(2);
   }
 
-  const w = window.open('', '_blank', 'width=420,height=320');
-  if(!w){ alert(t('msg.printBlocked')); return; }
-
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+  // ⚠️ الطباعة من **إطار مخفي جوه الصفحة**، مش نافذة جديدة.
+  //    نفس علاج كشف الحساب و PDF بالظبط:
+  //      • window.open على الأيفون بيفتح صفحة جديدة، ولما التطبيق
+  //        مثبّت (standalone) مفيش زرار رجوع — المستخدم بيتحبس
+  //        في صفحة about:blank فاضية.
+  //      • والتأخير (setTimeout) بيخلي سفاري يعتبرها "طباعة
+  //        تلقائية" ويرفضها أو يطلب إذن كل مرة.
+  //    دلوقتي الصفحة ما بتتحركش من مكانها، والطباعة بتتنده في
+  //    نفس لحظة الضغط.
+  lblPrintHtml(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <title>ليبل ${esc(devRef(d))}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -655,7 +661,7 @@ function browserPrintLabel(){
   *{ margin:0; padding:0; box-sizing:border-box; }
   html, body{ width:${sz.w}mm; height:${sz.h}mm; overflow:hidden; }
   body{
-    font-family:'Tajawal', sans-serif; color:#000; background:#fff;
+    font-family:'Tajawal',-apple-system,'SF Arabic','Segoe UI',Tahoma,sans-serif; color:#000; background:#fff;
     padding:${pad}mm; display:flex; flex-direction:column;
   }
   .top{ display:flex; align-items:center; gap:${pad}mm; flex:1; min-height:0; overflow:hidden; }
@@ -672,21 +678,21 @@ function browserPrintLabel(){
   .qr{ width:${qrSz}mm; height:${qrSz}mm; padding:${qrQuiet}mm; background:#fff; }
   .qr img{ width:100%; height:100%; display:block; }
   .brand{
-    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fBrand}mm;
+    font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:900; font-size:${fBrand}mm;
     letter-spacing:.15mm; margin-top:${brandGap}mm;
     white-space:nowrap; direction:ltr;
   }
   .info{ flex:1; min-width:0; line-height:1.3; }
   .shop{
-    font-family:'Cairo',sans-serif; font-weight:900; font-size:${fShop}mm;
+    font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:900; font-size:${fShop}mm;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .cust{
-    font-family:'Cairo',sans-serif; font-weight:700; font-size:${fCust}mm;
+    font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:700; font-size:${fCust}mm;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .dev{
-    font-family:'Cairo',sans-serif; font-weight:700; font-size:${fDev}mm;
+    font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:700; font-size:${fDev}mm;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .issue{
@@ -712,14 +718,40 @@ function browserPrintLabel(){
   </div>
   </div>
   ${cond ? `<div class="cond">${esc(cond)}</div>` : ''}
-<script>
-  window.onload = function(){
-    setTimeout(function(){ window.print(); }, 350);
-    window.onafterprint = function(){ window.close(); };
-  };
-<\/script>
 </body></html>`);
-  w.document.close();
+}
+
+// ============================================================
+// الطباعة — من جوه الصفحة
+// ------------------------------------------------------------
+// ⚠️ من غير أي setTimeout. الأيفون بيسمح بالطباعة **بس** لو جت
+//    في نفس اللحظة اللي المستخدم دس فيها. أي تأخير بيخليها
+//    "طباعة تلقائية" وبيترفض.
+//
+//    الاستايل مكتوب جوه الصفحة (<style>) فبيتقرا فوراً وشكل
+//    الليبل بيطلع مظبوط. الخط الخارجي هو اللي ممكن ما يلحقش —
+//    وساعتها بيطلع بخط النظام، وده أرحم من رسالة إذن كل مرة.
+// ============================================================
+function lblPrintHtml(html){
+  const old = document.getElementById('lblPrintFrame');
+  if(old) old.remove();
+
+  const f = document.createElement('iframe');
+  f.id = 'lblPrintFrame';
+  f.setAttribute('aria-hidden', 'true');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;';
+  document.body.appendChild(f);
+
+  try{
+    const d = f.contentWindow.document;
+    d.open(); d.write(html); d.close();
+    f.contentWindow.focus();
+    f.contentWindow.print();
+  }catch(e){
+    console.error('طباعة الليبل فشلت:', e);
+    f.remove();
+    alert('مقدرناش نفتح نافذة الطباعة. جرّب تاني.');
+  }
 }
 
 function toggleDetailLabel(id){
