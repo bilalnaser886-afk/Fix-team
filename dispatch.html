@@ -29,7 +29,10 @@
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
+<!-- مكتبة الباركود — نفس نسخة الداشبورد بالظبط -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="accounts.js"></script>
+<script src="label.js"></script>
 <script src="attendance.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
@@ -391,6 +394,11 @@
     padding:11px; font-size:13.5px; font-weight:800;}
   .di-call{background:var(--blue-bg,#EAF1F8); color:var(--blue,#2B6CB0);}
   .di-wa{background:var(--done-bg); color:var(--done);}
+  .di-label-row{margin-top:12px;}
+  .di-lbl{width:100%; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    border-radius:12px; padding:12px; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
+  .di-lbl:hover{background:var(--card);}
   .di-actions{display:flex; gap:9px; margin-top:14px;}
   .di-act{flex:1; border:none; border-radius:12px; padding:14px 10px;
     font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; color:#fff;}
@@ -1397,8 +1405,37 @@ function showInfo(id){
         ${row(t('dp.intake'), esc(fmtDate(d.intake)))}
       </div>
 
+      <div class="di-label-row">
+        <button class="di-lbl" onclick="dpToggleLabel('${d.id}')">🖨 ${esc(t('ui.printingLabel') || 'طباعة ليبل')}</button>
+      </div>
+      <div id="dpLabelArea"></div>
+
       <div class="di-actions">${actions}</div>
     </div>`);
+}
+
+// ============================================================
+// معاينة وطباعة الليبل
+// ------------------------------------------------------------
+// المحرك كله في label.js (نفس ملف الداشبورد بالحرف)، فمفيش أي
+// منطق طباعة هنا — الصفحة بتفتح المعاينة وبس.
+// ============================================================
+function dpToggleLabel(id){
+  const area = document.getElementById('dpLabelArea');
+  if(!area) return;
+  if(area.innerHTML.trim() !== ''){ area.innerHTML = ''; return; }
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  // ⚠️ label.js بيقرا الحقول بأسماء النظام (deviceType · customerName …)
+  //    وصفحة الديسباتشر بتخزّنها بأسماء مختصرة (type · customer …).
+  //    فبنبعتله السجل الخام لو موجود — وإلا بنركّب واحد بالأسماء الصح.
+  //    من غير ده الليبل كان هيطلع فاضي من غير أي خطأ يظهر.
+  const raw = d._raw || {
+    id: d.id, deviceType: d.type, model: d.model,
+    customerName: d.customer, shopName: d.shop,
+    reportedIssue: d.issue, status: d.status, intakeDate: d.intake
+  };
+  renderLabelInto('dpLabelArea', raw);
 }
 
 // رقم الواتساب: مصر بتبدأ بصفر، وواتساب عايز كود الدولة
