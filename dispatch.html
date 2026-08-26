@@ -370,6 +370,34 @@
   .info-k{color:var(--muted); font-size:13px; font-weight:700; flex:0 0 auto;}
   .info-v{color:var(--ink); font-size:14.5px; font-weight:600; text-align:left; line-height:1.6; word-break:break-word;}
   .info-chip{display:inline-block; padding:4px 13px; border-radius:999px; font-family:'Cairo',sans-serif; font-weight:800; font-size:12.5px; background:var(--st-bg); color:var(--st);}
+
+  /* ===== تفاصيل الجهاز — الشكل الجديد ===== */
+  .di-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;}
+  .di-title b{display:block; font-family:'Cairo',sans-serif; font-size:19px; line-height:1.35;}
+  .di-no{font-size:12px; color:var(--muted); font-family:var(--mono,monospace);}
+  .di-issue{display:flex; gap:8px; align-items:flex-start; background:var(--paper);
+    border:1px solid var(--line); border-radius:12px; padding:12px 13px;
+    font-size:14px; color:var(--ink-2); line-height:1.6; margin-bottom:12px;}
+  .di-card{border:1px solid var(--line); border-radius:14px; padding:4px 13px 12px; margin-bottom:11px;}
+  .di-card-h{font-size:12px; font-weight:800; color:var(--muted); padding:11px 0 3px;}
+  .di-row{display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 0; border-bottom:1px solid var(--line);}
+  .di-row:last-child{border-bottom:none;}
+  .di-k{color:var(--muted); font-size:12.5px; font-weight:700; flex:0 0 auto;}
+  .di-v{color:var(--ink); font-size:14px; font-weight:600; text-align:left;
+    line-height:1.6; word-break:break-word;}
+  .di-contact{display:flex; gap:9px; margin-top:11px;}
+  .di-btn{flex:1; text-align:center; text-decoration:none; border-radius:11px;
+    padding:11px; font-size:13.5px; font-weight:800;}
+  .di-call{background:var(--blue-bg,#EAF1F8); color:var(--blue,#2B6CB0);}
+  .di-wa{background:var(--done-bg); color:var(--done);}
+  .di-actions{display:flex; gap:9px; margin-top:14px;}
+  .di-act{flex:1; border:none; border-radius:12px; padding:14px 10px;
+    font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; color:#fff;}
+  .di-hand{background:var(--done);} .di-ret{background:var(--waiting);}
+  .di-rej{background:var(--red);}
+  .di-pend{flex:1; text-align:center; background:var(--waiting-bg); color:var(--waiting);
+    border-radius:12px; padding:13px; font-size:13px; font-weight:800; line-height:1.7;}
   .act-dev{display:flex; align-items:center; gap:13px; background:var(--paper); border:1px solid var(--line); border-radius:15px; padding:14px 15px; margin-bottom:18px;}
   .act-dev-ic{font-size:30px; line-height:1; flex:0 0 auto;}
   .act-dev-name{font-family:'Cairo',sans-serif; font-weight:900; font-size:16.5px; color:var(--ink); line-height:1.25;}
@@ -1309,24 +1337,76 @@ function ticketHtml(d){
 }
 
 // تفاصيل مختصرة — الديسباتشر مايشوفش أسعار
+// ============================================================
+// تفاصيل الجهاز — الشكل الجديد
+// ------------------------------------------------------------
+// كان قايمة صفوف جافة. بقى:
+//   • رأس فيه الجهاز والحالة ورقم التذكرة
+//   • كارت العميل مع **زرار اتصال وواتساب** — الرقم مكتوب
+//     وبس مكانش بينفع تدوس عليه، والديسباتشر بيكلّم عملاء طول اليوم
+//   • كارت العطل بارز لوحده
+//   • أزرار التسليم والإرجاع **من هنا** — قبل كده كانت على
+//     الكارت من برّه بس، فلو فتحت التفاصيل تتأكد كنت تقفل وتدوّر
+//     على الكارت تاني
+// ============================================================
 function showInfo(id){
   const d = devices.find(x => x.id === id); if(!d) return;
   const s = ST[d.status] || {label:d.status, c:'--muted'};
-  const V = txt => `<span class="info-v">${esc(String(txt))}</span>`;
-  const rows = [
-    [t('rp.ticket'),   V(ticketNo(d.id))],
-    [t('rp.device'),   V([d.type, d.model].filter(Boolean).join(' '))],
-    [t('rp.status'),   `<span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>`],
-    [t('rp.customer'), d.customer ? V(d.customer) : ''],
-    [t('rp.phone'),    d.phone ? `<span class="info-v" style="direction:ltr;">${esc(d.phone)}</span>` : ''],
-    [t('rp.shop'),     d.shop ? V(d.shop) : ''],
-    [t('rp.issue'),    d.issue ? V(d.issue) : ''],
-    [t('rp.tech'),     V(d.tech || t('tp.noTechYet'))],
-    [t('rp.by'),       d.by ? V(d.by) : ''],
-    [t('dp.intake'),   V(fmtDate(d.intake))]
-  ].filter(r => r[1]);
-  const body = rows.map(r => `<div class="info-row"><span class="info-k">${r[0]}</span>${r[1]}</div>`).join('');
-  openAct(t('rp.details'), body);
+  const delivered = d.status === 'delivered';
+  const name = [d.type, d.model].filter(Boolean).join(' ') || '—';
+  // الرقم للاتصال: بنشيل أي حاجة مش رقم
+  const tel = String(d.phone || '').replace(/[^\d+]/g, '');
+
+  const row = (k, v) => v ? `<div class="di-row"><span class="di-k">${esc(k)}</span><span class="di-v">${v}</span></div>` : '';
+
+  const actions = d.pending
+    ? `<div class="di-pend">⏳ ${d.pending.type === 'return' ? t('tp.reqReturn') : t('tp.reqDeliver')} بانتظار اعتماد المحاسب</div>`
+    : delivered
+      ? `<button class="di-act di-ret" onclick="closeAct();requestApproval('${d.id}','return')">↩️ ${t('rp.return')}</button>`
+      : `<button class="di-act di-hand" onclick="closeAct();requestApproval('${d.id}','handover')">📦 ${t('rp.deliver')}</button>
+         <button class="di-act di-rej" onclick="closeAct();requestReject('${d.id}')">🚫 رفض</button>`;
+
+  openAct(t('rp.details'), `
+    <div class="di">
+      <div class="di-head">
+        <div class="di-title">
+          <b>${esc(name)}</b>
+          <span class="di-no">${esc(ticketNo(d.id))}</span>
+        </div>
+        <span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>
+      </div>
+
+      ${d.issue ? `<div class="di-issue"><span>🛠️</span><span>${esc(d.issue)}</span></div>` : ''}
+
+      <div class="di-card">
+        <div class="di-card-h">👤 ${esc(t('rp.customer'))}</div>
+        ${row(t('rp.customer'), esc(d.customer || '—'))}
+        ${row(t('rp.shop'), d.shop ? esc(d.shop) : '')}
+        ${row(t('rp.phone'), d.phone ? `<span dir="ltr">${esc(d.phone)}</span>` : '')}
+        ${tel ? `<div class="di-contact">
+          <a class="di-btn di-call" href="tel:${esc(tel)}">📞 اتصال</a>
+          <a class="di-btn di-wa" target="_blank" rel="noopener"
+             href="https://wa.me/${esc(waNum(tel))}">💬 واتساب</a>
+        </div>` : ''}
+      </div>
+
+      <div class="di-card">
+        <div class="di-card-h">🔧 الصيانة</div>
+        ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')))}
+        ${row(t('rp.by'), d.by ? esc(d.by) : '')}
+        ${row(t('dp.intake'), esc(fmtDate(d.intake)))}
+      </div>
+
+      <div class="di-actions">${actions}</div>
+    </div>`);
+}
+
+// رقم الواتساب: مصر بتبدأ بصفر، وواتساب عايز كود الدولة
+function waNum(tel){
+  let n = String(tel || '').replace(/\D/g, '');
+  if(n.startsWith('0')) n = '2' + n;          // 010… → 2010…
+  else if(!n.startsWith('2')) n = '2' + n;
+  return n;
 }
 
 // فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع

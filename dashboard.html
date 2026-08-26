@@ -3712,6 +3712,12 @@ function renderDetail(){
       <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
       <datalist id="shopNameListDetail">${shopNamesForDatalist()}</datalist>
     </div>
+    <!-- ⚠️ رقم العميل كان **مش ظاهر خالص** في تفاصيل الداشبورد —
+         موجود في شاشة الإضافة وفي الواتساب بس. فالمحاسب اللي عايز
+         يكلّم عميل كان لازم يفتح الجهاز من صفحة تانية. -->
+    <label class="field"><span>${t('det.customerPhone') || 'رقم العميل'}</span>
+      <input type="tel" inputmode="tel" dir="ltr" value="${esc(d.customerPhone||'')}"${roI}
+             onblur="editField('customerPhone', this.value)" placeholder="01xxxxxxxxx" /></label>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `

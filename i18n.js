@@ -139,6 +139,7 @@
 
       /* شاشة تفاصيل الجهاز */
       'det.customerName': 'اسم العميل',
+      'det.customerPhone': 'رقم العميل',
       'det.shopName': 'اسم المحل',
       'det.price': 'السعر — أرقام صحيحة بالجنيه',
       'det.payMethod': 'طريقة الدفع',
@@ -802,6 +803,7 @@
 
       /* Device details screen */
       'det.customerName': 'Customer Name',
+      'det.customerPhone': 'Customer Phone',
       'det.shopName': 'Store Name',
       'det.price': 'Price — whole numbers in EGP',
       'det.payMethod': 'Payment Method',
