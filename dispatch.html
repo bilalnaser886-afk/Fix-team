@@ -524,6 +524,11 @@
      يعني بيفضلوا راكبين على الشاشة. الشاشة دي لازم تبقى فوقهم،
      وإلا هيفضلوا ظاهرين فوق الجرد. */
   #accountsOverlay, #inventoryOverlay{z-index:69;}
+  /* ⚠️ .overlay هي flex container، و.acc-page جواها عنصر flex —
+     يعني بيتقلّص لعرض محتواه بدل ما ياخد الشاشة كلها. لازم
+     width:100% صريحة، وإلا الصفحة بتطلع في ثلثين الشاشة والكروت
+     بتنزل واحد تحت التاني. */
+  #inventoryOverlay .acc-page{width:100%;}
   .acc-page{min-height:100%; background:var(--bg); padding-bottom:40px;}
   /* ⚠️ env(safe-area-inset-top) = ارتفاع "النتش" وشريط الساعة في
      الأيفون. من غيره الرأس بيتحط تحتيه، فزرار الإقفال بيختفي
