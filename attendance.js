@@ -234,14 +234,23 @@ async function attPunch(kind){
 // ============================================================
 // القراءة
 // ============================================================
+let _attErr = '';   // آخر خطأ في قراءة الحالة
+
 async function attLoadState(){
+  _attErr = '';
   try{
     const { data, error } = await sb.rpc('hr_my_today');
     if(error) throw error;
     const r = Array.isArray(data) ? data[0] : data;
     _attState = r || { last_kind:null, last_at:null, work_date:null, punches:0 };
   }catch(e){
+    // ⚠️ الفشل الصامت هنا كان أخطر من الخطأ نفسه.
+    //    لما قراءة الحالة كانت بتفشل، الصفحة كانت بتحط قيم فاضية
+    //    وتعرض "لسه ما سجّلتش حضور" — رسالة **منطقية وغلط**،
+    //    والموظف يفتكر إن حضوره ضاع والأزرار بايظة.
+    //    دلوقتي بنقول إن فيه مشكلة، مش بنخترع حالة.
     console.error('hr_my_today failed:', e);
+    _attErr = (e && e.message) ? e.message : String(e);
     _attState = { last_kind:null, last_at:null, work_date:null, punches:0 };
   }
   try{
@@ -270,6 +279,9 @@ async function attMyMonth(ym){
 // أنهي زرار ينفع دلوقتي؟ نفس منطق قاعدة البيانات بالحرف —
 // بس هنا عشان المستخدم يشوف الزرار مطفي بدل ما يدوس وياخد رفض.
 function attAllowed(kind){
+  // فيه خطأ في القراءة؟ نقفل كل حاجة — التسجيل على حالة مش
+  // متأكدين منها ممكن يعمل صفوف غلط في السجل
+  if(_attErr) return false;
   const k = _attState.last_kind;
   if(kind === 'in')     return k === null || k === 'out';
   if(kind === 'out')    return k === 'in' || k === 'resume' || k === 'break';
@@ -305,6 +317,8 @@ function attRender(busyMsg){
       </div>
       <div class="att-body">
         <div class="att-status">${esc(attStatusText())}</div>
+        ${_attErr ? `<div class="att-warn">⚠️ مقدرناش نقرا حالتك — الأزرار مقفولة عشان
+          ما نسجّلش حاجة غلط.<br><span class="att-warn-d">${esc(_attErr)}</span></div>` : ''}
         ${busyMsg ? `<div class="att-busy">${esc(busyMsg)}</div>` : ''}
         <div class="att-grid">
           ${btn('in')}${btn('out')}${btn('break')}${btn('resume')}
@@ -415,6 +429,12 @@ function closeAttendance(){
     border-radius:12px; padding:14px; font-weight:800; font-size:15px; text-align:center;
     color:var(--a-ink);}
   .att-busy{margin-top:10px; text-align:center; font-size:13px; color:var(--a-mut);}
+  .att-warn{margin-top:10px; background:rgba(180,83,9,.14); color:#B45309;
+    border:1px solid rgba(180,83,9,.35); border-radius:11px; padding:11px 13px;
+    font-size:12.5px; line-height:1.9; text-align:center;}
+  html[data-theme="dark"] #attOverlay .att-warn{color:#FBBF24;}
+  .att-warn-d{display:block; margin-top:5px; font-size:11px; opacity:.8; direction:ltr;
+    word-break:break-word;}
   .att-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
   .att-btn{padding:18px 10px; border:none; border-radius:14px; font-family:inherit;
     font-size:15px; font-weight:800; color:#fff; cursor:pointer;}
