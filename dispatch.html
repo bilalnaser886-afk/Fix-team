@@ -520,7 +520,10 @@
      بيتحط تحتيهم وهما بيركبوا على الشاشة.
      بنرفع الشاشة دي فوقهم، وتحت الحاجات اللي المفروض تغطي كل حاجة
      (شاشة الإعدادات 70 · القفل 9500 · شاشة التحميل 9999). */
-  #accountsOverlay{z-index:69;}
+  /* ⚠️ الشريطين "جهاز جديد" (z-index:30) والتبويبات (29) sticky —
+     يعني بيفضلوا راكبين على الشاشة. الشاشة دي لازم تبقى فوقهم،
+     وإلا هيفضلوا ظاهرين فوق الجرد. */
+  #accountsOverlay, #inventoryOverlay{z-index:69;}
   .acc-page{min-height:100%; background:var(--bg); padding-bottom:40px;}
   /* ⚠️ env(safe-area-inset-top) = ارتفاع "النتش" وشريط الساعة في
      الأيفون. من غيره الرأس بيتحط تحتيه، فزرار الإقفال بيختفي
@@ -666,15 +669,21 @@
      الـview أصلاً بيشيلها قبل ما توصل هنا.
      ============================================================ -->
 <div id="inventoryOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
-  <div class="summaries-page">
-    <div class="modal-head" style="padding:16px 20px;">
+  <div class="acc-page">
+    <!-- ⚠️ نفس رأس شاشة الحسابات بالحرف (acc-head) — مش .modal-head.
+         السبب: acc-head فيها env(safe-area-inset-top) اللي بينزّل الرأس
+         تحت نتش الأيفون. لو استخدمنا رأس من غير الحساب ده، العنوان
+         وزرار الـ× بيتحطوا تحت شريط الساعة ويختفوا. -->
+    <div class="acc-head">
       <h2>📋 الجرد</h2>
-      <button class="close-btn" onclick="closeInventory()">×</button>
+      <button class="acc-close" onclick="closeInventory()">×</button>
     </div>
-    <div class="modal-search" style="padding:0 20px 8px;">
-      <input id="invSearch" oninput="renderInventory()" placeholder="🔍 دور بإسم عميل، محل، فني، موديل..." style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
+    <div style="padding:12px 20px 4px;">
+      <div class="modal-search" style="position:static; background:none; padding:0;">
+        <input id="invSearch" oninput="renderInventory()" placeholder="🔍 دور بإسم عميل، محل، فني، موديل..." />
+      </div>
     </div>
-    <div id="inventoryBody" style="padding:16px 20px 40px;"></div>
+    <div id="inventoryBody" style="padding:8px 20px 40px;"></div>
   </div>
 </div>
 
