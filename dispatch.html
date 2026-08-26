@@ -201,6 +201,42 @@
   .inv-section-title{font-family:'Cairo',sans-serif; font-size:17px; font-weight:800; margin:22px 0 10px; color:var(--ink);}
   .empty-col{font-size:11px; color:var(--faint); text-align:center; padding:24px 0;}
 
+  /* ===== صفحة الجرد (ديسباتشر) — منقولة من dashboard.html، من غير أعمدة الفلوس ===== */
+  .inv-filter{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px;}
+  .inv-chip{
+    border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink-2); border-radius:20px;
+    padding:8px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .inv-chip.active{background:var(--chrome); border-color:var(--chrome); color:var(--on-chrome);}
+  .inv-cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:20px;}
+  .inv-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; text-align:center; box-shadow:0 2px 8px rgba(16,16,20,.04); cursor:pointer;}
+  .inv-card-num{font-family:'Cairo',sans-serif; font-size:34px; font-weight:900; line-height:1;}
+  .inv-card-label{font-size:13px; color:var(--ink-2); margin-top:8px; font-weight:600;}
+  .inv-card-more{font-size:11px; color:var(--muted-2); margin-top:7px; font-weight:700;}
+  .stuck-item{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:var(--surface); border:1px solid var(--danger-border); border-inline-start:4px solid var(--danger);
+    border-radius:10px; padding:12px 14px; margin-bottom:8px; cursor:pointer;
+  }
+  .stuck-item:hover{background:var(--danger-bg);}
+  .stuck-days{font-family:'Cairo',sans-serif; font-size:18px; font-weight:900; color:var(--danger); white-space:nowrap;}
+  .status-tag{display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
+  .iv-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:6px 0 16px; border-bottom:1px solid var(--border); margin-bottom:16px;}
+  .iv-back{border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:9px 14px; font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; color:var(--ink-2); cursor:pointer;}
+  .iv-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px; color:var(--ink); margin:0;}
+  .iv-count{background:var(--surface-2); color:var(--ink-2); font-weight:800; font-size:12.5px; border-radius:11px; padding:3px 10px;}
+  .iv-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:12px; background:var(--surface);}
+  .iv-table{width:100%; border-collapse:collapse; min-width:600px;}
+  .iv-table th{background:var(--surface-2); color:var(--ink-2); font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; text-align:start; padding:11px 13px; border-bottom:1px solid var(--border); white-space:nowrap;}
+  .iv-table td{padding:12px 13px; border-bottom:1px solid var(--border); font-size:13.5px; color:var(--ink); vertical-align:middle;}
+  .iv-table tr:last-child td{border-bottom:none;}
+  .iv-table tbody tr{cursor:pointer;}
+  .iv-table tbody tr:hover{background:var(--surface-2);}
+  .iv-ref{font-family:monospace; font-size:12px; font-weight:700; color:var(--muted);}
+  .iv-dev{font-weight:800;}
+  .iv-sub{font-size:12px; color:var(--muted-2); margin-top:2px;}
+  .iv-issue{max-width:200px; color:var(--ink-2); font-size:12.5px; line-height:1.6;}
+
   /* الموديول بيقرا متغيّرات الداشبورد — بنعملها هنا أسماء مرادفة
      عشان يشتغل بألوان الديسباتشر بدل ما يطلع بلون ناقص */
   :root{
@@ -579,6 +615,7 @@
       <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
       <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
       <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">🧾 الحسابات</button>
+      <button class="cap-inventory" style="display:none;" onclick="closeKebab(); openInventory()">📋 الجرد</button>
       <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <button class="att-menu-btn" style="display:none;" onclick="closeKebab(); openAttendance()">⏰ المواعيد</button>
       <div class="sep cap-purchases" style="display:none;"></div>
@@ -619,6 +656,25 @@
       </div>
     </div>
     <div id="accountsBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     شاشة الجرد — قراءة فقط
+     مبنية على devices اللي أصلاً محمّلة في الصفحة (devices_dispatch)،
+     فمفيش أي طلب إضافي على السيرفر. من غير أعمدة الفلوس عن قصد —
+     الـview أصلاً بيشيلها قبل ما توصل هنا.
+     ============================================================ -->
+<div id="inventoryOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>📋 الجرد</h2>
+      <button class="close-btn" onclick="closeInventory()">×</button>
+    </div>
+    <div class="modal-search" style="padding:0 20px 8px;">
+      <input id="invSearch" oninput="renderInventory()" placeholder="🔍 دور بإسم عميل، محل، فني، موديل..." style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
+    </div>
+    <div id="inventoryBody" style="padding:16px 20px 40px;"></div>
   </div>
 </div>
 
@@ -1170,6 +1226,20 @@ async function boot(){
     loadLedger().catch(() => {});
   }
 
+  // ============================================================
+  // صلاحية "الجرد" — قراءة فقط
+  // ------------------------------------------------------------
+  // مفيش تحميل إضافي هنا: الجرد بيقرا من devices اللي أصلاً
+  // بتتحمّل في loadDevices() تحت — زي أي صفحة تانية في الملف ده.
+  // ============================================================
+  try{
+    const { data } = await sb.rpc('has_cap', { p_cap: 'inventory_view' });
+    CAN_INVENTORY = (data === true);
+  }catch(e){ CAN_INVENTORY = false; }   // مشكلة في الشبكة؟ الافتراضي مقفول
+  if(CAN_INVENTORY){
+    document.querySelectorAll('.cap-inventory').forEach(el => el.style.display = '');
+  }
+
   // الاسم: من ملف الحساب، وإلا الجزء الأول من الإيميل
   ME = MY_EMAIL.split('@')[0];
   try{
@@ -1648,6 +1718,8 @@ let CAN_PURCHASES = false;
 let CAN_PARTS_REVIEW = false;
 // صلاحية عرض الحسابات (قراءة فقط) — الافتراضي مقفول
 let CAN_ACCOUNTS = false;
+// صلاحية "الجرد" (قراءة فقط) — الافتراضي مقفول
+let CAN_INVENTORY = false;
 
 // الموديول بيتحمّل عند الحاجة بس — مايتنزّلش على جهاز ديسباتشر
 // مقفولة عليه الميزة أصلاً
@@ -2099,6 +2171,208 @@ async function prUnlink(partId){
 window.prOnPartsChanged = function(){
   if(prPickingId) prShowDeviceParts(prPickingId);
 };
+
+// ============================================================
+// صفحة الجرد (ديسباتشر) — قراءة فقط
+// ------------------------------------------------------------
+// منقولة من dashboard.html بنفس الفكرة (فلتر فترة + كروت أعداد +
+// أداء الفنيين + الواقف كتير)، وبنفس أسماء الحقول اللي devices
+// هنا بتستخدمها (adapt() في أول الملف: type · shop · issue · intake).
+//
+// ⚠️ فرقين عن نسخة المحاسب، عن قصد:
+//   ١) مفيش عمود سعر ولا كارت "مدفوع/غير مدفوع" — devices_dispatch
+//      بتشيل الأسعار قبل ما توصل للمتصفح، فمفيش بيانات فلوس أصلاً
+//      نبني عليها الكارت ده.
+//   ٢) فلتر الفترة هنا "اليوم/الأسبوع/الشهر" بس، من غير "الكل" أو
+//      مدى مخصص — لأن loadDevices() بتحمّل الأجهزة المسلَّمة لآخر
+//      ٣٠ يوم بس (مش الأرشيف كله زي الداشبورد)، فأي فلتر أوسع من
+//      شهر هيدّي عدد ناقص من غير ما يبان إنه ناقص.
+// ============================================================
+const INV_STUCK_DAYS = 3;
+let invPeriod = { mode: 'today' };
+let invView = null;      // {kind:'card'|'tech', key} أو null للقائمة
+let invLists = {};
+let invTechLists = {};
+
+function setInvPeriod(mode){ invPeriod.mode = mode; renderInventory(); }
+
+function invRange(){
+  const now = new Date();
+  const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  if(invPeriod.mode === 'today') return [startOfDay(now), null];
+  if(invPeriod.mode === 'week'){ const s = startOfDay(now); s.setDate(s.getDate() - 6); return [s, null]; }
+  if(invPeriod.mode === 'month'){ const s = startOfDay(now); s.setDate(s.getDate() - 29); return [s, null]; }
+  return [null, null];
+}
+function invInRange(iso){
+  if(!iso) return false;
+  const [f, t] = invRange();
+  const d = new Date(iso);
+  if(f && d < f) return false;
+  if(t && d > t) return false;
+  return true;
+}
+
+const INV_ACTIVE_STATUSES = ['waiting','diagnosing','repairing','done'];
+const INV_OPEN_STATUSES   = ['waiting','diagnosing','repairing','returned'];
+const INV_TECH_STATUSES   = ['waiting','diagnosing','repairing','returned'];
+
+// آخر حركة على الجهاز — من statusHistory المحفوظ في _raw
+function invLastChange(d){
+  const h = (d._raw && d._raw.statusHistory) || [];
+  return h.length ? h[h.length - 1].date : d.intake;
+}
+function invDaysSince(iso){
+  if(!iso) return 0;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+// أول تسليم بعد آخر رجوع (زي دالة الداشبورد، بس على statusHistory الخام)
+function invDeliveredDate(d){
+  const h = (d._raw && d._raw.statusHistory) || [];
+  return h.length ? (h.filter(x => x.status === 'delivered').slice(-1)[0] || {}).date || null : null;
+}
+
+function invStuckDevices(){
+  return devices
+    .filter(d => INV_ACTIVE_STATUSES.includes(d.status))
+    .map(d => ({ d, days: invDaysSince(invLastChange(d)) }))
+    .filter(x => x.days >= INV_STUCK_DAYS)
+    .sort((a,b) => b.days - a.days);
+}
+
+function invMatchesSearch(d, q){
+  const hay = [d.customer, d.shop, d.tech, d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
+
+function openInventory(){
+  const _shield = document.getElementById('kebabShield'); if(_shield) _shield.classList.add('hidden');
+  invView = null;
+  const _s = document.getElementById('invSearch'); if(_s) _s.value = '';
+  document.getElementById('inventoryOverlay').classList.remove('hidden');
+  renderInventory();
+}
+function closeInventory(){ document.getElementById('inventoryOverlay').classList.add('hidden'); }
+
+function openInvView(kind, key){
+  invView = { kind, key };
+  renderInventory();
+  const sc = document.getElementById('inventoryOverlay');
+  if(sc) sc.scrollTop = 0;
+}
+function closeInvView(){ invView = null; renderInventory(); }
+
+function invStatusTag(status){
+  const s = ST[status] || { label: status, c: '--muted' };
+  return `<span class="status-tag" style="background:var(${s.c}-bg);color:var(${s.c})">${esc(s.label)}</span>`;
+}
+
+function invViewData(){
+  if(!invView) return null;
+  if(invView.kind === 'tech') return { title: '🔧 ' + invView.key, list: invTechLists[invView.key] || [] };
+  const labels = { received:'📥 استلمت الفترة دي', progress:'⏳ قيد التنفيذ', delivered:'✅ اتسلّمت', stuck:`⚠️ واقفة ${INV_STUCK_DAYS} أيام فأكتر` };
+  return { title: labels[invView.key] || invView.key, list: invLists[invView.key] || [] };
+}
+
+function invViewHtml(){
+  const data = invViewData();
+  if(!data) return '';
+  const rows = data.list.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;padding:34px;color:var(--muted-2);">مفيش أجهزة هنا</td></tr>`
+    : data.list.map(d => `<tr onclick="closeInvView(); showInfo('${d.id}')">
+        <td class="iv-ref">${esc(ticketNo(d.id))}</td>
+        <td><div class="iv-dev">${esc([d.type, d.model].filter(Boolean).join(' ') || '—')}</div></td>
+        <td><div style="font-weight:700;">${esc(d.customer) || '—'}</div>${d.shop ? `<div class="iv-sub">${esc(d.shop)}</div>` : ''}</td>
+        <td class="iv-issue">${esc(d.issue) || '—'}</td>
+        <td>${invStatusTag(d.status)}</td>
+      </tr>`).join('');
+  return `
+    <div class="iv-head">
+      <button class="iv-back" onclick="closeInvView()">⬅️ رجوع للقائمة</button>
+      <h3 class="iv-title">${esc(data.title)}</h3>
+      <span class="iv-count">${data.list.length}</span>
+    </div>
+    <div class="iv-scroll">
+      <table class="iv-table">
+        <thead><tr><th>الرقم</th><th>الجهاز</th><th>العميل</th><th>العطل</th><th>الحالة</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderInventory(){
+  const chip = (mode, label) => `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
+  const filterBar = `<div class="inv-filter">${chip('today','اليوم')}${chip('week','الأسبوع')}${chip('month','الشهر')}</div>`;
+
+  const received  = devices.filter(d => invInRange(d.intake));
+  const delivered = devices.filter(d => { const dd = invDeliveredDate(d); return dd && invInRange(dd); });
+  const inProgress = devices.filter(d => INV_OPEN_STATUSES.includes(d.status));
+  const stuck = invStuckDevices();
+  invLists = { received, delivered, progress: inProgress, stuck: stuck.map(x => x.d) };
+
+  const card = (key, num, color, label) => `
+    <div class="inv-card" onclick="openInvView('card','${key}')">
+      <div class="inv-card-num" style="color:${color};">${num}</div>
+      <div class="inv-card-label">${label}</div>
+      <div class="inv-card-more">عرض الأجهزة ←</div>
+    </div>`;
+  const cards = `<div class="inv-cards">
+      ${card('received', received.length, 'var(--info)', '📥 استلمت الفترة دي')}
+      ${card('progress', inProgress.length, 'var(--warn)', '⏳ قيد التنفيذ')}
+      ${card('delivered', delivered.length, 'var(--success)', '✅ اتسلّمت الفترة دي')}
+      ${card('stuck', stuck.length, 'var(--danger)', `⚠️ واقفة ${INV_STUCK_DAYS} أيام+`)}
+    </div>`;
+
+  // ===== بحث =====
+  const q = (document.getElementById('invSearch')?.value || '').trim();
+  let searchHtml = '';
+  if(q){
+    const found = devices.filter(d => invMatchesSearch(d, q));
+    searchHtml = `
+      <div class="inv-section-title">🔍 نتائج البحث "${esc(q)}" — ${found.length}</div>
+      <div class="iv-scroll" style="margin-bottom:20px;">
+        <table class="iv-table">
+          <thead><tr><th>الرقم</th><th>الجهاز</th><th>العميل</th><th>العطل</th><th>الحالة</th></tr></thead>
+          <tbody>${found.length === 0
+            ? `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-2);">مفيش نتايج</td></tr>`
+            : found.map(d => `<tr onclick="showInfo('${d.id}')">
+                <td class="iv-ref">${esc(ticketNo(d.id))}</td>
+                <td><div class="iv-dev">${esc([d.type, d.model].filter(Boolean).join(' ') || '—')}</div></td>
+                <td><div style="font-weight:700;">${esc(d.customer) || '—'}</div>${d.shop ? `<div class="iv-sub">${esc(d.shop)}</div>` : ''}</td>
+                <td class="iv-issue">${esc(d.issue) || '—'}</td>
+                <td>${invStatusTag(d.status)}</td>
+              </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ===== أداء الفنيين: الأجهزة اللي معاهم ولسه ما اتسلمتش =====
+  const withTech = {};
+  devices.forEach(d => {
+    if(!d.tech || !INV_TECH_STATUSES.includes(d.status)) return;
+    (withTech[d.tech] = withTech[d.tech] || []).push(d);
+  });
+  invTechLists = withTech;
+  const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
+  const techCards = techNames.length === 0
+    ? `<div class="empty-col">مفيش أجهزة موزّعة على فنيين دلوقتي</div>`
+    : `<div class="inv-cards">${techNames.map(tn => {
+        const late = withTech[tn].filter(d => invDaysSince(invLastChange(d)) >= INV_STUCK_DAYS).length;
+        const safe = esc(tn).replace(/'/g, "\\'");
+        return `<div class="inv-card" onclick="openInvView('tech','${safe}')">
+          <div class="inv-card-num" style="color:var(--repairing);">${withTech[tn].length}</div>
+          <div class="inv-card-label">🔧 ${esc(tn)}</div>
+          ${late ? `<div style="font-size:11px;color:var(--danger);font-weight:800;margin-top:4px;">${late} متأخرة</div>` : ''}
+          <div class="inv-card-more">عرض الأجهزة ←</div>
+        </div>`;
+      }).join('')}</div>`;
+
+  document.getElementById('inventoryBody').innerHTML = invView
+    ? `${filterBar}${invViewHtml()}`
+    : `${filterBar}${searchHtml}${cards}
+       <div class="inv-section-title">🔧 حسب الفني</div>
+       ${techCards}`;
+}
 
 document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
