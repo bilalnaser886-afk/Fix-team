@@ -2997,7 +2997,10 @@ function gsType(q){
   const query = String(q || '').trim();
   wrap.classList.toggle('has-q', query.length > 0);
 
-  if(query.length < 2){
+  // ⚠️ حرف واحد يكفي. كان الحد حرفين — والموظف اللي بيدوّر على
+  //    محل اسمه حرف، أو بيبدأ يكتب ويستنى نتيجة، مكانش بيشوف حاجة
+  //    ويفتكر البحث واقف.
+  if(query.length < 1){
     wrap.classList.remove('open');
     panel.innerHTML = '';
     return;
@@ -4324,7 +4327,7 @@ function onCustomerNameInput(){
   // وبتثقّل الكتابة على قايمة أجهزة كبيرة.
   const nameDl = document.getElementById('custNameList');
   if(nameDl){
-    nameDl.innerHTML = key.length < 2 ? '' :
+    nameDl.innerHTML = key.length < 1 ? '' :
       custNames.filter(x => custKey(x.name).indexOf(key) === 0)
                .slice(0, 15)
                .map(x => `<option value="${esc(x.name)}">`).join('');

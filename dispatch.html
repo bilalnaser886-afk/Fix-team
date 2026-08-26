@@ -1332,7 +1332,10 @@ function showInfo(id){
 // فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع
 // كل ضغطة زرار — نفس أسلوب الداشبورد.
 function reindexSearch(){
-  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by], true); }catch(e){}
+  // ⚠️ العطل لازم يكون في الفهرس **وفي** قايمة الاحتياطي تحت.
+  //    الفهرس هو اللي بيشتغل فعلياً، فلو زوّدناه في الاحتياطي بس
+  //    البحث بالعطل مكانش هيشتغل خالص.
+  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by, d.issue], true); }catch(e){}
 }
 
 function render(){
@@ -1341,7 +1344,7 @@ function render(){
   const match = d => {
     if(!q) return true;
     if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
-    const fields = [d.type,d.model,d.customer,d.shop,ticketNo(d.id)];
+    const fields = [d.type,d.model,d.customer,d.shop,ticketNo(d.id),d.issue];
     if(window.IFixSearch) return IFixSearch.match(q, fields);
     return fields.some(v => v && String(v).includes(q));
   };
@@ -1432,7 +1435,7 @@ function onDpCustInput(){
 
   // اقتراح الأسامي: **بادئة** بس ومقصوص على ١٥ — قايمة أطول مبتتقريش
   // على الموبايل وبتثقّل الكتابة
-  if(nameDl) nameDl.innerHTML = key.length < 2 ? '' :
+  if(nameDl) nameDl.innerHTML = key.length < 1 ? '' :
     dpCustNames.filter(x => dpKey(x.name).indexOf(key) === 0).slice(0,15)
                .map(x=>`<option value="${esc(x.name)}">`).join('');
 

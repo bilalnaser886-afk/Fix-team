@@ -370,6 +370,11 @@
     const model = [d.deviceType, d.model].filter(Boolean).join(' ').trim();
     return '#' + ticketNo(d) + (d.customerName ? ' — ' + d.customerName : '') + (model ? ' — ' + model : '');
   }
+  // العطل — بيتعرض في سطر تاني تحت العنوان في نتايج البحث،
+  // عشان المستخدم يعرف الجهاز من غير ما يفتحه
+  function deviceIssueOf(d) {
+    return (d && d.reportedIssue) ? String(d.reportedIssue).trim() : '';
+  }
   // ============================================================
   // ⚠️ الوصول لمتغيرات الداشبورد العامة
   // ------------------------------------------------------------
@@ -405,19 +410,34 @@
   function deviceById(id) {
     try { return allDevices().find(d => d.id === id) || null; } catch (e) { return null; }
   }
+  // آخر لمسة — أساس الترتيب.
+  // ⚠️ lastModifiedAt فاضي على الأجهزة القديمة، فبننزل لتاريخ
+  //    الاستلام بدل ما يتحطوا في آخر القايمة بالغلط.
+  function touchedAt(d) {
+    return new Date((d && (d.lastModifiedAt || d.intakeDate)) || 0).getTime();
+  }
+
   function searchDevices(q, limit) {
     const list = allDevices();
     const s = String(q || '').trim().toLowerCase();
     if (!s) return [];
     const cap = limit || CFG.deviceSearchLimit;
     const res = [];
-    for (let i = 0; i < list.length && res.length < cap; i++) {
+    // ⚠️ بنلف على القايمة كلها مش بنقف عند أول "cap" نتيجة.
+    //    الوقوف بدري كان بيمنع الترتيب من الشغل: كنا بناخد أول ٢٠
+    //    بترتيب الذاكرة وبعدين نرتّبهم — يعني الجهاز اللي اتلمس
+    //    دلوقتي ممكن ما يدخلش أصلاً.
+    for (let i = 0; i < list.length; i++) {
       const d = list[i];
-      const hay = [ticketNo(d), d.customerName, d.shopName, d.deviceType, d.model, d.serialNumber]
+      const hay = [ticketNo(d), d.customerName, d.shopName, d.deviceType,
+                   d.model, d.serialNumber,
+                   d.reportedIssue]          // ← جديد: البحث بالعطل
         .filter(Boolean).join(' ').toLowerCase();
       if (hay.indexOf(s) !== -1) res.push(d);
     }
-    return res;
+    // آخر لمسة الأول
+    res.sort((a, b) => touchedAt(b) - touchedAt(a));
+    return res.slice(0, cap);
   }
 
   // مكوّن قابل لإعادة الاستخدام.
@@ -450,7 +470,13 @@
     const hits = searchDevices(q, CFG.deviceSearchLimit);
     return `<div class="dsrch-drop">${
       hits.length
-        ? hits.map(d => `<button type="button" class="dsrch-opt" onclick="${onPick}'${esc(d.id)}')">${esc(deviceLabelOf(d))}</button>`).join('')
+        ? hits.map(d => {
+            const iss = deviceIssueOf(d);
+            return `<button type="button" class="dsrch-opt" onclick="${onPick}'${esc(d.id)}')">`
+              + `<span class="dsrch-t">${esc(deviceLabelOf(d))}</span>`
+              + (iss ? `<span class="dsrch-i">🛠️ ${esc(iss)}</span>` : '')
+              + `</button>`;
+          }).join('')
         : `<div class="dsrch-empty">${esc(T('dsrch.none'))}</div>`
     }</div>`;
   }
@@ -1430,6 +1456,10 @@
   .dsrch-opt{display:block; width:100%; text-align:start; border:none; background:var(--surface,#fff); cursor:pointer;
     padding:10px 12px; font-family:inherit; font-size:13px; color:var(--ink,#1A2332); border-top:1px solid var(--surface-3,#F1F5F9);}
   .dsrch-opt:hover{background:var(--surface-3,#F0F9FB);}
+  /* سطر العطل تحت اسم الجهاز في نتايج البحث */
+  .dsrch-t{display:block;}
+  .dsrch-i{display:block; font-size:11.5px; color:var(--muted,#64748B); margin-top:3px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .dsrch-empty{padding:10px 12px; font-size:12.5px; color:var(--muted-2,#94A3B8);}
   .dsrch-chosen{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;}
   .dsrch-picked{background:var(--success-bg,#ECFDF5); border:1px solid var(--success-border,#A7F3D0); color:var(--success,#065F46); border-radius:8px;
