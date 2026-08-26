@@ -815,6 +815,22 @@
   .stuck-item:hover{background:var(--danger-bg);}
   .stuck-days{font-family:'Cairo',sans-serif; font-size:19px; font-weight:900; color:var(--danger); white-space:nowrap;}
 
+  /* ===== صفحة الموظفين — لمبة الحضور ===== */
+  .stf-count{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
+  .stf-pill{flex:1; min-width:120px; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:12px 14px; text-align:center;}
+  .stf-pill-n{font-family:'Cairo',sans-serif; font-size:26px; font-weight:900; line-height:1;}
+  .stf-pill-l{font-size:12.5px; color:var(--ink-2); margin-top:5px; font-weight:700;}
+  .stf-row{display:flex; align-items:center; gap:12px; background:var(--surface);
+    border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:8px;}
+  /* اللمبة: دايرة صغيرة + هالة بنفس اللون عشان تبان من بعيد */
+  .stf-dot{flex:none; width:13px; height:13px; border-radius:50%;}
+  .stf-dot.on{background:#16A34A; box-shadow:0 0 0 4px rgba(22,163,74,.18);}
+  .stf-dot.off{background:#DC2626; box-shadow:0 0 0 4px rgba(220,38,38,.15);}
+  .stf-name{font-weight:800; font-size:14.5px; color:var(--ink);}
+  .stf-meta{font-size:12px; color:var(--muted-2); margin-top:2px;}
+  .stf-state{margin-inline-start:auto; font-size:12.5px; font-weight:800; white-space:nowrap;}
+
   /* ===== صفحة الحسابات ===== */
   .acc-payform{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(16,16,20,.04);}
   .acc-payform-row{display:grid; grid-template-columns:1.2fr 1fr 1.4fr auto; gap:10px;}
@@ -1165,6 +1181,7 @@
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
       <button class="att-menu-btn" style="display:none;" onclick="openAttendance()">⏰ المواعيد</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
     <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:var(--danger);">تسجيل الخروج</button>
@@ -1471,6 +1488,26 @@
   </div>
 </div>
 
+<!-- ============================================================
+     صفحة الموظفين — لمبة الحضور
+     ------------------------------------------------------------
+     بتقرا من دالة hr_today_presence() بس (ملف ٢٨).
+     🔴 مفيش أي كود بيكتب هنا — عرض بحت.
+     ============================================================ -->
+<div id="staffOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>👥 الموظفين</h2>
+      <button class="close-btn" onclick="closeStaff()">×</button>
+    </div>
+    <div class="modal-search" style="padding:0 20px 8px;">
+      <input id="staffSearch" oninput="renderStaff()" placeholder="🔍 دور باسم الموظف..."
+             style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
+    </div>
+    <div id="staffBody" style="padding:16px 20px 40px;"></div>
+  </div>
+</div>
+
 <!-- Analytics (الملخص) page -->
 <div id="analyticsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
@@ -1665,9 +1702,13 @@ const ROLE_LABEL_KEYS = {
   dispatcher:  'adm.roleDisp',
   technician:  'adm.roleTech'
 };
+// دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
+// فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
-  try{ return k ? t(k) : r; }catch(e){ return r; }
+  try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
+  catch(e){ return ROLE_LABEL_FALLBACK[r] || r; }
 }
 function currentRoleLabel(){ return roleLabel(myRole()); }
 
@@ -5713,7 +5754,7 @@ function openScannedDevice(hit){
     el.blur();
   }
   ['columnSearch','invSearch','scanInput','accSearch'].forEach(clearSearchBox);
-  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
+  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay','staffOverlay']
     .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
   gScanBuf = '';
   openDetail(hit.id);
@@ -6904,6 +6945,99 @@ function renderSummaries(){
     ${techCards}
   `;
   if(_sumScroller) _sumScroller.scrollTop = _sumY;
+}
+
+// ============================================================
+// صفحة الموظفين — لمبة الحضور
+// ------------------------------------------------------------
+// 🟢 = عنده وردية مفتوحة (حضر ولسه ما انصرفش)
+// 🔴 = مفيش وردية مفتوحة
+//
+// كل الحساب بيحصل في قاعدة البيانات (hr_today_presence في ملف ٢٨)
+// عشان الصفحة ما تشوفش إحداثيات ولا سجل — بتاخد اللمبة جاهزة.
+// ============================================================
+let staffRows = [];
+let staffErr  = '';
+
+function openStaff(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  if(typeof shieldGhostClick === 'function') shieldGhostClick();
+  const s = document.getElementById('staffSearch'); if(s) s.value = '';
+  document.getElementById('staffOverlay').classList.remove('hidden');
+  staffRows = []; staffErr = '';
+  document.getElementById('staffBody').innerHTML =
+    `<div class="empty-col">جاري التحميل…</div>`;
+  loadStaffPresence();
+}
+function closeStaff(){ document.getElementById('staffOverlay').classList.add('hidden'); }
+
+async function loadStaffPresence(){
+  try{
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. لو بلعناه هنا
+    //    الصفحة هتطلع فاضية والمستخدم يفتكر إن مفيش موظفين.
+    const { data, error } = await sb.rpc('hr_today_presence');
+    if(error) throw error;
+    staffRows = data || [];
+    staffErr = '';
+  }catch(e){
+    staffRows = [];
+    staffErr = (e && e.message) ? e.message : String(e);
+    console.error('hr_today_presence failed:', e);
+  }
+  renderStaff();
+}
+
+function renderStaff(){
+  const host = document.getElementById('staffBody');
+  if(!host) return;
+
+  if(staffErr){
+    host.innerHTML = `<div class="empty-col" style="color:var(--danger); line-height:2;">
+      ❌ مقدرناش نقرا حالة الموظفين<br>
+      <span style="font-family:monospace; font-size:11.5px;">${esc(staffErr)}</span><br>
+      <span style="font-size:12px; color:var(--muted-2);">لو الرسالة فيها «مالكش صلاحية» أو اسم الدالة — يبقى ملف 28-staff-presence.sql لسه ما اتشغّلش.</span>
+    </div>`;
+    return;
+  }
+
+  const q = (document.getElementById('staffSearch')?.value || '').trim().toLowerCase();
+  const list = q
+    ? staffRows.filter(r => (`${r.user_name||''} ${r.user_email||''}`).toLowerCase().includes(q))
+    : staffRows;
+
+  const onCount  = staffRows.filter(r => r.present).length;
+  const offCount = staffRows.length - onCount;
+
+  const counts = `
+    <div class="stf-count">
+      <div class="stf-pill"><div class="stf-pill-n" style="color:#16A34A;">${onCount}</div>
+        <div class="stf-pill-l">🟢 حاضر دلوقتي</div></div>
+      <div class="stf-pill"><div class="stf-pill-n" style="color:#DC2626;">${offCount}</div>
+        <div class="stf-pill-l">🔴 مش حاضر</div></div>
+    </div>`;
+
+  const rows = list.length === 0
+    ? `<div class="empty-col">${q ? 'مفيش نتايج' : 'مفيش موظفين متسجّلين'}</div>`
+    : list.map(r => {
+        const on = !!r.present;
+        // "من الساعة كذا" — بس للحاضر. المنصرف مالوش وقت نعرضه.
+        const since = (on && r.since)
+          ? new Date(r.since).toLocaleTimeString(
+              (typeof getLocale === 'function' ? getLocale() : 'ar-EG'),
+              { hour:'2-digit', minute:'2-digit' })
+          : '';
+        return `<div class="stf-row">
+          <span class="stf-dot ${on ? 'on' : 'off'}"></span>
+          <div style="min-width:0;">
+            <div class="stf-name">${esc(r.user_name || r.user_email || '—')}</div>
+            <div class="stf-meta">${esc(roleLabel(r.role))}${since ? ' · من ' + esc(since) : ''}</div>
+          </div>
+          <span class="stf-state" style="color:${on ? '#16A34A' : '#DC2626'};">
+            ${on ? 'حاضر' : 'مش حاضر'}</span>
+        </div>`;
+      }).join('');
+
+  host.innerHTML = counts + rows;
 }
 
 // ============================================================
