@@ -113,6 +113,46 @@ function attRand(n){ const a = new Uint8Array(n); crypto.getRandomValues(a); ret
 function attBioSupported(){
   return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 }
+
+// ============================================================
+// هل الجهاز ده قادر يتحقق من صاحبه أصلاً؟
+// ------------------------------------------------------------
+// ⚠️ ده أهم فحص في الملف كله.
+//
+//    فيه موبايلات مفيهاش بصمة ولا فيس آي دي خالص، وفيه موبايلات
+//    البصمة فيها بايظة. لو سجّلنا الحضور على إن البصمة **شرط**،
+//    الموظفين دول مش هيقدروا يسجّلوا حضور **أبداً** — وده أسوأ
+//    بكتير من إنهم يسجّلوا من غير بصمة.
+//
+//    بنسأل المتصفح نفسه السؤال ده بدل ما نخمّنه من الأخطاء:
+//        isUserVerifyingPlatformAuthenticatorAvailable()
+//    بترجّع true لو الجهاز يقدر يتحقق — ببصمة أو وجه **أو رمز
+//    قفل الشاشة**. يعني اللي بصمته بايظة وعنده رمز، هيتحقق برمزه
+//    عادي والنظام مش هيحس بالفرق.
+//
+//    بترجّع false بس لما الجهاز **مالوش أي وسيلة تحقق خالص**.
+//    ساعتها بنعدّي التسجيل ونعلّمه "من غير بصمة" عشان HR تشوفه.
+//
+// ⚠️ بنسأل مرة واحدة ونحتفظ بالإجابة — السؤال بياخد وقت على
+//    بعض الأجهزة، وما ينفعش نأخّر الموظف مع كل ضغطة.
+// ============================================================
+let _attCanVerify = null;
+
+async function attCanVerify(){
+  if(_attCanVerify !== null) return _attCanVerify;
+  if(!attBioSupported()){ _attCanVerify = false; return false; }
+  try{
+    const fn = window.PublicKeyCredential
+             && window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable;
+    // متصفح قديم مش عارف السؤال ده؟ بنجرّب عادي — لو فشل هنمسكه تحت
+    if(typeof fn !== 'function'){ _attCanVerify = true; return true; }
+    _attCanVerify = !!(await fn.call(window.PublicKeyCredential));
+  }catch(e){
+    console.warn('[المواعيد] مقدرناش نتأكد من قدرة الجهاز:', e);
+    _attCanVerify = false;
+  }
+  return _attCanVerify;
+}
 function attCredFor(email){
   try{ return JSON.parse(localStorage.getItem(ATT_CRED_KEY) || '{}')[email] || null; }
   catch(e){ return null; }
@@ -144,23 +184,62 @@ async function attBioRegister(email){
 
 // تأكيد البصمة قبل أي تسجيل
 // بترجّع true (اتأكد) أو false (الجهاز مش داعم) — وبترمي لو المستخدم رفض
+// بترجّع true (اتأكد) · false (الجهاز مش قادر — نعدّي بعلامة)
+// وبترمي بس لو المستخدم **رفض** أو التأكيد فشل وهو قادر.
 async function attBioVerify(email){
-  if(!attBioSupported()) return false;
+  // 🔴 الفحص الأول: الجهاز قادر أصلاً؟
+  if(!(await attCanVerify())){
+    console.info('[المواعيد] الجهاز مالوش وسيلة تحقق — التسجيل هيتم من غير بصمة');
+    return false;
+  }
   let id = attCredFor(email);
   if(!id){
     const ok = confirm('أول مرة على الجهاز ده — هنسجّل بصمتك/وجهك مرة واحدة.\nكمّل؟');
+    // المستخدم رفض بإيده → نوقف. ده قرار منه مش عطل في الجهاز.
     if(!ok) throw new Error('لازم تسجّل البصمة عشان تقدر تسجّل حضور');
-    await attBioRegister(email);
+    try{
+      await attBioRegister(email);
+    }catch(e){
+      // ⚠️ التسجيل نفسه فشل رغم إن الجهاز قال إنه قادر.
+      //    بيحصل مع بعض أجهزة أندرويد القديمة والمتصفحات الغريبة.
+      //    ما نقفلش الباب — نعدّي بعلامة "من غير بصمة".
+      //    الموظف موجود في المحل فعلاً (اللوكيشن اتفحص قبلها)،
+      //    ومنعه من تسجيل حضوره عقاب على عطل مالوش فيه.
+      if(e && e.name === 'NotAllowedError') throw e;   // ده رفض حقيقي
+      console.warn('[المواعيد] تسجيل البصمة فشل — هنكمّل من غيرها:', e);
+      return false;
+    }
     id = attCredFor(email);
+    if(!id) return false;
   }
-  const got = await navigator.credentials.get({ publicKey: {
-    challenge: attRand(32),
-    allowCredentials: [{ type:'public-key', id: attFromB64(id) }],
-    userVerification: 'required',
-    timeout: 60000
-  }});
-  if(!got) throw new Error('التأكيد فشل');
-  return true;
+  try{
+    const got = await navigator.credentials.get({ publicKey: {
+      challenge: attRand(32),
+      allowCredentials: [{ type:'public-key', id: attFromB64(id) }],
+      userVerification: 'required',
+      timeout: 60000
+    }});
+    if(!got) throw new Error('التأكيد فشل');
+    return true;
+  }catch(e){
+    // ⚠️ البصمة المسجّلة بقت مش صالحة؟ (الموظف غيّر بصمته، أو
+    //    مسح بيانات المتصفح، أو الجهاز اترجّع لضبط المصنع)
+    //    بنمسح المسجّل ونطلب تسجيل جديد بدل ما يفضل محبوس.
+    if(e && (e.name === 'InvalidStateError' || e.name === 'NotSupportedError')){
+      attForget(email);
+      throw new Error('بصمتك المسجّلة مابقتش صالحة — جرّب تاني وهنسجّلها من جديد');
+    }
+    throw e;
+  }
+}
+
+// مسح البصمة المسجّلة على الجهاز ده
+function attForget(email){
+  try{
+    const all = JSON.parse(localStorage.getItem(ATT_CRED_KEY) || '{}');
+    delete all[email];
+    localStorage.setItem(ATT_CRED_KEY, JSON.stringify(all));
+  }catch(e){}
 }
 
 // ============================================================
@@ -199,10 +278,14 @@ async function attPunch(kind){
     const pos = await attGetPosition();
 
     // ٢) البصمة
-    attRender('🔐 أكّد بصمتك…');
+    // ⚠️ الجهاز اللي مالوش بصمة بيعدّي على طول من غير ما نوقّفه،
+    //    والتسجيل بيتعلّم "من غير بصمة" عشان HR تشوفه.
+    const canBio = await attCanVerify();
+    attRender(canBio ? '🔐 أكّد بصمتك…' : '⏳ بنسجّل…');
     let verified = false;
-    try{ verified = await attBioVerify(email); }
-    catch(e){ throw e; }   // المستخدم رفض → نوقف
+    // ⚠️ بنرمي بس لو المستخدم رفض. الجهاز اللي مش قادر بيرجّع
+    //    false من غير ما يرمي، فالتسجيل بيكمّل عادي.
+    verified = await attBioVerify(email);
 
     // ٣) السيرفر هو اللي بيقرر
     attRender('⏳ بنسجّل…');

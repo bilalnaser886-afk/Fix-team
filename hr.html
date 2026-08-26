@@ -538,6 +538,17 @@ function renderEmpSheet(email, days){
 
     ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
       ساعاتهم مش محسوبة في الإجمالي.</div>` : ''}
+    ${(() => {
+      // ⚠️ التسجيلات من غير بصمة: يا إما جهاز الموظف مالوش بصمة
+      //    أصلاً، يا إما البصمة بايظة. المهم إن HR تشوف العدد —
+      //    لو موظف كل تسجيلاته من غير بصمة، ده يستاهل سؤال.
+      const nb = dkeys.reduce((n,d) => n + days[d].filter(r => !r.verified).length, 0);
+      const all = dkeys.reduce((n,d) => n + days[d].length, 0);
+      if(!nb) return '';
+      return `<div class="hintbox" style="margin-top:10px;">🔓 ${nb} من ${all} تسجيل
+        اتعمل <b>من غير بصمة</b> — جهازه غالباً مالوش بصمة أو بايظة.
+        (اللوكيشن اتفحص في كل الحالات.)</div>`;
+    })()}
 
     <div style="margin-top:14px;">
       ${dkeys.length
