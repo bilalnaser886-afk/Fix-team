@@ -139,6 +139,7 @@
 
       /* شاشة تفاصيل الجهاز */
       'det.customerName': 'اسم العميل',
+      'det.customerPhone': 'رقم العميل',
       'det.shopName': 'اسم المحل',
       'det.price': 'السعر — أرقام صحيحة بالجنيه',
       'det.payMethod': 'طريقة الدفع',
@@ -294,6 +295,11 @@
       'note.statusChange': 'تغيير الحالة: {from} → {to}',
       'note.problem': '⚠️ فيه مشكلة: {txt}',
       'note.handoffFull': '🔄 تسليم الجهاز بالكامل من {from} إلى {to}',
+      'note.issueEdit': '🛠️ العطل اتعدّل: «{from}» ← «{to}»',
+      'tp.editIssue':   '🛠️ تعديل العطل',
+      'tp.editIssuePh': 'العطل الحقيقي — عدّل النص:',
+      'tp.issueSaved':  'العطل اتحدّث ✅',
+      'tp.noChange':    'مفيش تغيير',
       'note.handoffAssist': '🤝 إضافة فني مساعد: {to}',
       'note.requestPending': '⏳ طلب {label} — بانتظار اعتماد المحاسب',
       'appr.panelTitle': 'طلبات بانتظار الاعتماد',
@@ -399,7 +405,7 @@
       'det.returnPriceNo': 'العميل رفض السعر الجديد',
 
       /* شاشة الحسابات */
-      'acc.title': 'الحسابات — آجل المحلات',
+      'acc.title': 'الحسابات',
       'acc.recordPayment': 'تسجيل دفعة من محل',
       'acc.shopNamePh': 'اسم المحل',
       'acc.amountPh': 'المبلغ بالجنيه',
@@ -550,6 +556,9 @@
       'adm.logout': 'تسجيل الخروج',
       'adm.roleSuper': 'Super Admin',
       'adm.roleAcc': 'محاسب',
+      'adm.roleDisp': 'مسؤول الحركة',
+      'adm.roleTech': 'فني',
+      'adm.roleHr': 'شؤون العاملين (HR)',
       'adm.delete': 'حذف',
 
       /* صفحة الاشتراك */
@@ -794,6 +803,7 @@
 
       /* Device details screen */
       'det.customerName': 'Customer Name',
+      'det.customerPhone': 'Customer Phone',
       'det.shopName': 'Store Name',
       'det.price': 'Price — whole numbers in EGP',
       'det.payMethod': 'Payment Method',
@@ -949,6 +959,11 @@
       'note.statusChange': 'Status changed: {from} → {to}',
       'note.problem': '⚠️ Problem: {txt}',
       'note.handoffFull': '🔄 Full hand-off from {from} to {to}',
+      'note.issueEdit': '🛠️ Fault updated: "{from}" → "{to}"',
+      'tp.editIssue':   '🛠️ Edit fault',
+      'tp.editIssuePh': 'Actual fault — edit the text:',
+      'tp.issueSaved':  'Fault updated ✅',
+      'tp.noChange':    'No change',
       'note.handoffAssist': '🤝 Assistant technician added: {to}',
       'note.requestPending': '⏳ {label} request — awaiting accountant approval',
       'appr.panelTitle': 'Pending approvals',
@@ -1054,7 +1069,7 @@
       'det.returnPriceNo': 'Customer declined the new price',
 
       /* Accounts screen */
-      'acc.title': 'Accounts — Store Credit',
+      'acc.title': 'Accounts',
       'acc.recordPayment': 'Record a store payment',
       'acc.shopNamePh': 'Store name',
       'acc.amountPh': 'Amount in EGP',
@@ -1205,6 +1220,9 @@
       'adm.logout': 'Sign Out',
       'adm.roleSuper': 'Super Admin',
       'adm.roleAcc': 'Accountant',
+      'adm.roleDisp': 'Dispatcher',
+      'adm.roleTech': 'Technician',
+      'adm.roleHr': 'HR',
       'adm.delete': 'Delete',
 
       /* Checkout page */

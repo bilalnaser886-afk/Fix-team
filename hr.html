@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح باقي الصفحات (ifix-theme).
+   من غير ده فيه ومضة بيضا قبل ما الغامق يشتغل. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  }catch(e){}
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>شؤون العاملين — I Fix Team</title>
+<meta name="theme-color" content="#1B2A3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HR">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<script src="i18n.js"></script>
+<!-- نفس مكتبة الداشبورد بالظبط — عشان شكل ملف الإكسل يبقى واحد في النظام كله -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="attendance.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* نفس ألوان باقي النظام بالحرف — الصفحة دي مش بتخترع لغة تصميم جديدة */
+  :root{
+    --chrome:#16233A; --on-chrome:#FFFFFF;
+    --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
+    --ink:#17222E; --ink-2:#475569; --muted:#6B7A8C; --faint:#94A3B4;
+    --red:#E8321E; --done:#15803D; --done-bg:#EAF6EE;
+    --waiting:#B5651D; --waiting-bg:#FBF2E9;
+    --blue:#2B6CB0; --blue-bg:#EAF1F8;
+    --mono:ui-monospace,'SFMono-Regular',Menlo,monospace;
+  }
+  :root{ --bg:var(--paper); --surface:var(--card); --surface-2:var(--paper);
+         --border:var(--line); --muted-2:var(--faint); }
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --chrome:#0E1721; --on-chrome:#E9EFF5;
+    --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
+    --ink:#E9EFF5; --ink-2:#C3D2DF; --muted:#92A6B8; --faint:#71879B;
+    --red:#F0554A; --done:#4ADE80; --done-bg:rgba(74,222,128,.14);
+    --waiting:#E0A15C; --waiting-bg:rgba(224,161,92,.15);
+    --blue:#7BA9DC; --blue-bg:rgba(123,169,220,.15);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Tajawal',system-ui,sans-serif; padding-bottom:40px;}
+
+  .topbar{position:sticky; top:0; z-index:20; background:var(--chrome);
+    color:var(--on-chrome); display:flex; align-items:center; gap:12px;
+    padding:calc(12px + env(safe-area-inset-top)) 16px 13px;}
+  .topbar h1{flex:1; min-width:0; margin:0; font-family:'Cairo',sans-serif;
+    font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .topbar .who{font-size:11.5px; opacity:.75;}
+  .icon-btn{border:none; background:rgba(255,255,255,.12); color:inherit;
+    width:38px; height:38px; border-radius:11px; font-size:17px; cursor:pointer;}
+
+  .wrap{padding:16px;}
+  .bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .bar input, .bar select{border:1px solid var(--border); background:var(--surface);
+    color:var(--ink); border-radius:10px; padding:10px 12px; font-family:inherit; font-size:14px;}
+  .bar input[type="search"]{flex:1; min-width:150px;}
+
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px;}
+  .kpi{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px;}
+  .kpi .v{font-family:'Cairo',sans-serif; font-weight:900; font-size:21px;}
+  .kpi .l{font-size:12px; color:var(--muted); margin-top:2px;}
+
+  .day{border:1px solid var(--border); border-radius:11px; padding:11px 13px; margin-bottom:8px;}
+  .day-h{display:flex; justify-content:space-between; align-items:center; gap:10px;
+    font-weight:800; font-size:13.5px; margin-bottom:7px;}
+  .day-h .hrs{font-family:var(--mono); color:var(--done);}
+  .punch{display:flex; justify-content:space-between; font-size:13px; padding:4px 0; color:var(--ink-2);}
+  .punch .meta{font-size:11px; color:var(--faint);}
+  .flag{display:inline-block; background:var(--waiting-bg); color:var(--waiting);
+    border-radius:7px; padding:2px 8px; font-size:11px; font-weight:800; margin-inline-start:6px;}
+  .empty{text-align:center; color:var(--muted); padding:40px 16px; font-size:14px; line-height:2;}
+  .btn{border:none; border-radius:11px; padding:11px 15px; font-family:inherit;
+    font-size:14px; font-weight:800; cursor:pointer; background:var(--blue); color:#fff;}
+
+  /* ===== كارت الموظف ===== */
+  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    overflow:hidden; transition:transform .12s, box-shadow .12s;}
+  .card:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(16,16,20,.10);}
+  .card-top{display:flex; align-items:center; gap:11px; padding:14px 15px 12px;
+    border-bottom:1px solid var(--border);}
+  .avatar{flex:none; width:42px; height:42px; border-radius:13px; display:flex;
+    align-items:center; justify-content:center; font-family:'Cairo',sans-serif;
+    font-weight:900; font-size:16px; color:#fff;}
+  .card-id{flex:1; min-width:0;}
+  .card-id b{display:block; font-size:15px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap;}
+  .card-id span{font-size:11.5px; color:var(--muted);}
+  .card-stats{display:grid; grid-template-columns:repeat(3,1fr); text-align:center;
+    padding:12px 8px; gap:4px;}
+  .card-stats div b{display:block; font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;}
+  .card-stats div span{font-size:11px; color:var(--muted);}
+  .card-bar{height:6px; background:var(--surface-2); display:flex;}
+  .card-bar i{display:block; height:100%;}
+  .card-foot{display:flex; gap:8px; padding:10px 12px 13px;}
+  .card-foot button{flex:1; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink-2); border-radius:10px; padding:9px; font-family:inherit;
+    font-size:12.5px; font-weight:800; cursor:pointer;}
+  .card-foot button:hover{background:var(--surface);}
+
+  /* ===== قايمة الثلاث نقط ===== */
+  .menu-wrap{position:relative;}
+  .menu-drop{position:absolute; inset-inline-end:0; top:46px; z-index:40; min-width:220px;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    box-shadow:0 14px 36px rgba(0,0,0,.22); padding:6px; display:none;}
+  .menu-drop.open{display:block;}
+  .menu-drop button{display:block; width:100%; text-align:right; border:none;
+    background:none; color:var(--ink); font-family:inherit; font-size:14px;
+    padding:12px 13px; border-radius:10px; cursor:pointer;}
+  .menu-drop button:hover{background:var(--surface-2);}
+  .menu-drop hr{border:none; border-top:1px solid var(--border); margin:5px 8px;}
+
+  /* ===== الشاشات المنبثقة ===== */
+  .sheet{position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; display:none;}
+  .sheet.open{display:block;}
+  .sheet-head{position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:10px;
+    background:var(--surface); border-bottom:1px solid var(--border);
+    padding:calc(14px + env(safe-area-inset-top)) 16px 14px;}
+  .sheet-head h2{flex:1; min-width:0; margin:0; font-family:'Cairo',sans-serif; font-size:17px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sheet-body{padding:16px 16px 60px;}
+
+  .fld{display:block; margin-bottom:14px;}
+  .fld > span{display:block; font-size:13px; font-weight:800; margin-bottom:6px;}
+  .fld > small{display:block; font-size:11.5px; color:var(--muted); line-height:1.8; margin-bottom:6px;}
+  .fld input, .fld select, .fld textarea{width:100%; border:1px solid var(--border);
+    background:var(--surface); color:var(--ink); border-radius:11px; padding:12px;
+    font-family:inherit; font-size:15px;}
+  .days{display:grid; grid-template-columns:repeat(4,1fr); gap:7px;}
+  .days button{border:1px solid var(--border); background:var(--surface); color:var(--ink-2);
+    border-radius:10px; padding:10px 4px; font-family:inherit; font-size:12.5px;
+    font-weight:800; cursor:pointer;}
+  .days button.on{background:var(--red); border-color:var(--red); color:#fff;}
+  .save{width:100%; border:none; border-radius:13px; padding:15px; background:var(--done);
+    color:#fff; font-family:inherit; font-size:15px; font-weight:900; cursor:pointer;}
+  .emp-top{display:flex; align-items:center; gap:12px;}
+  .emp-acts{display:flex; gap:8px;}
+  .emp-acts button{flex:1; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink-2); border-radius:11px; padding:11px 6px; font-family:inherit;
+    font-size:12.5px; font-weight:800; cursor:pointer;}
+  .emp-acts button:hover{background:var(--surface);}
+  .hintbox{background:var(--waiting-bg); color:var(--waiting); border-radius:11px;
+    padding:12px 14px; font-size:12.5px; line-height:1.9; margin-bottom:16px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="flex:1; min-width:0;">
+    <h1>👥 شؤون العاملين</h1>
+    <div class="who" id="whoLbl">—</div>
+  </div>
+  <button class="icon-btn att-menu-btn" style="display:none;" title="المواعيد" onclick="openAttendance()">⏰</button>
+  <div class="menu-wrap">
+    <button class="icon-btn" title="القايمة" onclick="toggleMenu(event)">⋮</button>
+    <div class="menu-drop" id="menuDrop">
+      <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
+      <button onclick="closeMenu(); openGeneral()">⚙️ الإعدادات العامة</button>
+      <hr>
+      <button onclick="closeMenu(); loadMonth()">↻ تحديث</button>
+      <button onclick="closeMenu(); doLogout()" style="color:var(--red);">⏻ تسجيل الخروج</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== إعدادات المواعيد (لكل موظف) ===== -->
+<div class="sheet" id="hrSet">
+  <div class="sheet-head">
+    <h2>⏰ إعدادات المواعيد</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('hrSet')">×</button>
+  </div>
+  <div class="sheet-body" id="hrSetBody"></div>
+</div>
+
+<!-- ===== سجل الموظف — شاشة كاملة ===== -->
+<div class="sheet" id="empSheet">
+  <div class="sheet-head">
+    <h2 id="empSheetTitle">📋 السجل</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeEmpLog()">×</button>
+  </div>
+  <div class="sheet-body" id="empSheetBody"></div>
+</div>
+
+<!-- ===== الإعدادات العامة ===== -->
+<div class="sheet" id="genSet">
+  <div class="sheet-head">
+    <h2>⚙️ الإعدادات العامة</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('genSet')">×</button>
+  </div>
+  <div class="sheet-body">
+    <label class="fld"><span>🌗 الإضاءة</span>
+      <select id="thSel" onchange="setTheme(this.value)">
+        <option value="auto">تلقائي (حسب الوقت)</option>
+        <option value="light">فاتح</option>
+        <option value="dark">غامق</option>
+      </select>
+    </label>
+    <label class="fld"><span>🌐 اللغة</span>
+      <select id="lgSel" onchange="setLang(this.value)">
+        <option value="ar">العربية</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<div class="wrap" id="root">
+  <div class="empty">جاري التحميل…</div>
+</div>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
+
+<script>
+// ============================================================
+// I Fix Team — شؤون العاملين (hr.html)
+// ------------------------------------------------------------
+// بتوري سجل مواعيد كل الموظفين بالشهر: حضور · انصراف · بريك ·
+// وساعات الشغل الصافية.
+//
+// 🔴 الحماية الحقيقية في قاعدة البيانات مش هنا.
+//    سياسة attendance_read بتقول: كل واحد سجله هو، إلا لو دوره
+//    hr أو super_admin. فحتى لو حد فتح الصفحة دي بالعافية،
+//    مش هيشوف غير سجله هو. الفحص اللي تحت للتوجيه بس.
+//
+// ⚠️ حساب الأوفر تايم والتأخير والخصومات **لسه ماتعملش**.
+//    الصفحة دي بتوري الساعات الخام. القواعد جاية في خطوة تانية.
+// ============================================================
+
+let ME = '', MY_ROLE = '', ROLES_MAP = {};
+let MONTH = (() => { const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); })();
+let ROWS = [], OPEN_EMP = null, SEARCH = '';
+
+const KIND = {
+  in:     { t:'حضور',   icon:'🟢' },
+  out:    { t:'انصراف', icon:'🔴' },
+  break:  { t:'بريك',   icon:'☕' },
+  resume: { t:'استئناف', icon:'▶️' }
+};
+
+// ===== الدخول =====
+(async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.href = 'index.html'; return; }
+  ME = (session.user.email || '').toLowerCase();
+
+  // خريطة الأدوار — عشان نعرض الأسماء والصلاحيات
+  try{
+    const { data } = await sb.from('app_data').select('value').eq('key','user-roles').maybeSingle();
+    if(data && data.value) ROLES_MAP = JSON.parse(data.value) || {};
+  }catch(e){ console.error('user-roles failed:', e); }
+
+  const mine = ROLES_MAP[ME];
+  MY_ROLE = typeof mine === 'string' ? mine : (mine && mine.role) || '';
+  document.getElementById('whoLbl').textContent =
+    ME + (MY_ROLE ? ' — ' + roleLabel(MY_ROLE) : '');
+
+  attSyncMenu();          // زرار المواعيد على الموبايل بس
+  await loadMonth();
+})();
+
+function roleLabel(r){
+  return { super_admin:'أدمن', accountant:'محاسب', dispatcher:'مسؤول حركة',
+           technician:'فني', hr:'شؤون العاملين' }[r] || r;
+}
+function nameOf(email){
+  const v = ROLES_MAP[email];
+  const n = (v && typeof v === 'object' && v.techName) ? v.techName : '';
+  return n || (email || '').split('@')[0];
+}
+async function doLogout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.href = 'index.html';
+}
+
+// ===== التحميل =====
+async function loadMonth(){
+  const root = document.getElementById('root');
+  root.innerHTML = '<div class="empty">جاري التحميل…</div>';
+  const [y,m] = MONTH.split('-').map(Number);
+  const from = `${y}-${String(m).padStart(2,'0')}-01`;
+  // اليوم صفر من الشهر اللي بعده = آخر يوم في الشهر ده
+  const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
+  try{
+    const { data, error } = await sb.from('attendance')
+      .select('user_email,user_name,kind,at,work_date,distance_m,verified')
+      .gte('work_date', from).lte('work_date', to)
+      .order('at', { ascending:true });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    ROWS = data || [];
+    await loadEmpSettings();   // القواعد لازم تكون موجودة قبل الرسم
+    render();
+  }catch(e){
+    console.error('loadMonth failed:', e);
+    root.innerHTML = '<div class="empty">❌ مقدرناش نحمّل السجل<br><small>' +
+      esc(e.message || e) + '</small></div>';
+  }
+}
+
+// ============================================================
+// حساب ساعات اليوم
+// ------------------------------------------------------------
+// بنمشي على تسجيلات اليوم بالترتيب:
+//   حضور/استئناف → بنفتح عدّاد
+//   بريك/انصراف  → بنقفله ونضيف الفرق
+// الوقت اللي جوه البريك مش بيتحسب — العدّاد بيبقى مقفول.
+//
+// ⚠️ لو الموظف نسي ينصرف، آخر فترة بتفضل مفتوحة ومش بتتحسب،
+//    وبنعلّم اليوم بعلامة "ناقص انصراف" عشان HR تشوفه وتصلّحه.
+//    الأأمن إننا نقول "مش عارفين" بدل ما نخمّن ساعة وننسبها له.
+// ============================================================
+function dayMinutes(punches){
+  let total = 0, openAt = null, missingOut = false;
+  for(const p of punches){
+    const t = new Date(p.at).getTime();
+    if(p.kind === 'in' || p.kind === 'resume'){
+      if(openAt === null) openAt = t;
+    }else if(p.kind === 'break' || p.kind === 'out'){
+      if(openAt !== null){ total += (t - openAt); openAt = null; }
+    }
+  }
+  // ⚠️ العلامة على **آخر تسجيل** مش على العدّاد.
+  //    الاختبار كشف إن اللي بيروح بريك وميرجعش خالص كان بيعدّي
+  //    نضيف: البريك قفل العدّاد فالعدّاد مش مفتوح — بس الراجل
+  //    برضه ما سجّلش انصراف. أي يوم آخره مش 'out' ناقص.
+  const last = punches.length ? punches[punches.length - 1].kind : null;
+  missingOut = (last !== 'out');
+  return { minutes: Math.round(total / 60000), missingOut };
+}
+function fmtHm(mins){
+  if(!mins) return '0:00';
+  return Math.floor(mins/60) + ':' + String(mins % 60).padStart(2,'0');
+}
+function fmtTime(iso){
+  return new Date(iso).toLocaleTimeString('ar-EG',
+    { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' });
+}
+
+// ===== العرض =====
+function render(){
+  const root = document.getElementById('root');
+
+  // تجميع: موظف → يوم → تسجيلات
+  const emps = {};
+  for(const r of ROWS){
+    const e = (r.user_email || '').toLowerCase();
+    (emps[e] = emps[e] || {})[r.work_date] = (emps[e][r.work_date] || []);
+    emps[e][r.work_date].push(r);
+  }
+
+  let keys = Object.keys(emps).sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+  if(SEARCH){
+    const q = SEARCH.toLowerCase();
+    keys = keys.filter(k => k.includes(q) || nameOf(k).toLowerCase().includes(q));
+  }
+
+  // مؤشرات فوق
+  let totalMin = 0, totalDays = 0, flagged = 0;
+  for(const e of Object.keys(emps)){
+    for(const d of Object.keys(emps[e])){
+      const s = dayMinutes(emps[e][d]);
+      totalMin += s.minutes; totalDays++;
+      if(s.missingOut) flagged++;
+    }
+  }
+
+  const bar = `
+    <div class="bar">
+      <input type="month" value="${MONTH}" onchange="MONTH=this.value; loadMonth()">
+      <input type="search" placeholder="ابحث باسم الموظف…" value="${esc(SEARCH)}"
+             oninput="SEARCH=this.value; render()">
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="v">${Object.keys(emps).length}</div><div class="l">موظف</div></div>
+      <div class="kpi"><div class="v">${totalDays}</div><div class="l">يوم حضور</div></div>
+      <div class="kpi"><div class="v">${fmtHm(totalMin)}</div><div class="l">إجمالي الساعات</div></div>
+      <div class="kpi"><div class="v" style="color:var(--waiting)">${flagged}</div><div class="l">يوم ناقص انصراف</div></div>
+    </div>`;
+
+  if(!keys.length){
+    root.innerHTML = bar + '<div class="empty">مفيش تسجيلات في الشهر ده' +
+      (ROWS.length ? '' : '<br><small>لو إنت مش HR ولا أدمن، مش هتشوف غير سجلك إنت</small>') +
+      '</div>';
+    return;
+  }
+
+  root.innerHTML = bar + '<div class="cards">' +
+    keys.map(e => cardHtml(e, emps[e])).join('') + '</div>';
+  // ⚠️ السجل بقى شاشة كاملة (empSheet) مش قسم بيتفتح تحت الكارت.
+  //    لو كان مفتوح وحصل تحديث، بنعيد رسمه بالبيانات الجديدة.
+  if(OPEN_EMP && emps[OPEN_EMP]) renderEmpSheet(OPEN_EMP, emps[OPEN_EMP]);
+}
+
+// تجميع أيام موظف واحد — بيتستخدم في الكروت وفي الشاشة
+function daysOf(email){
+  const days = {};
+  ROWS.filter(r => (r.user_email||'').toLowerCase() === email)
+      .forEach(r => { (days[r.work_date] = days[r.work_date] || []).push(r); });
+  return days;
+}
+
+// لون ثابت لكل موظف من اسمه — عشان يعرفه بالشكل بسرعة،
+// ونفس اللون يفضل معاه كل شهر
+function avatarColor(e){
+  let h = 0;
+  for(let i=0;i<e.length;i++) h = (h*31 + e.charCodeAt(i)) % 360;
+  return `hsl(${h} 55% 42%)`;
+}
+
+function cardHtml(e, days){
+  let mins = 0, flags = 0, penalty = 0, late = 0, over = 0, short = 0;
+  const dkeys = Object.keys(days);
+  dkeys.forEach(d => {
+    const st = dayMinutes(days[d]);
+    mins += st.minutes;
+    if(st.missingOut) flags++;
+    const r = applyRules(e, days[d]);
+    if(r){ penalty += r.penalty; if(r.state === 'late') late++; }
+    const o = dayOvertime(e, days[d]);
+    // ⚠️ اليوم اللي ناقصه انصراف ساعاته مش موثوقة، فمش بنحسبه
+    //    لا أوفر تايم ولا نقص — وإلا هنطلع أرقام متخيّلة.
+    if(o.has && !st.missingOut){ over += o.over; short += o.short; }
+  });
+  const c = EMP_SET[e] || {};
+  // الشريط الملوّن: أيام سليمة / متأخرة / ناقصة — قراءة بنظرة
+  const good = Math.max(0, dkeys.length - late - flags);
+  const pct  = n => dkeys.length ? (n / dkeys.length * 100) : 0;
+  return `
+  <div class="card">
+    <div class="card-top">
+      <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
+      <div class="card-id">
+        <b>${esc(nameOf(e))}</b>
+        <span>${c.shift_start ? '🕙 ' + String(c.shift_start).slice(0,5) : '⚠️ مفيش ميعاد محدد'}</span>
+      </div>
+    </div>
+    <div class="card-bar">
+      <i style="width:${pct(good)}%;background:var(--done)"></i>
+      <i style="width:${pct(late)}%;background:var(--red)"></i>
+      <i style="width:${pct(flags)}%;background:var(--waiting)"></i>
+    </div>
+    <div class="card-stats">
+      <div><b>${dkeys.length}</b><span>يوم</span></div>
+      <div><b>${fmtHm(mins)}</b><span>ساعات</span></div>
+      <div><b style="color:${over ? 'var(--done)' : 'inherit'}">${fmtHm(over)}</b><span>أوفر تايم</span></div>
+    </div>
+    <div class="card-stats" style="padding-top:0;">
+      <div><b style="color:${short ? 'var(--waiting)' : 'inherit'}">${fmtHm(short)}</b><span>نقص</span></div>
+      <div><b style="color:${late ? 'var(--red)' : 'inherit'}">${late}</b><span>تأخير</span></div>
+      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم ج.م</span></div>
+    </div>
+    <div class="card-foot">
+      <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
+      <button onclick="openHrSettings('${esc(e)}')">⏰</button>
+      <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
+      <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// سجل الموظف — شاشة كاملة
+// ------------------------------------------------------------
+// كان قسم بيتفتح تحت الكارت، فالمستخدم كان لازم يعدّي على كل
+// الكروت عشان يوصله، والملخص كان بيفضل فوق برّه الشاشة.
+// دلوقتي شاشة مستقلة: الملخص فوق ثابت، وتحته كل الأيام.
+// ============================================================
+function openEmpLog(email){
+  OPEN_EMP = email;
+  renderEmpSheet(email, daysOf(email));
+  openSheet('empSheet');
+}
+function closeEmpLog(){ OPEN_EMP = null; closeSheet('empSheet'); }
+
+function renderEmpSheet(email, days){
+  const box = document.getElementById('empSheetBody');
+  const ttl = document.getElementById('empSheetTitle');
+  if(!box) return;
+  if(ttl) ttl.textContent = '📋 سجل ' + nameOf(email);
+
+  const dkeys = Object.keys(days).sort().reverse();
+  let mins=0, over=0, short=0, pen=0, late=0, flags=0;
+  dkeys.forEach(d => {
+    const st = dayMinutes(days[d]);
+    mins += st.minutes;
+    if(st.missingOut) flags++;
+    const r = applyRules(email, days[d]);
+    if(r){ pen += r.penalty; if(r.state === 'late') late++; }
+    const o = dayOvertime(email, days[d]);
+    if(o.has && !st.missingOut){ over += o.over; short += o.short; }
+  });
+
+  const c = EMP_SET[email] || {};
+  box.innerHTML = `
+    <div class="emp-top">
+      <div class="avatar" style="background:${avatarColor(email)}">${esc(nameOf(email).charAt(0))}</div>
+      <div style="flex:1;min-width:0;">
+        <b style="display:block;font-size:17px;">${esc(nameOf(email))}</b>
+        <span style="font-size:12px;color:var(--muted);">
+          ${esc(monthLabel())}${c.shift_start ? ' · 🕙 ' + String(c.shift_start).slice(0,5) : ''}</span>
+      </div>
+    </div>
+
+    <div class="kpis" style="margin:14px 0 16px;">
+      <div class="kpi"><div class="v">${dkeys.length}</div><div class="l">يوم</div></div>
+      <div class="kpi"><div class="v">${fmtHm(mins)}</div><div class="l">ساعات</div></div>
+      <div class="kpi"><div class="v" style="color:${over?'var(--done)':'inherit'}">${fmtHm(over)}</div><div class="l">أوفر تايم</div></div>
+      <div class="kpi"><div class="v" style="color:${short?'var(--waiting)':'inherit'}">${fmtHm(short)}</div><div class="l">نقص</div></div>
+      <div class="kpi"><div class="v" style="color:${late?'var(--red)':'inherit'}">${late}</div><div class="l">تأخير</div></div>
+      <div class="kpi"><div class="v" style="color:${pen?'var(--red)':'inherit'}">${pen||0}</div><div class="l">خصم ج.م</div></div>
+    </div>
+
+    <div class="emp-acts">
+      <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
+      <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
+      <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
+    </div>
+
+    ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
+      ساعاتهم مش محسوبة في الإجمالي.</div>` : ''}
+    ${(() => {
+      // ⚠️ التسجيلات من غير بصمة: يا إما جهاز الموظف مالوش بصمة
+      //    أصلاً، يا إما البصمة بايظة. المهم إن HR تشوف العدد —
+      //    لو موظف كل تسجيلاته من غير بصمة، ده يستاهل سؤال.
+      const nb = dkeys.reduce((n,d) => n + days[d].filter(r => !r.verified).length, 0);
+      const all = dkeys.reduce((n,d) => n + days[d].length, 0);
+      if(!nb) return '';
+      return `<div class="hintbox" style="margin-top:10px;">🔓 ${nb} من ${all} تسجيل
+        اتعمل <b>من غير بصمة</b> — جهازه غالباً مالوش بصمة أو بايظة.
+        (اللوكيشن اتفحص في كل الحالات.)</div>`;
+    })()}
+
+    <div style="margin-top:14px;">
+      ${dkeys.length
+        ? dkeys.map(d => dayHtml(d, days[d], email)).join('')
+        : '<div class="empty">مفيش تسجيلات في الشهر ده</div>'}
+    </div>`;
+}
+
+function dayHtml(d, punches, email){
+  const s = dayMinutes(punches);
+  const r = email ? applyRules(email, punches) : null;
+  // سطر القواعد: بيوري الحضور الفعلي والمحتسب والمفروض ينصرف
+  const rules = !r ? '' : `
+    <div class="punch" style="border-bottom:1px solid var(--border); padding-bottom:7px; margin-bottom:5px;">
+      <span style="color:${STATE_LBL[r.state].c}; font-weight:800;">${STATE_LBL[r.state].t}
+        ${r.penalty ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">خصم ${r.penalty} ج.م</span>` : ''}</span>
+      <span class="meta">حضر ${fmtMinTime(r.arrived)} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
+    </div>`;
+  return `
+  <div class="day">
+    <div class="day-h">
+      <span>${new Date(d).toLocaleDateString('ar-EG',
+        { weekday:'long', day:'numeric', month:'long' })}
+        ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}</span>
+      <span class="hrs">${fmtHm(s.minutes)}${(() => {
+        const o = email ? dayOvertime(email, punches) : null;
+        if(!o || !o.has || s.missingOut) return '';
+        if(o.over)  return ` <span style="color:var(--done)">+${fmtHm(o.over)}</span>`;
+        if(o.short) return ` <span style="color:var(--waiting)">−${fmtHm(o.short)}</span>`;
+        return '';
+      })()}</span>
+    </div>
+    ${rules}
+    ${punches.map(p => `
+      <div class="punch">
+        <span>${KIND[p.kind].icon} ${KIND[p.kind].t}
+          ${p.verified ? '' : '<span class="meta">(من غير بصمة)</span>'}</span>
+        <span>${fmtTime(p.at)}
+          <span class="meta">${p.distance_m != null ? Math.round(p.distance_m) + 'م' : ''}</span>
+        </span>
+      </div>`).join('')}
+  </div>`;
+}
+
+
+// ============================================================
+// القايمة والشاشات
+// ============================================================
+function toggleMenu(ev){
+  ev.stopPropagation();
+  document.getElementById('menuDrop').classList.toggle('open');
+}
+function closeMenu(){ document.getElementById('menuDrop').classList.remove('open'); }
+document.addEventListener('click', closeMenu);
+
+function openSheet(id){ document.getElementById(id).classList.add('open'); }
+function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
+
+// ===== الإعدادات العامة =====
+function openGeneral(){
+  try{
+    document.getElementById('thSel').value = localStorage.getItem('ifix-theme') || 'auto';
+    document.getElementById('lgSel').value = localStorage.getItem('ifix-lang') || 'ar';
+  }catch(e){}
+  openSheet('genSet');
+}
+function setTheme(v){
+  try{ localStorage.setItem('ifix-theme', v); }catch(e){}
+  const h = new Date().getHours();
+  const dark = v === 'dark' || (v === 'auto' && (h >= 19 || h < 7));
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+}
+function setLang(v){
+  try{ localStorage.setItem('ifix-lang', v); }catch(e){}
+  location.reload();
+}
+
+// ============================================================
+// إعدادات مواعيد الموظف
+// ============================================================
+let EMP_SET = {};        // إيميل → إعداداته
+let SET_EMAIL = '';      // الموظف المفتوح دلوقتي في الشاشة
+
+const DAY_NAMES = ['الأحد','الاتنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+async function loadEmpSettings(){
+  try{
+    const { data, error } = await sb.from('hr_employee_settings').select('*');
+    if(error) throw error;
+    EMP_SET = {};
+    (data || []).forEach(r => { EMP_SET[(r.user_email||'').toLowerCase()] = r; });
+  }catch(e){ console.error('loadEmpSettings failed:', e); EMP_SET = {}; }
+}
+
+// كل الموظفين — من خريطة الأدوار، مش من السجل.
+// ⚠️ لو اعتمدنا على السجل، الموظف الجديد اللي لسه ما سجّلش حضور
+//    مش هيظهر في القايمة — ومش هتقدر تحطله ميعاد أصلاً.
+function allEmployees(){
+  const out = [];
+  for(const em of Object.keys(ROLES_MAP || {})){
+    const v = ROLES_MAP[em];
+    const r = typeof v === 'string' ? v : (v && v.role) || '';
+    if(r === 'hr') continue;          // HR مش بتسجّل حضور موظفين
+    out.push(em.toLowerCase());
+  }
+  // وأي حد في السجل ومش في الخريطة (حساب اتشال مثلاً)
+  ROWS.forEach(r => {
+    const e = (r.user_email||'').toLowerCase();
+    if(e && out.indexOf(e) < 0) out.push(e);
+  });
+  return out.sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+}
+
+async function openHrSettings(email){
+  await loadEmpSettings();
+  const list = allEmployees();
+  if(!list.length){
+    alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول');
+    return;
+  }
+  SET_EMAIL = (email || SET_EMAIL || list[0]).toLowerCase();
+  if(list.indexOf(SET_EMAIL) < 0) SET_EMAIL = list[0];
+  renderHrSettings();
+  openSheet('hrSet');
+}
+
+function renderHrSettings(){
+  const list = allEmployees();
+  const c = EMP_SET[SET_EMAIL] || {};
+  const off = Array.isArray(c.off_days) ? c.off_days : [];
+  document.getElementById('hrSetBody').innerHTML = `
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="SET_EMAIL=this.value; renderHrSettings()">
+        ${list.map(e => `<option value="${esc(e)}"${e===SET_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <div class="hintbox">
+      الحضور جوه فترة السماح بيتحسب كأنه في المعاد الأساسي — مفيش خصم ولا نقص ساعات.<br>
+      اللي بييجي بعد السماح وقبل الاحتياطي: مفيش خصم فلوس، بس بيمشي متأخر بنفس القدر.<br>
+      اللي بييجي بعد الاحتياطي: بيتخصم منه، والساعات من وقت حضوره الفعلي.
+    </div>
+
+    <label class="fld"><span>🕙 المعاد الأساسي</span>
+      <input type="time" id="fStart" value="${esc(c.shift_start ? String(c.shift_start).slice(0,5) : '')}">
+    </label>
+
+    <label class="fld"><span>⏳ فترة السماح (بالدقايق)</span>
+      <small>مثال: ٣٠ — يعني معاده ١٠ وجه ١٠:٣٠، يتحسب كأنه جه ١٠:٠٠ بالظبط.</small>
+      <input type="number" id="fGrace" min="0" max="240" value="${Number(c.grace_minutes||0)}">
+    </label>
+
+    <label class="fld"><span>⏱️ عدد ساعات العمل</span>
+      <small>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
+      <input type="number" id="fHours" min="1" max="24" step="0.25" value="${Number(c.work_hours||8)}">
+    </label>
+
+    <label class="fld"><span>🕛 المعاد الاحتياطي</span>
+      <small>لو حصل ظرف. اللي بييجي قبله مش بيتخصم منه فلوس — بس بيكمّل ساعاته.</small>
+      <input type="time" id="fBackup" value="${esc(c.backup_start ? String(c.backup_start).slice(0,5) : '')}">
+    </label>
+
+    <label class="fld"><span>💸 الخصم بعد المعاد الاحتياطي (بالجنيه)</span>
+      <input type="number" id="fPenalty" min="0" step="5" value="${Number(c.late_penalty != null ? c.late_penalty : 50)}">
+    </label>
+
+    <div class="fld"><span>📅 يوم الإجازة</span>
+      <small>تقدر تختار أكتر من يوم. دوس على اليوم عشان تشيله أو تحطه.</small>
+      <div class="days">
+        ${DAY_NAMES.map((n,i) => `<button type="button" class="${off.indexOf(i)>=0?'on':''}"
+           onclick="toggleOff(${i})">${n}</button>`).join('')}
+      </div>
+    </div>
+
+    <label class="fld"><span>☕ البريك المسموح (بالدقايق في اليوم)</span>
+      <input type="number" id="fBreak" min="0" max="480" value="${Number(c.break_minutes||0)}">
+    </label>
+
+    <label class="fld"><span>📝 ملاحظات</span>
+      <textarea id="fNote" rows="2">${esc(c.note||'')}</textarea>
+    </label>
+
+    <button class="save" onclick="saveEmpSettings()">💾 حفظ إعدادات ${esc(nameOf(SET_EMAIL))}</button>`;
+}
+
+function toggleOff(i){
+  const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
+  const off = Array.isArray(c.off_days) ? c.off_days.slice() : [];
+  const at = off.indexOf(i);
+  if(at >= 0) off.splice(at,1); else off.push(i);
+  // ⚠️ بنحفظ اللي متكتب في الخانات قبل إعادة الرسم — من غير كده
+  //    أي حاجة كتبتها وما حفظتهاش بتضيع أول ما تدوس على يوم.
+  stashForm(c);
+  c.off_days = off.sort();
+  renderHrSettings();
+}
+
+function stashForm(c){
+  const g = id => (document.getElementById(id) || {}).value;
+  if(g('fStart')   !== undefined) c.shift_start   = g('fStart')  || null;
+  if(g('fGrace')   !== undefined) c.grace_minutes = parseInt(g('fGrace'),10) || 0;
+  if(g('fHours')   !== undefined) c.work_hours    = parseFloat(g('fHours')) || 8;
+  if(g('fBackup')  !== undefined) c.backup_start  = g('fBackup') || null;
+  if(g('fPenalty') !== undefined) c.late_penalty  = parseFloat(g('fPenalty')) || 0;
+  if(g('fBreak')   !== undefined) c.break_minutes = parseInt(g('fBreak'),10) || 0;
+  if(g('fNote')    !== undefined) c.note          = g('fNote') || null;
+}
+
+async function saveEmpSettings(){
+  const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
+  stashForm(c);
+  if(!c.shift_start){ alert('اكتب المعاد الأساسي الأول'); return; }
+  // الاحتياطي لازم يكون بعد الأساسي وإلا الحساب كله هيبقى غلط
+  if(c.backup_start && c.backup_start <= c.shift_start){
+    alert('المعاد الاحتياطي لازم يكون **بعد** المعاد الأساسي');
+    return;
+  }
+  const payload = {
+    user_email: SET_EMAIL,
+    shift_start: c.shift_start,
+    grace_minutes: c.grace_minutes || 0,
+    work_hours: c.work_hours || 8,
+    backup_start: c.backup_start || null,
+    late_penalty: c.late_penalty != null ? c.late_penalty : 50,
+    off_days: Array.isArray(c.off_days) ? c.off_days : [],
+    break_minutes: c.break_minutes || 0,
+    note: c.note || null,
+    updated_at: new Date().toISOString(),
+    updated_by: ME
+  };
+  try{
+    const { error } = await sb.from('hr_employee_settings').upsert(payload);
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    EMP_SET[SET_EMAIL] = payload;
+    alert('اتحفظت ✅');
+    render();
+  }catch(e){
+    console.error('saveEmpSettings failed:', e);
+    const perm = e && (e.code === '42501' || /row-level security/i.test(e.message||''));
+    alert(perm ? 'الحفظ اترفض من الصلاحيات — لازم تكون HR أو أدمن'
+               : 'فشل الحفظ: ' + (e.message || e));
+  }
+}
+
+// ============================================================
+// تطبيق قواعد الميعاد على يوم واحد
+// ------------------------------------------------------------
+// بترجّع: وقت الحضور الفعلي · المحتسب · المفروض ينصرف · الخصم
+// ⚠️ لو الموظف مالوش إعدادات، بنرجّع null والعرض بيوري الساعات
+//    الخام بس — **ما بنخترعش ميعاد افتراضي**، لأن ميعاد متخيّل
+//    معناه خصم على حد ملوش ذنب.
+// ============================================================
+function hhmmOf(iso){
+  // الساعة والدقيقة بتوقيت مصر — مش بتوقيت الجهاز اللي بيتفرّج
+  const p = new Date(iso).toLocaleTimeString('en-GB',
+    { hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Africa/Cairo' });
+  const [h,m] = p.split(':').map(Number);
+  return h*60 + m;
+}
+function toMin(t){
+  if(!t) return null;
+  const [h,m] = String(t).slice(0,5).split(':').map(Number);
+  return h*60 + m;
+}
+function fmtMinTime(mins){
+  mins = ((mins % 1440) + 1440) % 1440;
+  return String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
+}
+
+function applyRules(email, punches){
+  const c = EMP_SET[(email||'').toLowerCase()];
+  if(!c || !c.shift_start) return null;
+  const firstIn = punches.find(p => p.kind === 'in');
+  if(!firstIn) return null;
+
+  const arrived = hhmmOf(firstIn.at);
+  const start   = toMin(c.shift_start);
+  const grace   = Number(c.grace_minutes || 0);
+  const backup  = toMin(c.backup_start);
+  const need    = Math.round(Number(c.work_hours || 8) * 60);
+
+  let counted, penalty = 0, state;
+  if(arrived <= start + grace){
+    // بدري أو جوه السماح → كأنه جه في المعاد بالظبط
+    counted = start;
+    state = arrived <= start ? 'ontime' : 'grace';
+  }else if(backup != null && arrived <= backup){
+    counted = arrived;
+    state = 'backup';
+  }else{
+    counted = arrived;
+    penalty = Number(c.late_penalty || 0);
+    state = 'late';
+  }
+  return { arrived, counted, leaveAt: counted + need, need, penalty, state };
+}
+
+// ============================================================
+// الأوفر تايم
+// ------------------------------------------------------------
+// بيبدأ بعد ما الموظف يخلّص عدد ساعاته ويفضل في الفرع.
+//
+// ⚠️ تفصيلة مهمة: الساعات بتتحسب من **الوقت المحتسب** مش من
+//    وقت الحضور الفعلي. يعني اللي جه ١٠:٢٠ وسماحه لـ ١٠:٣٠،
+//    الـ ٢٠ دقيقة دي بتتحسبله شغل — لأننا اتفقنا إنه "كأنه جه
+//    الساعة ١٠". من غير السطر ده كان هيخسر الوقت ده من ساعاته
+//    وممكن يطلع ناقص وهو ملوش ذنب.
+//
+//    والبريك مش داخل في الحساب أصلاً (dayMinutes بتقفل العدّاد
+//    عنده)، فالأوفر تايم شغل حقيقي مش قعدة.
+// ============================================================
+function dayOvertime(email, punches){
+  const r = applyRules(email, punches);
+  const raw = dayMinutes(punches);
+  if(!r) return { worked: raw.minutes, over: 0, short: 0, need: 0, has: false };
+
+  // الوقت اللي اتسامحنا فيه بيتضاف لشغله
+  const graceBonus = Math.max(0, r.arrived - r.counted);
+  const worked = raw.minutes + graceBonus;
+
+  return {
+    worked,
+    over:  Math.max(0, worked - r.need),
+    short: Math.max(0, r.need - worked),
+    need:  r.need,
+    has:   true
+  };
+}
+
+// ============================================================
+// التصدير — PDF و Excel لكل موظف
+// ============================================================
+
+// صفوف الكشف — مصدر واحد للاتنين، عشان الملفين ما يختلفوش
+function empRows(email){
+  const days = {};
+  ROWS.filter(r => (r.user_email||'').toLowerCase() === email)
+      .forEach(r => { (days[r.work_date] = days[r.work_date] || []).push(r); });
+
+  const out = [];
+  let tW=0, tO=0, tS=0, tP=0, flags=0;
+  Object.keys(days).sort().forEach(d => {
+    const p = days[d];
+    const st = dayMinutes(p);
+    const r  = applyRules(email, p);
+    const o  = dayOvertime(email, p);
+    const firstIn = p.find(x => x.kind === 'in');
+    const lastOut = [...p].reverse().find(x => x.kind === 'out');
+    if(st.missingOut) flags++;
+    const counted = !st.missingOut && o.has;
+    if(counted){ tW += o.worked; tO += o.over; tS += o.short; }
+    if(r) tP += r.penalty;
+    out.push({
+      date: d,
+      day:  new Date(d).toLocaleDateString('ar-EG', { weekday:'long' }),
+      in:   firstIn ? fmtTime(firstIn.at) : '—',
+      out:  lastOut ? fmtTime(lastOut.at) : '—',
+      counted: r ? fmtMinTime(r.counted) : '—',
+      due:  r ? fmtMinTime(r.leaveAt) : '—',
+      worked: fmtHm(st.minutes),
+      over:  counted && o.over  ? fmtHm(o.over)  : '',
+      short: counted && o.short ? fmtHm(o.short) : '',
+      pen:   r && r.penalty ? r.penalty : '',
+      state: r ? STATE_LBL[r.state].t : '—',
+      flag:  st.missingOut ? 'ناقص انصراف' : ''
+    });
+  });
+  return { rows: out, tW, tO, tS, tP, flags, days: Object.keys(days).length };
+}
+
+const HR_COLS = ['التاريخ','اليوم','حضور','انصراف','محتسب','المفروض ينصرف',
+                 'ساعات','أوفر تايم','نقص','خصم','الحالة','ملاحظة'];
+
+function monthLabel(){
+  const [y,m] = MONTH.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+}
+
+// ===== PDF =====
+// ⚠️ نفس طريقة كشف الحساب: طباعة من إطار جوه الصفحة، ومن غير
+//    أي تأخير — عشان الأيفون ما يقولش "blocked from automatically
+//    printing"، وعشان المستخدم ما يتحبسش في تاب مالوش رجوع.
+function exportEmpPdf(email){
+  const R = empRows(email);
+  if(!R.rows.length){ alert('مفيش تسجيلات للموظف ده في الشهر ده'); return; }
+  const td = r => `<tr>
+      <td>${esc(r.date)}</td><td>${esc(r.day)}</td><td>${esc(r.in)}</td><td>${esc(r.out)}</td>
+      <td>${esc(r.counted)}</td><td>${esc(r.due)}</td><td>${esc(r.worked)}</td>
+      <td class="g">${esc(r.over)}</td><td class="w">${esc(r.short)}</td>
+      <td class="r">${r.pen ? esc(r.pen) + ' ج' : ''}</td>
+      <td>${esc(r.state)}</td><td class="w">${esc(r.flag)}</td></tr>`;
+
+  hrPrint(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+  <title>كشف مواعيد — ${esc(nameOf(email))}</title>
+  <style>
+    /* الخط بيتحط صراحةً مع بدائل النظام — الخط الخارجي ممكن ما
+       يلحقش ينزّل والطباعة فورية، فبنضمن شكل مقروء في الحالتين */
+    body{font-family:-apple-system,'SF Arabic','Segoe UI',Tahoma,sans-serif;
+      color:#17222E; margin:0; padding:26px;}
+    h1{font-size:22px; margin:0 0 4px;} .sub{color:#6B7A8C; font-size:13px; margin-bottom:18px;}
+    .k{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;}
+    .k div{border:1px solid #E4E9EF; border-radius:10px; padding:9px 14px; font-size:13px;}
+    .k b{display:block; font-size:18px;}
+    table{width:100%; border-collapse:collapse; font-size:12px;}
+    th,td{border:1px solid #E4E9EF; padding:6px 5px; text-align:center;}
+    th{background:#F3F5F8; font-size:11.5px;}
+    tr:nth-child(even) td{background:#FAFBFC;}
+    .g{color:#15803D; font-weight:700;} .w{color:#B5651D;} .r{color:#DC2626; font-weight:700;}
+    @media print{ @page{ size:A4 landscape; margin:12mm; } }
+  </style></head><body>
+    <h1>كشف مواعيد — ${esc(nameOf(email))}</h1>
+    <div class="sub">${esc(monthLabel())} · <span dir="ltr">${esc(email)}</span></div>
+    <div class="k">
+      <div><b>${R.days}</b>يوم حضور</div>
+      <div><b>${fmtHm(R.tW)}</b>إجمالي الساعات</div>
+      <div><b style="color:#15803D">${fmtHm(R.tO)}</b>أوفر تايم</div>
+      <div><b style="color:#B5651D">${fmtHm(R.tS)}</b>نقص</div>
+      <div><b style="color:#DC2626">${R.tP} ج.م</b>خصومات</div>
+    </div>
+    <table><thead><tr>${HR_COLS.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${R.rows.map(td).join('')}</tbody></table>
+    <div class="sub" style="margin-top:16px;">
+      ${R.flags ? '⚠️ فيه ' + R.flags + ' يوم ناقص انصراف — ساعاتهم مش محسوبة في الإجمالي.' : ''}
+    </div>
+  </body></html>`, 'كشف مواعيد');
+}
+
+function hrPrint(html, title){
+  const old = document.getElementById('hrPrintFrame');
+  if(old) old.remove();
+  const f = document.createElement('iframe');
+  f.id = 'hrPrintFrame';
+  f.title = title || 'print';
+  f.setAttribute('aria-hidden','true');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;';
+  document.body.appendChild(f);
+  try{
+    const d = f.contentWindow.document;
+    d.open(); d.write(html); d.close();
+    f.contentWindow.focus();
+    f.contentWindow.print();     // فوراً — من غير أي انتظار
+  }catch(e){
+    console.error('hrPrint failed:', e);
+    f.remove();
+    alert('مقدرناش نفتح نافذة الطباعة. جرّب تاني.');
+  }
+}
+
+// ===== Excel =====
+async function exportEmpExcel(email){
+  const R = empRows(email);
+  if(!R.rows.length){ alert('مفيش تسجيلات للموظف ده في الشهر ده'); return; }
+  if(typeof ExcelJS === 'undefined'){
+    alert('مكتبة الإكسل مش محمّلة — اتأكد إن فيه نت وجرّب تاني');
+    return;
+  }
+  try{
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('المواعيد', { views:[{ rightToLeft:true, state:'frozen', ySplit:4 }] });
+
+    ws.mergeCells('A1:L1');
+    ws.getCell('A1').value = 'كشف مواعيد — ' + nameOf(email);
+    ws.getCell('A1').font = { bold:true, size:15 };
+    ws.getCell('A1').alignment = { horizontal:'center' };
+
+    ws.mergeCells('A2:L2');
+    ws.getCell('A2').value = monthLabel() + '  ·  ' + email;
+    ws.getCell('A2').alignment = { horizontal:'center' };
+
+    ws.mergeCells('A3:L3');
+    ws.getCell('A3').value = `أيام: ${R.days}   |   ساعات: ${fmtHm(R.tW)}   |   `
+      + `أوفر تايم: ${fmtHm(R.tO)}   |   نقص: ${fmtHm(R.tS)}   |   خصومات: ${R.tP} ج.م`;
+    ws.getCell('A3').alignment = { horizontal:'center' };
+
+    const head = ws.addRow(HR_COLS);
+    head.font = { bold:true };
+    head.eachCell(c => {
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF3F5F8' } };
+      c.alignment = { horizontal:'center' };
+    });
+
+    R.rows.forEach(r => {
+      const row = ws.addRow([r.date, r.day, r.in, r.out, r.counted, r.due,
+                             r.worked, r.over, r.short, r.pen, r.state, r.flag]);
+      row.alignment = { horizontal:'center' };
+      if(r.over)  row.getCell(8).font  = { color:{ argb:'FF15803D' }, bold:true };
+      if(r.short) row.getCell(9).font  = { color:{ argb:'FFB5651D' } };
+      if(r.pen)   row.getCell(10).font = { color:{ argb:'FFDC2626' }, bold:true };
+      if(r.flag)  row.getCell(12).font = { color:{ argb:'FFB5651D' } };
+    });
+
+    ws.columns.forEach((c,i) => { c.width = i === 0 ? 12 : (i === 5 ? 16 : 11); });
+
+    const buf = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf],
+      { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `مواعيد-${nameOf(email)}-${MONTH}.xlsx`;
+    a.click();
+    // ⚠️ بنفضّي الرابط بعد شوية — من غير كده الملف بيفضل في
+    //    الذاكرة لحد ما الصفحة تتقفل
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }catch(e){
+    console.error('exportEmpExcel failed:', e);
+    alert('فشل التصدير: ' + (e.message || e));
+  }
+}
+
+const STATE_LBL = {
+  ontime: { t:'في الميعاد', c:'var(--done)' },
+  grace:  { t:'جوه السماح', c:'var(--done)' },
+  backup: { t:'المعاد الاحتياطي', c:'var(--waiting)' },
+  late:   { t:'متأخر', c:'var(--red)' }
+};
+</script>
+</body>
+</html>

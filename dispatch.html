@@ -29,6 +29,11 @@
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
+<!-- مكتبة الباركود — نفس نسخة الداشبورد بالظبط -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="accounts.js"></script>
+<script src="label.js"></script>
+<script src="attendance.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -291,6 +296,15 @@
     background:var(--st-bg,#EEF1F3); color:var(--st,#64748B);}
   .tk-title{font-family:'Cairo',sans-serif; font-weight:800; font-size:16px; line-height:1.35;}
   .tk-sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  /* ⚠️ الألوان كانت ثابتة فاتحة (#F7F9FB) — فالخانة كانت بتطلع
+     بيضا في الوضع الغامق والكلام مش مقروء. بقت من متغيرات الثيم. */
+  .tk-issue{
+    display:flex; gap:7px; align-items:flex-start;
+    font-size:12.5px; color:var(--ink-2); line-height:1.55;
+    background:var(--paper); border:1px solid var(--line); border-radius:9px;
+    padding:8px 10px; margin-top:9px;
+  }
+  .tk-issue .w{flex:none; opacity:.7;}
   .tk-sub .dot{opacity:.5; margin:0 5px;}
   .tk-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--faint);}
   .tk-meta .chip{background:var(--paper); color:#52657A; border-radius:7px; padding:3px 8px; font-weight:600;}
@@ -359,6 +373,39 @@
   .info-k{color:var(--muted); font-size:13px; font-weight:700; flex:0 0 auto;}
   .info-v{color:var(--ink); font-size:14.5px; font-weight:600; text-align:left; line-height:1.6; word-break:break-word;}
   .info-chip{display:inline-block; padding:4px 13px; border-radius:999px; font-family:'Cairo',sans-serif; font-weight:800; font-size:12.5px; background:var(--st-bg); color:var(--st);}
+
+  /* ===== تفاصيل الجهاز — الشكل الجديد ===== */
+  .di-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;}
+  .di-title b{display:block; font-family:'Cairo',sans-serif; font-size:19px; line-height:1.35;}
+  .di-no{font-size:12px; color:var(--muted); font-family:var(--mono,monospace);}
+  .di-issue{display:flex; gap:8px; align-items:flex-start; background:var(--paper);
+    border:1px solid var(--line); border-radius:12px; padding:12px 13px;
+    font-size:14px; color:var(--ink-2); line-height:1.6; margin-bottom:12px;}
+  .di-card{border:1px solid var(--line); border-radius:14px; padding:4px 13px 12px; margin-bottom:11px;}
+  .di-card-h{font-size:12px; font-weight:800; color:var(--muted); padding:11px 0 3px;}
+  .di-row{display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 0; border-bottom:1px solid var(--line);}
+  .di-row:last-child{border-bottom:none;}
+  .di-k{color:var(--muted); font-size:12.5px; font-weight:700; flex:0 0 auto;}
+  .di-v{color:var(--ink); font-size:14px; font-weight:600; text-align:left;
+    line-height:1.6; word-break:break-word;}
+  .di-contact{display:flex; gap:9px; margin-top:11px;}
+  .di-btn{flex:1; text-align:center; text-decoration:none; border-radius:11px;
+    padding:11px; font-size:13.5px; font-weight:800;}
+  .di-call{background:var(--blue-bg,#EAF1F8); color:var(--blue,#2B6CB0);}
+  .di-wa{background:var(--done-bg); color:var(--done);}
+  .di-label-row{margin-top:12px;}
+  .di-lbl{width:100%; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    border-radius:12px; padding:12px; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
+  .di-lbl:hover{background:var(--card);}
+  .di-actions{display:flex; gap:9px; margin-top:14px;}
+  .di-act{flex:1; border:none; border-radius:12px; padding:14px 10px;
+    font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; color:#fff;}
+  .di-hand{background:var(--done);} .di-ret{background:var(--waiting);}
+  .di-rej{background:var(--red);}
+  .di-pend{flex:1; text-align:center; background:var(--waiting-bg); color:var(--waiting);
+    border-radius:12px; padding:13px; font-size:13px; font-weight:800; line-height:1.7;}
   .act-dev{display:flex; align-items:center; gap:13px; background:var(--paper); border:1px solid var(--line); border-radius:15px; padding:14px 15px; margin-bottom:18px;}
   .act-dev-ic{font-size:30px; line-height:1; flex:0 0 auto;}
   .act-dev-name{font-family:'Cairo',sans-serif; font-weight:900; font-size:16.5px; color:var(--ink); line-height:1.25;}
@@ -408,6 +455,108 @@
     font-size:13px;font-weight:700;line-height:1.7;}
   .pr-cm.none{color:var(--muted);font-weight:400;font-style:italic;background:none;padding:6px 0;}
   .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
+
+  /* ============================================================
+     شاشة الحسابات (قراءة فقط) — نفس شكل الداشبورد
+     ⚠️ لو غيّرت شكل الشاشة في الداشبورد، غيّرها هنا كمان.
+        الكود مشترك في accounts.js، لكن الاستايل متكرر —
+        الاختلاف في الشكل مزعج، لكن الاختلاف في المنطق بق.
+     ============================================================ */
+  :root{
+    --violet:#7C3AED; --info:#2563EB; --info-bg:#EFF6FF; --info-border:#BFDBFE;
+    --danger-strong:#B91C1C; --warn-tint:#FFFBEB; --ink-3:#334155;
+    --success-border:#BBF7D0;
+    /* ⚠️ التلاتة دول مش معرّفين في الصفحة دي أصلاً (الداشبورد بس).
+       من غيرهم خلفيات الحركات في الكشف بتطلع شفافة ومش مقروءة. */
+    --danger-bg:#FEF2F2; --danger-border:#FCA5A5; --success-bg:#F0FDF4;
+  }
+  html[data-theme="dark"]{
+    --violet:#A78BFA; --info:#60A5FA; --info-bg:rgba(96,165,250,.13);
+    --info-border:rgba(96,165,250,.40); --danger-strong:#FCA5A5;
+    --warn-tint:rgba(251,191,36,.10); --ink-3:#D6E1EB;
+    --success-border:rgba(74,222,128,.40);
+    --danger-bg:rgba(248,113,113,.15); --danger-border:rgba(248,113,113,.42);
+    --success-bg:rgba(74,222,128,.13);
+  }
+
+  /* ⚠️ التوب بار z-index:31 وشريط "جهاز جديد" z-index:30 — والاتنين
+     sticky يعني بيفضلوا بانيين. الأوفرلاي العام z-index:30 فكان
+     بيتحط تحتيهم وهما بيركبوا على الشاشة.
+     بنرفع الشاشة دي فوقهم، وتحت الحاجات اللي المفروض تغطي كل حاجة
+     (شاشة الإعدادات 70 · القفل 9500 · شاشة التحميل 9999). */
+  #accountsOverlay{z-index:69;}
+  .acc-page{min-height:100%; background:var(--bg); padding-bottom:40px;}
+  /* ⚠️ env(safe-area-inset-top) = ارتفاع "النتش" وشريط الساعة في
+     الأيفون. من غيره الرأس بيتحط تحتيه، فزرار الإقفال بيختفي
+     والعنوان بيتاكل نصه. التوب بار الأصلي في الصفحة دي بيعمل
+     نفس الحساب بالظبط — بنقلّده. */
+  .acc-head{display:flex; align-items:center; justify-content:space-between;
+    gap:10px; padding:calc(14px + env(safe-area-inset-top)) 20px 14px;
+    border-bottom:1px solid var(--border); background:var(--surface);
+    position:sticky; top:0; z-index:5;}
+  .acc-head h2{font-family:'Cairo',sans-serif; font-size:18px; margin:0;
+    /* العنوان بياخد المساحة الفاضية، والزرار بياخد مقاسه وخلاص */
+    flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-close{flex:none; border:none; background:var(--surface-2); color:var(--ink);
+    width:38px; height:38px; border-radius:10px; font-size:20px; cursor:pointer; line-height:1;}
+
+  .acc-shop{background:var(--surface); border:1px solid var(--border); border-radius:14px; margin-bottom:12px; overflow:hidden;}
+  .acc-shop-head{width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:none; border:none; padding:15px 18px; cursor:pointer; font-family:inherit;
+    text-align:right; color:var(--ink); flex-wrap:wrap;}
+  .acc-shop-head:hover{background:var(--surface-2);}
+  .acc-nums{display:flex; gap:16px; align-items:center; font-size:13.5px; color:var(--ink-2); flex-wrap:wrap;}
+  .acc-toolbar{display:flex; gap:8px; padding:0 18px 4px; justify-content:flex-end; flex-wrap:wrap;}
+  .acc-entries{padding:6px 18px 14px;}
+
+  .acc-viewbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px;}
+  .acc-viewbar-label{font-size:12.5px; font-weight:700; color:var(--muted);}
+  .acc-viewbtns{display:inline-flex; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:3px; gap:2px;}
+  .acc-viewbtn{display:inline-flex; align-items:center; gap:6px; border:none; background:none;
+    border-radius:9px; padding:8px 12px; font-family:inherit; font-size:12.5px; font-weight:700;
+    color:var(--ink-2); cursor:pointer;}
+  .acc-viewbtn .acc-viewbtn-ic{font-size:15px; line-height:1;}
+  .acc-viewbtn:hover{background:var(--surface-3);}
+  .acc-viewbtn.active{background:#E8321E; color:#fff;}
+  .acc-viewbtn.active:hover{background:#E8321E;}
+
+  .acc-grid-small{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px;}
+  .acc-grid-large{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:16px;}
+  .acc-card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    font-family:inherit; text-align:right; padding:0; transition:transform .12s, box-shadow .12s;}
+  .acc-card:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(16,16,20,.10);}
+  .acc-card-sm{display:flex; flex-direction:column; gap:6px; align-items:flex-start; width:100%; cursor:pointer; padding:14px;}
+  .acc-card-sm .acc-card-name{font-weight:800; font-size:14px; color:var(--ink); display:block;
+    width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-card-sm .acc-card-bal{font-family:'Cairo',sans-serif; font-weight:900; font-size:19px;}
+  .acc-card-sm .acc-card-bal small{font-size:11px; font-weight:700;}
+  .acc-card-lg{display:flex; flex-direction:column; overflow:hidden;}
+  .acc-card-lg-head{display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:14px 16px 10px; border-bottom:1px solid var(--border);}
+  .acc-card-open{flex:1; min-width:0; background:none; border:none; cursor:pointer; text-align:right; font-family:inherit; padding:0;}
+  .acc-card-open span{font-weight:800; font-size:16px; color:var(--ink); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-card-print{flex:none; background:var(--surface-2); border:1px solid var(--border); border-radius:9px;
+    cursor:pointer; font-size:15px; padding:6px 9px; line-height:1;}
+  .acc-card-print:hover{background:var(--danger-bg); border-color:var(--danger-border);}
+  .acc-card-lg-body{padding:12px 16px 16px; cursor:pointer;}
+  .acc-card-row{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; color:var(--ink-2); padding:4px 0;}
+  .acc-card-row b{font-size:15px; color:var(--ink-3);}
+  .acc-card-bal-badge{display:flex; justify-content:space-between; align-items:center; margin-top:10px;
+    padding:10px 12px; border-radius:10px; font-size:13px; font-weight:700;}
+  .acc-card-bal-badge b{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;}
+
+  .acc-entry{display:flex; justify-content:space-between; align-items:center; gap:12px;
+    border:1px solid var(--border); border-radius:10px; padding:11px 13px; margin-bottom:8px; font-size:14px;}
+  .acc-entry-meta{font-size:12px; color:var(--muted-2); margin-top:3px;}
+  .acc-mini-btn{border:1px solid var(--border); background:var(--surface); border-radius:7px; padding:4px 9px;
+    font-size:11.5px; cursor:pointer; font-family:inherit; color:var(--ink-2); margin-top:5px;}
+  .acc-mini-btn:hover{background:var(--surface-2);}
+  /* accounts.js بيستخدم الكلاس ده لزرار PDF — الصفحة دي مفيهاش، فبنعرّفه */
+  .btn-secondary{border:1px solid var(--border); background:var(--surface); border-radius:9px;
+    padding:8px 13px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; color:var(--ink-2);}
+  .btn-secondary:hover{background:var(--surface-2);}
+  .modal-search input{width:100%; border:1px solid var(--border); background:var(--surface);
+    color:var(--ink); border-radius:10px; padding:11px 13px; font-size:14.5px; font-family:inherit;}
 </style>
 </head>
 <body>
@@ -429,12 +578,47 @@
       <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
       <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
       <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
+      <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">🧾 الحسابات</button>
       <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+      <button class="att-menu-btn" style="display:none;" onclick="closeKebab(); openAttendance()">⏰ المواعيد</button>
       <div class="sep cap-purchases" style="display:none;"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
       <button class="danger" onclick="kebabLogout()" data-i18n="rp.logout">تسجيل الخروج ⏻</button>
     </div>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     شاشة الحسابات — قراءة فقط
+     الكود في accounts.js (نفس ملف الداشبورد بالحرف).
+     الفرق الوحيد: ACC_CAN_EDIT = false تحت.
+     ============================================================ -->
+<div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="acc-page">
+    <div class="acc-head">
+      <h2>🧾 الحسابات</h2>
+      <button class="acc-close" onclick="closeAccounts()">×</button>
+    </div>
+    <div style="padding:12px 20px 8px;">
+      <div class="modal-search"><input id="accSearch" oninput="renderAccounts()" placeholder="ابحث باسم المحل..." /></div>
+      <div id="accViewBar" class="acc-viewbar">
+        <span class="acc-viewbar-label">طريقة العرض</span>
+        <div class="acc-viewbtns">
+          <button type="button" class="acc-viewbtn" data-mode="list" onclick="setAccViewMode('list')">
+            <span class="acc-viewbtn-ic">📜</span><span>قائمة تفصيلية</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-small" onclick="setAccViewMode('grid-small')">
+            <span class="acc-viewbtn-ic">🔲</span><span>مربعات صغيرة</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-large" onclick="setAccViewMode('grid-large')">
+            <span class="acc-viewbtn-ic">🔳</span><span>مربعات كبيرة</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -694,13 +878,18 @@ async function loadNotices(){
       // خلصت الفترة المجانية → رسالة إيقاف ثم قفل (نفس رسالة الداشبورد)
       // ⚠️ بس بنتأكد الأول من الاشتراك المدفوع — لو المحل مشترك فعلاً
       //    (paid_until في المستقبل) الخدمة بتفضل شغّالة زي الداشبورد.
+      // ملحوظة: القفل الحقيقي بقى في بوابة الاشتراك أول boot —
+      // الجزء ده للبانر بس. سايبينه كحزام أمان تاني.
       if(left <= 0){
-        let paidActive = false;
+        let stillOn = false;
         try{
-          const { data:sh } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
-          paidActive = !!(sh && sh.paid_until && new Date(sh.paid_until) > new Date());
+          const { data:sh } = await sb.from('shop')
+            .select('paid_until, trial_until').eq('id',1).maybeSingle();
+          const nowT = new Date();
+          stillOn = !!(sh && ((sh.paid_until  && new Date(sh.paid_until)  > nowT)
+                           || (sh.trial_until && new Date(sh.trial_until) > nowT)));
         }catch(e){}
-        if(!paidActive){ try{ showServiceStopped(false); }catch(e){} return; }
+        if(!stillOn){ try{ showServiceStopped(false); }catch(e){} return; }
       }
       ntBar('🎁 ' + t('sys.trialBanner', { n: left }), 'var(--waiting)');
       if(cfg.trialAnnId){
@@ -891,6 +1080,26 @@ async function boot(){
 
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ location.replace('index.html'); return; }
+
+  // ═══════════════════════════════════════════════════════════
+  // بوابة الاشتراك
+  // -----------------------------------------------------------
+  // ⚠️ لازم تكون هنا، مش جوه الكود اللي بيقرا app_data تحت.
+  //    لأن app_data نفسه بيتقفل مع انتهاء المدة، فالفحص اللي
+  //    جواه مكانش بيشتغل أصلاً — والصفحة كانت هتفضل فاضية
+  //    من غير ما الموظف يعرف السبب.
+  //    جدول shop بيتقرا دايماً، فهو المكان الصح للفحص.
+  // ═══════════════════════════════════════════════════════════
+  try{
+    const { data:sh } = await sb.from('shop')
+      .select('paid_until, trial_until').eq('id',1).maybeSingle();
+    if(sh){
+      const nowT = new Date();
+      const okPaid  = !!(sh.paid_until  && new Date(sh.paid_until)  > nowT);
+      const okTrial = !!(sh.trial_until && new Date(sh.trial_until) > nowT);
+      if(!okPaid && !okTrial){ try{ showServiceStopped(false); }catch(e){} return; }
+    }
+  }catch(e){ console.error('[الاشتراك] فشل فحص المدة:', e); }
   MY_EMAIL = (session.user.email || '').toLowerCase();
 
   let role = 'accountant';
@@ -936,6 +1145,29 @@ async function boot(){
     // بيحتاج موديول قطع الغيار عشان الربط يشتغل من جوه تفاصيل الجهاز
     if(!CAN_PURCHASES) loadPurchasesModule();
     document.querySelectorAll('.cap-partsreview').forEach(el => el.style.display = '');
+  }
+
+  // ============================================================
+  // صلاحية "عرض الحسابات" — قراءة فقط
+  // ------------------------------------------------------------
+  // 🔴 ACC_CAN_EDIT = false **دايماً** في الصفحة دي. مش شرط،
+  //    مش حسب الدور — ثابت. الديسباتشر عمره ما هيسجّل دفعة
+  //    ولا خصم من هنا.
+  //
+  //    وده مش الحاجز الوحيد: accounts.js أصلاً مفيهوش الكود
+  //    اللي بيكتب، وسياسات قاعدة البيانات بترفض الكتابة على
+  //    مفتاح accounts-ledger من أي حد غير الأدمن والمحاسب.
+  //    تلات طبقات مستقلة.
+  // ============================================================
+  ACC_CAN_EDIT = false;
+  try{
+    const { data } = await sb.rpc('has_cap', { p_cap: 'accounts_view' });
+    CAN_ACCOUNTS = (data === true);
+  }catch(e){ CAN_ACCOUNTS = false; }   // مشكلة في الشبكة؟ الافتراضي مقفول
+  if(CAN_ACCOUNTS){
+    document.querySelectorAll('.cap-accounts').forEach(el => el.style.display = '');
+    // الدفتر بيتحمّل في الخلفية — الشاشة مش هتستنى عليه
+    loadLedger().catch(() => {});
   }
 
   // الاسم: من ملف الحساب، وإلا الجزء الأول من الإيميل
@@ -1101,6 +1333,7 @@ function ticketHtml(d){
     <div class="tk-top"><span class="tk-no">${ticketNo(d.id)}</span>${statusPill(d.status)}</div>
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
     <div class="tk-sub">${esc(d.customer)}${d.shop?`<span class="dot">•</span>${esc(d.shop)}`:''}</div>
+    ${d.issue?`<div class="tk-issue"><span class="w">🛠️</span><span>${esc(d.issue)}</span></div>`:''}
     <div class="tk-meta">
       <span class="chip">${t('rp.byColon')} <b>${esc(d.by===ME?t('rp.you'):d.by)}</b></span>
       ${d.tech?`<span class="chip">${t('rp.techColon')} <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);" data-i18n="tp.noTechYet">لسه من غير ${t('tp.roleTech')}</span>`}
@@ -1112,30 +1345,114 @@ function ticketHtml(d){
 }
 
 // تفاصيل مختصرة — الديسباتشر مايشوفش أسعار
+// ============================================================
+// تفاصيل الجهاز — الشكل الجديد
+// ------------------------------------------------------------
+// كان قايمة صفوف جافة. بقى:
+//   • رأس فيه الجهاز والحالة ورقم التذكرة
+//   • كارت العميل مع **زرار اتصال وواتساب** — الرقم مكتوب
+//     وبس مكانش بينفع تدوس عليه، والديسباتشر بيكلّم عملاء طول اليوم
+//   • كارت العطل بارز لوحده
+//   • أزرار التسليم والإرجاع **من هنا** — قبل كده كانت على
+//     الكارت من برّه بس، فلو فتحت التفاصيل تتأكد كنت تقفل وتدوّر
+//     على الكارت تاني
+// ============================================================
 function showInfo(id){
   const d = devices.find(x => x.id === id); if(!d) return;
   const s = ST[d.status] || {label:d.status, c:'--muted'};
-  const V = txt => `<span class="info-v">${esc(String(txt))}</span>`;
-  const rows = [
-    [t('rp.ticket'),   V(ticketNo(d.id))],
-    [t('rp.device'),   V([d.type, d.model].filter(Boolean).join(' '))],
-    [t('rp.status'),   `<span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>`],
-    [t('rp.customer'), d.customer ? V(d.customer) : ''],
-    [t('rp.phone'),    d.phone ? `<span class="info-v" style="direction:ltr;">${esc(d.phone)}</span>` : ''],
-    [t('rp.shop'),     d.shop ? V(d.shop) : ''],
-    [t('rp.issue'),    d.issue ? V(d.issue) : ''],
-    [t('rp.tech'),     V(d.tech || t('tp.noTechYet'))],
-    [t('rp.by'),       d.by ? V(d.by) : ''],
-    [t('dp.intake'),   V(fmtDate(d.intake))]
-  ].filter(r => r[1]);
-  const body = rows.map(r => `<div class="info-row"><span class="info-k">${r[0]}</span>${r[1]}</div>`).join('');
-  openAct(t('rp.details'), body);
+  const delivered = d.status === 'delivered';
+  const name = [d.type, d.model].filter(Boolean).join(' ') || '—';
+  // الرقم للاتصال: بنشيل أي حاجة مش رقم
+  const tel = String(d.phone || '').replace(/[^\d+]/g, '');
+
+  const row = (k, v) => v ? `<div class="di-row"><span class="di-k">${esc(k)}</span><span class="di-v">${v}</span></div>` : '';
+
+  const actions = d.pending
+    ? `<div class="di-pend">⏳ ${d.pending.type === 'return' ? t('tp.reqReturn') : t('tp.reqDeliver')} بانتظار اعتماد المحاسب</div>`
+    : delivered
+      ? `<button class="di-act di-ret" onclick="closeAct();requestApproval('${d.id}','return')">↩️ ${t('rp.return')}</button>`
+      : `<button class="di-act di-hand" onclick="closeAct();requestApproval('${d.id}','handover')">📦 ${t('rp.deliver')}</button>
+         <button class="di-act di-rej" onclick="closeAct();requestReject('${d.id}')">🚫 رفض</button>`;
+
+  openAct(t('rp.details'), `
+    <div class="di">
+      <div class="di-head">
+        <div class="di-title">
+          <b>${esc(name)}</b>
+          <span class="di-no">${esc(ticketNo(d.id))}</span>
+        </div>
+        <span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>
+      </div>
+
+      ${d.issue ? `<div class="di-issue"><span>🛠️</span><span>${esc(d.issue)}</span></div>` : ''}
+
+      <div class="di-card">
+        <div class="di-card-h">👤 ${esc(t('rp.customer'))}</div>
+        ${row(t('rp.customer'), esc(d.customer || '—'))}
+        ${row(t('rp.shop'), d.shop ? esc(d.shop) : '')}
+        ${row(t('rp.phone'), d.phone ? `<span dir="ltr">${esc(d.phone)}</span>` : '')}
+        ${tel ? `<div class="di-contact">
+          <a class="di-btn di-call" href="tel:${esc(tel)}">📞 اتصال</a>
+          <a class="di-btn di-wa" target="_blank" rel="noopener"
+             href="https://wa.me/${esc(waNum(tel))}">💬 واتساب</a>
+        </div>` : ''}
+      </div>
+
+      <div class="di-card">
+        <div class="di-card-h">🔧 الصيانة</div>
+        ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')))}
+        ${row(t('rp.by'), d.by ? esc(d.by) : '')}
+        ${row(t('dp.intake'), esc(fmtDate(d.intake)))}
+      </div>
+
+      <div class="di-label-row">
+        <button class="di-lbl" onclick="dpToggleLabel('${d.id}')">🖨 ${esc(t('ui.printingLabel') || 'طباعة ليبل')}</button>
+      </div>
+      <div id="dpLabelArea"></div>
+
+      <div class="di-actions">${actions}</div>
+    </div>`);
+}
+
+// ============================================================
+// معاينة وطباعة الليبل
+// ------------------------------------------------------------
+// المحرك كله في label.js (نفس ملف الداشبورد بالحرف)، فمفيش أي
+// منطق طباعة هنا — الصفحة بتفتح المعاينة وبس.
+// ============================================================
+function dpToggleLabel(id){
+  const area = document.getElementById('dpLabelArea');
+  if(!area) return;
+  if(area.innerHTML.trim() !== ''){ area.innerHTML = ''; return; }
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  // ⚠️ label.js بيقرا الحقول بأسماء النظام (deviceType · customerName …)
+  //    وصفحة الديسباتشر بتخزّنها بأسماء مختصرة (type · customer …).
+  //    فبنبعتله السجل الخام لو موجود — وإلا بنركّب واحد بالأسماء الصح.
+  //    من غير ده الليبل كان هيطلع فاضي من غير أي خطأ يظهر.
+  const raw = d._raw || {
+    id: d.id, deviceType: d.type, model: d.model,
+    customerName: d.customer, shopName: d.shop,
+    reportedIssue: d.issue, status: d.status, intakeDate: d.intake
+  };
+  renderLabelInto('dpLabelArea', raw);
+}
+
+// رقم الواتساب: مصر بتبدأ بصفر، وواتساب عايز كود الدولة
+function waNum(tel){
+  let n = String(tel || '').replace(/\D/g, '');
+  if(n.startsWith('0')) n = '2' + n;          // 010… → 2010…
+  else if(!n.startsWith('2')) n = '2' + n;
+  return n;
 }
 
 // فهرس البحث بيتبني مرة واحدة بعد كل تحميل بدل ما يتحسب مع
 // كل ضغطة زرار — نفس أسلوب الداشبورد.
 function reindexSearch(){
-  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by], true); }catch(e){}
+  // ⚠️ العطل لازم يكون في الفهرس **وفي** قايمة الاحتياطي تحت.
+  //    الفهرس هو اللي بيشتغل فعلياً، فلو زوّدناه في الاحتياطي بس
+  //    البحث بالعطل مكانش هيشتغل خالص.
+  try{ if(window.IFixSearch) IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop, d.phone, d.tech, d.by, d.issue], true); }catch(e){}
 }
 
 function render(){
@@ -1144,7 +1461,7 @@ function render(){
   const match = d => {
     if(!q) return true;
     if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
-    const fields = [d.type,d.model,d.customer,d.shop,ticketNo(d.id)];
+    const fields = [d.type,d.model,d.customer,d.shop,ticketNo(d.id),d.issue];
     if(window.IFixSearch) return IFixSearch.match(q, fields);
     return fields.some(v => v && String(v).includes(q));
   };
@@ -1155,8 +1472,14 @@ function render(){
   }).join('');
   // القائمة
   const tab = TABS.find(t=>t.key===activeTab);
+  // ⚠️ الترتيب بآخر تعديل مش بتاريخ الاستلام.
+  //    الجهاز اللي اتلمس دلوقتي هو اللي الموظف بيدوّر عليه —
+  //    مش اللي اتسجّل النهاردة الصبح وسايب من ساعتها.
+  //    lastModifiedAt ممكن يكون فاضي على الأجهزة القديمة، فبننزل
+  //    لتاريخ الاستلام بدل ما نحطهم في آخر القايمة بالغلط.
+  const _touch = x => new Date((x._raw && x._raw.lastModifiedAt) || x.intake || 0);
   const list = devices.filter(tab.filter).filter(match)
-    .sort((a,b)=> new Date(b.intake) - new Date(a.intake));
+    .sort((a,b)=> _touch(b) - _touch(a));
   const emptyMsg = q ? t('rp.noResults')
     : activeTab==='mine' ? t('dp.emptyMine')
     : activeTab==='out'  ? t('dp.emptyDelivered')
@@ -1229,7 +1552,7 @@ function onDpCustInput(){
 
   // اقتراح الأسامي: **بادئة** بس ومقصوص على ١٥ — قايمة أطول مبتتقريش
   // على الموبايل وبتثقّل الكتابة
-  if(nameDl) nameDl.innerHTML = key.length < 2 ? '' :
+  if(nameDl) nameDl.innerHTML = key.length < 1 ? '' :
     dpCustNames.filter(x => dpKey(x.name).indexOf(key) === 0).slice(0,15)
                .map(x=>`<option value="${esc(x.name)}">`).join('');
 
@@ -1323,6 +1646,8 @@ function actDevBlock(d){
 let userRoles = {};
 let CAN_PURCHASES = false;
 let CAN_PARTS_REVIEW = false;
+// صلاحية عرض الحسابات (قراءة فقط) — الافتراضي مقفول
+let CAN_ACCOUNTS = false;
 
 // الموديول بيتحمّل عند الحاجة بس — مايتنزّلش على جهاز ديسباتشر
 // مقفولة عليه الميزة أصلاً
@@ -1780,5 +2105,8 @@ document.addEventListener('DOMContentLoaded', function(){
   try{ mountScanBtn(); }catch(e){}
 });
 </script>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
 </body>
 </html>

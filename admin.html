@@ -146,10 +146,118 @@ const KNOWN_FLAGS = [
   { key:'live_broadcasts',    desc:'الإشعارات اللحظية من الأدمن' },
 ];
 
+// ============================================================
+// 🎁 الفترة المجانية — مصدر الحقيقة بقى جدول shop
+// ------------------------------------------------------------
+// كانت متخزّنة في app_data، وده كان بيعمل حلقة مقفولة: عشان
+// تكتب في app_data لازم يكون الاشتراك شغّال، وعشان الاشتراك
+// يشتغل لازم تكتب الفترة المجانية في app_data.
+//
+// دلوقتي تاريخ نهاية التجربة في shop.trial_until — وجدول shop
+// سياساته بتتحقق إنك أدمن وبس، من غير أي شرط اشتراك. فالحلقة
+// اتكسرت، وقاعدة البيانات بقت هي اللي بتقرر (subscription_active).
+//
+// systemConfig لسه بيتكتب فيه mode/trialStart/trialAnnId — بس
+// دول للعرض والبانرات بس، مش للقرار.
+// ============================================================
+let shopSub = { paid_until:null, trial_until:null };
+
+// ============================================================
+// المواعيد — لوكيشن المحل
+// ------------------------------------------------------------
+// الإحداثيات بتتخزّن في جدول hr_settings، والسيرفر هو اللي
+// بيقارن بيها وقت التسجيل. الصفحة دي بتكتب بس.
+// ============================================================
+let hrSet = { lat:null, lng:null, radius_m:75 };
+
+async function loadHrSettings(){
+  try{
+    const { data, error } = await sb.from('hr_settings')
+      .select('lat,lng,radius_m').eq('id',1).maybeSingle();
+    if(error) throw error;
+    if(data) hrSet = data;
+  }catch(e){ console.error('loadHrSettings failed:', e); }
+  renderHrLoc();
+}
+
+function renderHrLoc(){
+  const l = document.getElementById('hrLocLbl');
+  const r = document.getElementById('hrRadLbl');
+  if(r) r.textContent = hrSet.radius_m || 75;
+  if(!l) return;
+  l.innerHTML = (hrSet.lat == null || hrSet.lng == null)
+    ? '🔴 <b>اللوكيشن لسه مش متحدد</b> — الموظفين مش هيقدروا يسجّلوا حضور.'
+    : '🟢 متحدد: <span dir="ltr">' + Number(hrSet.lat).toFixed(6) + ', '
+      + Number(hrSet.lng).toFixed(6) + '</span>';
+}
+
+async function hrSetLocation(){
+  if(!navigator.geolocation){ toast('جهازك مش بيدعم تحديد الموقع', false); return; }
+  toast('⏳ بنحدد مكانك…');
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const { latitude:lat, longitude:lng, accuracy:acc } = pos.coords;
+    // ⚠️ بنوري الدقة عشان الأدمن يقرر. لو الدقة ٥٠٠ متر يبقى
+    //    المكان ده مش موثوق ولازم يعيد وهو بره أو جنب شباك.
+    if(!confirm('المكان اللي لقيناه:\n' + lat.toFixed(6) + ', ' + lng.toFixed(6)
+      + '\nدقة القراءة: ' + Math.round(acc) + ' متر\n\nنحفظه كموقع المحل؟')) return;
+    try{
+      const { error } = await sb.from('hr_settings')
+        .upsert({ id:1, lat, lng, updated_at:new Date().toISOString() });
+      if(error) throw error;
+      hrSet.lat = lat; hrSet.lng = lng;
+      renderHrLoc();
+      await addAudit('حدد لوكيشن المحل للمواعيد');
+      toast('اتحفظ ✅');
+    }catch(e){
+      console.error('hrSetLocation failed:', e);
+      toast('فشل الحفظ: ' + (e.message||e), false);
+    }
+  }, (e) => {
+    toast(e.code === 1 ? 'لازم تسمح بالوصول لموقعك' : 'مقدرناش نحدد مكانك', false);
+  }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+}
+
+async function hrSetRadius(){
+  const v = prompt('نص القطر المسموح بالمتر:', String(hrSet.radius_m || 75));
+  if(v === null) return;
+  const n = parseInt(v, 10);
+  if(!n || n < 20 || n > 2000){ toast('اكتب رقم بين ٢٠ و ٢٠٠٠', false); return; }
+  try{
+    const { error } = await sb.from('hr_settings')
+      .upsert({ id:1, radius_m:n, updated_at:new Date().toISOString() });
+    if(error) throw error;
+    hrSet.radius_m = n;
+    renderHrLoc();
+    await addAudit('غيّر نص قطر المواعيد لـ ' + n + ' متر');
+    toast('اتحفظ ✅');
+  }catch(e){
+    console.error('hrSetRadius failed:', e);
+    toast('فشل الحفظ: ' + (e.message||e), false);
+  }
+}
+
+async function loadShopSub(){
+  try{
+    const { data, error } = await sb.from('shop')
+      .select('paid_until, trial_until').eq('id',1).maybeSingle();
+    if(error) throw error;
+    shopSub = data || { paid_until:null, trial_until:null };
+  }catch(e){
+    console.error('[الاشتراك] فشلت قراءة جدول shop:', e);
+    shopSub = { paid_until:null, trial_until:null };
+  }
+}
+
+function paidActive(){
+  return !!(shopSub.paid_until && new Date(shopSub.paid_until) > new Date());
+}
+function trialActive(){
+  return !!(shopSub.trial_until && new Date(shopSub.trial_until) > new Date());
+}
 function trialDaysLeft(){
-  if(systemConfig.mode !== 'trial' || !systemConfig.trialStart) return 0;
-  const end = new Date(systemConfig.trialStart).getTime() + (systemConfig.trialDays||7)*86400000;
-  return Math.max(0, Math.ceil((end - Date.now())/86400000));
+  if(!shopSub.trial_until) return 0;
+  const ms = new Date(shopSub.trial_until).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms/86400000));
 }
 function isFeatureEnabled(key){ const f = featureFlags[key]; return !!(f && f.is_enabled); }
 
@@ -197,6 +305,13 @@ async function addAudit(action){
 
 // ===== تحميل كل الإعدادات =====
 async function loadAll(){
+  // ⚠️ shop الأول: لو الاشتراك خلص، قراءة app_data تحت بتترفض
+  //    (سياساتها فيها subscription_active) وبتقع في الـ catch —
+  //    لكن جدول shop بيتقرا دايماً، فحالة الاشتراك بتفضل معروفة
+  //    ولوحة الأدمن تفضل قادرة تفعّل.
+  await loadShopSub();
+  // hr_settings زي shop: جدول مستقل مفيهوش شرط اشتراك، فبيتقرا دايماً
+  await loadHrSettings();
   try{ const r = await storage.get(SYSTEM_CONFIG_KEY); if(r&&r.value) systemConfig = Object.assign(systemConfig, JSON.parse(r.value)); }catch(e){}
   try{ const r = await storage.get(ROLES_KEY); if(r&&r.value) userRoles = JSON.parse(r.value)||{}; }catch(e){}
   try{ const r = await storage.get(FLAGS_KEY); if(r&&r.value) featureFlags = JSON.parse(r.value)||{}; }catch(e){}
@@ -212,7 +327,10 @@ async function loadAll(){
 
 // ===== الواجهة =====
 function render(){
-  const m = systemConfig.mode;
+  // الوضع بيتحسب من الحقيقة (جدول shop) مش من الإعدادات المخزّنة —
+  // عشان لو التجربة خلصت، الشاشة تقول كده فوراً حتى لو app_data
+  // اتقفل ومقدرناش نحدّث mode جواه.
+  const m = systemConfig.mode === 'beta' ? 'beta' : (trialActive() ? 'trial' : 'normal');
   const modeLabel = m==='beta' ? '🛠️ '+t('adm.modeBeta') : (m==='trial' ? '🎁 '+t('adm.modeTrial') : '✅ '+t('adm.modeNormal'));
   const left = trialDaysLeft();
 
@@ -226,29 +344,35 @@ function render(){
       <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ ${t('adm.openDashboard')}</button>
     </div>
 
+    <!-- ⚠️ قسم «وضع البيتا» وقسم «الفترة المجانية» اتشالوا بالكامل
+         (أغسطس ٢٠٢٦) بناءً على طلب المالك: العميل بيدفع اشتراك عادي،
+         والفترة المجانية والبيتا مالهمش لازمة.
+         الدوال setMode / changeTrialDays لسه موجودة تحت في الكود بس
+         مفيش أي زرار بيناديها — سايبينها عشان لو احتجناها يوم نرجّع
+         الزراير بس، من غير ما نعيد كتابة منطق كامل. -->
     <div class="sec">
-      <div class="sec-title">🛠️ ${t('adm.betaSection')}</div>
-      <p class="hint">${t('adm.betaHint')}</p>
-      ${m==='beta'
-        ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.betaOn')}</div>
-           <button class="btn danger" onclick="setMode('cancelBeta')">🛑 ${t('adm.betaCancel')}</button>`
-        : `<button class="btn" onclick="setMode('beta')">${t('adm.betaEnable')}</button>`}
-    </div>
-
-    <div class="sec">
-      <div class="sec-title">🎁 ${t('adm.trialSection')}</div>
-      <p class="hint">${t('adm.trialHint',{d:(systemConfig.trialDays||7)})}</p>
-      ${m==='trial'
-        ? `<div class="badge" style="background:var(--success-bg);color:var(--success);margin-bottom:9px;">● ${t('adm.trialOn',{n:left})}</div>
-           <button class="btn danger" onclick="setMode('cancelTrial')">🛑 ${t('adm.trialCancel')}</button>`
-        : `<button class="btn warn" onclick="setMode('trial')">${t('adm.trialEnable')}</button>`}
-      <div style="margin-top:10px;"><button class="mini" onclick="changeTrialDays()">⏳ ${t('adm.trialDays')} (${systemConfig.trialDays||7})</button></div>
-      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line,#334155);">
-        <div style="font-weight:800;margin-bottom:4px;">💳 تفعيل اشتراك مدفوع</div>
+      <div>
+        <div class="sec-title">💳 تفعيل اشتراك مدفوع</div>
         <p class="hint">بعد ما المسؤول يدفع — اضغط واختار المدة، والخدمة هتشتغل فوراً لكل الموظفين.</p>
         <button class="btn" onclick="activatePaid()">✅ تفعيل الاشتراك بعد الدفع</button>
         <div class="hint" id="paidUntilLbl" style="margin-top:6px;"></div>
+        ${paidActive() ? `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line,#334155);">
+          <p class="hint" style="margin-top:0;">لإلغاء الاشتراك فوراً — الخدمة هتتقفل عند كل الموظفين على طول.</p>
+          <button class="btn danger" onclick="cancelPaid()">🛑 إلغاء الاشتراك المدفوع</button>
+        </div>` : ''}
       </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">⏰ المواعيد — لوكيشن المحل</div>
+      <p class="hint">الموظفين مش هيقدروا يسجّلوا حضور إلا وهما جوه الدايرة دي.
+        <b>قف في المحل</b> ودوس «حدد مكاني دلوقتي».</p>
+      <div id="hrLocLbl" class="hint" style="margin-bottom:8px;">…</div>
+      <button class="btn" onclick="hrSetLocation()">📍 حدد مكاني دلوقتي كموقع المحل</button>
+      <div style="margin-top:10px;"><button class="mini" onclick="hrSetRadius()">📏 نص القطر المسموح (<span id="hrRadLbl">—</span> متر)</button></div>
+      <p class="hint" style="margin-top:10px;">⚠️ دقة الـ GPS جوه المبنى بتوصل ٥٠ متر.
+        لو حطيت رقم صغير أوي، هترفض ناس موجودة فعلاً في المحل.</p>
     </div>
 
     <div class="sec">
@@ -375,6 +499,10 @@ function render(){
     </div>
   `;
   try{ showPaidUntil(); }catch(e){}   // تاريخ نهاية الاشتراك تحت الزرار
+  // ⚠️ render() بيعيد بناء الـ HTML كله، فالعناصر اللي كتبنا فيها
+  //    قبل كده بتتمسح وتترسم من جديد فاضية. لازم نعيد ملّاها بعد
+  //    كل رسمة — من غير السطر ده حالة اللوكيشن هتفضل "…".
+  try{ renderHrLoc(); }catch(e){}
 }
 
 // ===== العمليات =====
@@ -385,11 +513,34 @@ async function setMode(kind){
   };
   if(!confirm(texts[kind])) return;
   try{
+    // ══ ترتيب الخطوات هنا مقصود ومهم ══
+    // بدء التجربة: نكتب في shop **الأول**. الكتابة دي مسموحة دايماً
+    // للأدمن، وأول ما تنجح الخدمة بتفتح — وساعتها بس نقدر نكتب في
+    // app_data. لو عكسنا الترتيب، حفظ الإعدادات هيترفض والزرار
+    // هيفضل مايشتغلش زي ما كان بيحصل قبل كده.
+    //
+    // إلغاء التجربة: العكس. بنحفظ الإعدادات وإحنا لسه مفتوحين،
+    // وبعدين نقفل — لأن بعد القفل مش هنقدر نكتب.
+    if(kind==='trial'){
+      const days = systemConfig.trialDays || 7;
+      const end  = new Date(Date.now() + days*86400000);
+      const { error } = await sb.from('shop')
+        .upsert({ id:1, trial_until: end.toISOString() });
+      if(error) throw error;
+      shopSub.trial_until = end.toISOString();
+      systemConfig.mode='trial'; systemConfig.trialStart=new Date().toISOString(); systemConfig.trialAnnId=Date.now();
+    }
     if(kind==='beta'){ systemConfig.mode='beta'; systemConfig.betaAnnId=Date.now(); }
-    if(kind==='trial'){ systemConfig.mode='trial'; systemConfig.trialStart=new Date().toISOString(); systemConfig.trialAnnId=Date.now(); }
     if(kind==='cancelBeta'){ systemConfig.mode='normal'; systemConfig.betaAnnId=null; }
     if(kind==='cancelTrial'){ systemConfig.mode='normal'; systemConfig.trialStart=null; systemConfig.trialAnnId=null; }
+
     await saveConfig();
+
+    if(kind==='cancelTrial'){
+      const { error } = await sb.from('shop').upsert({ id:1, trial_until: null });
+      if(error) throw error;
+      shopSub.trial_until = null;
+    }
     await addAudit({beta:'فعّل وضع البيتا', trial:'بدأ الفترة المجانية', cancelBeta:'ألغى وضع البيتا', cancelTrial:'ألغى الوضع المجاني'}[kind]);
     render(); toast('تم الحفظ ✅');
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
@@ -419,9 +570,13 @@ async function activatePaid(){
   if(!confirm(`تفعيل الاشتراك لمدة ${months} شهر؟\nالخدمة هتشتغل لحد: ${end.toLocaleDateString('ar-EG')}`)) return;
 
   try{
+    // التجربة بتتلغي مع الدفع — فمفيش لبس بين الاتنين، والبانر
+    // بتاعها بيختفي فوراً عند كل الموظفين.
     const { error } = await sb.from('shop')
-      .upsert({ id:1, paid_until: end.toISOString() });
+      .upsert({ id:1, paid_until: end.toISOString(), trial_until: null });
     if(error) throw error;
+    shopSub.paid_until = end.toISOString();
+    shopSub.trial_until = null;
 
     // نرجّع الوضع العادي عشان بانر التجربة يختفي
     systemConfig.mode = 'normal';
@@ -437,19 +592,65 @@ async function activatePaid(){
   }
 }
 
+// ============================================================
+// 🛑 إلغاء الاشتراك المدفوع
+// ------------------------------------------------------------
+// ⚠️ ترتيب الخطوات هنا مقصود:
+//    السجل (audit-log) والإعدادات متخزّنين في app_data، وسياسة
+//    الكتابة عليه بتتحقق من subscription_active(). أول ما نمسح
+//    paid_until الخدمة بتتقفل — وأي كتابة بعد كده بتترفض.
+//    فبنكتب الأول وإحنا لسه مفتوحين، وبنقفل آخر حاجة.
+//
+// ملحوظة: لو فيه فترة مجانية سارية، الخدمة هتفضل شغالة بعد
+// الإلغاء — لأن subscription_active() بتقبل أي واحد فيهم.
+// ============================================================
+async function cancelPaid(){
+  if(!paidActive()){ toast('مفيش اشتراك مدفوع ساري', false); return; }
+
+  const stillTrial = trialActive();
+  const warn = stillTrial
+    ? `\n\n🎁 ملحوظة: فيه فترة مجانية سارية (${trialDaysLeft()} يوم) — الخدمة هتفضل شغالة لحد ما تخلص.`
+    : '\n\n⛔ الخدمة هتتقفل فوراً عند كل الموظفين.';
+
+  if(!confirm('إلغاء الاشتراك المدفوع؟' + warn)) return;
+  if(!stillTrial && !confirm('متأكد؟ كل الموظفين هيتقفل عليهم النظام دلوقتي حالاً.')) return;
+
+  try{
+    // (١) السجل الأول — وإحنا لسه قادرين نكتب
+    await addAudit('ألغى الاشتراك المدفوع يدوياً');
+
+    // (٢) وبعدين القفل
+    const { error } = await sb.from('shop').upsert({ id:1, paid_until: null });
+    if(error) throw error;
+    shopSub.paid_until = null;
+
+    render(); showPaidUntil();
+    toast(stillTrial ? '✅ الاشتراك اتلغى — التجربة لسه شغالة'
+                     : '🛑 الاشتراك اتلغى — الخدمة اتقفلت');
+  }catch(e){
+    console.error('cancelPaid failed:', e);
+    toast('فشل الإلغاء: ' + (e.message||e), false);
+  }
+}
+
 // بيوري تاريخ نهاية الاشتراك الحالي تحت الزرار
 async function showPaidUntil(){
   const el = document.getElementById('paidUntilLbl');
   if(!el) return;
   try{
-    const { data } = await sb.from('shop').select('paid_until').eq('id',1).maybeSingle();
-    if(data && data.paid_until){
-      const d = new Date(data.paid_until);
-      const on = d > new Date();
-      el.textContent = (on ? '🟢 مشترك لحد: ' : '🔴 انتهى في: ') + d.toLocaleDateString('ar-EG');
+    await loadShopSub();
+    const lines = [];
+    if(shopSub.paid_until){
+      const d = new Date(shopSub.paid_until);
+      lines.push((d > new Date() ? '🟢 مشترك لحد: ' : '🔴 الاشتراك انتهى في: ') + d.toLocaleDateString('ar-EG'));
     }else{
-      el.textContent = 'مفيش اشتراك مدفوع مسجّل.';
+      lines.push('مفيش اشتراك مدفوع مسجّل.');
     }
+    if(shopSub.trial_until){
+      const d = new Date(shopSub.trial_until);
+      lines.push((d > new Date() ? '🎁 تجربة مجانية لحد: ' : '⌛ التجربة انتهت في: ') + d.toLocaleDateString('ar-EG'));
+    }
+    el.textContent = lines.join('  ·  ');
   }catch(e){ el.textContent = ''; }
 }
 
@@ -458,7 +659,18 @@ async function changeTrialDays(){
   if(v===null) return;
   const n = parseInt(v)||0;
   if(n<=0){ toast('اكتب رقم صحيح', false); return; }
-  try{ systemConfig.trialDays = n; await saveConfig(); await addAudit('غيّر مدة الفترة المجانية لـ ' + n + ' يوم'); render(); toast('تم ✅'); }
+  try{
+    systemConfig.trialDays = n;
+    // لو فيه تجربة شغالة دلوقتي، بنعيد حساب تاريخ نهايتها من
+    // تاريخ بدايتها — عشان الرقم اللي على الشاشة والقفل الحقيقي
+    // في قاعدة البيانات يفضلوا متطابقين.
+    if(trialActive() && systemConfig.trialStart){
+      const end = new Date(new Date(systemConfig.trialStart).getTime() + n*86400000);
+      const { error } = await sb.from('shop').upsert({ id:1, trial_until: end.toISOString() });
+      if(error) throw error;
+      shopSub.trial_until = end.toISOString();
+    }
+    await saveConfig(); await addAudit('غيّر مدة الفترة المجانية لـ ' + n + ' يوم'); render(); toast('تم ✅'); }
   catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
 async function toggleFlag(key){
@@ -470,12 +682,15 @@ async function toggleFlag(key){
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
 }
 // الأدوار المتاحة — لازم تفضل زي اللي في dashboard.html
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician'];
+// ⚠️ hr = مسؤول شؤون العاملين. بيشوف سجل مواعيد كل الموظفين
+//    وبس — مالوش أي علاقة بالأجهزة ولا الفلوس.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
   dispatcher:  'adm.roleDisp',
-  technician:  'adm.roleTech'
+  technician:  'adm.roleTech',
+  hr:          'adm.roleHr'
 };
 function roleLabel(r){ const k = ROLE_LABEL_KEYS[r]; try{ return k ? t(k) : r; }catch(e){ return r; } }
 
@@ -505,6 +720,13 @@ const CAPS = [
     forRoles:['dispatcher'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
   { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
     hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
+    forRoles:['dispatcher'] },
+  // ⚠️ قراءة فقط — عن قصد. تسجيل الدفعات والخصومات والرصيد الافتتاحي
+  //    شغل المحاسب وحده. الديسباتشر بيشوف ويدوّر ويطبع PDF وبس.
+  //    القفل ده مش في الواجهة بس: مفتاح accounts-ledger **الكتابة**
+  //    فيه محصورة على الأدمن والمحاسب في قاعدة البيانات أصلاً.
+  { key:'accounts_view', icon:'🧾', label:'عرض الحسابات (قراءة فقط)',
+    hint:'يشوف آجل المحلات ويدوّر فيه ويصدّر كشف PDF — من غير تسجيل دفعة ولا خصم ولا حذف',
     forRoles:['dispatcher'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }

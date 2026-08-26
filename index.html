@@ -227,7 +227,11 @@ async function landingByRole(email){
       const map = JSON.parse(res.data.value) || {};
       const v = map[e];
       const found = (typeof v === 'string') ? v : (v && v.role);
-      if(['super_admin','accountant','dispatcher','technician'].includes(found)) role = found;
+      // ⚠️ القايمة دي حارس: أي دور مش فيها بيتجاهل ويرجع 'accountant'.
+      //    نسيت أزوّد 'hr' فيها، فحساب شؤون العاملين كان بيتحوّل
+      //    لمحاسب ويفتح الداشبورد — الدور اتقرا صح، بس الحارس رماه.
+      //    **أي دور جديد لازم يتضاف هنا كمان**، مش في ROLES بس.
+      if(['super_admin','accountant','dispatcher','technician','hr'].includes(found)) role = found;
     }
   }catch(err){ /* نكمّل بالافتراضي */ }
 
@@ -239,6 +243,10 @@ async function landingByRole(email){
 
   if(role === 'technician') return 'my-devices.html';
   if(role === 'dispatcher') return 'dispatch.html';
+  // ⚠️ شؤون العاملين ليها صفحتها لوحدها. من غير السطر ده كانت
+  //    هتروح للداشبورد وتشوف الأجهزة والفلوس والتقارير كلها —
+  //    وهي المفروض تشوف سجل المواعيد وبس.
+  if(role === 'hr')         return 'hr.html';
   return 'dashboard.html';
 }
 if(APP_ENV === "staging"){
