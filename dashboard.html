@@ -3620,6 +3620,7 @@ function openDetail(id){
 }
 function closeDetail(){
   document.getElementById('detailOverlay').classList.add('hidden');
+  _detailRenderPending = false;   // مفيش رسم مؤجّل بعد ما الشاشة تتقفل
   selectedId = null;
   trackResponses = {};
   pointsBoxOpen = false;
@@ -3690,7 +3691,60 @@ function accountantOptions(){
   return names.map(n => `<option value="${esc(n)}"></option>`).join('');
 }
 
+// ============================================================
+// ⚠️ رسم التفاصيل — الحارس ضد ضياع الكتابة
+// ------------------------------------------------------------
+// المشكلة اللي ده بيصلّحها:
+//   بتفتح تفاصيل جهاز → تدوس على خانة السعر → تكتب رقمين تلاتة →
+//   الكلام يختفي فجأة، وتضطر تدوس على الخانة تاني وتكتب من الأول.
+//
+// السبب: الرسم بيمسح **كل** محتوى الشاشة ويبنيه من جديد. والخانة
+// اللي بتكتب فيها بتتمسح معاه — بالنص اللي كتبته. وده بيحصل لأن
+// فيه حاجات بتخلص بعد ما الشاشة تفتح بثانية أو اتنين وبتطلب رسم:
+//   • قراءة رد العميل على السعر من السيرفر (openDetail)
+//   • رد العميل بيتغيّر لحظياً (المزامنة اللحظية)
+//   • الذكاء الاصطناعي بيخلص تحليل العطل
+// كلهم بيوصلوا **بالظبط** وإنت بتكتب.
+//
+// تشبيه: بتكتب على ورقة، وكل شوية حد بيسحبها ويحط ورقة نضيفة
+// مكانها. الورقة الجديدة سليمة — بس اللي كتبته راح.
+//
+// الحل: لو إيدك على أي خانة دلوقتي، بنأجّل الرسم لحد ما تسيبها.
+// مش بنلغيه — بنستناه. فالبيانات بتتحدّث زي ما هي، بس بعد ما
+// تخلص كتابة.
+//
+// ⚠️ ليه ده مش بيعطّل أي حاجة؟ لأن الرسم اللي بييجي بعد ضغطة
+//    زرار (تغيير حالة · تأكيد دفع · إضافة ملاحظة) بيبقى التركيز
+//    فيه على **الزرار** مش على خانة كتابة — فبيعدّي عادي فوراً.
+// ============================================================
+let _detailRenderPending = false;
+
 function renderDetail(){
+  const modal = document.getElementById('detailModal');
+  const ae = document.activeElement;
+  const typing = modal && ae && modal.contains(ae)
+              && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+
+  if(typing){
+    _detailRenderPending = true;
+    // بنعلّق مرة واحدة بس على الخانة دي — { once:true } بيشيل نفسه
+    if(ae.dataset.reRenderHooked !== '1'){
+      ae.dataset.reRenderHooked = '1';
+      ae.addEventListener('blur', () => {
+        if(_detailRenderPending){
+          _detailRenderPending = false;
+          renderDetail();
+        }
+      }, { once:true });
+    }
+    return;
+  }
+
+  _detailRenderPending = false;
+  renderDetailNow();
+}
+
+function renderDetailNow(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return closeDetail();
   const s = statusInfo(d.status);
