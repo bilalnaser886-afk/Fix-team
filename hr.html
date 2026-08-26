@@ -75,16 +75,6 @@
   .kpi .v{font-family:'Cairo',sans-serif; font-weight:900; font-size:21px;}
   .kpi .l{font-size:12px; color:var(--muted); margin-top:2px;}
 
-  .emp{background:var(--surface); border:1px solid var(--border); border-radius:14px;
-    margin-bottom:10px; overflow:hidden;}
-  .emp-head{width:100%; display:flex; align-items:center; gap:12px; padding:14px 16px;
-    background:none; border:none; cursor:pointer; font-family:inherit; text-align:right; color:var(--ink);}
-  .emp-head:hover{background:var(--surface-2);}
-  .emp-name{flex:1; min-width:0; font-weight:800; font-size:15px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .emp-sum{font-size:12.5px; color:var(--muted); white-space:nowrap;}
-  .emp-body{padding:0 16px 14px;}
-
   .day{border:1px solid var(--border); border-radius:11px; padding:11px 13px; margin-bottom:8px;}
   .day-h{display:flex; justify-content:space-between; align-items:center; gap:10px;
     font-weight:800; font-size:13.5px; margin-bottom:7px;}
@@ -158,6 +148,12 @@
   .days button.on{background:var(--red); border-color:var(--red); color:#fff;}
   .save{width:100%; border:none; border-radius:13px; padding:15px; background:var(--done);
     color:#fff; font-family:inherit; font-size:15px; font-weight:900; cursor:pointer;}
+  .emp-top{display:flex; align-items:center; gap:12px;}
+  .emp-acts{display:flex; gap:8px;}
+  .emp-acts button{flex:1; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink-2); border-radius:11px; padding:11px 6px; font-family:inherit;
+    font-size:12.5px; font-weight:800; cursor:pointer;}
+  .emp-acts button:hover{background:var(--surface);}
   .hintbox{background:var(--waiting-bg); color:var(--waiting); border-radius:11px;
     padding:12px 14px; font-size:12.5px; line-height:1.9; margin-bottom:16px;}
 </style>
@@ -190,6 +186,16 @@
             onclick="closeSheet('hrSet')">×</button>
   </div>
   <div class="sheet-body" id="hrSetBody"></div>
+</div>
+
+<!-- ===== سجل الموظف — شاشة كاملة ===== -->
+<div class="sheet" id="empSheet">
+  <div class="sheet-head">
+    <h2 id="empSheetTitle">📋 السجل</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeEmpLog()">×</button>
+  </div>
+  <div class="sheet-body" id="empSheetBody"></div>
 </div>
 
 <!-- ===== الإعدادات العامة ===== -->
@@ -399,8 +405,18 @@ function render(){
   }
 
   root.innerHTML = bar + '<div class="cards">' +
-    keys.map(e => cardHtml(e, emps[e])).join('') + '</div>' +
-    (OPEN_EMP && emps[OPEN_EMP] ? detailHtml(OPEN_EMP, emps[OPEN_EMP]) : '');
+    keys.map(e => cardHtml(e, emps[e])).join('') + '</div>';
+  // ⚠️ السجل بقى شاشة كاملة (empSheet) مش قسم بيتفتح تحت الكارت.
+  //    لو كان مفتوح وحصل تحديث، بنعيد رسمه بالبيانات الجديدة.
+  if(OPEN_EMP && emps[OPEN_EMP]) renderEmpSheet(OPEN_EMP, emps[OPEN_EMP]);
+}
+
+// تجميع أيام موظف واحد — بيتستخدم في الكروت وفي الشاشة
+function daysOf(email){
+  const days = {};
+  ROWS.filter(r => (r.user_email||'').toLowerCase() === email)
+      .forEach(r => { (days[r.work_date] = days[r.work_date] || []).push(r); });
+  return days;
 }
 
 // لون ثابت لكل موظف من اسمه — عشان يعرفه بالشكل بسرعة،
@@ -454,7 +470,7 @@ function cardHtml(e, days){
       <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم ج.م</span></div>
     </div>
     <div class="card-foot">
-      <button onclick="toggleEmp('${esc(e)}')">${OPEN_EMP === e ? '▲ اقفل' : '📋 السجل'}</button>
+      <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
       <button onclick="openHrSettings('${esc(e)}')">⏰</button>
       <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
       <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
@@ -462,18 +478,72 @@ function cardHtml(e, days){
   </div>`;
 }
 
-function detailHtml(e, days){
-  return `
-  <div class="emp" style="margin-top:16px;">
-    <div class="emp-head" style="cursor:default;">
-      <span class="emp-name">📋 سجل ${esc(nameOf(e))}</span>
-      <button class="icon-btn" style="background:var(--surface-2);color:var(--ink);"
-              onclick="toggleEmp('${esc(e)}')">×</button>
+// ============================================================
+// سجل الموظف — شاشة كاملة
+// ------------------------------------------------------------
+// كان قسم بيتفتح تحت الكارت، فالمستخدم كان لازم يعدّي على كل
+// الكروت عشان يوصله، والملخص كان بيفضل فوق برّه الشاشة.
+// دلوقتي شاشة مستقلة: الملخص فوق ثابت، وتحته كل الأيام.
+// ============================================================
+function openEmpLog(email){
+  OPEN_EMP = email;
+  renderEmpSheet(email, daysOf(email));
+  openSheet('empSheet');
+}
+function closeEmpLog(){ OPEN_EMP = null; closeSheet('empSheet'); }
+
+function renderEmpSheet(email, days){
+  const box = document.getElementById('empSheetBody');
+  const ttl = document.getElementById('empSheetTitle');
+  if(!box) return;
+  if(ttl) ttl.textContent = '📋 سجل ' + nameOf(email);
+
+  const dkeys = Object.keys(days).sort().reverse();
+  let mins=0, over=0, short=0, pen=0, late=0, flags=0;
+  dkeys.forEach(d => {
+    const st = dayMinutes(days[d]);
+    mins += st.minutes;
+    if(st.missingOut) flags++;
+    const r = applyRules(email, days[d]);
+    if(r){ pen += r.penalty; if(r.state === 'late') late++; }
+    const o = dayOvertime(email, days[d]);
+    if(o.has && !st.missingOut){ over += o.over; short += o.short; }
+  });
+
+  const c = EMP_SET[email] || {};
+  box.innerHTML = `
+    <div class="emp-top">
+      <div class="avatar" style="background:${avatarColor(email)}">${esc(nameOf(email).charAt(0))}</div>
+      <div style="flex:1;min-width:0;">
+        <b style="display:block;font-size:17px;">${esc(nameOf(email))}</b>
+        <span style="font-size:12px;color:var(--muted);">
+          ${esc(monthLabel())}${c.shift_start ? ' · 🕙 ' + String(c.shift_start).slice(0,5) : ''}</span>
+      </div>
     </div>
-    <div class="emp-body">${
-      Object.keys(days).sort().reverse().map(d => dayHtml(d, days[d], e)).join('')
-    }</div>
-  </div>`;
+
+    <div class="kpis" style="margin:14px 0 16px;">
+      <div class="kpi"><div class="v">${dkeys.length}</div><div class="l">يوم</div></div>
+      <div class="kpi"><div class="v">${fmtHm(mins)}</div><div class="l">ساعات</div></div>
+      <div class="kpi"><div class="v" style="color:${over?'var(--done)':'inherit'}">${fmtHm(over)}</div><div class="l">أوفر تايم</div></div>
+      <div class="kpi"><div class="v" style="color:${short?'var(--waiting)':'inherit'}">${fmtHm(short)}</div><div class="l">نقص</div></div>
+      <div class="kpi"><div class="v" style="color:${late?'var(--red)':'inherit'}">${late}</div><div class="l">تأخير</div></div>
+      <div class="kpi"><div class="v" style="color:${pen?'var(--red)':'inherit'}">${pen||0}</div><div class="l">خصم ج.م</div></div>
+    </div>
+
+    <div class="emp-acts">
+      <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
+      <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
+      <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
+    </div>
+
+    ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
+      ساعاتهم مش محسوبة في الإجمالي.</div>` : ''}
+
+    <div style="margin-top:14px;">
+      ${dkeys.length
+        ? dkeys.map(d => dayHtml(d, days[d], email)).join('')
+        : '<div class="empty">مفيش تسجيلات في الشهر ده</div>'}
+    </div>`;
 }
 
 function dayHtml(d, punches, email){
@@ -512,7 +582,6 @@ function dayHtml(d, punches, email){
   </div>`;
 }
 
-function toggleEmp(e){ OPEN_EMP = (OPEN_EMP === e) ? null : e; render(); }
 
 // ============================================================
 // القايمة والشاشات
