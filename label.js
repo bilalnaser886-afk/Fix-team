@@ -97,6 +97,17 @@ function lblToast(msg){
 
 const LABEL_SIZE_KEY = 'ifix_label_size';
 let labelDeviceId = null;
+let labelDevice = null;      // السجل الكامل بأسماء النظام
+
+// بيرجّع السجل اللي اترسم، ولو مش موجود بيدوّر في devices كاحتياطي
+function lblDevice(){
+  if(labelDevice && labelDevice.id === labelDeviceId) return labelDevice;
+  try{
+    if(typeof devices !== 'undefined' && Array.isArray(devices))
+      return devices.find(x => x.id === labelDeviceId) || null;
+  }catch(e){}
+  return null;
+}
 
 function getLabelSize(){
   try{
@@ -116,6 +127,13 @@ function saveLabelSize(){
 
 function renderLabelInto(containerId, d){
   labelDeviceId = d.id;
+  // ⚠️ بنحفظ **السجل نفسه** مش المعرّف بس.
+  //    الطباعة كانت بتدوّر عليه تاني في devices — وده بيشتغل في
+  //    الداشبورد (بيخزّن بأسماء النظام: deviceType · customerName)
+  //    لكن في الديسباتشر الأسماء مختصرة (type · customer)، فالبحث
+  //    كان بيرجّع كائن بحقول فاضية والزرار كأنه مش شغّال.
+  //    الحل: الملف يفتكر اللي اترسم بيه — مصدر واحد للحقيقة.
+  labelDevice = d;
   const sz = getLabelSize();
   const container = document.getElementById(containerId);
   container.innerHTML = `
@@ -575,7 +593,7 @@ function showPrintBusy(msg){
 }
 
 async function printLabel(){
-  const dv = devices.find(x => x.id === labelDeviceId);
+  const dv = lblDevice();
   if(dv && lblFeature('silent_label_print')){
     saveLabelSize();
     lblErr('');
@@ -603,8 +621,8 @@ async function printLabel(){
 
 function browserPrintLabel(){
   saveLabelSize();
-  const d = devices.find(x => x.id === labelDeviceId);
-  if(!d){ alert(t('msg.labelError')); return; }
+  const d = lblDevice();
+  if(!d){ alert(t('msg.labelError') || 'مقدرناش نجهّز الليبل'); return; }
 
   const sz = getLabelSize();
   const qr = grabQrDataUrl();
@@ -754,12 +772,21 @@ function lblPrintHtml(html){
   }
 }
 
+// ⚠️ دي للداشبورد (عنده detailLabelArea و devices بأسماء النظام).
+//    الديسباتشر عنده دالته هو (dpToggleLabel) لأن أسماء حقوله
+//    مختلفة. الحراسة هنا عشان الملف ما يقعش لو اتنده في صفحة
+//    مفيهاش الاتنين.
 function toggleDetailLabel(id){
   const area = document.getElementById('detailLabelArea');
+  if(!area) return;
   if(area.innerHTML.trim() !== ''){
     area.innerHTML = '';
     return;
   }
-  const d = devices.find(x => x.id === id);
+  let d = null;
+  try{
+    if(typeof devices !== 'undefined' && Array.isArray(devices))
+      d = devices.find(x => x.id === id);
+  }catch(e){}
   if(d) renderLabelInto('detailLabelArea', d);
 }
