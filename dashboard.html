@@ -815,6 +815,22 @@
   .stuck-item:hover{background:var(--danger-bg);}
   .stuck-days{font-family:'Cairo',sans-serif; font-size:19px; font-weight:900; color:var(--danger); white-space:nowrap;}
 
+  /* ===== صفحة الموظفين — لمبة الحضور ===== */
+  .stf-count{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
+  .stf-pill{flex:1; min-width:120px; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:12px 14px; text-align:center;}
+  .stf-pill-n{font-family:'Cairo',sans-serif; font-size:26px; font-weight:900; line-height:1;}
+  .stf-pill-l{font-size:12.5px; color:var(--ink-2); margin-top:5px; font-weight:700;}
+  .stf-row{display:flex; align-items:center; gap:12px; background:var(--surface);
+    border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:8px;}
+  /* اللمبة: دايرة صغيرة + هالة بنفس اللون عشان تبان من بعيد */
+  .stf-dot{flex:none; width:13px; height:13px; border-radius:50%;}
+  .stf-dot.on{background:#16A34A; box-shadow:0 0 0 4px rgba(22,163,74,.18);}
+  .stf-dot.off{background:#DC2626; box-shadow:0 0 0 4px rgba(220,38,38,.15);}
+  .stf-name{font-weight:800; font-size:14.5px; color:var(--ink);}
+  .stf-meta{font-size:12px; color:var(--muted-2); margin-top:2px;}
+  .stf-state{margin-inline-start:auto; font-size:12.5px; font-weight:800; white-space:nowrap;}
+
   /* ===== صفحة الحسابات ===== */
   .acc-payform{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(16,16,20,.04);}
   .acc-payform-row{display:grid; grid-template-columns:1.2fr 1fr 1.4fr auto; gap:10px;}
@@ -1165,6 +1181,7 @@
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
       <button class="att-menu-btn" style="display:none;" onclick="openAttendance()">⏰ المواعيد</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
+    <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
     <button data-i18n="menu.settings" onclick="openSettings()">⚙️ الإعدادات</button>
     <button class="logout-menu-item" data-i18n="menu.logout" onclick="logout()" style="color:var(--danger);">تسجيل الخروج</button>
@@ -1471,6 +1488,26 @@
   </div>
 </div>
 
+<!-- ============================================================
+     صفحة الموظفين — لمبة الحضور
+     ------------------------------------------------------------
+     بتقرا من دالة hr_today_presence() بس (ملف ٢٨).
+     🔴 مفيش أي كود بيكتب هنا — عرض بحت.
+     ============================================================ -->
+<div id="staffOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>👥 الموظفين</h2>
+      <button class="close-btn" onclick="closeStaff()">×</button>
+    </div>
+    <div class="modal-search" style="padding:0 20px 8px;">
+      <input id="staffSearch" oninput="renderStaff()" placeholder="🔍 دور باسم الموظف..."
+             style="border-radius:10px; padding:12px 14px; font-size:15px; font-family:inherit;" />
+    </div>
+    <div id="staffBody" style="padding:16px 20px 40px;"></div>
+  </div>
+</div>
+
 <!-- Analytics (الملخص) page -->
 <div id="analyticsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
@@ -1665,9 +1702,13 @@ const ROLE_LABEL_KEYS = {
   dispatcher:  'adm.roleDisp',
   technician:  'adm.roleTech'
 };
+// دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
+// فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
-  try{ return k ? t(k) : r; }catch(e){ return r; }
+  try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
+  catch(e){ return ROLE_LABEL_FALLBACK[r] || r; }
 }
 function currentRoleLabel(){ return roleLabel(myRole()); }
 
@@ -3579,6 +3620,7 @@ function openDetail(id){
 }
 function closeDetail(){
   document.getElementById('detailOverlay').classList.add('hidden');
+  _detailRenderPending = false;   // مفيش رسم مؤجّل بعد ما الشاشة تتقفل
   selectedId = null;
   trackResponses = {};
   pointsBoxOpen = false;
@@ -3649,7 +3691,60 @@ function accountantOptions(){
   return names.map(n => `<option value="${esc(n)}"></option>`).join('');
 }
 
+// ============================================================
+// ⚠️ رسم التفاصيل — الحارس ضد ضياع الكتابة
+// ------------------------------------------------------------
+// المشكلة اللي ده بيصلّحها:
+//   بتفتح تفاصيل جهاز → تدوس على خانة السعر → تكتب رقمين تلاتة →
+//   الكلام يختفي فجأة، وتضطر تدوس على الخانة تاني وتكتب من الأول.
+//
+// السبب: الرسم بيمسح **كل** محتوى الشاشة ويبنيه من جديد. والخانة
+// اللي بتكتب فيها بتتمسح معاه — بالنص اللي كتبته. وده بيحصل لأن
+// فيه حاجات بتخلص بعد ما الشاشة تفتح بثانية أو اتنين وبتطلب رسم:
+//   • قراءة رد العميل على السعر من السيرفر (openDetail)
+//   • رد العميل بيتغيّر لحظياً (المزامنة اللحظية)
+//   • الذكاء الاصطناعي بيخلص تحليل العطل
+// كلهم بيوصلوا **بالظبط** وإنت بتكتب.
+//
+// تشبيه: بتكتب على ورقة، وكل شوية حد بيسحبها ويحط ورقة نضيفة
+// مكانها. الورقة الجديدة سليمة — بس اللي كتبته راح.
+//
+// الحل: لو إيدك على أي خانة دلوقتي، بنأجّل الرسم لحد ما تسيبها.
+// مش بنلغيه — بنستناه. فالبيانات بتتحدّث زي ما هي، بس بعد ما
+// تخلص كتابة.
+//
+// ⚠️ ليه ده مش بيعطّل أي حاجة؟ لأن الرسم اللي بييجي بعد ضغطة
+//    زرار (تغيير حالة · تأكيد دفع · إضافة ملاحظة) بيبقى التركيز
+//    فيه على **الزرار** مش على خانة كتابة — فبيعدّي عادي فوراً.
+// ============================================================
+let _detailRenderPending = false;
+
 function renderDetail(){
+  const modal = document.getElementById('detailModal');
+  const ae = document.activeElement;
+  const typing = modal && ae && modal.contains(ae)
+              && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+
+  if(typing){
+    _detailRenderPending = true;
+    // بنعلّق مرة واحدة بس على الخانة دي — { once:true } بيشيل نفسه
+    if(ae.dataset.reRenderHooked !== '1'){
+      ae.dataset.reRenderHooked = '1';
+      ae.addEventListener('blur', () => {
+        if(_detailRenderPending){
+          _detailRenderPending = false;
+          renderDetail();
+        }
+      }, { once:true });
+    }
+    return;
+  }
+
+  _detailRenderPending = false;
+  renderDetailNow();
+}
+
+function renderDetailNow(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return closeDetail();
   const s = statusInfo(d.status);
@@ -5713,7 +5808,7 @@ function openScannedDevice(hit){
     el.blur();
   }
   ['columnSearch','invSearch','scanInput','accSearch'].forEach(clearSearchBox);
-  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay']
+  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay','staffOverlay']
     .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
   gScanBuf = '';
   openDetail(hit.id);
@@ -6907,6 +7002,99 @@ function renderSummaries(){
 }
 
 // ============================================================
+// صفحة الموظفين — لمبة الحضور
+// ------------------------------------------------------------
+// 🟢 = عنده وردية مفتوحة (حضر ولسه ما انصرفش)
+// 🔴 = مفيش وردية مفتوحة
+//
+// كل الحساب بيحصل في قاعدة البيانات (hr_today_presence في ملف ٢٨)
+// عشان الصفحة ما تشوفش إحداثيات ولا سجل — بتاخد اللمبة جاهزة.
+// ============================================================
+let staffRows = [];
+let staffErr  = '';
+
+function openStaff(){
+  document.getElementById('menuDropdown').classList.add('hidden');
+  if(typeof shieldGhostClick === 'function') shieldGhostClick();
+  const s = document.getElementById('staffSearch'); if(s) s.value = '';
+  document.getElementById('staffOverlay').classList.remove('hidden');
+  staffRows = []; staffErr = '';
+  document.getElementById('staffBody').innerHTML =
+    `<div class="empty-col">جاري التحميل…</div>`;
+  loadStaffPresence();
+}
+function closeStaff(){ document.getElementById('staffOverlay').classList.add('hidden'); }
+
+async function loadStaffPresence(){
+  try{
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. لو بلعناه هنا
+    //    الصفحة هتطلع فاضية والمستخدم يفتكر إن مفيش موظفين.
+    const { data, error } = await sb.rpc('hr_today_presence');
+    if(error) throw error;
+    staffRows = data || [];
+    staffErr = '';
+  }catch(e){
+    staffRows = [];
+    staffErr = (e && e.message) ? e.message : String(e);
+    console.error('hr_today_presence failed:', e);
+  }
+  renderStaff();
+}
+
+function renderStaff(){
+  const host = document.getElementById('staffBody');
+  if(!host) return;
+
+  if(staffErr){
+    host.innerHTML = `<div class="empty-col" style="color:var(--danger); line-height:2;">
+      ❌ مقدرناش نقرا حالة الموظفين<br>
+      <span style="font-family:monospace; font-size:11.5px;">${esc(staffErr)}</span><br>
+      <span style="font-size:12px; color:var(--muted-2);">لو الرسالة فيها «مالكش صلاحية» أو اسم الدالة — يبقى ملف 28-staff-presence.sql لسه ما اتشغّلش.</span>
+    </div>`;
+    return;
+  }
+
+  const q = (document.getElementById('staffSearch')?.value || '').trim().toLowerCase();
+  const list = q
+    ? staffRows.filter(r => (`${r.user_name||''} ${r.user_email||''}`).toLowerCase().includes(q))
+    : staffRows;
+
+  const onCount  = staffRows.filter(r => r.present).length;
+  const offCount = staffRows.length - onCount;
+
+  const counts = `
+    <div class="stf-count">
+      <div class="stf-pill"><div class="stf-pill-n" style="color:#16A34A;">${onCount}</div>
+        <div class="stf-pill-l">🟢 حاضر دلوقتي</div></div>
+      <div class="stf-pill"><div class="stf-pill-n" style="color:#DC2626;">${offCount}</div>
+        <div class="stf-pill-l">🔴 مش حاضر</div></div>
+    </div>`;
+
+  const rows = list.length === 0
+    ? `<div class="empty-col">${q ? 'مفيش نتايج' : 'مفيش موظفين متسجّلين'}</div>`
+    : list.map(r => {
+        const on = !!r.present;
+        // "من الساعة كذا" — بس للحاضر. المنصرف مالوش وقت نعرضه.
+        const since = (on && r.since)
+          ? new Date(r.since).toLocaleTimeString(
+              (typeof getLocale === 'function' ? getLocale() : 'ar-EG'),
+              { hour:'2-digit', minute:'2-digit' })
+          : '';
+        return `<div class="stf-row">
+          <span class="stf-dot ${on ? 'on' : 'off'}"></span>
+          <div style="min-width:0;">
+            <div class="stf-name">${esc(r.user_name || r.user_email || '—')}</div>
+            <div class="stf-meta">${esc(roleLabel(r.role))}${since ? ' · من ' + esc(since) : ''}</div>
+          </div>
+          <span class="stf-state" style="color:${on ? '#16A34A' : '#DC2626'};">
+            ${on ? 'حاضر' : 'مش حاضر'}</span>
+        </div>`;
+      }).join('');
+
+  host.innerHTML = counts + rows;
+}
+
+// ============================================================
 // تصدير "تم التسليم بانتظار الدفع": Excel حقيقي + PDF ملون
 // ============================================================
 function deliveredUnpaidRows(list){
@@ -7142,7 +7330,47 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? 'var(--danger)' : 'var(--success)'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${t('an.outstanding')}</div></div>
     </div>`;
 
+  // ============================================================
   // ===== كبار العملاء =====
+  // ------------------------------------------------------------
+  // القاعدة: العميل اللي جاب VIP_MIN_DEVICES جهاز أو أكتر **في
+  // الشهر الميلادي الحالي** يدخل القايمة.
+  //
+  // ⚠️ القايمة دي **مش** متأثرة بفلتر الفترة اللي فوق — هي دايماً
+  //    على الشهر الحالي. وده مقصود: الفلتر بيخص أرقام الفلوس،
+  //    وكبار العملاء قاعدتها شهرية ثابتة زي ما اتطلبت.
+  //
+  // ⚠️ التجديد **بيحصل لوحده**، مفيش أي كود بيشتغل أول الشهر ولا
+  //    قايمة متخزّنة في أي مكان. العدّ بيتعمل من أول وجديد في كل
+  //    مرة تفتح الصفحة، وبيعدّ أجهزة الشهر الحالي بس.
+  //
+  //    يعني أول ما الشهر يقلب، أجهزة الشهر اللي فات بتخرج من
+  //    الحساب تلقائياً، والعميل اللي مجابش ٣ تانيين بيختفي لوحده.
+  //
+  //    تشبيه: زي عدّاد الكهرباء اللي بيتصفّر أول الشهر — مش محتاج
+  //    حد يفتكر يصفّره، الشهر الجديد بيبدأ من صفر بطبيعته.
+  //
+  //    والبديل (قايمة متخزّنة + مهمة شهرية تنضّفها) كان معناه
+  //    حاجة ممكن تنسى تشتغل، وبيانات ممكن تبقى غلط من غير ما يبان.
+  // ============================================================
+  const VIP_MIN_DEVICES = 3;   // ← غيّر الرقم ده لو عايز الحد يختلف
+
+  const _now      = new Date();
+  const monthFrom = new Date(_now.getFullYear(), _now.getMonth(), 1, 0, 0, 0, 0);
+  // ⚠️ حد أعلى كمان — مش من أول الشهر وخلاص.
+  //    من غيره، جهاز اتسجّل بالغلط بتاريخ في الشهر الجاي (غلطة
+  //    كتابة في التاريخ) هيتحسب في قايمة الشهر ده، والعميل يدخل
+  //    كبار العملاء وهو مستحقهاش.
+  const monthTo   = new Date(_now.getFullYear(), _now.getMonth() + 1, 1, 0, 0, 0, 0);
+  const monthName = _now.toLocaleDateString(
+    (typeof getLocale === 'function' ? getLocale() : 'ar-EG'),
+    { month: 'long', year: 'numeric' });
+  const inThisMonth = iso => {
+    if(!iso) return false;
+    const d = new Date(iso);
+    return !isNaN(d) && d >= monthFrom && d < monthTo;
+  };
+
   // ⚠️ تمريرة أولى: خريطة اسم ← تليفون.
   // العميل ساعات بيتسجّل من غير تليفون في تذكرة وبتليفون في تانية.
   // من غير الخريطة دي كان بينقسم لصفّين: واحد بالاسم من غير زرار
@@ -7156,7 +7384,7 @@ function renderAnalytics(){
 
   const byCustomer = {};
   devices.forEach(d => {
-    if(!inAnRange(d.intakeDate)) return;
+    if(!inThisMonth(d.intakeDate)) return;   // الشهر الحالي بس
     const nm       = (d.customerName || '').trim();
     // تليفون الجهاز نفسه، وإلا أي تليفون اتسجّل لنفس الاسم
     const rawPhone = d.customerPhone || nameToPhone[nm] || '';
@@ -7171,10 +7399,20 @@ function renderAnalytics(){
     if(!byCustomer[key].phone && rawPhone) byCustomer[key].phone = rawPhone;
     if(!byCustomer[key].shop && d.shopName) byCustomer[key].shop = d.shopName;
   });
-  const topCustomers = Object.values(byCustomer).sort((a,b) => b.count - a.count).slice(0, 10);
+
+  const topCustomers = Object.values(byCustomer)
+    .filter(c => c.count >= VIP_MIN_DEVICES)
+    .sort((a,b) => b.count - a.count);
+
+  // اللي قرّبوا يوصلوا — بيوضّح إن القايمة شغّالة حتى لو فاضية
+  const nearlyThere = Object.values(byCustomer)
+    .filter(c => c.count === VIP_MIN_DEVICES - 1).length;
 
   const custList = topCustomers.length === 0
-    ? `<div class="empty-col">${t('an.noCustomers')}</div>`
+    ? `<div class="empty-col">
+         لسه محدش وصل لـ ${VIP_MIN_DEVICES} أجهزة في ${esc(monthName)}
+         ${nearlyThere ? `<br><span style="color:var(--muted-2);">${nearlyThere} عميل على بُعد جهاز واحد</span>` : ''}
+       </div>`
     : topCustomers.map((c, i) => `
       <div class="cust-item">
         <div style="display:flex; align-items:center; gap:12px;">
@@ -7191,6 +7429,11 @@ function renderAnalytics(){
     ${filterBar}
     ${moneyCards}
     <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
+    <div style="font-size:12.5px; color:var(--muted-2); margin:-4px 0 10px; line-height:1.9;">
+      ${VIP_MIN_DEVICES} أجهزة فأكتر خلال <b>${esc(monthName)}</b>
+      · بتتجدّد لوحدها أول كل شهر
+      · <span style="color:var(--muted);">مش متأثرة بفلتر الفترة فوق</span>
+    </div>
     ${custList}
   `;
 }

@@ -132,12 +132,14 @@
       //    بيتحمّل بعدين بيكسب.
       'parts.title': '🧰 مخزن قطع الغيار',
       'inv.tab.unallocated': 'قطع غيار غير موجهة',
+      'inv.tab.stored': 'قطع غيار مخزنة',
       'inv.tab.allocated': 'قطع غيار موجهة',
       'inv.tab.supplies': 'لوازم الصيانة',
       'inv.count': 'قطعة',
       'inv.totalCost': 'إجمالي التكلفة (ج.م)',
       'inv.searchPh': 'ابحث باسم القطعة أو الجهاز...',
       'inv.emptyUnallocated': 'المخزن العام فاضي — البنود بتيجي من فواتير المشتريات، أو ضيف قطعة يدوي.',
+      'inv.emptyStored': 'مفيش قطع مخزنة — راجع الوارد في «قطع غيار غير موجهة» وانقله هنا.',
       'inv.emptyAllocated': 'لسه مفيش قطع مربوطة بأجهزة.',
       'inv.emptySupplies': 'مفيش لوازم صيانة متسجلة.',
       'inv.addManual': '➕ إضافة قطعة يدوي',
@@ -151,6 +153,8 @@
       'inv.allocate': '🔗 ربط بجهاز',
       'inv.unlink': 'إلغاء الربط',
       'inv.toSupplies': 'تحويل إلى لوازم صيانة',
+      'inv.toStored': '📦 نقل للمخزن',
+      'inv.toInbox': '↩️ رجوع للوارد',
       'inv.toStock': 'إرجاع للمخزن العام',
       'inv.delete': 'حذف',
       'inv.save': 'حفظ',
@@ -161,6 +165,8 @@
       'inv.unlinked': 'رجعت للمخزن العام ✅',
       'inv.movedSupplies': 'اتحوّلت للوازم الصيانة ✅',
       'inv.movedStock': 'رجعت للمخزن العام ✅',
+      'inv.movedStored': 'اتخزّنت — مستنية جهاز ✅',
+      'inv.movedInbox': 'رجعت للوارد ✅',
       'inv.added': 'اتضافت للمخزن ✅',
       'inv.deleted': 'اتحذفت',
       'inv.errNet': 'العملية دي محتاجة نت — استنى النت يرجع.',
@@ -255,12 +261,14 @@
       'inv.menu': 'Spare-parts store',
       'parts.title': '🧰 Spare-parts store',
       'inv.tab.unallocated': 'Unallocated parts',
+      'inv.tab.stored': 'Stored parts',
       'inv.tab.allocated': 'Allocated parts',
       'inv.tab.supplies': 'Maintenance supplies',
       'inv.count': 'items',
       'inv.totalCost': 'Total cost (EGP)',
       'inv.searchPh': 'Search by part or device...',
       'inv.emptyUnallocated': 'General stock is empty — items arrive from purchase invoices, or add one manually.',
+      'inv.emptyStored': 'No stored parts — review the inbox under "Unallocated parts" and move items here.',
       'inv.emptyAllocated': 'No parts linked to devices yet.',
       'inv.emptySupplies': 'No maintenance supplies recorded.',
       'inv.addManual': '➕ Add part manually',
@@ -274,6 +282,8 @@
       'inv.allocate': '🔗 Link to device',
       'inv.unlink': 'Unlink',
       'inv.toSupplies': 'Move to supplies',
+      'inv.toStored': '📦 Move to store',
+      'inv.toInbox': '↩️ Back to inbox',
       'inv.toStock': 'Return to stock',
       'inv.delete': 'Delete',
       'inv.save': 'Save',
@@ -284,6 +294,8 @@
       'inv.unlinked': 'Returned to general stock ✅',
       'inv.movedSupplies': 'Moved to maintenance supplies ✅',
       'inv.movedStock': 'Returned to general stock ✅',
+      'inv.movedStored': 'Stored — waiting for a device ✅',
+      'inv.movedInbox': 'Returned to inbox ✅',
       'inv.added': 'Added to stock ✅',
       'inv.deleted': 'Deleted',
       'inv.errNet': 'This action needs an internet connection.',
@@ -1415,8 +1427,11 @@
   // ============================================================
   // ============================================================
 
+  // ⚠️ الترتيب هنا = ترتيب رحلة القطعة في المحل:
+  //    وارد جديد → مخزنة (بعد المراجعة) → متربطة بجهاز
   const TABS = [
     { key: 'unallocated', k: 'inv.tab.unallocated', color: 'var(--info,#2563EB)' },
+    { key: 'stored', k: 'inv.tab.stored', color: 'var(--accent,#0891A8)' },
     { key: 'allocated', k: 'inv.tab.allocated', color: 'var(--success,#15803D)' },
     { key: 'supplies', k: 'inv.tab.supplies', color: 'var(--warn,#B45309)' }
   ];
@@ -1478,7 +1493,9 @@
   .pur-devhint{font-size:11.5px; color:var(--muted,#64748B); margin-top:6px;}
 
   /* تبويبات المخزن */
-  .inv-tabs{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px;}
+  /* ⚠️ العدد هنا لازم يساوي عدد التبويبات في TABS. بقوا ٤ بعد ما
+     اتزاد "قطع غيار مخزنة". وعلى الموبايل بيبقوا تحت بعض. */
+  .inv-tabs{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px;}
   @media (max-width:560px){ .inv-tabs{grid-template-columns:1fr;} }
   .inv-tab{background:var(--surface,#fff); border:1.5px solid var(--border,#E2E8F0); border-radius:10px; padding:11px 8px;
     font-family:'Cairo',sans-serif; font-size:13.5px; font-weight:800; color:var(--muted,#64748B); cursor:pointer;
@@ -1615,6 +1632,14 @@
     } else if (p.category === 'unallocated') {
       actions = `
         <button class="inv-btn primary" onclick="INV.beginAlloc('${esc(p.id)}')">${esc(T('inv.allocate'))}</button>
+        <button class="inv-btn" onclick="INV.toStored('${esc(p.id)}')">${esc(T('inv.toStored'))}</button>
+        <button class="inv-btn" onclick="INV.toSupplies('${esc(p.id)}')">${esc(T('inv.toSupplies'))}</button>
+        <button class="inv-btn del" onclick="INV.del('${esc(p.id)}')">${esc(T('inv.delete'))}</button>`;
+    } else if (p.category === 'stored') {
+      // القطعة اتراجعت واتسعّرت — الخطوة الطبيعية اللي بعدها الربط بجهاز
+      actions = `
+        <button class="inv-btn primary" onclick="INV.beginAlloc('${esc(p.id)}')">${esc(T('inv.allocate'))}</button>
+        <button class="inv-btn" onclick="INV.toInbox('${esc(p.id)}')">${esc(T('inv.toInbox'))}</button>
         <button class="inv-btn" onclick="INV.toSupplies('${esc(p.id)}')">${esc(T('inv.toSupplies'))}</button>
         <button class="inv-btn del" onclick="INV.del('${esc(p.id)}')">${esc(T('inv.delete'))}</button>`;
     } else if (p.category === 'allocated') {
@@ -1652,7 +1677,8 @@
       <div class="inv-tot-l">${esc(T('inv.totalCost'))}</div></div>`;
 
     const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
-      : IS.tab === 'supplies' ? 'inv.emptySupplies' : 'inv.emptyUnallocated';
+      : IS.tab === 'supplies' ? 'inv.emptySupplies'
+      : IS.tab === 'stored' ? 'inv.emptyStored' : 'inv.emptyUnallocated';
     const list = rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`;
 
     // الإضافة اليدوية متاحة في المخزن العام واللوازم بس (الموجه بيتربط من الجهاز)
@@ -1678,7 +1704,8 @@
   function invListBodyHtml() {
     const rows = invFiltered();
     const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
-      : IS.tab === 'supplies' ? 'inv.emptySupplies' : 'inv.emptyUnallocated';
+      : IS.tab === 'supplies' ? 'inv.emptySupplies'
+      : IS.tab === 'stored' ? 'inv.emptyStored' : 'inv.emptyUnallocated';
     return rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`;
   }
 
@@ -1863,6 +1890,10 @@
     },
     toSupplies(id) { updatePart(id, { category: 'supplies', device_id: null, device_label: null }, 'inv.movedSupplies'); },
     toStock(id) { updatePart(id, { category: 'unallocated', device_id: null, device_label: null }, 'inv.movedStock'); },
+    // الوارد → المخزن (بعد ما تراجعه وتسعّره)
+    toStored(id) { updatePart(id, { category: 'stored', device_id: null, device_label: null }, 'inv.movedStored'); },
+    // المخزن → الوارد (لو نقلتها بالغلط)
+    toInbox(id) { updatePart(id, { category: 'unallocated', device_id: null, device_label: null }, 'inv.movedInbox'); },
 
     async del(id) {
       if (!confirm(T('inv.confirmDelete'))) return;
@@ -1922,10 +1953,21 @@
       if (!online()) { toast(T('inv.errNet'), false); return; }
       let rows = [];
       try {
-        const { data } = await sb.from(CFG.partsTable).select('*')
-          .eq('category', 'unallocated').order('created_at', { ascending: false }).limit(1000);
+        // ⚠️ الوارد **والمخزن** الاتنين. ده جوهر الميزة: القطعة
+        //    المخزنة موجودة عشان تستنى جهاز — فلو مظهرتش هنا،
+        //    التخزين نفسه مالوش لازمة.
+        const { data, error } = await sb.from(CFG.partsTable).select('*')
+          .in('category', ['unallocated', 'stored'])
+          .order('created_at', { ascending: false }).limit(1000);
+        // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. من غير السطر
+        //    ده الشاشة بتقول "المخزن فاضي" وهو مليان.
+        if (error) throw error;
         rows = data || [];
-      } catch (e) { rows = []; }
+      } catch (e) {
+        console.error('openPickForDevice failed:', e);
+        toast(T('inv.errGeneric', { m: (e && e.message) || e }), false);
+        rows = [];
+      }
 
       let ov = $('dpPickOverlay');
       if (!ov) {
