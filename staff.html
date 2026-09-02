@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح باقي الصفحات (ifix-theme).
+   من غير ده فيه ومضة بيضا قبل ما الغامق يشتغل. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  }catch(e){}
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>المواعيد — I Fix Team</title>
+<meta name="theme-color" content="#1B2A3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="المواعيد">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<script src="i18n.js"></script>
+<script src="attendance.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* نفس ألوان باقي النظام بالحرف — الصفحة دي مش بتخترع لغة تصميم جديدة */
+  :root{
+    --chrome:#16233A; --on-chrome:#FFFFFF;
+    --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
+    --ink:#17222E; --ink-2:#475569; --muted:#6B7A8C; --faint:#94A3B4;
+    --red:#E8321E; --done:#15803D; --done-bg:#EAF6EE;
+    --waiting:#B5651D; --waiting-bg:#FBF2E9;
+    --blue:#2B6CB0; --blue-bg:#EAF1F8;
+    --surface:#FFFFFF; --surface-2:#F2F5F8; --border:#E4E9EF;
+  }
+  [data-theme="dark"]{
+    --chrome:#0F1823; --on-chrome:#F2F5F8;
+    --paper:#0E1620; --card:#16202C; --line:#233040;
+    --ink:#E9EEF4; --ink-2:#B7C3D0; --muted:#8A99A9; --faint:#67788A;
+    --done:#4ADE80; --done-bg:#123122;
+    --waiting:#F0A552; --waiting-bg:#33240F;
+    --blue:#7FB2E5; --blue-bg:#12243A;
+    --surface:#16202C; --surface-2:#1D2937; --border:#233040;
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Tajawal',system-ui,sans-serif;
+    min-height:100dvh;
+  }
+
+  /* ⚠️ padding-top فيه env(safe-area-inset-top) — من غيره الرأس
+     بيتحط تحت شريط الساعة والنتش على الأيفون ويختفي.
+     (نفس الدرس اللي اتعلمناه في شاشة الجرد.) */
+  .topbar{
+    background:var(--chrome); color:var(--on-chrome);
+    padding:calc(env(safe-area-inset-top, 0px) + 14px) 18px 14px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    position:sticky; top:0; z-index:20;
+  }
+  .topbar h1{font-family:'Cairo',sans-serif; font-size:17px; margin:0; font-weight:900;}
+  .who{font-size:12px; opacity:.75; margin-top:2px;}
+  .logout{
+    flex:none; border:1px solid rgba(255,255,255,.25); background:transparent;
+    color:var(--on-chrome); border-radius:9px; padding:8px 13px;
+    font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+
+  .wrap{padding:18px; padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 60px);}
+
+  .hint{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:18px; text-align:center; color:var(--ink-2);
+    font-size:14px; line-height:2;
+  }
+  .big-btn{
+    display:block; width:100%; margin:0 0 16px;
+    background:var(--chrome); color:var(--on-chrome); border:none;
+    border-radius:16px; padding:22px; font-family:'Cairo',sans-serif;
+    font-size:19px; font-weight:900; cursor:pointer;
+    box-shadow:0 4px 14px rgba(16,16,20,.12);
+  }
+  .big-btn:active{transform:scale(.99);}
+
+  .note{font-size:12.5px; color:var(--muted); text-align:center; margin-top:14px; line-height:1.9;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>⏰ المواعيد</h1>
+    <div class="who" id="whoLbl">…</div>
+  </div>
+  <button class="logout" onclick="doLogout()">خروج</button>
+</div>
+
+<div class="wrap">
+  <!-- ⚠️ الكلاس att-menu-btn مهم: attendance.js بيدوّر عليه بنفسه
+       ويظهّره على الموبايل. من غيره الزرار هيفضل مخفي. -->
+  <button class="big-btn att-menu-btn" style="display:none;"
+          onclick="openAttendance()">⏰ افتح المواعيد</button>
+
+  <!-- بيبان على الكمبيوتر بس — attendance.js بيخفي الزرار فوق هناك -->
+  <div class="hint" id="deskHint" style="display:none;">
+    📱 تسجيل الحضور من الموبايل بس.<br>
+    افتح الصفحة من تليفونك عشان تقدر تسجّل.
+  </div>
+
+  <div class="note">
+    الصفحة دي للحضور والانصراف والبريك بس.<br>
+    لو محتاج أي حاجة تانية كلّم الإدارة.
+  </div>
+</div>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
+
+<script>
+// ============================================================
+// صفحة الموظف — المواعيد وبس
+// ------------------------------------------------------------
+// ⚠️ الصفحة دي **مابتقراش** أي جدول أجهزة ولا فلوس ولا حسابات.
+//    كل اللي بتعمله: تتأكد إنك داخل، وتفتح شاشة المواعيد.
+//
+//    وده مقصود — أقل صفحة في النظام من ناحية الوصول للبيانات.
+//    الحماية الحقيقية في قاعدة البيانات (سياسات RLS)، والصفحة
+//    دي بتحترم نفس المبدأ: ما تطلبش حاجة مالكش لازمة بيها.
+// ============================================================
+let ME = '', ROLES_MAP = {}, MY_ROLE = '';
+
+(async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.href = 'index.html'; return; }
+  ME = (session.user.email || '').toLowerCase();
+
+  // الاسم والدور — للعرض في الرأس بس
+  try{
+    const { data, error } = await sb.from('app_data')
+      .select('value').eq('key','user-roles').maybeSingle();
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    if(data && data.value) ROLES_MAP = JSON.parse(data.value) || {};
+  }catch(e){ console.error('user-roles failed:', e); }
+
+  const mine = ROLES_MAP[ME];
+  MY_ROLE = typeof mine === 'string' ? mine : (mine && mine.role) || '';
+
+  document.getElementById('whoLbl').textContent =
+    nameOf(ME) + (MY_ROLE ? ' — ' + roleLabel(MY_ROLE) : '');
+
+  // ⚠️ الموظف اللي دوره اتغيّر وهو فاتح الصفحة — نوديه لمكانه.
+  //    من غير ده هيفضل قافل على صفحة المواعيد بعد ما يبقى فني
+  //    أو محاسب، ومش هيعرف يوصل لشغله.
+  const HOME = {
+    technician:  'my-devices.html',
+    dispatcher:  'dispatch.html',
+    hr:          'hr.html',
+    accountant:  'dashboard.html',
+    super_admin: 'dashboard.html'
+  };
+  if(MY_ROLE && HOME[MY_ROLE]){ location.replace(HOME[MY_ROLE]); return; }
+
+  // على الكمبيوتر زرار المواعيد بيتخفي — نوضّح السبب بدل شاشة فاضية
+  setTimeout(() => {
+    const btn = document.querySelector('.att-menu-btn');
+    const hidden = !btn || btn.style.display === 'none';
+    const hint = document.getElementById('deskHint');
+    if(hint) hint.style.display = hidden ? '' : 'none';
+  }, 1500);
+})();
+
+function roleLabel(r){
+  return { super_admin:'أدمن', accountant:'محاسب', dispatcher:'مسؤول حركة',
+           technician:'فني', hr:'شؤون العاملين', staff:'موظف' }[r] || r;
+}
+function nameOf(email){
+  const v = ROLES_MAP[email];
+  const n = (v && typeof v === 'object' && v.techName) ? v.techName : '';
+  return n || (email || '').split('@')[0];
+}
+async function doLogout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.href = 'index.html';
+}
+</script>
+</body>
+</html>

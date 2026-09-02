@@ -684,7 +684,17 @@ async function toggleFlag(key){
 // الأدوار المتاحة — لازم تفضل زي اللي في dashboard.html
 // ⚠️ hr = مسؤول شؤون العاملين. بيشوف سجل مواعيد كل الموظفين
 //    وبس — مالوش أي علاقة بالأجهزة ولا الفلوس.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr'];
+// ⚠️ staff = موظف عادي (مش فني ولا محاسب ولا مسؤول حركة).
+//    صفحته مواعيد وبس — حضور وانصراف وبريك.
+//
+// 🔴🔴 أي دور جديد لازم يتسجّل في **خمس** أماكن، مش هنا بس:
+//    ١) ROLES دي (admin.html)
+//    ٢) قايمة الحارس في index.html
+//    ٣) إعادة التوجيه في dashboard.html (مكانين)
+//    ٤) قايمة IN جوه دالة my_app_role في قاعدة البيانات
+//    ٥) roleLabel في hr.html و staff.html
+//    نسيان أي واحدة = الدور بيتحوّل لمحاسب في صمت.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -692,7 +702,14 @@ const ROLE_LABEL_KEYS = {
   technician:  'adm.roleTech',
   hr:          'adm.roleHr'
 };
-function roleLabel(r){ const k = ROLE_LABEL_KEYS[r]; try{ return k ? t(k) : r; }catch(e){ return r; } }
+// الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
+// الإنجليزي الخام (staff) قدّام الأدمن.
+const ROLE_LABEL_FALLBACK = { staff: 'موظف' };
+function roleLabel(r){
+  const k = ROLE_LABEL_KEYS[r];
+  try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
+  catch(e){ return ROLE_LABEL_FALLBACK[r] || r; }
+}
 
 // بيقرا الشكلين: النص القديم "super_admin" والكائن الجديد {role, techName}
 function normRole(v){
