@@ -57,10 +57,11 @@
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html'
                      : last === 'hr'         ? 'hr.html'
+                     : last === 'staff'      ? 'staff.html'
                      : 'my-devices.html');
       return;
     }
@@ -1640,7 +1641,7 @@ function isAdmin(){ return isSuperAdmin(); }
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr'];
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff'];
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
@@ -1704,7 +1705,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -1741,6 +1742,8 @@ function applyRoleVisibility(){
   // ⚠️ شؤون العاملين مالهاش أي علاقة بالأجهزة ولا الفلوس.
   //    لو وصلت هنا بأي طريقة، بنحوّلها لصفحتها.
   if(myRole() === 'hr'){ location.replace('hr.html');       return; }
+  // ⚠️ الموظف العادي مالوش أي علاقة بالأجهزة ولا الفلوس.
+  if(myRole() === 'staff'){ location.replace('staff.html'); return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{

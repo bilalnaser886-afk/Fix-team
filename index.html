@@ -231,7 +231,7 @@ async function landingByRole(email){
       //    نسيت أزوّد 'hr' فيها، فحساب شؤون العاملين كان بيتحوّل
       //    لمحاسب ويفتح الداشبورد — الدور اتقرا صح، بس الحارس رماه.
       //    **أي دور جديد لازم يتضاف هنا كمان**، مش في ROLES بس.
-      if(['super_admin','accountant','dispatcher','technician','hr'].includes(found)) role = found;
+      if(['super_admin','accountant','dispatcher','technician','hr','staff'].includes(found)) role = found;
     }
   }catch(err){ /* نكمّل بالافتراضي */ }
 
@@ -247,6 +247,9 @@ async function landingByRole(email){
   //    هتروح للداشبورد وتشوف الأجهزة والفلوس والتقارير كلها —
   //    وهي المفروض تشوف سجل المواعيد وبس.
   if(role === 'hr')         return 'hr.html';
+  // ⚠️ الموظف العادي: صفحته مواعيد وبس. من غير السطر ده كان
+  //    هيروح للداشبورد ويشوف الأجهزة والفلوس والتقارير كلها.
+  if(role === 'staff')      return 'staff.html';
   return 'dashboard.html';
 }
 if(APP_ENV === "staging"){
