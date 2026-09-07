@@ -171,6 +171,22 @@
       'inv.deleted': 'اتحذفت',
       'inv.errNet': 'العملية دي محتاجة نت — استنى النت يرجع.',
       'inv.errGeneric': 'العملية ما تمّتش: {m}',
+      // حذف فاتورة كاملة
+      'pur.del': '🗑 حذف الفاتورة',
+      'pur.delTitle': 'حذف الفاتورة نهائياً',
+      'pur.delIntro': 'هتتحذف الفاتورة، ومعاها كل قطع الغيار اللي جت منها.',
+      'pur.delNoParts': 'مفيش قطع غيار متبقية من الفاتورة دي.',
+      'pur.delCount': '{n} قطعة هتتحذف من المخزن',
+      'pur.delAllocWarn': '⚠️ فيهم {n} قطعة **مركّبة على أجهزة**. الأجهزة دي هتفضل من غير سجل قطع الغيار بتاعها:',
+      'pur.delType': 'اكتب كلمة «حذف» بالعربي عشان تأكّد:',
+      'pur.delTypeWord': 'حذف',
+      'pur.delGo': 'احذف نهائياً',
+      'pur.delCancel': 'إلغاء',
+      'pur.delMismatch': 'اكتب كلمة «حذف» بالظبط عشان تأكّد.',
+      'pur.delDone': 'اتحذفت الفاتورة و{n} قطعة ✅',
+      'pur.delDoneNoParts': 'اتحذفت الفاتورة ✅',
+      'pur.delForbidden': 'اللي دخّل الفاتورة هو بس اللي يقدر يحذفها.',
+      'pur.delCounting': 'بنعد القطع…',
       'inv.pickPartTitle': 'اختر قطعة من المخزن العام',
       'inv.noStock': 'المخزن العام فاضي — ضيف فاتورة مشتريات الأول أو قطعة يدوي.',
       'inv.link': 'ربط',
@@ -300,6 +316,21 @@
       'inv.deleted': 'Deleted',
       'inv.errNet': 'This action needs an internet connection.',
       'inv.errGeneric': 'Action failed: {m}',
+      'pur.del': '🗑 Delete invoice',
+      'pur.delTitle': 'Delete invoice permanently',
+      'pur.delIntro': 'The invoice and every spare part that came from it will be deleted.',
+      'pur.delNoParts': 'No parts remain from this invoice.',
+      'pur.delCount': '{n} part(s) will be removed from stock',
+      'pur.delAllocWarn': '⚠️ {n} of them are installed on devices. Those devices will lose their parts record:',
+      'pur.delType': 'Type the word below to confirm:',
+      'pur.delTypeWord': 'حذف',
+      'pur.delGo': 'Delete permanently',
+      'pur.delCancel': 'Cancel',
+      'pur.delMismatch': 'Type the confirmation word exactly.',
+      'pur.delDone': 'Invoice and {n} part(s) deleted ✅',
+      'pur.delDoneNoParts': 'Invoice deleted ✅',
+      'pur.delForbidden': 'Only the person who entered the invoice can delete it.',
+      'pur.delCounting': 'Counting parts…',
       'inv.pickPartTitle': 'Choose a part from general stock',
       'inv.noStock': 'General stock is empty — add a purchase invoice or a manual part first.',
       'inv.link': 'Link',
@@ -686,7 +717,10 @@
     header: {}, conf: {}, seen: {}, items: [],
     model: '', raw: null, warnings: [],
     dup: null, dupOk: false,
-    saving: false, list: [], listOpen: null, q: ''
+    saving: false, list: [], listOpen: null, q: '',
+    // حالة حذف فاتورة: { id, loading, parts:[], word, ok, busy }
+    // null = مفيش حذف جاري
+    del: null
   };
 
   function resetEntry() {
@@ -1094,9 +1128,89 @@
                   color:${(TARGETS.find(x => x.key === it.target) || TARGETS[0]).color};">${esc(targetLabel(it.target))}</span></td>
               </tr>`).join('')}
             </table>
+            ${delZoneHtml(r)}
           </div>` : ''}
         </div>`;
       }).join('');
+  }
+
+  // ============================================================
+  // منطقة حذف الفاتورة
+  // ------------------------------------------------------------
+  // ⚠️ الحذف ده **بياخد معاه قطع الغيار** اللي جت من الفاتورة،
+  //    حتى المركّبة على أجهزة. وده غير قابل للتراجع.
+  //
+  // عشان كده مش زرار واحد. الخطوات:
+  //   ١) تدوس "حذف الفاتورة" → بنعدّ القطع من السيرفر
+  //   ٢) بنوريك بالظبط كام قطعة، وأسماء الأجهزة اللي هتتأثر
+  //   ٣) تكتب كلمة «حذف» بإيدك
+  //   ٤) وقتها بس الزرار الأحمر بيشتغل
+  //
+  // ليه كتابة كلمة مش "متأكد؟" عادية؟ لأن نافذة "متأكد؟" بتتدوس
+  // بالعادة من غير قراية. الكتابة بتجبرك تقف وتقرا.
+  //
+  // ⚠️ وقاعدة البيانات هي خط الدفاع الأخير: سياسة الحذف على
+  //    الفواتير والقطع محصورة على **اللي أنشأها**. فحتى لو حد
+  //    اتحايل على الواجهة، مش هيحذف شغل غيره.
+  // ============================================================
+  function delZoneHtml(r) {
+    const st = S.del && S.del.id === r.id ? S.del : null;
+
+    if (!st) {
+      return `<div style="margin-top:14px; text-align:end;">
+        <button class="pur-mini" style="color:var(--danger,#DC2626);"
+                onclick="event.stopPropagation(); PUR.delAsk('${r.id}')">${esc(T('pur.del'))}</button>
+      </div>`;
+    }
+
+    if (st.loading) {
+      return `<div class="empty-col" style="margin-top:12px;">${esc(T('pur.delCounting'))}</div>`;
+    }
+
+    const alloc = st.parts.filter(p => p.category === 'allocated');
+    const list = alloc.length === 0 ? '' : `
+      <div style="margin-top:10px; padding:11px 13px; border-radius:10px;
+                  background:var(--danger-bg,#FEF2F2); border:1px solid var(--danger-border,#FECACA);">
+        <div style="font-weight:800; font-size:12.5px; color:var(--danger,#DC2626); line-height:1.9;">
+          ⚠️ ${alloc.length} قطعة مركّبة على أجهزة — الأجهزة دي هتفضل من غير سجل قطع الغيار بتاعها:
+        </div>
+        <ul style="margin:8px 0 0; padding-inline-start:18px; font-size:12.5px; color:var(--ink-2,#475569); line-height:2;">
+          ${alloc.slice(0, 12).map(p => `<li>${esc(p.name)}${p.device_label ? ` — <b>${esc(p.device_label)}</b>` : ''}</li>`).join('')}
+          ${alloc.length > 12 ? `<li>… و${alloc.length - 12} كمان</li>` : ''}
+        </ul>
+      </div>`;
+
+    return `<div onclick="event.stopPropagation()" style="margin-top:14px; padding:14px;
+                 border-radius:12px; border:2px solid var(--danger,#DC2626);
+                 background:var(--surface,#fff);">
+      <div style="font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;
+                  color:var(--danger,#DC2626); margin-bottom:6px;">${esc(T('pur.delTitle'))}</div>
+      <div style="font-size:13px; color:var(--ink-2,#475569); line-height:1.9;">
+        ${esc(T('pur.delIntro'))}<br>
+        ${st.parts.length === 0
+          ? esc(T('pur.delNoParts'))
+          : esc(T('pur.delCount', { n: st.parts.length }))}
+      </div>
+      ${list}
+      <div style="margin-top:12px; font-size:12.5px; color:var(--ink-2,#475569); font-weight:700;">
+        ${esc(T('pur.delType'))}
+      </div>
+      <input id="purDelWord" value="${esc(st.word || '')}"
+             oninput="PUR.delWord(this.value)"
+             placeholder="${esc(T('pur.delTypeWord'))}"
+             style="width:100%; margin-top:7px; border:1.5px solid var(--border,#E2E8F0);
+                    background:var(--surface-2,#F8FAFC); color:var(--ink,#1A2332);
+                    border-radius:10px; padding:11px 13px; font-family:inherit;
+                    font-size:15px; font-weight:800; text-align:center;" />
+      <div style="display:flex; gap:9px; margin-top:12px;">
+        <button class="pur-mini" style="flex:1;" onclick="PUR.delCancel()">${esc(T('pur.delCancel'))}</button>
+        <button class="pur-mini" style="flex:1; ${st.ok
+            ? 'background:var(--danger,#DC2626); color:#fff; border-color:var(--danger,#DC2626);'
+            : 'opacity:.45;'}"
+                ${st.ok && !st.busy ? '' : 'disabled'}
+                onclick="PUR.delGo()">${esc(st.busy ? '…' : T('pur.delGo'))}</button>
+      </div>
+    </div>`;
   }
 
   // خانة البحث بتفضل برّه الحاويتين اللي بيتحدّثوا مع كل حرف —
@@ -1410,7 +1524,103 @@
       } catch (e) { S.list = []; }
       if (S.view === 'home') render();
     },
-    toggle(id) { S.listOpen = S.listOpen === id ? null : id; render(); },
+    toggle(id) {
+      S.listOpen = S.listOpen === id ? null : id;
+      // قفلت الفاتورة؟ نلغي أي حذف كان جاري عليها — عشان
+      // ما تفتحهاش تاني وتلاقي الشاشة الحمرا مستنية.
+      if (S.listOpen !== id) S.del = null;
+      render();
+    },
+
+    // ============================================================
+    // حذف فاتورة — الخطوة ١: العدّ والتحذير
+    // ============================================================
+    async delAsk(id) {
+      if (!online()) { toast(T('inv.errNet'), false); return; }
+      S.del = { id, loading: true, parts: [], word: '', ok: false, busy: false };
+      render();
+      try {
+        // ⚠️ بنعدّ من السيرفر مش من الفاتورة نفسها. البنود المكتوبة
+        //    في الفاتورة حاجة، والقطع الموجودة في المخزن حاجة تانية:
+        //    ممكن حد يكون حذف قطعة أو حوّلها للوازم صيانة بعد كده.
+        //    اللي هيتحذف هو **الموجود فعلاً**، وده اللي بنوريه.
+        const { data, error } = await sb.from(CFG.partsTable)
+          .select('id,name,category,device_label')
+          .eq('source_invoice_id', id);
+        if (error) throw error;
+        if (!S.del || S.del.id !== id) return;   // المستخدم قفلها في الوقت ده
+        S.del.parts = data || [];
+        S.del.loading = false;
+        render();
+      } catch (e) {
+        S.del = null;
+        render();
+        toast(T('inv.errGeneric', { m: (e && e.message) || '' }), false);
+      }
+    },
+
+    // الخطوة ٢: الكتابة للتأكيد
+    delWord(v) {
+      if (!S.del) return;
+      S.del.word = v;
+      const want = T('pur.delTypeWord');
+      const ok = String(v || '').trim() === want;
+      if (ok === S.del.ok) return;   // مفيش تغيير = مفيش رسم
+      S.del.ok = ok;
+      // ⚠️ الرسم بيمسح خانة الكتابة، فبنرجّع التركيز ومكان المؤشر
+      //    بعده على طول — من غير ده الكيبورد بتقفل وإنت في نص الكلمة.
+      render();
+      const inp = $('purDelWord');
+      if (inp) { inp.focus(); try { inp.setSelectionRange(v.length, v.length); } catch (e) {} }
+    },
+
+    delCancel() { S.del = null; render(); },
+
+    // الخطوة ٣: التنفيذ
+    async delGo() {
+      const st = S.del;
+      if (!st || !st.ok || st.busy) return;
+      if (!online()) { toast(T('inv.errNet'), false); return; }
+
+      st.busy = true; render();
+      const n = st.parts.length;
+
+      try {
+        // ⚠️ الترتيب مهم: القطع الأول وبعدين الفاتورة.
+        //    لو عكسنا وفشل حذف القطع، هنبقى قطع "يتيمة" مربوطة
+        //    بفاتورة مش موجودة — ومحدش هيعرف ييجي منين.
+        //    بالترتيب ده، لو القطع فشلت الفاتورة بتفضل مكانها
+        //    وتقدر تعيد المحاولة.
+        if (n > 0) {
+          const { error: pe } = await sb.from(CFG.partsTable)
+            .delete().eq('source_invoice_id', st.id);
+          if (pe) throw pe;
+        }
+
+        const { error: ie } = await sb.from(CFG.table).delete().eq('id', st.id);
+        if (ie) throw ie;
+
+        // ⚠️ الحذف ممكن "ينجح" وما يحذفش حاجة لو السياسة رفضت
+        //    (RLS بترجّع صفر صفوف من غير خطأ). فبنتأكد بنفسنا.
+        const { data: still, error: ce } = await sb.from(CFG.table)
+          .select('id').eq('id', st.id).maybeSingle();
+        if (!ce && still) throw new Error(T('pur.delForbidden'));
+
+        S.list = S.list.filter(r => r.id !== st.id);
+        S.listOpen = null;
+        S.del = null;
+        toast(n > 0 ? T('pur.delDone', { n }) : T('pur.delDoneNoParts'), true);
+        render();
+
+        // المخزن المفتوح لازم يعكس اللي اتشال
+        // ⚠️ loadParts هي الاسم الصح — INV.reload مش موجودة.
+        try { if (window.INV && INV.loadParts) INV.loadParts(); } catch (e) {}
+      } catch (e) {
+        if (S.del) { S.del.busy = false; }
+        render();
+        toast(T('inv.errGeneric', { m: (e && e.message) || '' }), false);
+      }
+    },
     search(v) {
       S.q = v;
       if (S.view !== 'home') return;
