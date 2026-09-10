@@ -154,6 +154,21 @@
     color:var(--ink-2); border-radius:11px; padding:11px 6px; font-family:inherit;
     font-size:12.5px; font-weight:800; cursor:pointer;}
   .emp-acts button:hover{background:var(--surface);}
+  .card-ded{background:var(--rejected-bg,#FEF2F2); color:var(--red); font-size:12px;
+    font-weight:800; padding:8px 13px; border-top:1px solid var(--border);}
+  html[data-theme="dark"] .card-ded{background:rgba(240,85,74,.13);}
+  .card-ded i{font-style:normal; opacity:.85;}
+  /* قايمة الخصومات جوه سجل الموظف */
+  .ded-row{display:flex; align-items:flex-start; gap:10px; background:var(--surface);
+    border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:8px;}
+  .ded-row.unseen{border-color:var(--red);}
+  .ded-amt{flex:none; font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;
+    color:var(--red);}
+  .ded-mid{flex:1; min-width:0;}
+  .ded-mid b{display:block; font-size:13.5px; line-height:1.8; word-break:break-word;}
+  .ded-mid span{font-size:11px; color:var(--muted);}
+  .ded-del{flex:none; border:none; background:none; color:var(--muted);
+    font-size:17px; cursor:pointer; padding:2px 4px;}
   .hintbox{background:var(--waiting-bg); color:var(--waiting); border-radius:11px;
     padding:12px 14px; font-size:12.5px; line-height:1.9; margin-bottom:16px;}
 </style>
@@ -196,6 +211,16 @@
             onclick="closeEmpLog()">×</button>
   </div>
   <div class="sheet-body" id="empSheetBody"></div>
+</div>
+
+<!-- ===== 💸 خصم جديد ===== -->
+<div class="sheet" id="dedSheet">
+  <div class="sheet-head">
+    <h2 id="dedTitle">💸 خصم جديد</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('dedSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="dedBody"></div>
 </div>
 
 <!-- ===== الإعدادات العامة ===== -->
@@ -309,6 +334,7 @@ async function loadMonth(){
     if(error) throw error;
     ROWS = data || [];
     await loadEmpSettings();   // القواعد لازم تكون موجودة قبل الرسم
+    await loadDeductions();    // والخصومات كمان — الكارت بيوريها
     render();
   }catch(e){
     console.error('loadMonth failed:', e);
@@ -467,10 +493,19 @@ function cardHtml(e, days){
     <div class="card-stats" style="padding-top:0;">
       <div><b style="color:${short ? 'var(--waiting)' : 'inherit'}">${fmtHm(short)}</b><span>نقص</span></div>
       <div><b style="color:${late ? 'var(--red)' : 'inherit'}">${late}</b><span>تأخير</span></div>
-      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم ج.م</span></div>
+      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم تأخير</span></div>
     </div>
+    ${(() => {
+      // شريط الخصم اليدوي — بيظهر لو فيه خصم بس، عشان الكارت
+      // ما يتزحمش على الموظفين اللي مالهمش خصومات
+      const m = manualDed(e);
+      if(!m.total) return '';
+      return `<div class="card-ded">💸 خصم يدوي: <b>${m.total}</b> ج.م${
+        m.unseen ? ` · <i>${m.unseen} لسه ما اتقراش</i>` : ''}</div>`;
+    })()}
     <div class="card-foot">
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
+      <button onclick="openDeduction('${esc(e)}')" title="خصم">💸</button>
       <button onclick="openHrSettings('${esc(e)}')">⏰</button>
       <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
       <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
@@ -531,10 +566,13 @@ function renderEmpSheet(email, days){
     </div>
 
     <div class="emp-acts">
+      <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
       <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
       <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
     </div>
+
+    ${dedSectionHtml(email)}
 
     ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
       ساعاتهم مش محسوبة في الإجمالي.</div>` : ''}
@@ -1056,6 +1094,215 @@ async function exportEmpExcel(email){
   }catch(e){
     console.error('exportEmpExcel failed:', e);
     alert('فشل التصدير: ' + (e.message || e));
+  }
+}
+
+
+// ============================================================
+// 💸 الخصومات اليدوية
+// ------------------------------------------------------------
+// HR بتكتب خصم + سبب، والموظف بيشوفه في شاشة «مرتبك» على موبايله.
+//
+// 🔴 الكتابة كلها من دوال السيرفر (hr_add_deduction / hr_delete_deduction).
+//    جدول hr_deductions **مفيهوش سياسة إدخال ولا حذف خالص** — زي
+//    جدول attendance بالظبط. الصفحة دي واجهة عرض وبس.
+//
+// ⚠️ الخصم ده **غير** خصم التأخير الأوتوماتيكي اللي بيتحسب من
+//    قواعد المواعيد. ده يدوي وبسبب مكتوب، وده بيتحسب لوحده —
+//    وعن قصد مش بنجمعهم في رقم واحد عشان محدش يتلغبط.
+// ============================================================
+let DEDS = {};            // إيميل → [خصومات] (كل الشهور، مش الشهر المعروض بس)
+let DED_EMAIL = '';       // الموظف المفتوح في شاشة الخصم
+
+async function loadDeductions(){
+  try{
+    // ⚠️ ترتيب قبل قص — أحدث خصم لازم يبان حتى لو العدد وصل الحد
+    const { data, error } = await sb.from('hr_deductions')
+      .select('id,user_email,amount,reason,work_date,created_at,created_by,seen_at')
+      .order('created_at', { ascending:false })
+      .limit(1000);
+    if(error) throw error;
+    DEDS = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (DEDS[e] = DEDS[e] || []).push(r);
+    });
+  }catch(e){
+    // بنقول بصوت عالي. الفشل الصامت هنا معناه إن HR تفتكر إن
+    // الموظف مالوش خصومات وهي موجودة فعلاً.
+    console.error('loadDeductions failed:', e);
+    DEDS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/hr_deductions/i.test(t) || (e && e.code === '42P01'))
+      console.warn('⚠️ الجدول لسه ماتعملش — شغّل 32-hr-deductions.sql');
+  }
+}
+
+// مجموع الخصم اليدوي لموظف (كله، مش الشهر المعروض)
+function manualDed(email){
+  const list = DEDS[(email||'').toLowerCase()] || [];
+  let total = 0, unseen = 0;
+  list.forEach(r => { total += Number(r.amount || 0); if(!r.seen_at) unseen++; });
+  return { total: Math.round(total * 100) / 100, unseen, count: list.length, list };
+}
+
+function dedSectionHtml(email){
+  const m = manualDed(email);
+  if(!m.count) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <b style="flex:1;font-size:14px;">💸 الخصومات اليدوية</b>
+        <span style="font-size:12.5px;font-weight:800;color:var(--red);">
+          ${m.total} ج.م${m.unseen ? ` · ${m.unseen} لسه ما اتقراش` : ''}</span>
+      </div>
+      ${m.list.map(r => `
+        <div class="ded-row${r.seen_at ? '' : ' unseen'}">
+          <div class="ded-amt">−${Number(r.amount)}</div>
+          <div class="ded-mid">
+            <b>${esc(r.reason)}</b>
+            <span>${new Date(r.created_at).toLocaleDateString('ar-EG',
+              { day:'numeric', month:'long', year:'numeric' })}
+              · ${r.seen_at ? '✔️ قراه الموظف' : '🔔 لسه ما قراهوش'}</span>
+          </div>
+          <button class="ded-del" title="مسح الخصم"
+                  onclick="deleteDeduction('${esc(r.id)}')">🗑️</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ===== شاشة إضافة خصم =====
+function openDeduction(email){
+  DED_EMAIL = (email || '').toLowerCase();
+  const list = allEmployees();
+  if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
+  if(list.indexOf(DED_EMAIL) < 0) DED_EMAIL = list[0];
+  renderDeduction();
+  openSheet('dedSheet');
+}
+
+function renderDeduction(){
+  const list = allEmployees();
+  const m = manualDed(DED_EMAIL);
+  document.getElementById('dedTitle').textContent = '💸 خصم — ' + nameOf(DED_EMAIL);
+  document.getElementById('dedBody').innerHTML = `
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="DED_EMAIL=this.value; renderDeduction()">
+        ${list.map(e => `<option value="${esc(e)}"${e===DED_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <div class="hintbox">
+      الخصم هيوصل للموظف على موبايله في شاشة «مرتبك» مع السبب.<br>
+      لما يدوس «فهمت» الكارت بيختفي من عنده — <b>بس المبلغ بيفضل في المجموع</b>.<br>
+      لو غلطت، تقدر تمسح الخصم من سجل الموظف.
+    </div>
+
+    <label class="fld"><span>💰 المبلغ (بالجنيه)</span>
+      <input type="number" id="dedAmt" min="1" step="5" inputmode="decimal" placeholder="50">
+    </label>
+
+    <label class="fld"><span>📝 سبب الخصم</span>
+      <small>اكتبه واضح. بعد شهر محدش هيفتكر الخصم ده كان ليه —
+        والسبب المكتوب هو اللي بيمنع الخناقة.</small>
+      <textarea id="dedWhy" rows="3" placeholder="مثال: تأخير ساعتين يوم الأحد من غير إذن"></textarea>
+    </label>
+
+    <button class="save" id="dedSave" style="background:var(--red);"
+            onclick="saveDeduction()">💸 اعمل الخصم</button>
+
+    ${m.count ? `<div style="margin-top:22px;">
+      <b style="font-size:13.5px;">آخر خصومات ${esc(nameOf(DED_EMAIL))}</b>
+      <div style="font-size:12px;color:var(--muted);margin:4px 0 10px;">
+        الإجمالي: <b style="color:var(--red)">${m.total} ج.م</b></div>
+      ${m.list.slice(0, 5).map(r => `
+        <div class="ded-row${r.seen_at ? '' : ' unseen'}">
+          <div class="ded-amt">−${Number(r.amount)}</div>
+          <div class="ded-mid"><b>${esc(r.reason)}</b>
+            <span>${new Date(r.created_at).toLocaleDateString('ar-EG',
+              { day:'numeric', month:'long' })} · ${r.seen_at ? '✔️ قراه' : '🔔 لسه'}</span></div>
+          <button class="ded-del" onclick="deleteDeduction('${esc(r.id)}')">🗑️</button>
+        </div>`).join('')}
+    </div>` : ''}`;
+}
+
+async function saveDeduction(){
+  const btn = document.getElementById('dedSave');
+  const amt = parseFloat((document.getElementById('dedAmt') || {}).value);
+  const why = ((document.getElementById('dedWhy') || {}).value || '').trim();
+
+  // ⚠️ الفحص هنا **مجاملة للمستخدم بس**. الفحص الحقيقي جوه دالة
+  //    hr_add_deduction في السيرفر — لو شيلنا السطرين دول، محدش
+  //    هيقدر يعدّي خصم فاضي برضه.
+  if(!amt || amt <= 0){ alert('اكتب مبلغ أكبر من صفر'); return; }
+  if(!why){ alert('لازم تكتب سبب الخصم'); return; }
+  if(!confirm(`تأكيد الخصم\n\nالموظف: ${nameOf(DED_EMAIL)}\nالمبلغ: ${amt} ج.م\nالسبب: ${why}`)) return;
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    const { data, error } = await sb.rpc('hr_add_deduction', {
+      p_email:  DED_EMAIL,
+      p_amount: amt,
+      p_reason: why
+    });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. من غير السطر ده
+    //    الشاشة هتقول «اتحفظ ✅» والخصم ما اتكتبش.
+    if(error) throw error;
+
+    await notifyDeduction(DED_EMAIL, amt, why);   // إشعار برّه التطبيق (اختياري)
+    await loadDeductions();
+    render();
+    renderDeduction();
+    const a = document.getElementById('dedAmt'); if(a) a.value = '';
+    const w = document.getElementById('dedWhy'); if(w) w.value = '';
+    alert('✅ اتسجّل الخصم — هيوصل للموظف في شاشة «مرتبك»');
+  }catch(e){
+    console.error('saveDeduction failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883|42P01/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش في قاعدة البيانات — شغّل ملف 32-hr-deductions.sql'
+      : '❌ فشل الخصم: ' + t);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '💸 اعمل الخصم'; }
+  }
+}
+
+async function deleteDeduction(id){
+  if(!confirm('متأكد إنك عايز تمسح الخصم ده؟\n\nهيتشال من عند الموظف ومن المجموع.')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_deduction', { p_id: id });
+    if(error) throw error;
+    await loadDeductions();
+    render();
+    if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    alert('اتمسح ✅');
+  }catch(e){
+    console.error('deleteDeduction failed:', e);
+    alert('❌ مقدرناش نمسحه: ' + (e.message || e));
+  }
+}
+
+// ============================================================
+// الإشعار خارج التطبيق
+// ------------------------------------------------------------
+// ⚠️ ده **طبقة زيادة مش أساس**. لو الـ Edge Function مش متظبّطة،
+//    الخصم بيتسجّل عادي وبيوصل في التطبيق — الإشعار الخارجي بس
+//    اللي مش هيطلع. عشان كده الخطأ هنا بيتسجّل في الكونسول
+//    وبس، ومش بيوقّف الحفظ.
+// ============================================================
+async function notifyDeduction(email, amount, reason){
+  try{
+    const { error } = await sb.functions.invoke('send-push', {
+      body: {
+        emails: [email],
+        title:  '💰 تحديث في شاشة مرتبك',
+        body:   `حصل خصم ${amount} ج.م — ${reason}`,
+        url:    'index.html'
+      }
+    });
+    if(error) throw error;
+  }catch(e){
+    console.warn('send-push failed (الخصم اتسجّل عادي):', e);
   }
 }
 
