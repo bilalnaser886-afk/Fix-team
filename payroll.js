@@ -41,6 +41,7 @@ const PAY_VAPID_PUBLIC_KEY = '';
 let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
+let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
 const PAY_EMPTY = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
                     salary:0, has_salary:false, late_month:0, late_all:0,
                     late_unseen_count:0, net_month:0 };
@@ -123,6 +124,14 @@ async function payLoad(){
     if(wv.error) throw wv.error;
     _payWaiv = wv.data || [];
 
+    // ⚠️ الكشف قبل الصرف **حي** وبعد الصرف **متجمّد**. الدالة
+    //    بترجّع المحسوب لحد ما HR تدوس «تم صرف الراتب»، وساعتها
+    //    بترجّع الصورة المحفوظة. عشان ورقة القبض ما تتغيّرش بأثر
+    //    رجعي لو حصل تعديل في السجل بعد شهور.
+    const sl = await sb.rpc('hr_payroll_periods', { p_email: me });
+    if(sl.error) throw sl.error;
+    _paySlips = sl.data || [];
+
     _payLoaded = true;
   }catch(e){
     // ⚠️ الفشل الصامت هنا خطر: الشاشة تقول «مفيش خصومات ✅»
@@ -132,6 +141,7 @@ async function payLoad(){
     _payRows   = [];
     _payLate   = [];
     _payWaiv   = [];
+    _paySlips  = [];
     _payTotals = Object.assign({}, PAY_EMPTY);
     _payLoaded = false;
   }
@@ -229,7 +239,11 @@ function payRender(busyMsg){
     //    جدول hr_penalty_acks هو اللي بيقول «شاف يوم كذا».
     //    من غيره الخصم التلقائي كان بيعدّي من غير جرس خالص.
     .concat(_payLate.filter(r => Number(r.penalty) > 0 && !r.acked)
-      .map(r => ({ kind:'latePenalty', row:r })));
+      .map(r => ({ kind:'latePenalty', row:r })))
+    // الفلوس اللي بتوصل من غير خبر بتخلّي الموظف يسأل كل شهر
+    // «اتصرف ولا لأ» — الكارت ده بيمنع السؤال ده
+    .concat(_paySlips.filter(p => p.paid && !p.seen_at)
+      .map(p => ({ kind:'paidSlip', row:p })));
   const seen   = _payRows.filter(r =>  r.seen_at);
 
   ov.innerHTML = `
@@ -256,9 +270,9 @@ function payRender(busyMsg){
         <!-- ⚠️ الكشف تحت الكروت عن قصد: هو اللي بيفضل بعد ما كل
              الكروت تختفي. لو حطيناه فوق، الشاشة كانت هتبان فاضية
              تماماً لما يقرا كل حاجة. -->
-        ${payLateHtml()}
+        ${paySlipsHtml()}
 
-        ${payTotalsHtml()}
+        ${payLateHtml()}
 
         ${seen.length ? `
           <button class="pay-more" onclick="payToggleOld()">
@@ -287,49 +301,126 @@ function payRender(busyMsg){
 //    لو خلطناهم، الموظف اللي HR نسيت تكتب مرتبه هيقرا «مرتبك ٠
 //    ج.م» — وده أسوأ بكتير من إننا نقوله «لسه ماتحددش».
 // ============================================================
-function payTotalsHtml(){
-  const t   = _payTotals;
-  const has = !!t.has_salary;
-  const ded = Number(t.total_month || 0);
-
-  // مفيش مرتب متحدد؟ نوري الخصومات بس — ومنخترعش صافي
-  if(!has){
-    return `
-    <div class="pay-tot">
-      <div class="pay-tot-big">
-        <span class="pay-tot-n">${payMoney(ded)}</span>
-        <span class="pay-tot-c">ج.م</span>
-      </div>
-      <div class="pay-tot-l">إجمالي خصومات ${_payMonthName()}</div>
-      ${Number(t.late_month) ? `<div class="pay-tot-hint">⏰ وخصم تأخير الشهر ده:
-        <b>${payMoney(t.late_month)} ج.م</b></div>` : ''}
+// ============================================================
+// 🧾 كشوف الرواتب
+// ------------------------------------------------------------
+// اللي لسه ماتصرفش **برّه** — عشان الموظف يشوف مستحقاته على طول.
+// واللي اتصرف **جوه سجل مطوي** — عشان الشاشة ما تبقاش طابور
+// كروت قديمة بعد سنة.
+//
+// ⚠️ الكشف المصروف عليه قفل 🔒 وتاريخ الصرف. الأرقام دي مش
+//    بتتغيّر تاني مهما حصل تعديل في السجل بعد كده.
+// ============================================================
+function paySlipsHtml(){
+  if(!_paySlips.length){
+    // مفيش كشوف خالص = لسه ماتحددش مرتب ومفيش خصومات
+    return `<div class="pay-tot">
       <div class="pay-tot-hint">💵 مرتبك لسه ماتحددش في النظام —
-        كلّم شؤون العاملين.</div>
-      <div class="pay-tot-all">وإجمالي كل الخصومات من أول الشغل:
-        <b>${payMoney(t.total_all)} ج.م</b></div>
-    </div>`;
+        كلّم شؤون العاملين.</div></div>`;
   }
 
-  const net = Number(t.net_month || 0);
+  const due  = _paySlips.filter(p => !p.paid);
+  const paid = _paySlips.filter(p =>  p.paid);
+
   return `
-  <div class="pay-tot">
-    <div class="pay-tot-l" style="margin:0 0 4px;">صافي مرتب ${_payMonthName()}</div>
-    <div class="pay-tot-big">
-      <span class="pay-tot-n net">${payMoney(net)}</span>
-      <span class="pay-tot-c net">ج.م</span>
+  ${due.length ? `
+    <div class="pay-sec dim">💰 مرتباتك المستحقة</div>
+    ${due.map((p, i) => paySlipCard(p, i === 0)).join('')}` : ''}
+
+  ${paid.length ? `
+    <button class="pay-more" onclick="paySlipsToggle()">
+      <span id="paySlipArrow">▾</span> 📜 سجل المرتبات المصروفة (${paid.length})
+    </button>
+    <div id="paySlipOld" class="pay-old hidden">
+      ${paid.map(p => paySlipCard(p, false)).join('')}
+    </div>` : ''}`;
+}
+
+function paySlipsToggle(){
+  const box = document.getElementById('paySlipOld');
+  const arw = document.getElementById('paySlipArrow');
+  if(!box) return;
+  box.classList.toggle('hidden');
+  if(arw) arw.textContent = box.classList.contains('hidden') ? '▾' : '▴';
+}
+
+function _paySlipMonth(p){
+  return new Date(p).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+}
+
+// big = الكشف الحالي: الرقم الكبير فوق. الباقي مضغوط.
+function paySlipCard(p, big){
+  return `
+  <div class="pay-tot slip${p.paid ? ' paid' : ''}">
+    <div class="pay-slip-h">
+      <b>${_payEsc(_paySlipMonth(p.period))}</b>
+      <span class="pay-slip-tag ${p.paid ? 'ok' : 'wait'}">${
+        p.paid ? '✅ اتصرف' : '⏳ لسه'}</span>
     </div>
+
+    ${big ? `
+      <div class="pay-tot-big" style="margin-top:10px;">
+        <span class="pay-tot-n net">${payMoney(p.net)}</span>
+        <span class="pay-tot-c net">ج.م</span>
+      </div>
+      <div class="pay-tot-l">صافي مرتبك</div>` : ''}
 
     <div class="pay-calc">
-      <div><span>المرتب</span><b>${payMoney(t.salary)}</b></div>
-      <div><span>− خصومات يدوية</span><b class="minus">${payMoney(ded)}</b></div>
-      <div><span>− خصومات تأخير</span><b class="minus">${payMoney(t.late_month)}</b></div>
-      <div class="eq"><span>= الصافي</span><b>${payMoney(net)}</b></div>
+      <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
+      <div><span>− خصومات يدوية</span><b class="minus">${payMoney(p.manual_ded)}</b></div>
+      <div><span>− خصومات تأخير</span><b class="minus">${payMoney(p.late_ded)}</b></div>
+      <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
 
-    <div class="pay-tot-all">وإجمالي كل الخصومات من أول الشغل:
-      <b>${payMoney(t.total_all)} ج.م</b></div>
+    ${p.paid ? `<div class="pay-slip-meta">🔒 اتصرف
+      ${_payEsc(new Date(p.paid_at).toLocaleDateString('ar-EG',
+        { day:'numeric', month:'long', year:'numeric' }))}
+      — الأرقام دي متقفلة ومش بتتغيّر.</div>` : ''}
   </div>`;
 }
+
+// كارت خبر «مرتبك اتصرف»
+function payPaidSlipCard(p){
+  return `
+  <div class="pay-card good">
+    <div class="pay-card-top">
+      <div class="pay-amt good">💵 اتصرف</div>
+      <div class="pay-when">${_payEsc(new Date(p.paid_at).toLocaleDateString('ar-EG',
+        { day:'numeric', month:'long' }))}</div>
+    </div>
+    <div class="pay-why">تم صرف راتب <b>${_payEsc(_paySlipMonth(p.period))}</b>.</div>
+    <div class="pay-calc" style="margin-top:10px;">
+      <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
+      <div><span>− الخصومات</span><b class="minus">${payMoney(
+        Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>
+      <div class="eq"><span>= اللي قبضته</span><b>${payMoney(p.net)}</b></div>
+    </div>
+    <button class="pay-ok-btn" onclick="payAckSlip('${_payEsc(p.period)}')">👍 فهمت</button>
+  </div>`;
+}
+
+async function payAckSlip(period){
+  if(_payBusy) return;
+  _payBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_ack_payslip', { p_period: period });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await payLoad();
+    payRender('');
+  }catch(e){
+    console.error('payAckSlip failed:', e);
+    alert('❌ مقدرناش نسجّل إنك قريته: ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
+
+// ⚠️ دالة payTotalsHtml اتشالت من هنا.
+// كانت بتوري كشف الشهر الحالي بس. دلوقتي paySlipsHtml بتوري كل
+// الشهور (المستحق برّه والمصروف جوه سجل)، والشهر الحالي بقى أول
+// كارت فيهم. سيبنا الدالة القديمة كانت هتفضل تشتغل من غير ما حد
+// يندهها — وأول واحد يقرا الملف بعد سنة هيفتكرها المستخدمة.
 
 function _payMonthStart(){
   const d = new Date();
@@ -351,6 +442,7 @@ function payItemCard(it){
   if(it.kind === 'waived')     return payWaivedDedCard(it.row);
   if(it.kind === 'lateWaived')  return payWaivedLateCard(it.row);
   if(it.kind === 'latePenalty') return payLateCard(it.row);
+  if(it.kind === 'paidSlip')    return payPaidSlipCard(it.row);
   return '';
 }
 
@@ -796,6 +888,18 @@ function payUrlB64ToU8(s){
 
   .pay-tot{margin-top:18px; background:var(--p-card); border:1px solid var(--p-line);
     border-radius:16px; padding:18px 16px; text-align:center;}
+  /* كروت كشف الراتب */
+  .pay-tot.slip{margin-top:11px; padding:14px 16px; border-color:var(--p-line);}
+  .pay-tot.slip.paid{border-color:var(--p-green);}
+  .pay-slip-h{display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
+  .pay-slip-h b{font-size:15px; color:var(--p-ink);}
+  .pay-slip-tag{flex:none; font-size:11px; font-weight:800; border-radius:7px;
+    padding:3px 9px;}
+  .pay-slip-tag.ok{background:rgba(22,163,74,.14); color:var(--p-green);}
+  .pay-slip-tag.wait{background:rgba(180,83,9,.14); color:#B45309;}
+  html[data-theme="dark"] #payOverlay .pay-slip-tag.wait{color:#FBBF24;}
+  .pay-slip-meta{margin-top:10px; padding-top:9px; border-top:1px solid var(--p-line);
+    font-size:11px; line-height:1.8; color:var(--p-mut); text-align:start;}
   .pay-tot-big{display:flex; align-items:baseline; justify-content:center; gap:6px;}
   .pay-tot-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:36px;
     color:var(--p-red); line-height:1;}
