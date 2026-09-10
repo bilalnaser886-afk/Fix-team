@@ -154,6 +154,78 @@
     color:var(--ink-2); border-radius:11px; padding:11px 6px; font-family:inherit;
     font-size:12.5px; font-weight:800; cursor:pointer;}
   .emp-acts button:hover{background:var(--surface);}
+  /* زراير صغيرة جوه سطور السجل */
+  .mini-btn{flex:none; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink-2); border-radius:8px; padding:5px 10px; font-family:inherit;
+    font-size:11.5px; font-weight:800; cursor:pointer;}
+  .mini-btn.danger{border-color:var(--red); color:var(--red);}
+  .punch .meta.manual{color:var(--blue); font-weight:800;}
+  .punch .mini-btn{padding:3px 7px; font-size:11px; margin-inline-start:5px;}
+  .ded-row.waived{opacity:.85; border-color:var(--done);}
+  /* أيام المواعيد الخاصة */
+  .dsch-days button.edit{outline:2px solid var(--blue); outline-offset:-2px;}
+  .dsch-days button.on{background:var(--blue); border-color:var(--blue); color:#fff;}
+  .dsch-form{margin-top:14px; background:var(--surface-2); border:1px solid var(--border);
+    border-radius:13px; padding:14px;}
+  /* شريط تاريخ بداية الخصم */
+  .pen-start{background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:13px 14px; margin-top:14px;}
+  .pen-start.warn{border-color:var(--red); background:var(--rejected-bg,#FEF2F2);}
+  html[data-theme="dark"] .pen-start.warn{background:rgba(240,85,74,.10);}
+  .pen-start-h{display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; font-size:13.5px; margin-bottom:5px;}
+  .pen-start-h span{font-weight:800; color:var(--done);}
+  .pen-start-h span.bad{color:var(--red);}
+  .pen-start small{display:block; font-size:12px; line-height:1.9; color:var(--muted);}
+  .pen-start.warn small{color:var(--red);}
+  .pen-start-row{display:flex; gap:8px; margin-top:10px;}
+  .pen-start-row input{flex:1; min-width:0; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--ink); border-radius:10px;
+    padding:10px 11px; font-family:inherit; font-size:14.5px;}
+  .pen-start-row button{flex:none; border:none; border-radius:10px; padding:10px 14px;
+    background:var(--done); color:#fff; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
+  /* ===== كروت صفحة المخصومات والمرتبات ===== */
+  .pr-card{background:var(--surface); border:1px solid var(--border);
+    border-radius:15px; padding:13px 14px; margin-bottom:11px;}
+  .pr-card.alert{border-color:var(--red);}
+  .pr-top{display:flex; align-items:center; gap:11px;}
+  .pr-top .card-id b{font-size:15px;}
+  .pr-top .card-id span{font-size:11px; color:var(--muted); direction:ltr; display:block;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pr-sal{display:flex; align-items:center; gap:7px; margin-top:11px;}
+  .pr-sal label{flex:none; font-size:12.5px; font-weight:800; color:var(--ink-2);}
+  .pr-sal input{flex:1; min-width:0; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink); border-radius:10px; padding:10px 11px; font-family:inherit;
+    font-size:15px; font-weight:800; text-align:center;}
+  .pr-sal button{flex:none; border:none; border-radius:10px; padding:10px 13px;
+    background:var(--done); color:#fff; font-family:inherit; font-size:14px;
+    font-weight:800; cursor:pointer;}
+  .pr-sal button:disabled{opacity:.5; cursor:default;}
+  .pr-nums{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;
+    padding-top:10px; border-top:1px solid var(--border);}
+  .pr-nums div{text-align:center;}
+  .pr-nums b{display:block; font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;}
+  .pr-nums span{font-size:11px; color:var(--muted);}
+  .pr-ded-btn{width:100%; margin-top:10px; border:none; border-radius:11px; padding:11px;
+    background:var(--red); color:#fff; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
+  .pr-bell{margin-top:9px; font-size:11.5px; font-weight:800; color:var(--red);}
+  .card-ded{background:var(--rejected-bg,#FEF2F2); color:var(--red); font-size:12px;
+    font-weight:800; padding:8px 13px; border-top:1px solid var(--border);}
+  html[data-theme="dark"] .card-ded{background:rgba(240,85,74,.13);}
+  .card-ded i{font-style:normal; opacity:.85;}
+  /* قايمة الخصومات جوه سجل الموظف */
+  .ded-row{display:flex; align-items:flex-start; gap:10px; background:var(--surface);
+    border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:8px;}
+  .ded-row.unseen{border-color:var(--red);}
+  .ded-amt{flex:none; font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;
+    color:var(--red);}
+  .ded-mid{flex:1; min-width:0;}
+  .ded-mid b{display:block; font-size:13.5px; line-height:1.8; word-break:break-word;}
+  .ded-mid span{font-size:11px; color:var(--muted);}
+  .ded-del{flex:none; border:none; background:none; color:var(--muted);
+    font-size:17px; cursor:pointer; padding:2px 4px;}
   .hintbox{background:var(--waiting-bg); color:var(--waiting); border-radius:11px;
     padding:12px 14px; font-size:12.5px; line-height:1.9; margin-bottom:16px;}
 </style>
@@ -169,6 +241,7 @@
   <div class="menu-wrap">
     <button class="icon-btn" title="القايمة" onclick="toggleMenu(event)">⋮</button>
     <div class="menu-drop" id="menuDrop">
+      <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
       <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
       <button onclick="closeMenu(); openGeneral()">⚙️ الإعدادات العامة</button>
       <hr>
@@ -196,6 +269,48 @@
             onclick="closeEmpLog()">×</button>
   </div>
   <div class="sheet-body" id="empSheetBody"></div>
+</div>
+
+<!-- ===== ✍️ تسجيل يدوي (إضافة / تعديل) =====
+     ⚠️ z-index:65 — أعلى من كل الشاشات، لأنها بتفتح **من جوه**
+        شاشة سجل الموظف (60). -->
+<div class="sheet" id="punchSheet" style="z-index:65;">
+  <div class="sheet-head">
+    <h2 id="punchTitle">✍️ تسجيل يدوي</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('punchSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="punchBody"></div>
+</div>
+
+<!-- ===== 💰 المخصومات والمرتبات =====
+     ⚠️ z-index:55 عن قصد — أقل من dedSheet (60) عشان شاشة الخصم
+        تفتح فوقها مش تحتها. -->
+<div class="sheet" id="paySheet" style="z-index:55;">
+  <!-- ⚠️ خانة البحث **جوه** الهيدر اللي sticky، على سطر تاني
+       (flex-basis:100%). لو حطيناها تحته كانت هتروح مع السكرول
+       وإنت بتدوّر على موظف في نص قايمة طويلة. -->
+  <div class="sheet-head" style="flex-wrap:wrap;">
+    <h2>💰 المخصومات والمرتبات</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('paySheet')">×</button>
+    <input type="search" id="paySearch" placeholder="🔍 ابحث باسم الموظف أو إيميله…"
+           oninput="PAY_Q=this.value; renderPayrollAdmin()"
+           style="flex-basis:100%; border:1px solid var(--border);
+                  background:var(--surface-2); color:var(--ink); border-radius:11px;
+                  padding:11px 13px; font-family:inherit; font-size:15px;">
+  </div>
+  <div class="sheet-body" id="payBody"></div>
+</div>
+
+<!-- ===== 💸 خصم جديد ===== -->
+<div class="sheet" id="dedSheet">
+  <div class="sheet-head">
+    <h2 id="dedTitle">💸 خصم جديد</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('dedSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="dedBody"></div>
 </div>
 
 <!-- ===== الإعدادات العامة ===== -->
@@ -302,13 +417,18 @@ async function loadMonth(){
   const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
   try{
     const { data, error } = await sb.from('attendance')
-      .select('user_email,user_name,kind,at,work_date,distance_m,verified')
+      // ⚠️ id لازم يكون هنا — من غيره مفيش تعديل ولا مسح.
+      //    و manual_by هو ختم «اتكتب بإيد HR».
+      .select('id,user_email,user_name,kind,at,work_date,distance_m,verified,manual_by,manual_note')
       .gte('work_date', from).lte('work_date', to)
       .order('at', { ascending:true });
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
     if(error) throw error;
     ROWS = data || [];
     await loadEmpSettings();   // القواعد لازم تكون موجودة قبل الرسم
+    await loadPenaltyStart();       // الحاجز لازم يتقرا قبل العرض
+    await loadPenalties(from, to);  // 🔴 خصم التأخير — من السيرفر
+    await loadDeductions();    // والخصومات اليدوية كمان
     render();
   }catch(e){
     console.error('loadMonth failed:', e);
@@ -434,9 +554,9 @@ function cardHtml(e, days){
     const st = dayMinutes(days[d]);
     mins += st.minutes;
     if(st.missingOut) flags++;
-    const r = applyRules(e, days[d]);
+    const r = applyRules(e, days[d], d);
     if(r){ penalty += r.penalty; if(r.state === 'late') late++; }
-    const o = dayOvertime(e, days[d]);
+    const o = dayOvertime(e, days[d], d);
     // ⚠️ اليوم اللي ناقصه انصراف ساعاته مش موثوقة، فمش بنحسبه
     //    لا أوفر تايم ولا نقص — وإلا هنطلع أرقام متخيّلة.
     if(o.has && !st.missingOut){ over += o.over; short += o.short; }
@@ -467,10 +587,19 @@ function cardHtml(e, days){
     <div class="card-stats" style="padding-top:0;">
       <div><b style="color:${short ? 'var(--waiting)' : 'inherit'}">${fmtHm(short)}</b><span>نقص</span></div>
       <div><b style="color:${late ? 'var(--red)' : 'inherit'}">${late}</b><span>تأخير</span></div>
-      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم ج.م</span></div>
+      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم تأخير</span></div>
     </div>
+    ${(() => {
+      // شريط الخصم اليدوي — بيظهر لو فيه خصم بس، عشان الكارت
+      // ما يتزحمش على الموظفين اللي مالهمش خصومات
+      const m = manualDed(e);
+      if(!m.total) return '';
+      return `<div class="card-ded">💸 خصم يدوي: <b>${m.total}</b> ج.م${
+        m.unseen ? ` · <i>${m.unseen} لسه ما اتقراش</i>` : ''}</div>`;
+    })()}
     <div class="card-foot">
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
+      <button onclick="openDeduction('${esc(e)}')" title="خصم">💸</button>
       <button onclick="openHrSettings('${esc(e)}')">⏰</button>
       <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
       <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
@@ -504,9 +633,9 @@ function renderEmpSheet(email, days){
     const st = dayMinutes(days[d]);
     mins += st.minutes;
     if(st.missingOut) flags++;
-    const r = applyRules(email, days[d]);
+    const r = applyRules(email, days[d], d);
     if(r){ pen += r.penalty; if(r.state === 'late') late++; }
-    const o = dayOvertime(email, days[d]);
+    const o = dayOvertime(email, days[d], d);
     if(o.has && !st.missingOut){ over += o.over; short += o.short; }
   });
 
@@ -531,10 +660,14 @@ function renderEmpSheet(email, days){
     </div>
 
     <div class="emp-acts">
+      <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
+      <button onclick="openPunch('${esc(email)}')">✍️ تسجيل يدوي</button>
       <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
       <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
     </div>
+
+    ${dedSectionHtml(email)}
 
     ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
       ساعاتهم مش محسوبة في الإجمالي.</div>` : ''}
@@ -559,14 +692,29 @@ function renderEmpSheet(email, days){
 
 function dayHtml(d, punches, email){
   const s = dayMinutes(punches);
-  const r = email ? applyRules(email, punches) : null;
+  const r = email ? applyRules(email, punches, d) : null;
   // سطر القواعد: بيوري الحضور الفعلي والمحتسب والمفروض ينصرف
   const rules = !r ? '' : `
     <div class="punch" style="border-bottom:1px solid var(--border); padding-bottom:7px; margin-bottom:5px;">
       <span style="color:${STATE_LBL[r.state].c}; font-weight:800;">${STATE_LBL[r.state].t}
-        ${r.penalty ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">خصم ${r.penalty} ج.م</span>` : ''}</span>
+        ${r.penalty ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">خصم ${r.penalty} ج.م</span>` : ''}
+        ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
       <span class="meta">حضر ${fmtMinTime(r.arrived)} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
-    </div>`;
+    </div>
+    ${r.beforeStart ? `
+      <div class="punch" style="padding-bottom:7px;">
+        <span class="meta" style="flex:1;">🛡️ اليوم ده قبل بداية تطبيق الخصم — متأخر بس من غير فلوس</span>
+      </div>` :
+      (r.waived ? `
+      <div class="punch" style="padding-bottom:7px;">
+        <span class="meta" style="flex:1;">سبب الشيل: ${esc(r.waiveReason || '—')}</span>
+        <button class="mini-btn" onclick="unwaivePenalty('${esc(email)}','${esc(d)}')">↩️ رجّع الخصم</button>
+      </div>` :
+      (r.penalty ? `
+      <div class="punch" style="padding-bottom:7px;">
+        <span class="meta" style="flex:1;">الخصم ده تلقائي حسب المواعيد</span>
+        <button class="mini-btn danger" onclick="waivePenalty('${esc(email)}','${esc(d)}')">✋ شيل الخصم</button>
+      </div>` : ''))}`;
   return `
   <div class="day">
     <div class="day-h">
@@ -574,7 +722,7 @@ function dayHtml(d, punches, email){
         { weekday:'long', day:'numeric', month:'long' })}
         ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}</span>
       <span class="hrs">${fmtHm(s.minutes)}${(() => {
-        const o = email ? dayOvertime(email, punches) : null;
+        const o = email ? dayOvertime(email, punches, d) : null;
         if(!o || !o.has || s.missingOut) return '';
         if(o.over)  return ` <span style="color:var(--done)">+${fmtHm(o.over)}</span>`;
         if(o.short) return ` <span style="color:var(--waiting)">−${fmtHm(o.short)}</span>`;
@@ -584,12 +732,21 @@ function dayHtml(d, punches, email){
     ${rules}
     ${punches.map(p => `
       <div class="punch">
-        <span>${KIND[p.kind].icon} ${KIND[p.kind].t}
-          ${p.verified ? '' : '<span class="meta">(من غير بصمة)</span>'}</span>
+        <span style="flex:1;min-width:0;">${KIND[p.kind].icon} ${KIND[p.kind].t}
+          ${p.manual_by
+            ? '<span class="meta manual">✍️ يدوي</span>'
+            : (p.verified ? '' : '<span class="meta">(من غير بصمة)</span>')}</span>
         <span>${fmtTime(p.at)}
           <span class="meta">${p.distance_m != null ? Math.round(p.distance_m) + 'م' : ''}</span>
         </span>
+        ${email && p.id ? `
+          <button class="mini-btn" title="تعديل"
+                  onclick="openPunch('${esc(email)}','${esc(d)}','${esc(p.id)}')">✏️</button>
+          <button class="mini-btn danger" title="مسح"
+                  onclick="deletePunch('${esc(p.id)}')">🗑️</button>` : ''}
       </div>`).join('')}
+    ${email ? `<button class="mini-btn" style="width:100%;margin-top:8px;"
+        onclick="openPunch('${esc(email)}','${esc(d)}')">➕ ضيف تسجيل لليوم ده</button>` : ''}
   </div>`;
 }
 
@@ -629,8 +786,57 @@ function setLang(v){
 // ============================================================
 // إعدادات مواعيد الموظف
 // ============================================================
-let EMP_SET = {};        // إيميل → إعداداته
+let EMP_SET   = {};      // إيميل → إعداداته الأساسية
+let DAY_SCHED = {};      // إيميل → { رقم اليوم: إعدادات اليوم ده }
 let SET_EMAIL = '';      // الموظف المفتوح دلوقتي في الشاشة
+let DAY_EDIT  = null;    // اليوم المفتوح للتعديل في شاشة المواعيد
+
+// 🔴 خصومات التأخير — **محسوبة في السيرفر مش هنا**
+//    شكلها: PENS['fanie@fix.com']['2026-09-10'] = { ...صف اليوم }
+let PENS = {};
+
+// 🔴 تاريخ بداية تطبيق خصم التأخير
+// ------------------------------------------------------------
+// أي يوم قبله خصمه صفر. فاضي = الخصم بيتطبق على **كل التاريخ**،
+// وده بيعمل صدمة بأثر رجعي لكل الموظفين — عشان كده الصفحة
+// بتنبّه بشريط أحمر لو فضي بدل ما تسكت.
+let PEN_START = null;
+
+async function loadPenaltyStart(){
+  try{
+    const { data, error } = await sb.rpc('hr_penalty_start');
+    if(error) throw error;
+    PEN_START = data || null;
+  }catch(e){
+    console.error('loadPenaltyStart failed:', e);
+    PEN_START = null;
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42883/i.test(t))
+      console.warn('⚠️ ميزة تاريخ بدء الخصم لسه ماتركبتش — شغّل 38-penalty-start-date.sql');
+  }
+}
+
+async function loadPenalties(from, to){
+  try{
+    // p_email فاضي = كل الموظفين (مسموح لـ HR والأدمن بس)
+    const { data, error } = await sb.rpc('hr_late_penalties',
+      { p_email: null, p_from: from, p_to: to });
+    if(error) throw error;
+    PENS = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (PENS[e] = PENS[e] || {})[r.work_date] = r;
+    });
+  }catch(e){
+    // ⚠️ الفشل الصامت هنا معناه إن كل الخصومات هتبان صفر و HR
+    //    تفتكر إن الشهر نضيف. بنقول في الكونسول بوضوح.
+    console.error('loadPenalties failed:', e);
+    PENS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42883/i.test(t))
+      console.warn('⚠️ دالة خصم التأخير لسه ماتعملتش — شغّل 35-schedules-penalties-waivers.sql');
+  }
+}
 
 const DAY_NAMES = ['الأحد','الاتنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
@@ -641,6 +847,20 @@ async function loadEmpSettings(){
     EMP_SET = {};
     (data || []).forEach(r => { EMP_SET[(r.user_email||'').toLowerCase()] = r; });
   }catch(e){ console.error('loadEmpSettings failed:', e); EMP_SET = {}; }
+
+  // مواعيد الأيام الخاصة (الجمعة من ٢ لـ ١٢ مثلاً)
+  try{
+    const { data, error } = await sb.from('hr_day_schedules').select('*');
+    if(error) throw error;
+    DAY_SCHED = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email||'').toLowerCase();
+      (DAY_SCHED[e] = DAY_SCHED[e] || {})[Number(r.weekday)] = r;
+    });
+  }catch(e){
+    console.error('loadDaySchedules failed:', e);
+    DAY_SCHED = {};
+  }
 }
 
 // كل الموظفين — من خريطة الأدوار، مش من السجل.
@@ -731,7 +951,9 @@ function renderHrSettings(){
       <textarea id="fNote" rows="2">${esc(c.note||'')}</textarea>
     </label>
 
-    <button class="save" onclick="saveEmpSettings()">💾 حفظ إعدادات ${esc(nameOf(SET_EMAIL))}</button>`;
+    <button class="save" onclick="saveEmpSettings()">💾 حفظ إعدادات ${esc(nameOf(SET_EMAIL))}</button>
+
+    ${daySchedHtml()}`;
 }
 
 function toggleOff(i){
@@ -819,32 +1041,39 @@ function fmtMinTime(mins){
   return String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
 }
 
-function applyRules(email, punches){
-  const c = EMP_SET[(email||'').toLowerCase()];
-  if(!c || !c.shift_start) return null;
-  const firstIn = punches.find(p => p.kind === 'in');
-  if(!firstIn) return null;
-
-  const arrived = hhmmOf(firstIn.at);
-  const start   = toMin(c.shift_start);
-  const grace   = Number(c.grace_minutes || 0);
-  const backup  = toMin(c.backup_start);
-  const need    = Math.round(Number(c.work_hours || 8) * 60);
-
-  let counted, penalty = 0, state;
-  if(arrived <= start + grace){
-    // بدري أو جوه السماح → كأنه جه في المعاد بالظبط
-    counted = start;
-    state = arrived <= start ? 'ontime' : 'grace';
-  }else if(backup != null && arrived <= backup){
-    counted = arrived;
-    state = 'backup';
-  }else{
-    counted = arrived;
-    penalty = Number(c.late_penalty || 0);
-    state = 'late';
-  }
-  return { arrived, counted, leaveAt: counted + need, need, penalty, state };
+// 🔴🔴 الدالة دي **مبقتش بتحسب حاجة** — بقت بتقرا من السيرفر.
+// ------------------------------------------------------------
+// كانت بتطبّق القواعد هنا في الجافاسكريبت. المشكلة ظهرت أول ما
+// الموظف بقى يشوف خصمه في شاشة «مرتبك»: يا إما نكتب نفس الحساب
+// تاني في payroll.js، يا إما نخلّي مصدر واحد.
+//
+// كتابة الحساب مرتين معناها إن أول تعديل على واحد فيهم من غير
+// التاني = HR شايفة رقم والموظف شايف رقم تاني، ومحدش هياخد باله
+// غير لما تحصل خناقة على المرتب.
+//
+// دلوقتي دالة hr_late_penalties في السيرفر هي المصدر الوحيد،
+// والاتنين بيقروا منها. الدالة دي بقت **مترجم** بس.
+//
+// ⚠️ بترجّع null لو اليوم مش في رد السيرفر — وده بيحصل في حالتين
+//    شرعيتين: الموظف مالوش ميعاد محدد، أو مسجّلش «حضور» في اليوم
+//    ده أصلاً. العرض ساعتها بيوري الساعات الخام وبس.
+function applyRules(email, punches, workDate){
+  const byDay = PENS[(email || '').toLowerCase()];
+  const row = byDay && workDate ? byDay[workDate] : null;
+  if(!row) return null;
+  const need = Number(row.need_min || 0);
+  return {
+    arrived: Number(row.arrived_min),
+    counted: Number(row.counted_min),
+    leaveAt: Number(row.counted_min) + need,
+    need,
+    // السيرفر بيصفّر الخصم لوحده لو HR شالته — مش بنكرّر الفحص هنا
+    penalty: Number(row.penalty || 0),
+    state:   row.state,
+    waived:  !!row.waived,
+    waiveReason: row.waive_reason || '',
+    beforeStart: !!row.before_start
+  };
 }
 
 // ============================================================
@@ -861,8 +1090,8 @@ function applyRules(email, punches){
 //    والبريك مش داخل في الحساب أصلاً (dayMinutes بتقفل العدّاد
 //    عنده)، فالأوفر تايم شغل حقيقي مش قعدة.
 // ============================================================
-function dayOvertime(email, punches){
-  const r = applyRules(email, punches);
+function dayOvertime(email, punches, workDate){
+  const r = applyRules(email, punches, workDate);
   const raw = dayMinutes(punches);
   if(!r) return { worked: raw.minutes, over: 0, short: 0, need: 0, has: false };
 
@@ -894,8 +1123,8 @@ function empRows(email){
   Object.keys(days).sort().forEach(d => {
     const p = days[d];
     const st = dayMinutes(p);
-    const r  = applyRules(email, p);
-    const o  = dayOvertime(email, p);
+    const r  = applyRules(email, p, d);
+    const o  = dayOvertime(email, p, d);
     const firstIn = p.find(x => x.kind === 'in');
     const lastOut = [...p].reverse().find(x => x.kind === 'out');
     if(st.missingOut) flags++;
@@ -1056,6 +1285,936 @@ async function exportEmpExcel(email){
   }catch(e){
     console.error('exportEmpExcel failed:', e);
     alert('فشل التصدير: ' + (e.message || e));
+  }
+}
+
+
+// ============================================================
+// 💸 الخصومات اليدوية
+// ------------------------------------------------------------
+// HR بتكتب خصم + سبب، والموظف بيشوفه في شاشة «مرتبك» على موبايله.
+//
+// 🔴 الكتابة كلها من دوال السيرفر (hr_add_deduction / hr_delete_deduction).
+//    جدول hr_deductions **مفيهوش سياسة إدخال ولا حذف خالص** — زي
+//    جدول attendance بالظبط. الصفحة دي واجهة عرض وبس.
+//
+// ⚠️ الخصم ده **غير** خصم التأخير الأوتوماتيكي اللي بيتحسب من
+//    قواعد المواعيد. ده يدوي وبسبب مكتوب، وده بيتحسب لوحده —
+//    وعن قصد مش بنجمعهم في رقم واحد عشان محدش يتلغبط.
+// ============================================================
+let DEDS = {};            // إيميل → [خصومات] (كل الشهور، مش الشهر المعروض بس)
+let DED_EMAIL = '';       // الموظف المفتوح في شاشة الخصم
+
+async function loadDeductions(){
+  try{
+    // ⚠️ ترتيب قبل قص — أحدث خصم لازم يبان حتى لو العدد وصل الحد
+    const { data, error } = await sb.from('hr_deductions')
+      .select('id,user_email,amount,reason,work_date,created_at,created_by,seen_at,waived_at,waived_by,waive_reason')
+      .order('created_at', { ascending:false })
+      .limit(1000);
+    if(error) throw error;
+    DEDS = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (DEDS[e] = DEDS[e] || []).push(r);
+    });
+  }catch(e){
+    // بنقول بصوت عالي. الفشل الصامت هنا معناه إن HR تفتكر إن
+    // الموظف مالوش خصومات وهي موجودة فعلاً.
+    console.error('loadDeductions failed:', e);
+    DEDS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/hr_deductions/i.test(t) || (e && e.code === '42P01'))
+      console.warn('⚠️ الجدول لسه ماتعملش — شغّل 32-hr-deductions.sql');
+  }
+}
+
+// مجموع الخصم اليدوي لموظف (كله، مش الشهر المعروض)
+// ⚠️ اللي اتشال **مش داخل في المجموع** — بس بيفضل في القايمة
+//    بختم مين شاله وليه. لو شلناه من القايمة كمان، محدش هيعرف
+//    إن كان فيه خصم أصلاً.
+function manualDed(email){
+  const list = DEDS[(email||'').toLowerCase()] || [];
+  let total = 0, unseen = 0, waived = 0;
+  list.forEach(r => {
+    if(r.waived_at){ waived++; }
+    else { total += Number(r.amount || 0); }
+    if(!r.seen_at) unseen++;
+  });
+  return { total: Math.round(total * 100) / 100, unseen, waived,
+           count: list.length, list };
+}
+
+// خصم التأخير التلقائي لموظف في الشهر المعروض
+function lateDed(email){
+  const byDay = PENS[(email||'').toLowerCase()] || {};
+  let total = 0, days = 0, waived = 0;
+  Object.keys(byDay).forEach(d => {
+    const r = byDay[d];
+    if(r.waived){ waived++; return; }
+    const p = Number(r.penalty || 0);
+    if(p > 0){ total += p; days++; }
+  });
+  return { total: Math.round(total * 100) / 100, days, waived };
+}
+
+// سطر خصم يدوي واحد — مصدر واحد عشان الشكل ما يختلفش بين
+// قايمة السجل وقايمة شاشة الخصم
+function dedRowHtml(r){
+  const w = !!r.waived_at;
+  return `
+    <div class="ded-row${w ? ' waived' : (r.seen_at ? '' : ' unseen')}">
+      <div class="ded-amt" ${w ? 'style="text-decoration:line-through;opacity:.55;"' : ''}>−${Number(r.amount)}</div>
+      <div class="ded-mid">
+        <b ${w ? 'style="text-decoration:line-through;opacity:.6;"' : ''}>${esc(r.reason)}</b>
+        <span>${new Date(r.created_at).toLocaleDateString('ar-EG',
+          { day:'numeric', month:'long', year:'numeric' })}
+          · ${w ? '✋ اتشال' : (r.seen_at ? '✔️ قراه الموظف' : '🔔 لسه ما قراهوش')}</span>
+        ${w ? `<span style="color:var(--done);">سبب الشيل: ${esc(r.waive_reason || '—')}</span>` : ''}
+      </div>
+      ${w
+        ? `<button class="ded-del" title="رجّع الخصم" onclick="unwaiveDeduction('${esc(r.id)}')">↩️</button>`
+        : `<button class="ded-del" title="شيل الخصم" onclick="waiveDeduction('${esc(r.id)}')">✋</button>`}
+      <button class="ded-del" title="مسح نهائي" onclick="deleteDeduction('${esc(r.id)}')">🗑️</button>
+    </div>`;
+}
+
+function dedSectionHtml(email){
+  const m = manualDed(email);
+  if(!m.count) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <b style="flex:1;font-size:14px;">💸 الخصومات اليدوية</b>
+        <span style="font-size:12.5px;font-weight:800;color:var(--red);">
+          ${m.total} ج.م${m.unseen ? ` · ${m.unseen} لسه ما اتقراش` : ''}</span>
+      </div>
+      ${m.list.map(dedRowHtml).join('')}
+    </div>`;
+}
+
+// ===== شاشة إضافة خصم =====
+function openDeduction(email){
+  DED_EMAIL = (email || '').toLowerCase();
+  const list = allPeople();
+  if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
+  if(list.indexOf(DED_EMAIL) < 0) DED_EMAIL = list[0];
+  renderDeduction();
+  openSheet('dedSheet');
+}
+
+function renderDeduction(){
+  const list = allPeople();
+  const m = manualDed(DED_EMAIL);
+  document.getElementById('dedTitle').textContent = '💸 خصم — ' + nameOf(DED_EMAIL);
+  document.getElementById('dedBody').innerHTML = `
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="DED_EMAIL=this.value; renderDeduction()">
+        ${list.map(e => `<option value="${esc(e)}"${e===DED_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <div class="hintbox">
+      الخصم هيوصل للموظف على موبايله في شاشة «مرتبك» مع السبب.<br>
+      لما يدوس «فهمت» الكارت بيختفي من عنده — <b>بس المبلغ بيفضل في المجموع</b>.<br>
+      لو غلطت، تقدر تمسح الخصم من سجل الموظف.
+    </div>
+
+    <label class="fld"><span>💰 المبلغ (بالجنيه)</span>
+      <input type="number" id="dedAmt" min="1" step="5" inputmode="decimal" placeholder="50">
+    </label>
+
+    <label class="fld"><span>📝 سبب الخصم</span>
+      <small>اكتبه واضح. بعد شهر محدش هيفتكر الخصم ده كان ليه —
+        والسبب المكتوب هو اللي بيمنع الخناقة.</small>
+      <textarea id="dedWhy" rows="3" placeholder="مثال: تأخير ساعتين يوم الأحد من غير إذن"></textarea>
+    </label>
+
+    <button class="save" id="dedSave" style="background:var(--red);"
+            onclick="saveDeduction()">💸 اعمل الخصم</button>
+
+    ${m.count ? `<div style="margin-top:22px;">
+      <b style="font-size:13.5px;">آخر خصومات ${esc(nameOf(DED_EMAIL))}</b>
+      <div style="font-size:12px;color:var(--muted);margin:4px 0 10px;">
+        الإجمالي: <b style="color:var(--red)">${m.total} ج.م</b></div>
+      ${m.list.slice(0, 5).map(dedRowHtml).join('')}
+    </div>` : ''}`;
+}
+
+async function saveDeduction(){
+  const btn = document.getElementById('dedSave');
+  const amt = parseFloat((document.getElementById('dedAmt') || {}).value);
+  const why = ((document.getElementById('dedWhy') || {}).value || '').trim();
+
+  // ⚠️ الفحص هنا **مجاملة للمستخدم بس**. الفحص الحقيقي جوه دالة
+  //    hr_add_deduction في السيرفر — لو شيلنا السطرين دول، محدش
+  //    هيقدر يعدّي خصم فاضي برضه.
+  if(!amt || amt <= 0){ alert('اكتب مبلغ أكبر من صفر'); return; }
+  if(!why){ alert('لازم تكتب سبب الخصم'); return; }
+  if(!confirm(`تأكيد الخصم\n\nالموظف: ${nameOf(DED_EMAIL)}\nالمبلغ: ${amt} ج.م\nالسبب: ${why}`)) return;
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    const { data, error } = await sb.rpc('hr_add_deduction', {
+      p_email:  DED_EMAIL,
+      p_amount: amt,
+      p_reason: why
+    });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. من غير السطر ده
+    //    الشاشة هتقول «اتحفظ ✅» والخصم ما اتكتبش.
+    if(error) throw error;
+
+    await notifyDeduction(DED_EMAIL, amt, why);   // إشعار برّه التطبيق (اختياري)
+    await loadDeductions();
+    render();
+    renderDeduction();
+    // ⚠️ لو الخصم اتعمل من صفحة المرتبات، لازم أرقامها تتحدّث كمان —
+    //    من غير السطر ده الصافي بيفضل قديم قدام عين المستخدم.
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    const a = document.getElementById('dedAmt'); if(a) a.value = '';
+    const w = document.getElementById('dedWhy'); if(w) w.value = '';
+    alert('✅ اتسجّل الخصم — هيوصل للموظف في شاشة «مرتبك»');
+  }catch(e){
+    console.error('saveDeduction failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883|42P01/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش في قاعدة البيانات — شغّل ملف 32-hr-deductions.sql'
+      : '❌ فشل الخصم: ' + t);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '💸 اعمل الخصم'; }
+  }
+}
+
+async function deleteDeduction(id){
+  if(!confirm('متأكد إنك عايز تمسح الخصم ده؟\n\nهيتشال من عند الموظف ومن المجموع.')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_deduction', { p_id: id });
+    if(error) throw error;
+    await loadDeductions();
+    render();
+    if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    alert('اتمسح ✅');
+  }catch(e){
+    console.error('deleteDeduction failed:', e);
+    alert('❌ مقدرناش نمسحه: ' + (e.message || e));
+  }
+}
+
+// ============================================================
+// الإشعار خارج التطبيق
+// ------------------------------------------------------------
+// ⚠️ ده **طبقة زيادة مش أساس**. لو الـ Edge Function مش متظبّطة،
+//    الخصم بيتسجّل عادي وبيوصل في التطبيق — الإشعار الخارجي بس
+//    اللي مش هيطلع. عشان كده الخطأ هنا بيتسجّل في الكونسول
+//    وبس، ومش بيوقّف الحفظ.
+// ============================================================
+async function notifyPay(email, body){
+  try{
+    const { error } = await sb.functions.invoke('send-push', {
+      body: {
+        emails: [email],
+        title:  '💰 تحديث في شاشة مرتبك',
+        body:   body,
+        url:    'index.html'
+      }
+    });
+    if(error) throw error;
+  }catch(e){
+    console.warn('send-push failed (العملية اتسجّلت عادي):', e);
+  }
+}
+function notifyDeduction(email, amount, reason){
+  return notifyPay(email, `حصل خصم ${amount} ج.م — ${reason}`);
+}
+
+// ============================================================
+// 🛡️ تاريخ بداية تطبيق خصم التأخير
+// ------------------------------------------------------------
+// ⚠️ الشريط الأحمر لما يكون فاضي **مقصود ومهم**. لو سكتنا،
+//    النظام هيفضل يخصم بأثر رجعي على شهور الموظف ما كانش يعرف
+//    فيها إن فيه نظام خصم أصلاً — وده بيهدّ الثقة في النظام كله
+//    من أول يوم.
+// ============================================================
+function penStartHtml(){
+  const set = !!PEN_START;
+  const nice = set ? new Date(PEN_START).toLocaleDateString('ar-EG',
+    { day:'numeric', month:'long', year:'numeric' }) : '';
+
+  return `
+  <div class="pen-start${set ? '' : ' warn'}">
+    <div class="pen-start-h">
+      <b>🛡️ خصم التأخير بيبدأ من</b>
+      ${set ? `<span>${esc(nice)}</span>` : `<span class="bad">⚠️ مش متحدد</span>`}
+    </div>
+
+    ${set
+      ? `<small>أي يوم قبل التاريخ ده بيبان في السجل إن الموظف كان متأخر —
+           <b>بس من غير خصم فلوس</b>.</small>`
+      : `<small><b>النظام دلوقتي بيخصم على كل التاريخ</b>، بما فيه شهور الموظفين
+           ما كانوش يعرفوا فيها إن فيه نظام خصم أصلاً. حدد تاريخ بداية.</small>`}
+
+    <div class="pen-start-row">
+      <input type="date" id="penStartInp" value="${esc(PEN_START || '')}">
+      <button onclick="savePenaltyStart()">💾 حفظ</button>
+    </div>
+  </div>`;
+}
+
+async function savePenaltyStart(){
+  const el = document.getElementById('penStartInp');
+  if(!el) return;
+  const v = (el.value || '').trim();
+
+  // ⚠️ المسح بيرجّع النظام للخصم على كل التاريخ. مش بنمنعه —
+  //    ممكن يكون مقصود — بس بنتأكد إن اللي بيعمله فاهم نتيجته.
+  if(!v){
+    if(!confirm('لو سيبته فاضي، الخصم هيتطبق على **كل تاريخ الحضور** '
+              + 'من أول يوم في النظام.\n\nمتأكد؟')) return;
+  }else{
+    const nice = new Date(v).toLocaleDateString('ar-EG',
+      { day:'numeric', month:'long', year:'numeric' });
+    if(!confirm('خصم التأخير هيبدأ من ' + nice + '.\n\n'
+              + 'كل الأيام اللي قبله خصمها هيبقى صفر عند كل الموظفين.')) return;
+  }
+
+  try{
+    const { error } = await sb.rpc('hr_set_penalty_start', { p_date: v || null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    // إعادة تحميل كاملة: كل الخصومات بتتحسب من أول وجديد
+    await loadMonth();
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    alert('✅ اتحفظ — الخصومات اتحسبت من أول وجديد');
+  }catch(e){
+    console.error('savePenaltyStart failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف 38-penalty-start-date.sql'
+      : '❌ ' + t);
+  }
+}
+
+// ============================================================
+// ✍️ التسجيل اليدوي — إضافة · تعديل · مسح
+// ------------------------------------------------------------
+// 🔴 جدول attendance **لسه مقفول** على الإدخال المباشر. كل حاجة
+//    هنا بتمر من ٣ دوال في السيرفر بتفحص إن اللي بينده HR أو أدمن،
+//    وبتحط ختم على الصف: مين كتبه بإيده وإمتى.
+//
+// 🔴 والختم بيظهر للموظف نفسه في سجله («✍️ يدوي»). لو HR قدرت
+//    تعدّل السجل في الخفا، السجل كله يفقد قيمته كدليل — والموظف
+//    يبقى معاه حق يشك في أي رقم.
+//
+// ⚠️ الوقت بيتبعت **نص** ('YYYY-MM-DD HH:MM') والسيرفر بيحوّله
+//    بتوقيت القاهرة. لو بنينا timestamp في المتصفح، كان هيتبني
+//    بساعة **الجهاز** — ولو جهاز الـ HR على توقيت تاني، كل
+//    التسجيلات تتكتب غلط ومحدش ياخد باله.
+// ============================================================
+let PUNCH = { email:'', id:null, day:'' };
+
+const PUNCH_KINDS = [
+  { k:'in',     t:'🟢 حضور' },
+  { k:'out',    t:'🔴 انصراف' },
+  { k:'break',  t:'☕ بريك' },
+  { k:'resume', t:'▶️ استئناف العمل' }
+];
+
+function openPunch(email, day, id){
+  PUNCH = { email:(email||'').toLowerCase(), id:id || null, day:day || '' };
+  renderPunch();
+  openSheet('punchSheet');
+}
+
+function findPunch(id){
+  return ROWS.find(r => String(r.id) === String(id)) || null;
+}
+
+// الوقت بتوقيت القاهرة في صيغة خانة datetime-local
+function cairoLocal(iso){
+  const p = new Date(iso).toLocaleString('sv-SE', { timeZone:'Africa/Cairo' });
+  return p.slice(0,16).replace(' ', 'T');   // 'YYYY-MM-DDTHH:MM'
+}
+
+function renderPunch(){
+  const editing = !!PUNCH.id;
+  const row = editing ? findPunch(PUNCH.id) : null;
+  const list = allPeople();
+
+  if(editing && !row){
+    document.getElementById('punchBody').innerHTML =
+      '<div class="empty">التسجيل ده مش موجود — اقفل وافتح تاني</div>';
+    return;
+  }
+
+  const kind = row ? row.kind : 'in';
+  const day  = row ? row.work_date : (PUNCH.day || todayCairo());
+  // الوقت الافتراضي: نص اليوم — عشان HR تكتبه بإيدها بدل ما تسيب
+  // ساعة عشوائية تعدّي بالغلط
+  const at   = row ? cairoLocal(row.at) : (day + 'T00:00');
+  // الصف الموجود: اليوم المحاسبي مختلف عن يوم الوقت؟ يبقى ده
+  // تسجيل بعد نص الليل
+  const prevShift = row ? (String(row.work_date) !== at.slice(0,10)) : false;
+
+  document.getElementById('punchTitle').textContent =
+    (editing ? '✏️ تعديل تسجيل — ' : '✍️ تسجيل يدوي — ') + nameOf(PUNCH.email || (list[0]||''));
+
+  document.getElementById('punchBody').innerHTML = `
+    <div class="hintbox">
+      التسجيل ده هيتكتب <b>باسمك</b> وهيظهر للموظف بعلامة «✍️ يدوي».<br>
+      ومش هيبقى موثّق ببصمة ولا لوكيشن — طبيعي، الموظف مش موجود دلوقتي.<br>
+      وأي تعديل هنا <b>بيعيد حساب الساعات والخصومات</b> لليوم ده لوحده.
+    </div>
+
+    ${editing ? '' : `
+    <label class="fld"><span>👤 الموظف</span>
+      <select id="pkEmail" onchange="PUNCH.email=this.value; renderPunch()">
+        ${list.map(e => `<option value="${esc(e)}"${e===PUNCH.email?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>`}
+
+    <label class="fld"><span>📌 نوع التسجيل</span>
+      <select id="pkKind">
+        ${PUNCH_KINDS.map(x => `<option value="${x.k}"${x.k===kind?' selected':''}>${x.t}</option>`).join('')}
+      </select>
+    </label>
+
+    <label class="fld"><span>🕐 وقت التسجيل — بتوقيت القاهرة</span>
+      <small>اكتب اليوم والساعة اللي حصل فيهم فعلاً. الكارت بيتحدد من هنا.</small>
+      <input type="datetime-local" id="pkAt" value="${esc(at)}" oninput="punchPreview()">
+    </label>
+
+    <!-- ⚠️ كان فيه خانة تانية اسمها «اليوم المحاسبي». اتشالت.
+         خانتين تاريخ في شاشة واحدة = دعوة للغلط: المستخدم بيغيّر
+         واحدة وينسى التانية، فالتسجيل بيروح لكارت يوم تاني وهو
+         مش فاهم ليه. دلوقتي التاريخ بيتاخد من الوقت أوتوماتيك،
+         والحالة الاستثنائية الوحيدة بقت صح/غلط واضح. -->
+    <label class="fld" style="display:flex;align-items:flex-start;gap:9px;">
+      <input type="checkbox" id="pkPrev" ${prevShift ? 'checked' : ''}
+             onchange="punchPreview()"
+             style="width:auto;margin-top:3px;flex:none;">
+      <span style="font-weight:700;font-size:13px;line-height:1.8;">
+        ده تسجيل <b>بعد نص الليل</b> وبيتبع وردية اليوم اللي قبله<br>
+        <small style="font-weight:400;color:var(--muted);">
+          مثال: حضر ٣١ ومشي ٢ الفجر يوم ١ — الانصراف بيتحسب على وردية ٣١.</small>
+      </span>
+    </label>
+
+    <div class="hintbox" id="pkPreview" style="background:var(--blue-bg);color:var(--blue);"></div>
+
+    <label class="fld"><span>📝 ملاحظة (اختياري)</span>
+      <input type="text" id="pkNote" placeholder="مثال: نسي يسجّل الانصراف"
+             value="${esc(row && row.manual_note ? row.manual_note : '')}">
+    </label>
+
+    <button class="save" id="pkSave" onclick="savePunch()">
+      ${editing ? '💾 احفظ التعديل' : '➕ اكتب التسجيل'}</button>
+
+    ${editing ? `<button class="save" style="margin-top:10px;background:var(--red);"
+      onclick="deletePunch('${esc(PUNCH.id)}')">🗑️ امسح التسجيل ده</button>` : ''}`;
+
+  punchPreview();   // ⚠️ بعد الرسم — العناصر لازم تكون موجودة الأول
+}
+
+function todayCairo(){
+  return new Date().toLocaleDateString('sv-SE', { timeZone:'Africa/Cairo' });
+}
+
+// إزاحة يوم على نص 'YYYY-MM-DD' — بـ UTC عشان التوقيت الصيفي
+// ما يخليش اليوم يقفز يومين أو يقف مكانه
+function shiftDay(ymd, delta){
+  const [y,m,d] = ymd.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m-1, d));
+  t.setUTCDate(t.getUTCDate() + delta);
+  return t.toISOString().slice(0,10);
+}
+
+// 🔴 مصدر واحد لحساب اليوم المحاسبي — المعاينة والحفظ بيندهوه.
+//    لو حسبناه في مكانين، المعاينة تقول كارت وهو يروح كارت تاني.
+function punchWorkDate(){
+  const atv = ((document.getElementById('pkAt') || {}).value || '').trim();
+  if(!atv) return '';
+  const day  = atv.slice(0,10);
+  const prev = !!(document.getElementById('pkPrev') || {}).checked;
+  return prev ? shiftDay(day, -1) : day;
+}
+
+// بتوري لـ HR الكارت اللي التسجيل هيروحه **قبل** ما تحفظ.
+// ⚠️ ده مش زينة: الغلطة اللي حصلت كانت إن التسجيل راح لكارت يوم
+//    تاني ومحدش عرف غير بعد ما دوّر. الشاشة بقت بتقول قبل الحفظ.
+function punchPreview(){
+  const box = document.getElementById('pkPreview');
+  if(!box) return;
+  const wd = punchWorkDate();
+  if(!wd){ box.textContent = 'اكتب الوقت الأول'; return; }
+  const nice = new Date(wd).toLocaleDateString('ar-EG',
+    { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  box.innerHTML = '📍 هيتحط في كارت: <b>' + esc(nice) + '</b>';
+}
+
+async function savePunch(){
+  const g   = id => ((document.getElementById(id) || {}).value || '').trim();
+  const btn = document.getElementById('pkSave');
+  const kind = g('pkKind'), note = g('pkNote');
+  const atv  = g('pkAt');
+  // 🔴 نفس الدالة اللي المعاينة بتستخدمها — عشان اللي شافته HR
+  //    هو اللي هيتحفظ بالظبط
+  const day  = punchWorkDate();
+
+  if(!kind || !day || !atv){ alert('املا نوع التسجيل والوقت'); return; }
+  // السيرفر عايز 'YYYY-MM-DD HH:MM' — الخانة بتدي 'YYYY-MM-DDTHH:MM'
+  const local = atv.replace('T', ' ').slice(0,16);
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    let error;
+    if(PUNCH.id){
+      ({ error } = await sb.rpc('hr_edit_punch', {
+        p_id: PUNCH.id, p_kind: kind, p_work_date: day, p_local: local, p_note: note || null }));
+    }else{
+      const em = g('pkEmail') || PUNCH.email;
+      if(!em){ alert('اختار الموظف'); return; }
+      ({ error } = await sb.rpc('hr_manual_punch', {
+        p_email: em, p_kind: kind, p_work_date: day, p_local: local, p_note: note || null }));
+    }
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+
+    closeSheet('punchSheet');
+    // إعادة تحميل كاملة: الساعات والخصومات كلها بتتحسب من أول وجديد
+    await loadMonth();
+    alert('✅ اتحفظ');
+  }catch(e){
+    console.error('savePunch failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف 37-hr-manual-attendance.sql'
+      : '❌ ' + t);
+  }finally{
+    if(btn){ btn.disabled = false; }
+  }
+}
+
+async function deletePunch(id){
+  const r = findPunch(id);
+  const what = r ? (KIND[r.kind] ? KIND[r.kind].t : r.kind) + ' ' + fmtTime(r.at) : 'التسجيل ده';
+  if(!confirm('متأكد إنك عايز تمسح ' + what + '؟\n\nالساعات والخصومات هتتحسب من أول وجديد.')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_punch', { p_id: id });
+    if(error) throw error;
+    closeSheet('punchSheet');
+    await loadMonth();
+  }catch(e){
+    console.error('deletePunch failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+// ============================================================
+// 📅 مواعيد الأيام الخاصة
+// ------------------------------------------------------------
+// مثال: fanie مواعيده ١٠ لـ ٨، بس الجمعة ٢ لـ ١٢.
+//
+// ⚠️ كل خانة فاضية معناها **«زي الأساسي»** مش «صفر». يعني لو
+//    الجمعة بتبدأ ٢ وباقي القواعد زي أي يوم، تكتب البداية بس.
+//    لو خلّينا كل حاجة إجبارية، كنت هتضطر تعيد كتابة كل القواعد
+//    لكل يوم — وأول ما تغيّر قاعدة عامة، الأيام الخاصة تفضل على
+//    القديم في صمت وتخصم غلط.
+//
+// ⚠️ الترقيم ٠=الأحد … ٦=السبت — نفس ترقيم JS و Postgres (dow).
+//    لو غيّرناه هنا لازم يتغيّر في hr_late_penalties كمان.
+// ============================================================
+function daySchedHtml(){
+  const mine = DAY_SCHED[SET_EMAIL] || {};
+  const base = EMP_SET[SET_EMAIL] || {};
+
+  const chips = DAY_NAMES.map((n, i) => {
+    const has = !!mine[i];
+    return `<button type="button" class="${has ? 'on' : ''}${DAY_EDIT === i ? ' edit' : ''}"
+      onclick="toggleDayEdit(${i})">${n}${has ? ' ●' : ''}</button>`;
+  }).join('');
+
+  let form = '';
+  if(DAY_EDIT != null){
+    const d = mine[DAY_EDIT] || {};
+    const ph = (v, unit) => v == null || v === '' ? 'زي الأساسي' : ('زي الأساسي: ' + v + (unit||''));
+    form = `
+    <div class="dsch-form">
+      <b style="display:block;font-size:13.5px;margin-bottom:4px;">${DAY_NAMES[DAY_EDIT]}</b>
+      <small style="display:block;font-size:11.5px;color:var(--muted);line-height:1.9;margin-bottom:10px;">
+        سيب أي خانة فاضية عشان تمشي بالقاعدة الأساسية.</small>
+
+      <label class="fld"><span>🕙 المعاد الأساسي</span>
+        <input type="time" id="dsStart" value="${esc(d.shift_start ? String(d.shift_start).slice(0,5) : '')}">
+      </label>
+      <label class="fld"><span>⏱️ عدد ساعات الشغل</span>
+        <input type="number" id="dsHours" min="1" max="24" step="0.25"
+               placeholder="${esc(ph(base.work_hours, ' ساعة'))}"
+               value="${d.work_hours != null ? Number(d.work_hours) : ''}">
+      </label>
+      <label class="fld"><span>⏳ فترة السماح (دقايق)</span>
+        <input type="number" id="dsGrace" min="0"
+               placeholder="${esc(ph(base.grace_minutes, ' د'))}"
+               value="${d.grace_minutes != null ? Number(d.grace_minutes) : ''}">
+      </label>
+      <label class="fld"><span>🕛 المعاد الاحتياطي</span>
+        <input type="time" id="dsBackup" value="${esc(d.backup_start ? String(d.backup_start).slice(0,5) : '')}">
+      </label>
+      <label class="fld"><span>💸 الخصم بعد الاحتياطي (ج.م)</span>
+        <input type="number" id="dsPen" min="0" step="5"
+               placeholder="${esc(ph(base.late_penalty, ' ج.م'))}"
+               value="${d.late_penalty != null ? Number(d.late_penalty) : ''}">
+      </label>
+
+      <div style="display:flex;gap:8px;">
+        <button class="save" style="flex:1;" onclick="saveDaySched()">💾 حفظ ${DAY_NAMES[DAY_EDIT]}</button>
+        ${mine[DAY_EDIT] ? `<button class="save" style="flex:none;background:var(--red);"
+          onclick="deleteDaySched(${DAY_EDIT})">🗑️</button>` : ''}
+      </div>
+    </div>`;
+  }
+
+  return `
+  <div style="margin-top:26px;padding-top:20px;border-top:1px solid var(--border);">
+    <b style="display:block;font-size:14px;margin-bottom:5px;">📅 مواعيد أيام خاصة</b>
+    <small style="display:block;font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:10px;">
+      لو يوم معيّن مواعيده مختلفة (زي الجمعة من ٢ لـ ١٢)، دوس عليه واكتب اللي مختلف بس.<br>
+      اليوم اللي عليه ● معناه إن له ميعاد خاص.</small>
+    <div class="days dsch-days">${chips}</div>
+    ${form}
+  </div>`;
+}
+
+function toggleDayEdit(i){
+  // ⚠️ بنحفظ اللي متكتب في خانات الإعدادات الأساسية قبل إعادة
+  //    الرسم — من غير كده أي حاجة كتبتها وما حفظتهاش بتضيع.
+  const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
+  stashForm(c);
+  DAY_EDIT = (DAY_EDIT === i) ? null : i;
+  renderHrSettings();
+}
+
+async function saveDaySched(){
+  const g  = id => ((document.getElementById(id) || {}).value || '').trim();
+  const nu = v => v === '' ? null : (parseFloat(v));
+
+  const row = {
+    user_email:    SET_EMAIL,
+    weekday:       DAY_EDIT,
+    shift_start:   g('dsStart')  || null,
+    work_hours:    nu(g('dsHours')),
+    grace_minutes: g('dsGrace') === '' ? null : parseInt(g('dsGrace'), 10),
+    backup_start:  g('dsBackup') || null,
+    late_penalty:  nu(g('dsPen')),
+    updated_at:    new Date().toISOString(),
+    updated_by:    ME
+  };
+
+  // كل حاجة فاضية = مفيش استثناء أصلاً. بنمسح بدل ما نسيب صف
+  // فاضي بيوهم إن اليوم ده مختلف وهو مش مختلف في حاجة.
+  const empty = !row.shift_start && row.work_hours == null &&
+                row.grace_minutes == null && !row.backup_start && row.late_penalty == null;
+  if(empty){ await deleteDaySched(DAY_EDIT); return; }
+
+  // الاحتياطي لازم يكون بعد الأساسي، وإلا الحساب كله هيبقى غلط
+  const st = row.shift_start || (EMP_SET[SET_EMAIL] || {}).shift_start;
+  if(row.backup_start && st && String(row.backup_start).slice(0,5) <= String(st).slice(0,5)){
+    alert('المعاد الاحتياطي لازم يكون **بعد** المعاد الأساسي');
+    return;
+  }
+
+  try{
+    const { error } = await sb.from('hr_day_schedules').upsert(row);
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    alert('اتحفظ ✅ — ' + DAY_NAMES[DAY_EDIT]);
+    DAY_EDIT = null;
+    await loadEmpSettings();
+    await loadMonth();          // الخصومات بتتحسب من أول وجديد
+    renderHrSettings();
+  }catch(e){
+    console.error('saveDaySched failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/42P01|hr_day_schedules/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف 35-schedules-penalties-waivers.sql'
+      : (/42501|row-level security/i.test(t)
+         ? '❌ الحفظ اترفض من الصلاحيات — لازم تكون HR أو أدمن'
+         : '❌ فشل الحفظ: ' + t));
+  }
+}
+
+async function deleteDaySched(i){
+  try{
+    const { error } = await sb.from('hr_day_schedules')
+      .delete().eq('user_email', SET_EMAIL).eq('weekday', i);
+    if(error) throw error;
+    DAY_EDIT = null;
+    await loadEmpSettings();
+    await loadMonth();
+    renderHrSettings();
+  }catch(e){
+    console.error('deleteDaySched failed:', e);
+    alert('❌ مقدرناش نمسحه: ' + (e.message || e));
+  }
+}
+
+// ============================================================
+// ✋ شيل الخصم
+// ------------------------------------------------------------
+// نوعين، وكل واحد ليه دالة مختلفة في السيرفر:
+//   • خصم يدوي     → hr_waive_deduction (بيعلّم الصف)
+//   • خصم تأخير     → hr_waive_penalty  (بيسجّل إعفاء لليوم ده)
+//
+// ⚠️ الاتنين بيصفّروا seen_at عن قصد — عشان الموظف ياخد جرس
+//    جديد ويشوف السبب. الخصم اللي بيختفي في صمت بيولّد شك.
+// ============================================================
+async function waiveDeduction(id){
+  const why = prompt('ليه بتشيل الخصم ده؟\n\nالسبب هيوصل للموظف زي ما هو.');
+  if(why == null) return;
+  if(!why.trim()){ alert('لازم تكتب السبب'); return; }
+  try{
+    const { error } = await sb.rpc('hr_waive_deduction', { p_id: id, p_reason: why.trim() });
+    if(error) throw error;
+    const row = (DEDS[DED_EMAIL] || []).concat(
+      Object.keys(DEDS).reduce((a,k) => a.concat(DEDS[k]), [])).find(x => x.id === id);
+    if(row) await notifyPay(row.user_email, `اتشال عنك خصم ${row.amount} ج.م — ${why.trim()}`);
+    await loadDeductions();
+    render();
+    if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    alert('✅ الخصم اتشال — والموظف هيشوف السبب');
+  }catch(e){
+    console.error('waiveDeduction failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+async function unwaiveDeduction(id){
+  if(!confirm('ترجّع الخصم ده تاني؟')) return;
+  try{
+    const { error } = await sb.rpc('hr_unwaive_deduction', { p_id: id });
+    if(error) throw error;
+    await loadDeductions();
+    render();
+    if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+  }catch(e){
+    console.error('unwaiveDeduction failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+async function waivePenalty(email, d){
+  const why = prompt('ليه بتشيل خصم التأخير ده؟\n\nالسبب هيوصل للموظف زي ما هو.');
+  if(why == null) return;
+  if(!why.trim()){ alert('لازم تكتب السبب'); return; }
+  try{
+    const { error } = await sb.rpc('hr_waive_penalty',
+      { p_email: email, p_date: d, p_reason: why.trim() });
+    if(error) throw error;
+    await notifyPay(email, `اتشال عنك خصم التأخير بتاع ${d} — ${why.trim()}`);
+    await loadMonth();
+    alert('✅ خصم التأخير اتشال — والموظف هيشوف السبب');
+  }catch(e){
+    console.error('waivePenalty failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+async function unwaivePenalty(email, d){
+  if(!confirm('ترجّع خصم التأخير ده تاني؟')) return;
+  try{
+    const { error } = await sb.rpc('hr_unwaive_penalty', { p_email: email, p_date: d });
+    if(error) throw error;
+    await loadMonth();
+  }catch(e){
+    console.error('unwaivePenalty failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+// ============================================================
+// 💰 صفحة «المخصومات والمرتبات»
+// ------------------------------------------------------------
+// 🔴 الفرق الجوهري بينها وبين الصفحة الرئيسية:
+//    الصفحة الرئيسية بتبني كروتها **من سجل الحضور** — يعني
+//    الموظف اللي ما سجّلش حضور ولا مرة مالوش كارت أصلاً، ومكانش
+//    ينفع تحطله مرتب ولا تخصم منه.
+//
+//    الصفحة دي بتبني كروتها **من قايمة الأدمن** (user-roles).
+//    فأي حد الأدمن سجّله بيبان هنا، حضر أو ما حضرش.
+//
+// ⚠️ الكتابة كلها من دوال السيرفر. جدول hr_salaries زي جدول
+//    hr_deductions بالظبط: **مفيهوش سياسة كتابة خالص**.
+// ============================================================
+let SALS  = {};    // إيميل → مرتبه
+let PAY_Q = '';    // نص البحث
+
+// كل الناس اللي الأدمن سجّلهم — ما عدا السوبر أدمن (صاحب المحل)
+// ⚠️ مش بنستخدم allEmployees() هنا لأنها بتشيل دور hr، وشؤون
+//    العاملين نفسها ليها مرتب زي أي حد.
+function allPeople(){
+  const out = [];
+  for(const em of Object.keys(ROLES_MAP || {})){
+    const v = ROLES_MAP[em];
+    const r = typeof v === 'string' ? v : (v && v.role) || '';
+    if(r === 'super_admin') continue;
+    out.push(em.toLowerCase());
+  }
+  // وأي حد ظهر في سجل الحضور ومش في الخريطة (حساب اتشال مثلاً) —
+  // مينفعش يختفي وعليه خصومات
+  ROWS.forEach(r => {
+    const e = (r.user_email||'').toLowerCase();
+    if(e && out.indexOf(e) < 0) out.push(e);
+  });
+  return out.sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+}
+
+async function loadSalaries(){
+  try{
+    const { data, error } = await sb.from('hr_salaries').select('user_email,amount');
+    if(error) throw error;
+    SALS = {};
+    (data || []).forEach(r => { SALS[(r.user_email||'').toLowerCase()] = Number(r.amount || 0); });
+  }catch(e){
+    // بنقول بصوت عالي بدل ما الصفحة توري «مفيش مرتب» لكل الناس
+    console.error('loadSalaries failed:', e);
+    SALS = {};
+    if(e && (e.code === '42P01' || /hr_salaries/i.test(e.message||'')))
+      console.warn('⚠️ جدول المرتبات لسه ماتعملش — شغّل 34-hr-salaries.sql');
+  }
+}
+
+async function openPayrollAdmin(){
+  PAY_Q = '';
+  const box = document.getElementById('payBody');
+  if(box) box.innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('paySheet');
+  const q = document.getElementById('paySearch'); if(q) q.value = '';
+  // ⚠️ بنعيد التحميل عن قصد: ممكن الأدمن يكون ضاف موظف جديد
+  //    والصفحة مفتوحة من ساعة
+  await loadSalaries();
+  await loadDeductions();
+  renderPayrollAdmin();
+}
+
+function renderPayrollAdmin(){
+  const box = document.getElementById('payBody');
+  if(!box) return;
+
+  let list = allPeople();
+  if(PAY_Q){
+    const q = PAY_Q.trim().toLowerCase();
+    list = list.filter(e => e.includes(q) || nameOf(e).toLowerCase().includes(q));
+  }
+
+  if(!list.length){
+    box.innerHTML = '<div class="empty">' +
+      (PAY_Q ? 'مفيش موظف بالاسم ده' :
+       'مفيش موظفين متسجّلين<br><small>ضيفهم من لوحة الأدمن الأول</small>') +
+      '</div>';
+    return;
+  }
+
+  // ملخص فوق: كام مرتب متحدد، وإجمالي المرتبات والخصومات
+  let setN = 0, totSal = 0, totDed = 0;
+  allPeople().forEach(e => {
+    if(SALS[e] != null){ setN++; totSal += SALS[e]; }
+    totDed += manualDed(e).total + lateDed(e).total;
+  });
+
+  box.innerHTML = `
+    ${penStartHtml()}
+
+    <div class="kpis" style="margin:14px 0 16px;">
+      <div class="kpi"><div class="v">${setN}/${allPeople().length}</div><div class="l">مرتب متحدد</div></div>
+      <div class="kpi"><div class="v">${totSal.toLocaleString('en-US')}</div><div class="l">إجمالي المرتبات</div></div>
+      <div class="kpi"><div class="v" style="color:${totDed?'var(--red)':'inherit'}">${totDed.toLocaleString('en-US')}</div><div class="l">كل الخصومات</div></div>
+    </div>
+    ${list.map(prCardHtml).join('')}`;
+}
+
+function prCardHtml(e){
+  const m   = manualDed(e);
+  // ⚠️ خصم التأخير بتاع **الشهر المعروض فوق في الصفحة الرئيسية**
+  //    مش كل التاريخ — عشان يتماشى مع المرتب الشهري.
+  const lt  = lateDed(e);
+  const sal = SALS[e];
+  const has = sal != null;
+  const net = (has ? sal : 0) - m.total - lt.total;
+  // معرّف آمن للخانة: الإيميل فيه @ و . فمينفعش يبقى id مباشرة
+  const uid = 'sal_' + e.replace(/[^a-z0-9]/gi, '_');
+  return `
+  <div class="pr-card${m.unseen ? ' alert' : ''}">
+    <div class="pr-top">
+      <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
+      <div class="card-id">
+        <b>${esc(nameOf(e))}</b>
+        <span>${esc(e)}</span>
+      </div>
+    </div>
+
+    <div class="pr-sal">
+      <label>💵 المرتب</label>
+      <input type="number" id="${uid}" min="0" step="50" inputmode="decimal"
+             placeholder="لسه مش متحدد" value="${has ? sal : ''}">
+      <button onclick="saveSalary('${esc(e)}','${uid}')">💾</button>
+    </div>
+
+    <div class="pr-nums" style="grid-template-columns:repeat(3,1fr);">
+      <div>
+        <b style="color:${m.total ? 'var(--red)' : 'inherit'}">${m.total.toLocaleString('en-US')}</b>
+        <span>خصم يدوي</span>
+      </div>
+      <div>
+        <b style="color:${lt.total ? 'var(--red)' : 'inherit'}">${lt.total.toLocaleString('en-US')}</b>
+        <span>خصم تأخير</span>
+      </div>
+      <div>
+        <b style="color:${has ? (net < 0 ? 'var(--red)' : 'var(--done)') : 'var(--muted)'}">${
+          has ? net.toLocaleString('en-US') : '—'}</b>
+        <span>الصافي ج.م</span>
+      </div>
+    </div>
+
+    ${lt.days ? `<div class="pr-bell" style="color:var(--waiting);">⏰ ${lt.days} يوم تأخير
+      محسوب تلقائي — تقدر تشيله من 📋 السجل</div>` : ''}
+    ${m.unseen ? `<div class="pr-bell">🔔 ${m.unseen} رسالة لسه ما قراهاش الموظف</div>` : ''}
+
+    <button class="pr-ded-btn" onclick="openDeduction('${esc(e)}')">💸 خصم</button>
+  </div>`;
+}
+
+async function saveSalary(email, uid){
+  const el = document.getElementById(uid);
+  if(!el) return;
+  const raw = (el.value || '').trim();
+
+  // خانة فاضية = «لسه مش متحدد». مش بنكتب صفر عشان الموظف
+  // ما يشوفش «مرتبك ٠ ج.م» وده مجرد إن حد نسي يكتبه.
+  if(raw === ''){ alert('اكتب المرتب الأول'); el.focus(); return; }
+
+  const amt = parseFloat(raw);
+  if(isNaN(amt) || amt < 0){ alert('المرتب مينفعش يكون بالسالب'); return; }
+
+  const btn = el.parentNode.querySelector('button');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳'; }
+  try{
+    const { error } = await sb.rpc('hr_set_salary', { p_email: email, p_amount: amt });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. من غير السطر ده
+    //    الزرار هيوري ✅ والمرتب ما اتكتبش.
+    if(error) throw error;
+    SALS[email] = amt;
+    if(btn){ btn.textContent = '✅'; }
+    // بنعيد الرسم بعد لحظة عشان الصافي يتحدّث، والعلامة تبان للمستخدم
+    setTimeout(renderPayrollAdmin, 700);
+  }catch(e){
+    console.error('saveSalary failed:', e);
+    if(btn){ btn.disabled = false; btn.textContent = '💾'; }
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883|42P01/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش في قاعدة البيانات — شغّل ملف 34-hr-salaries.sql'
+      : '❌ فشل حفظ المرتب: ' + t);
   }
 }
 

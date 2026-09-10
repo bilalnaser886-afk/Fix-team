@@ -101,6 +101,7 @@
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
+<script src="payroll.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1181,6 +1182,9 @@
     <button class="admin-menu-item" data-i18n="menu.techEval" onclick="openTechEval()">تقييم الفنيين</button>
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
       <button class="att-menu-btn" style="display:none;" onclick="openAttendance()">⏰ المواعيد</button>
+      <!-- ⚠️ الكلاس pay-menu-btn مهم: payroll.js بيدوّر عليه بنفسه
+           ويظهّره على الموبايل بس ويحط عليه عدد الخصومات الجديدة. -->
+      <button class="pay-menu-btn" style="display:none;" onclick="openPayroll()">💰 مرتبك</button>
     <button class="admin-menu-item" data-i18n="menu.inventory" onclick="openSummaries()">الجرد</button>
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
     <button class="money-menu-item" data-i18n="menu.accounts" onclick="openAccounts()">الحسابات</button>
@@ -8428,5 +8432,8 @@ async function saveSubInfo(){
 
 <!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
 <div id="attOverlay" class="hidden"></div>
+
+<!-- شاشة «مرتبك» — بتتبني بالكامل من payroll.js -->
+<div id="payOverlay" class="hidden"></div>
 </body>
 </html>

@@ -4,7 +4,7 @@
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده في APP_SHELL تحت،
 //    وزوّد رقم الإصدار (v4 → v5). تعديل ملف موجود مش محتاج تزويد الرقم —
 //    ملفات الكود بتتقرا من النت الأول (شوف قسم fetch).
-const CACHE_NAME = 'ifixteam-v48';
+const CACHE_NAME = 'ifixteam-v49';
 
 const APP_SHELL = [
   './',
@@ -21,6 +21,7 @@ const APP_SHELL = [
   'tech-icon-512.png',
   'admin.html',
   'hr.html',
+  'staff.html',
   'checkout.html',
   'manifest.json',
   'i18n.js',
@@ -35,6 +36,7 @@ const APP_SHELL = [
   'accounts.js',
   'label.js',
   'attendance.js',
+  'payroll.js',
   'dock.js',
   'dock-tools.js',
   'assist.html',
@@ -118,6 +120,59 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       });
+    })
+  );
+});
+
+// ============================================================
+// 🔔 الإشعارات خارج التطبيق (Web Push)
+// ------------------------------------------------------------
+// الـ service worker ده بيفضل شغّال حتى والتطبيق مقفول — وده
+// السبب الوحيد اللي بيخلّي الإشعار يوصل وإنت برّه التطبيق.
+// السيرفر بيبعت الرسالة **له هو**، مش للصفحة.
+//
+// ⚠️ userVisibleOnly=true في الاشتراك معناها وعد للمتصفح:
+//    «كل رسالة توصل، هطلّع منها إشعار مرئي». لو استقبلنا رسالة
+//    وما طلّعناش إشعار، المتصفح بيلغي الاشتراك بعد كام مرة.
+//    عشان كده showNotification بتتنده **دايماً**، حتى لو البيانات
+//    جت بايظة — بنطلّع رسالة عامة بدل ما نسكت.
+// ============================================================
+self.addEventListener('push', (event) => {
+  let d = {};
+  try{ d = event.data ? event.data.json() : {}; }catch(e){ d = {}; }
+
+  const title = d.title || 'تحديث جديد';
+  const opts  = {
+    body:  d.body || 'افتح التطبيق للتفاصيل',
+    icon:  'icon-192.png',
+    badge: 'icon-192.png',
+    dir:   'rtl',
+    lang:  'ar',
+    // tag واحد = الإشعار الجديد بيستبدل القديم بدل ما يتكوّم ٢٠ إشعار
+    tag:   d.tag || 'ifix-payroll',
+    renotify: true,
+    data:  { url: d.url || 'index.html' }
+  };
+  event.waitUntil(self.registration.showNotification(title, opts));
+});
+
+// ============================================================
+// الدوس على الإشعار
+// ------------------------------------------------------------
+// ⚠️ لو التطبيق مفتوح في الخلفية، بنركّز عليه بدل ما نفتح تبويب
+//    جديد. من غير الفحص ده الموظف بيلاقي نسختين من التطبيق
+//    مفتوحين — وفي وضع الشاشة الرئيسية النسخة الجديدة مالهاش
+//    زرار رجوع خالص.
+// ============================================================
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || 'index.html';
+  event.waitUntil(
+    self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
+      for(const c of list){
+        if(c.url.indexOf(self.location.origin) === 0 && 'focus' in c) return c.focus();
+      }
+      return self.clients.openWindow(target);
     })
   );
 });
