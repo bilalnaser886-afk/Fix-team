@@ -167,6 +167,24 @@
   .dsch-days button.on{background:var(--blue); border-color:var(--blue); color:#fff;}
   .dsch-form{margin-top:14px; background:var(--surface-2); border:1px solid var(--border);
     border-radius:13px; padding:14px;}
+  /* شريط تاريخ بداية الخصم */
+  .pen-start{background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:13px 14px; margin-top:14px;}
+  .pen-start.warn{border-color:var(--red); background:var(--rejected-bg,#FEF2F2);}
+  html[data-theme="dark"] .pen-start.warn{background:rgba(240,85,74,.10);}
+  .pen-start-h{display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; font-size:13.5px; margin-bottom:5px;}
+  .pen-start-h span{font-weight:800; color:var(--done);}
+  .pen-start-h span.bad{color:var(--red);}
+  .pen-start small{display:block; font-size:12px; line-height:1.9; color:var(--muted);}
+  .pen-start.warn small{color:var(--red);}
+  .pen-start-row{display:flex; gap:8px; margin-top:10px;}
+  .pen-start-row input{flex:1; min-width:0; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--ink); border-radius:10px;
+    padding:10px 11px; font-family:inherit; font-size:14.5px;}
+  .pen-start-row button{flex:none; border:none; border-radius:10px; padding:10px 14px;
+    background:var(--done); color:#fff; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
   /* ===== كروت صفحة المخصومات والمرتبات ===== */
   .pr-card{background:var(--surface); border:1px solid var(--border);
     border-radius:15px; padding:13px 14px; margin-bottom:11px;}
@@ -408,6 +426,7 @@ async function loadMonth(){
     if(error) throw error;
     ROWS = data || [];
     await loadEmpSettings();   // القواعد لازم تكون موجودة قبل الرسم
+    await loadPenaltyStart();       // الحاجز لازم يتقرا قبل العرض
     await loadPenalties(from, to);  // 🔴 خصم التأخير — من السيرفر
     await loadDeductions();    // والخصومات اليدوية كمان
     render();
@@ -682,7 +701,11 @@ function dayHtml(d, punches, email){
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
       <span class="meta">حضر ${fmtMinTime(r.arrived)} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
     </div>
-    ${r.waived ? `
+    ${r.beforeStart ? `
+      <div class="punch" style="padding-bottom:7px;">
+        <span class="meta" style="flex:1;">🛡️ اليوم ده قبل بداية تطبيق الخصم — متأخر بس من غير فلوس</span>
+      </div>` :
+      (r.waived ? `
       <div class="punch" style="padding-bottom:7px;">
         <span class="meta" style="flex:1;">سبب الشيل: ${esc(r.waiveReason || '—')}</span>
         <button class="mini-btn" onclick="unwaivePenalty('${esc(email)}','${esc(d)}')">↩️ رجّع الخصم</button>
@@ -691,7 +714,7 @@ function dayHtml(d, punches, email){
       <div class="punch" style="padding-bottom:7px;">
         <span class="meta" style="flex:1;">الخصم ده تلقائي حسب المواعيد</span>
         <button class="mini-btn danger" onclick="waivePenalty('${esc(email)}','${esc(d)}')">✋ شيل الخصم</button>
-      </div>` : '')}`;
+      </div>` : ''))}`;
   return `
   <div class="day">
     <div class="day-h">
@@ -771,6 +794,27 @@ let DAY_EDIT  = null;    // اليوم المفتوح للتعديل في شاش
 // 🔴 خصومات التأخير — **محسوبة في السيرفر مش هنا**
 //    شكلها: PENS['fanie@fix.com']['2026-09-10'] = { ...صف اليوم }
 let PENS = {};
+
+// 🔴 تاريخ بداية تطبيق خصم التأخير
+// ------------------------------------------------------------
+// أي يوم قبله خصمه صفر. فاضي = الخصم بيتطبق على **كل التاريخ**،
+// وده بيعمل صدمة بأثر رجعي لكل الموظفين — عشان كده الصفحة
+// بتنبّه بشريط أحمر لو فضي بدل ما تسكت.
+let PEN_START = null;
+
+async function loadPenaltyStart(){
+  try{
+    const { data, error } = await sb.rpc('hr_penalty_start');
+    if(error) throw error;
+    PEN_START = data || null;
+  }catch(e){
+    console.error('loadPenaltyStart failed:', e);
+    PEN_START = null;
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42883/i.test(t))
+      console.warn('⚠️ ميزة تاريخ بدء الخصم لسه ماتركبتش — شغّل 38-penalty-start-date.sql');
+  }
+}
 
 async function loadPenalties(from, to){
   try{
@@ -1027,7 +1071,8 @@ function applyRules(email, punches, workDate){
     penalty: Number(row.penalty || 0),
     state:   row.state,
     waived:  !!row.waived,
-    waiveReason: row.waive_reason || ''
+    waiveReason: row.waive_reason || '',
+    beforeStart: !!row.before_start
   };
 }
 
@@ -1484,6 +1529,73 @@ function notifyDeduction(email, amount, reason){
 }
 
 // ============================================================
+// 🛡️ تاريخ بداية تطبيق خصم التأخير
+// ------------------------------------------------------------
+// ⚠️ الشريط الأحمر لما يكون فاضي **مقصود ومهم**. لو سكتنا،
+//    النظام هيفضل يخصم بأثر رجعي على شهور الموظف ما كانش يعرف
+//    فيها إن فيه نظام خصم أصلاً — وده بيهدّ الثقة في النظام كله
+//    من أول يوم.
+// ============================================================
+function penStartHtml(){
+  const set = !!PEN_START;
+  const nice = set ? new Date(PEN_START).toLocaleDateString('ar-EG',
+    { day:'numeric', month:'long', year:'numeric' }) : '';
+
+  return `
+  <div class="pen-start${set ? '' : ' warn'}">
+    <div class="pen-start-h">
+      <b>🛡️ خصم التأخير بيبدأ من</b>
+      ${set ? `<span>${esc(nice)}</span>` : `<span class="bad">⚠️ مش متحدد</span>`}
+    </div>
+
+    ${set
+      ? `<small>أي يوم قبل التاريخ ده بيبان في السجل إن الموظف كان متأخر —
+           <b>بس من غير خصم فلوس</b>.</small>`
+      : `<small><b>النظام دلوقتي بيخصم على كل التاريخ</b>، بما فيه شهور الموظفين
+           ما كانوش يعرفوا فيها إن فيه نظام خصم أصلاً. حدد تاريخ بداية.</small>`}
+
+    <div class="pen-start-row">
+      <input type="date" id="penStartInp" value="${esc(PEN_START || '')}">
+      <button onclick="savePenaltyStart()">💾 حفظ</button>
+    </div>
+  </div>`;
+}
+
+async function savePenaltyStart(){
+  const el = document.getElementById('penStartInp');
+  if(!el) return;
+  const v = (el.value || '').trim();
+
+  // ⚠️ المسح بيرجّع النظام للخصم على كل التاريخ. مش بنمنعه —
+  //    ممكن يكون مقصود — بس بنتأكد إن اللي بيعمله فاهم نتيجته.
+  if(!v){
+    if(!confirm('لو سيبته فاضي، الخصم هيتطبق على **كل تاريخ الحضور** '
+              + 'من أول يوم في النظام.\n\nمتأكد؟')) return;
+  }else{
+    const nice = new Date(v).toLocaleDateString('ar-EG',
+      { day:'numeric', month:'long', year:'numeric' });
+    if(!confirm('خصم التأخير هيبدأ من ' + nice + '.\n\n'
+              + 'كل الأيام اللي قبله خصمها هيبقى صفر عند كل الموظفين.')) return;
+  }
+
+  try{
+    const { error } = await sb.rpc('hr_set_penalty_start', { p_date: v || null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    // إعادة تحميل كاملة: كل الخصومات بتتحسب من أول وجديد
+    await loadMonth();
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    alert('✅ اتحفظ — الخصومات اتحسبت من أول وجديد');
+  }catch(e){
+    console.error('savePenaltyStart failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف 38-penalty-start-date.sql'
+      : '❌ ' + t);
+  }
+}
+
+// ============================================================
 // ✍️ التسجيل اليدوي — إضافة · تعديل · مسح
 // ------------------------------------------------------------
 // 🔴 جدول attendance **لسه مقفول** على الإدخال المباشر. كل حاجة
@@ -1540,6 +1652,9 @@ function renderPunch(){
   // الوقت الافتراضي: نص اليوم — عشان HR تكتبه بإيدها بدل ما تسيب
   // ساعة عشوائية تعدّي بالغلط
   const at   = row ? cairoLocal(row.at) : (day + 'T00:00');
+  // الصف الموجود: اليوم المحاسبي مختلف عن يوم الوقت؟ يبقى ده
+  // تسجيل بعد نص الليل
+  const prevShift = row ? (String(row.work_date) !== at.slice(0,10)) : false;
 
   document.getElementById('punchTitle').textContent =
     (editing ? '✏️ تعديل تسجيل — ' : '✍️ تسجيل يدوي — ') + nameOf(PUNCH.email || (list[0]||''));
@@ -1564,17 +1679,28 @@ function renderPunch(){
       </select>
     </label>
 
-    <label class="fld"><span>🕐 وقت التسجيل الفعلي</span>
-      <small>بتوقيت القاهرة. لو الموظف مشي بعد نص الليل، حط التاريخ الحقيقي هنا
-        وسيب اليوم المحاسبي تحت على يوم الوردية.</small>
-      <input type="datetime-local" id="pkAt" value="${esc(at)}">
+    <label class="fld"><span>🕐 وقت التسجيل — بتوقيت القاهرة</span>
+      <small>اكتب اليوم والساعة اللي حصل فيهم فعلاً. الكارت بيتحدد من هنا.</small>
+      <input type="datetime-local" id="pkAt" value="${esc(at)}" oninput="punchPreview()">
     </label>
 
-    <label class="fld"><span>📅 اليوم المحاسبي</span>
-      <small>الوردية بتتبع يوم <b>الحضور</b>. اللي حضر ٣١ ومشي ٢ الفجر يوم ١،
-        انصرافه يومه المحاسبي ٣١.</small>
-      <input type="date" id="pkDay" value="${esc(day)}">
+    <!-- ⚠️ كان فيه خانة تانية اسمها «اليوم المحاسبي». اتشالت.
+         خانتين تاريخ في شاشة واحدة = دعوة للغلط: المستخدم بيغيّر
+         واحدة وينسى التانية، فالتسجيل بيروح لكارت يوم تاني وهو
+         مش فاهم ليه. دلوقتي التاريخ بيتاخد من الوقت أوتوماتيك،
+         والحالة الاستثنائية الوحيدة بقت صح/غلط واضح. -->
+    <label class="fld" style="display:flex;align-items:flex-start;gap:9px;">
+      <input type="checkbox" id="pkPrev" ${prevShift ? 'checked' : ''}
+             onchange="punchPreview()"
+             style="width:auto;margin-top:3px;flex:none;">
+      <span style="font-weight:700;font-size:13px;line-height:1.8;">
+        ده تسجيل <b>بعد نص الليل</b> وبيتبع وردية اليوم اللي قبله<br>
+        <small style="font-weight:400;color:var(--muted);">
+          مثال: حضر ٣١ ومشي ٢ الفجر يوم ١ — الانصراف بيتحسب على وردية ٣١.</small>
+      </span>
     </label>
+
+    <div class="hintbox" id="pkPreview" style="background:var(--blue-bg);color:var(--blue);"></div>
 
     <label class="fld"><span>📝 ملاحظة (اختياري)</span>
       <input type="text" id="pkNote" placeholder="مثال: نسي يسجّل الانصراف"
@@ -1586,19 +1712,56 @@ function renderPunch(){
 
     ${editing ? `<button class="save" style="margin-top:10px;background:var(--red);"
       onclick="deletePunch('${esc(PUNCH.id)}')">🗑️ امسح التسجيل ده</button>` : ''}`;
+
+  punchPreview();   // ⚠️ بعد الرسم — العناصر لازم تكون موجودة الأول
 }
 
 function todayCairo(){
   return new Date().toLocaleDateString('sv-SE', { timeZone:'Africa/Cairo' });
 }
 
+// إزاحة يوم على نص 'YYYY-MM-DD' — بـ UTC عشان التوقيت الصيفي
+// ما يخليش اليوم يقفز يومين أو يقف مكانه
+function shiftDay(ymd, delta){
+  const [y,m,d] = ymd.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m-1, d));
+  t.setUTCDate(t.getUTCDate() + delta);
+  return t.toISOString().slice(0,10);
+}
+
+// 🔴 مصدر واحد لحساب اليوم المحاسبي — المعاينة والحفظ بيندهوه.
+//    لو حسبناه في مكانين، المعاينة تقول كارت وهو يروح كارت تاني.
+function punchWorkDate(){
+  const atv = ((document.getElementById('pkAt') || {}).value || '').trim();
+  if(!atv) return '';
+  const day  = atv.slice(0,10);
+  const prev = !!(document.getElementById('pkPrev') || {}).checked;
+  return prev ? shiftDay(day, -1) : day;
+}
+
+// بتوري لـ HR الكارت اللي التسجيل هيروحه **قبل** ما تحفظ.
+// ⚠️ ده مش زينة: الغلطة اللي حصلت كانت إن التسجيل راح لكارت يوم
+//    تاني ومحدش عرف غير بعد ما دوّر. الشاشة بقت بتقول قبل الحفظ.
+function punchPreview(){
+  const box = document.getElementById('pkPreview');
+  if(!box) return;
+  const wd = punchWorkDate();
+  if(!wd){ box.textContent = 'اكتب الوقت الأول'; return; }
+  const nice = new Date(wd).toLocaleDateString('ar-EG',
+    { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  box.innerHTML = '📍 هيتحط في كارت: <b>' + esc(nice) + '</b>';
+}
+
 async function savePunch(){
   const g   = id => ((document.getElementById(id) || {}).value || '').trim();
   const btn = document.getElementById('pkSave');
-  const kind = g('pkKind'), day = g('pkDay'), note = g('pkNote');
+  const kind = g('pkKind'), note = g('pkNote');
   const atv  = g('pkAt');
+  // 🔴 نفس الدالة اللي المعاينة بتستخدمها — عشان اللي شافته HR
+  //    هو اللي هيتحفظ بالظبط
+  const day  = punchWorkDate();
 
-  if(!kind || !day || !atv){ alert('املا نوع التسجيل والوقت واليوم'); return; }
+  if(!kind || !day || !atv){ alert('املا نوع التسجيل والوقت'); return; }
   // السيرفر عايز 'YYYY-MM-DD HH:MM' — الخانة بتدي 'YYYY-MM-DDTHH:MM'
   const local = atv.replace('T', ' ').slice(0,16);
 
@@ -1961,6 +2124,8 @@ function renderPayrollAdmin(){
   });
 
   box.innerHTML = `
+    ${penStartHtml()}
+
     <div class="kpis" style="margin:14px 0 16px;">
       <div class="kpi"><div class="v">${setN}/${allPeople().length}</div><div class="l">مرتب متحدد</div></div>
       <div class="kpi"><div class="v">${totSal.toLocaleString('en-US')}</div><div class="l">إجمالي المرتبات</div></div>
