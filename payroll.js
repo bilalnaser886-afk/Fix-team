@@ -38,9 +38,12 @@
 //    عايز تشغّله؟ اقرا 34-push-subscriptions.sql — فيه الخطوات.
 const PAY_VAPID_PUBLIC_KEY = '';
 
-let _payRows   = [];
-let _payTotals = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
-                   salary:0, has_salary:false, net_month:0 };
+let _payRows   = [];   // الخصومات اليدوية
+let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
+let _payWaiv   = [];   // رسايل «الخصم اتشال»
+const PAY_EMPTY = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
+                    salary:0, has_salary:false, late_month:0, late_all:0, net_month:0 };
+let _payTotals = Object.assign({}, PAY_EMPTY);
 let _payErr    = '';
 let _payBusy   = false;
 let _payLoaded = false;
@@ -75,6 +78,10 @@ const _payEsc = (s) => (typeof esc === 'function')
 async function payLoad(){
   _payErr = '';
   try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const me = ((session && session.user && session.user.email) || '').toLowerCase();
+    if(!me) throw new Error('مش مسجّل دخول');
+
     // ⚠️ ترتيب قبل قص. لو قصّينا ٣٠٠ الأول وبعدين رتّبنا، أحدث
     //    خصم ممكن ما يظهرش خالص — نفس الدرس اللي وقعنا فيه قبل كده.
     const { data, error } = await sb.from('hr_deductions')
@@ -87,8 +94,26 @@ async function payLoad(){
     const t = await sb.rpc('hr_my_deduction_totals');
     if(t.error) throw t.error;
     const r = Array.isArray(t.data) ? t.data[0] : t.data;
-    _payTotals = r || { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
-                        salary:0, has_salary:false, net_month:0 };
+    _payTotals = Object.assign({}, PAY_EMPTY, r || {});
+
+    // ⚠️ خصومات التأخير **مش صفوف محفوظة** — بتتحسب لحظتها في
+    //    السيرفر من سجل الحضور + المواعيد. عشان كده لو HR عدّلت
+    //    ميعادك، الأيام القديمة بتتصحّح لوحدها.
+    //    وبنبعت إيميلنا صراحةً: لو الحساب ده HR أو أدمن، السيرفر
+    //    كان هيرجّع كل الموظفين لو سبناه فاضي.
+    const lp = await sb.rpc('hr_late_penalties',
+      { p_email: me, p_from: _payMonthStart(), p_to: _payMonthEnd() });
+    if(lp.error) throw lp.error;
+    _payLate = (lp.data || []).filter(x => Number(x.penalty) > 0 || x.waived);
+
+    // رسايل «الخصم اتشال» — دي أخبار للموظف زي الخصم بالظبط
+    const wv = await sb.from('hr_penalty_waivers')
+      .select('work_date,reason,created_at,seen_at')
+      .order('created_at', { ascending:false })
+      .limit(100);
+    if(wv.error) throw wv.error;
+    _payWaiv = wv.data || [];
+
     _payLoaded = true;
   }catch(e){
     // ⚠️ الفشل الصامت هنا خطر: الشاشة تقول «مفيش خصومات ✅»
@@ -96,8 +121,9 @@ async function payLoad(){
     console.error('payLoad failed:', e);
     _payErr    = (e && e.message) ? e.message : String(e);
     _payRows   = [];
-    _payTotals = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
-                   salary:0, has_salary:false, net_month:0 };
+    _payLate   = [];
+    _payWaiv   = [];
+    _payTotals = Object.assign({}, PAY_EMPTY);
     _payLoaded = false;
   }
   paySyncBadge();
@@ -182,7 +208,14 @@ function payRender(busyMsg){
 
   // ⚠️ اللي لسه ما اتقراش فوق، والمقروء تحت في قسم مطوي.
   //    الموظف لما يفتح لازم يشوف الجديد على طول.
-  const unseen = _payRows.filter(r => !r.seen_at);
+  //
+  // ⚠️ «اللي ما اتقراش» بقى نوعين: خصم جديد، ورسالة إن خصم اتشال.
+  //    الشيل خبر برضه — لو خلّيناه يعدّي في صمت، الموظف هيلاقي
+  //    رقمه اتغيّر ومش عارف ليه.
+  const unseen = _payRows.filter(r => !r.seen_at)
+    .map(r => ({ kind: r.waived_at ? 'waived' : 'ded', row:r }))
+    .concat(_payWaiv.filter(w => !w.seen_at)
+      .map(w => ({ kind:'lateWaived', row:w })));
   const seen   = _payRows.filter(r =>  r.seen_at);
 
   ov.innerHTML = `
@@ -201,14 +234,16 @@ function payRender(busyMsg){
 
         ${unseen.length ? `
           <div class="pay-sec">🔔 خصومات جديدة — اقراها ودوس «فهمت»</div>
-          ${unseen.map(payCard).join('')}
+          ${unseen.map(payItemCard).join('')}
         ` : (busyMsg || _payErr ? '' : `
-          <div class="pay-ok">✅ مفيش خصومات جديدة</div>
+          <div class="pay-ok">✅ مفيش حاجة جديدة</div>
         `)}
 
         <!-- ⚠️ الكشف تحت الكروت عن قصد: هو اللي بيفضل بعد ما كل
              الكروت تختفي. لو حطيناه فوق، الشاشة كانت هتبان فاضية
              تماماً لما يقرا كل حاجة. -->
+        ${payLateHtml()}
+
         ${payTotalsHtml()}
 
         ${seen.length ? `
@@ -216,7 +251,7 @@ function payRender(busyMsg){
             <span id="payOldArrow">▾</span> الخصومات اللي قريتها (${seen.length})
           </button>
           <div id="payOld" class="pay-old hidden">
-            ${seen.map(payCard).join('')}
+            ${seen.map(r => payCard(r)).join('')}
           </div>` : ''}
 
         ${payPushBtnHtml()}
@@ -252,6 +287,8 @@ function payTotalsHtml(){
         <span class="pay-tot-c">ج.م</span>
       </div>
       <div class="pay-tot-l">إجمالي خصومات ${_payMonthName()}</div>
+      ${Number(t.late_month) ? `<div class="pay-tot-hint">⏰ وخصم تأخير الشهر ده:
+        <b>${payMoney(t.late_month)} ج.م</b></div>` : ''}
       <div class="pay-tot-hint">💵 مرتبك لسه ماتحددش في النظام —
         كلّم شؤون العاملين.</div>
       <div class="pay-tot-all">وإجمالي كل الخصومات من أول الشغل:
@@ -270,7 +307,8 @@ function payTotalsHtml(){
 
     <div class="pay-calc">
       <div><span>المرتب</span><b>${payMoney(t.salary)}</b></div>
-      <div><span>− الخصومات</span><b class="minus">${payMoney(ded)}</b></div>
+      <div><span>− خصومات يدوية</span><b class="minus">${payMoney(ded)}</b></div>
+      <div><span>− خصومات تأخير</span><b class="minus">${payMoney(t.late_month)}</b></div>
       <div class="eq"><span>= الصافي</span><b>${payMoney(net)}</b></div>
     </div>
 
@@ -279,8 +317,96 @@ function payTotalsHtml(){
   </div>`;
 }
 
+function _payMonthStart(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+}
+function _payMonthEnd(){
+  const d = new Date();
+  // اليوم صفر من الشهر اللي بعده = آخر يوم في الشهر ده
+  const e = new Date(Date.UTC(d.getFullYear(), d.getMonth()+1, 0));
+  return e.toISOString().slice(0,10);
+}
 function _payMonthName(){
   return new Date().toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+}
+
+// موزّع: كل نوع كارت ليه شكل وزرار «فهمت» بينده دالة مختلفة
+function payItemCard(it){
+  if(it.kind === 'ded')        return payCard(it.row);
+  if(it.kind === 'waived')     return payWaivedDedCard(it.row);
+  if(it.kind === 'lateWaived') return payWaivedLateCard(it.row);
+  return '';
+}
+
+// خصم يدوي HR شالته
+function payWaivedDedCard(r){
+  return `
+  <div class="pay-card good">
+    <div class="pay-card-top">
+      <div class="pay-amt good">✋ اتشال</div>
+      <div class="pay-when">${_payEsc(new Date(r.created_at).toLocaleDateString('ar-EG',
+        { day:'numeric', month:'long' }))}</div>
+    </div>
+    <div class="pay-why">خصم <b>${payMoney(r.amount)} ج.م</b> كان بسبب:
+      <span style="text-decoration:line-through;opacity:.7;">${_payEsc(r.reason)}</span></div>
+    <div class="pay-why" style="color:var(--p-green);">
+      <b>اتشال لأن:</b> ${_payEsc(r.waive_reason || '—')}</div>
+    <button class="pay-ok-btn" onclick="payAck('${_payEsc(r.id)}')">👍 فهمت</button>
+  </div>`;
+}
+
+// خصم تأخير تلقائي HR شالته
+function payWaivedLateCard(w){
+  return `
+  <div class="pay-card good">
+    <div class="pay-card-top">
+      <div class="pay-amt good">✋ اتشال</div>
+      <div class="pay-when">${_payEsc(new Date(w.work_date).toLocaleDateString('ar-EG',
+        { weekday:'long', day:'numeric', month:'long' }))}</div>
+    </div>
+    <div class="pay-why">خصم التأخير بتاع اليوم ده اتشال.</div>
+    <div class="pay-why" style="color:var(--p-green);">
+      <b>السبب:</b> ${_payEsc(w.reason || '—')}</div>
+    <button class="pay-ok-btn" onclick="payAckWaiver('${_payEsc(w.work_date)}')">👍 فهمت</button>
+  </div>`;
+}
+
+// ============================================================
+// قسم خصومات التأخير
+// ------------------------------------------------------------
+// ⚠️ مفيش زرار «فهمت» هنا عن قصد. دي **مش رسايل** — دي نتيجة
+//    حسابية بتتحدّث لوحدها من سجل حضورك. لو حطينا زرار، الموظف
+//    كان هيفتكر إنه بيوافق على حاجة.
+// ============================================================
+function payLateHtml(){
+  if(!_payLate.length) return '';
+  const active = _payLate.filter(r => !r.waived);
+  return `
+  <div class="pay-sec dim">⏰ خصومات التأخير — ${_payMonthName()}</div>
+  <div class="pay-late">
+    ${_payLate.map(r => `
+      <div class="pay-late-row${r.waived ? ' off' : ''}">
+        <span class="d">${_payEsc(new Date(r.work_date).toLocaleDateString('ar-EG',
+          { weekday:'short', day:'numeric', month:'short' }))}</span>
+        <span class="t">حضرت ${_payHm(r.arrived_min)} · ميعادك ${_payHm(r.counted_min)}</span>
+        <span class="v">${r.waived
+          ? '<b class="ok">✋ اتشال</b>'
+          : '<b>−' + payMoney(r.penalty) + '</b>'}</span>
+      </div>
+      ${r.waived && r.waive_reason
+        ? `<div class="pay-late-why">${_payEsc(r.waive_reason)}</div>` : ''}
+    `).join('')}
+  </div>
+  <div class="pay-late-note">
+    الخصم بيتحسب تلقائي من مواعيدك. لو شايف إن فيه يوم غلط، كلّم شؤون العاملين —
+    وهي تقدر تشيله وتكتبلك السبب.
+  </div>`;
+}
+
+function _payHm(mins){
+  const m = ((Number(mins) % 1440) + 1440) % 1440;
+  return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
 }
 
 function payCard(r){
@@ -327,6 +453,23 @@ async function payAck(id){
     payRender('');
   }catch(e){
     console.error('payAck failed:', e);
+    alert('❌ مقدرناش نسجّل إنك قريته: ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
+
+async function payAckWaiver(workDate){
+  if(_payBusy) return;
+  _payBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_ack_penalty_waiver', { p_date: workDate });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await payLoad();
+    payRender('');
+  }catch(e){
+    console.error('payAckWaiver failed:', e);
     alert('❌ مقدرناش نسجّل إنك قريته: ' + (e.message || e));
   }finally{
     _payBusy = false;
@@ -560,6 +703,24 @@ function payUrlB64ToU8(s){
     border-radius:13px; padding:22px 14px;}
   .pay-sec{font-weight:900; font-size:13.5px; color:var(--p-red); margin-bottom:10px;}
 
+  .pay-sec.dim{color:var(--p-ink2); margin-top:20px;}
+  .pay-card.good{border-color:var(--p-green); background:rgba(22,163,74,.08);}
+  .pay-amt.good{font-size:19px; color:var(--p-green);}
+  /* قايمة خصومات التأخير */
+  .pay-late{background:var(--p-card); border:1px solid var(--p-line);
+    border-radius:14px; padding:6px 12px;}
+  .pay-late-row{display:flex; align-items:baseline; gap:9px; padding:9px 0;
+    border-bottom:1px solid var(--p-line); font-size:13px; color:var(--p-ink2);}
+  .pay-late-row:last-child{border-bottom:none;}
+  .pay-late-row .d{flex:none; font-weight:800; color:var(--p-ink);}
+  .pay-late-row .t{flex:1; min-width:0; font-size:11.5px; color:var(--p-mut);}
+  .pay-late-row .v{flex:none;}
+  .pay-late-row .v b{font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;
+    color:var(--p-red);}
+  .pay-late-row .v b.ok{color:var(--p-green); font-size:12px;}
+  .pay-late-row.off .d, .pay-late-row.off .t{opacity:.6;}
+  .pay-late-why{font-size:11.5px; color:var(--p-green); padding:0 0 9px; line-height:1.8;}
+  .pay-late-note{margin-top:10px; font-size:11.5px; line-height:1.9; color:var(--p-mut);}
   .pay-card{background:var(--p-card); border:1px solid var(--p-line);
     border-radius:14px; padding:14px; margin-bottom:11px;}
   .pay-card.new{border-color:var(--p-red); background:var(--p-red-bg);}
