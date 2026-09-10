@@ -42,7 +42,8 @@ let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 const PAY_EMPTY = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
-                    salary:0, has_salary:false, late_month:0, late_all:0, net_month:0 };
+                    salary:0, has_salary:false, late_month:0, late_all:0,
+                    late_unseen_count:0, net_month:0 };
 let _payTotals = Object.assign({}, PAY_EMPTY);
 let _payErr    = '';
 let _payBusy   = false;
@@ -85,7 +86,12 @@ async function payLoad(){
     // ⚠️ ترتيب قبل قص. لو قصّينا ٣٠٠ الأول وبعدين رتّبنا، أحدث
     //    خصم ممكن ما يظهرش خالص — نفس الدرس اللي وقعنا فيه قبل كده.
     const { data, error } = await sb.from('hr_deductions')
-      .select('id,amount,reason,work_date,created_at,seen_at')
+      // 🔴 waived_at و waive_reason **لازم يكونوا هنا**.
+      // من غيرهم الشاشة مش بتعرف أصلاً إن الخصم اتشال، فبتعامله
+      // كخصم عادي وتوري السبب الأصلي بدل سبب الشيل. الكود اللي
+      // بيوري سبب الشيل كان مكتوب صح — البيانات هي اللي مكانتش
+      // واصلاه. عمود ناقص في select = ميزة كاملة بتموت في صمت.
+      .select('id,amount,reason,work_date,created_at,seen_at,waived_at,waive_reason')
       .order('created_at', { ascending: false })
       .limit(300);
     if(error) throw error;
@@ -101,8 +107,11 @@ async function payLoad(){
     //    ميعادك، الأيام القديمة بتتصحّح لوحدها.
     //    وبنبعت إيميلنا صراحةً: لو الحساب ده HR أو أدمن، السيرفر
     //    كان هيرجّع كل الموظفين لو سبناه فاضي.
+    // ⚠️ بنجيب **كل التاريخ** مش الشهر الحالي بس. لو HR ظبطت
+    //    ميعاد بأثر رجعي وطلع خصم على شهر فات، الموظف لازم ياخد
+    //    خبر — والقايمة اللي تحت بتفلتر بالشهر لوحدها.
     const lp = await sb.rpc('hr_late_penalties',
-      { p_email: me, p_from: _payMonthStart(), p_to: _payMonthEnd() });
+      { p_email: me, p_from: null, p_to: null });
     if(lp.error) throw lp.error;
     _payLate = (lp.data || []).filter(x => Number(x.penalty) > 0 || x.waived);
 
@@ -215,7 +224,12 @@ function payRender(busyMsg){
   const unseen = _payRows.filter(r => !r.seen_at)
     .map(r => ({ kind: r.waived_at ? 'waived' : 'ded', row:r }))
     .concat(_payWaiv.filter(w => !w.seen_at)
-      .map(w => ({ kind:'lateWaived', row:w })));
+      .map(w => ({ kind:'lateWaived', row:w })))
+    // ⚠️ خصم التأخير **مش صف محفوظ**، فمفيش seen_at يتعلّم عليه.
+    //    جدول hr_penalty_acks هو اللي بيقول «شاف يوم كذا».
+    //    من غيره الخصم التلقائي كان بيعدّي من غير جرس خالص.
+    .concat(_payLate.filter(r => Number(r.penalty) > 0 && !r.acked)
+      .map(r => ({ kind:'latePenalty', row:r })));
   const seen   = _payRows.filter(r =>  r.seen_at);
 
   ov.innerHTML = `
@@ -335,7 +349,8 @@ function _payMonthName(){
 function payItemCard(it){
   if(it.kind === 'ded')        return payCard(it.row);
   if(it.kind === 'waived')     return payWaivedDedCard(it.row);
-  if(it.kind === 'lateWaived') return payWaivedLateCard(it.row);
+  if(it.kind === 'lateWaived')  return payWaivedLateCard(it.row);
+  if(it.kind === 'latePenalty') return payLateCard(it.row);
   return '';
 }
 
@@ -353,6 +368,24 @@ function payWaivedDedCard(r){
     <div class="pay-why" style="color:var(--p-green);">
       <b>اتشال لأن:</b> ${_payEsc(r.waive_reason || '—')}</div>
     <button class="pay-ok-btn" onclick="payAck('${_payEsc(r.id)}')">👍 فهمت</button>
+  </div>`;
+}
+
+// خصم تأخير تلقائي جديد — الموظف لسه ما شافوش
+function payLateCard(r){
+  const d = new Date(r.work_date).toLocaleDateString('ar-EG',
+    { weekday:'long', day:'numeric', month:'long' });
+  return `
+  <div class="pay-card new">
+    <div class="pay-card-top">
+      <div class="pay-amt">− ${payMoney(r.penalty)} <small>ج.م</small></div>
+      <div class="pay-when">${_payEsc(d)}</div>
+    </div>
+    <div class="pay-why"><b>السبب:</b> تأخير — حضرت
+      <b>${_payHm(r.arrived_min)}</b> وميعادك <b>${_payHm(r.counted_min)}</b>.</div>
+    <div class="pay-why" style="font-size:12px;opacity:.85;">
+      الخصم ده اتحسب تلقائي من مواعيدك. لو شايف إنه غلط، كلّم شؤون العاملين.</div>
+    <button class="pay-ok-btn" onclick="payAckPenalty('${_payEsc(r.work_date)}')">👍 فهمت</button>
   </div>`;
 }
 
@@ -380,12 +413,15 @@ function payWaivedLateCard(w){
 //    كان هيفتكر إنه بيوافق على حاجة.
 // ============================================================
 function payLateHtml(){
-  if(!_payLate.length) return '';
-  const active = _payLate.filter(r => !r.waived);
+  // القايمة دي للشهر الحالي بس — عشان تتماشى مع كشف المرتب تحتها.
+  // (الكروت فوق بتوري أي خصم جديد مهما كان شهره.)
+  const mStart = _payMonthStart(), mEnd = _payMonthEnd();
+  const rows = _payLate.filter(r => r.work_date >= mStart && r.work_date <= mEnd);
+  if(!rows.length) return '';
   return `
   <div class="pay-sec dim">⏰ خصومات التأخير — ${_payMonthName()}</div>
   <div class="pay-late">
-    ${_payLate.map(r => `
+    ${rows.map(r => `
       <div class="pay-late-row${r.waived ? ' off' : ''}">
         <span class="d">${_payEsc(new Date(r.work_date).toLocaleDateString('ar-EG',
           { weekday:'short', day:'numeric', month:'short' }))}</span>
@@ -453,6 +489,23 @@ async function payAck(id){
     payRender('');
   }catch(e){
     console.error('payAck failed:', e);
+    alert('❌ مقدرناش نسجّل إنك قريته: ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
+
+async function payAckPenalty(workDate){
+  if(_payBusy) return;
+  _payBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_ack_penalty', { p_date: workDate });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await payLoad();
+    payRender('');
+  }catch(e){
+    console.error('payAckPenalty failed:', e);
     alert('❌ مقدرناش نسجّل إنك قريته: ' + (e.message || e));
   }finally{
     _payBusy = false;
@@ -598,6 +651,9 @@ function payUrlB64ToU8(s){
       if(!session) return;           // لسه ما دخلش — مفيش داعي نقرا
       await payLoad();
     }catch(e){ console.error('payBoot refresh failed:', e); }
+    // لو الشاشة مفتوحة وإحنا بنحدّث، نعيد رسمها كمان
+    const ov = document.getElementById('payOverlay');
+    if(ov && !ov.classList.contains('hidden')) payRender('');
   };
 
   const sync = () => { try{ paySyncBadge(); }catch(e){} };

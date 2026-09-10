@@ -462,8 +462,25 @@ async function attPunch(kind){
 
     await attLoadState();
     attRender('');
+
+    // ⚠️ التنبيه بيتحط في **نفس الرسالة** مش في alert تانية.
+    //    اتنين ورا بعض على الموبايل: الأولى بتتقفل بالغلط والتانية
+    //    بتبان من غير سياق — والموظف يفتكر إن فيه حاجة بايظة.
+    let extra = '';
+    try{ extra = await attDayWarning(kind); }catch(e){ console.error('attDayWarning:', e); }
+
     alert('✅ اتسجّل — ' + ATT_LABELS[kind].t + '\n' +
-          new Date(data.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }));
+          new Date(data.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }) +
+          extra);
+
+    // ⚠️ خصم التأخير بيتولد **لحظة التسجيل**، مش من HR. فمفيش
+    //    حاجة في قاعدة البيانات تنبّه شاشة «مرتبك» إنها تحدّث
+    //    نفسها (الريل تايم بتاعها بيسمع على جدول الخصومات اليدوية
+    //    بس). بنندهها بإيدينا هنا — ولو الملف مش محمّل في الصفحة
+    //    دي، السطر بيعدّي من غير ما يعمل حاجة.
+    if(typeof payLoad === 'function'){
+      try{ await payLoad(); }catch(e){ console.error('payLoad after punch:', e); }
+    }
   }catch(e){
     console.error('attPunch failed:', e);
     attRender('');
@@ -471,6 +488,66 @@ async function attPunch(kind){
   }finally{
     _attBusy = false;
   }
+}
+
+
+// ============================================================
+// ⚠️ التنبيه لحظة التسجيل
+// ------------------------------------------------------------
+// المشكلة اللي بيحلها: خصم التأخير بيتحسب تلقائي، فالموظف كان
+// بيكتشفه آخر الشهر لما ياخد مرتبه ناقص. ووقتها بقى فات الأوان
+// على أي كلام.
+//
+// دلوقتي:
+//   • سجّل حضور وهو متأخر بعد الاحتياطي → بيعرف الخصم فوراً
+//   • سجّل انصراف وساعاته ناقصة → بيعرف ناقصه كام قبل ما يمشي
+//
+// 🔴 الأرقام دي **مش محسوبة هنا**. جاية من hr_my_day_status في
+//    السيرفر، اللي بتنده hr_late_penalties. لو حسبناها هنا كنا
+//    بقينا ٣ نسخ من نفس القاعدة (HR · مرتبك · المواعيد) — وأول
+//    تعديل على واحدة يخلّي التلاتة بيقولوا كلام مختلف.
+//
+// ⚠️ الدالة دي **مبتوقّعش التسجيل أبداً**. لو فشلت، التسجيل
+//    اتم خلاص والرسالة بتطلع من غير السطر الزيادة وبس. التنبيه
+//    خدمة إضافية مش شرط.
+// ============================================================
+async function attDayWarning(kind){
+  // البريك والاستئناف: الوردية لسه شغّالة، فأي كلام عن نقص
+  // ساعات دلوقتي هيبقى مضلّل.
+  if(kind !== 'in' && kind !== 'out') return '';
+
+  const { data, error } = await sb.rpc('hr_my_day_status',
+    { p_date: _attState.work_date || null });
+  if(error) throw error;
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if(!r) return '';
+
+  const hm = m => {
+    m = Math.max(0, Math.round(Number(m) || 0));
+    return Math.floor(m / 60) + ' ساعة و ' + (m % 60) + ' دقيقة';
+  };
+  const clock = m => {
+    const v = ((Number(m) % 1440) + 1440) % 1440;
+    return String(Math.floor(v / 60)).padStart(2, '0') + ':' +
+           String(v % 60).padStart(2, '0');
+  };
+
+  // ---- حضور ----
+  if(kind === 'in'){
+    if(r.waived) return '';                       // HR شالت الخصم خلاص
+    if(!(Number(r.penalty) > 0)) return '';       // مفيش خصم = مفيش داعي نخوّفه
+    return '\n\n⚠️ إنت متأخر النهاردة.\n'
+         + 'حضرت ' + clock(r.arrived_min) + ' وميعادك ' + clock(r.counted_min) + '.\n'
+         + '💸 هيتخصم منك ' + Number(r.penalty) + ' ج.م.\n'
+         + 'شوف التفاصيل في شاشة «مرتبك».';
+  }
+
+  // ---- انصراف ----
+  if(!(Number(r.short_min) > 0)) return '';
+  return '\n\n⚠️ ساعاتك ناقصة النهاردة.\n'
+       + 'شغلت ' + hm(r.worked_min) + ' والمطلوب ' + hm(r.need_min) + '.\n'
+       + '⏳ ناقصك ' + hm(r.short_min) + '.';
 }
 
 // ============================================================
