@@ -159,6 +159,8 @@
     color:var(--ink-2); border-radius:8px; padding:5px 10px; font-family:inherit;
     font-size:11.5px; font-weight:800; cursor:pointer;}
   .mini-btn.danger{border-color:var(--red); color:var(--red);}
+  .punch .meta.manual{color:var(--blue); font-weight:800;}
+  .punch .mini-btn{padding:3px 7px; font-size:11px; margin-inline-start:5px;}
   .ded-row.waived{opacity:.85; border-color:var(--done);}
   /* أيام المواعيد الخاصة */
   .dsch-days button.edit{outline:2px solid var(--blue); outline-offset:-2px;}
@@ -249,6 +251,18 @@
             onclick="closeEmpLog()">×</button>
   </div>
   <div class="sheet-body" id="empSheetBody"></div>
+</div>
+
+<!-- ===== ✍️ تسجيل يدوي (إضافة / تعديل) =====
+     ⚠️ z-index:65 — أعلى من كل الشاشات، لأنها بتفتح **من جوه**
+        شاشة سجل الموظف (60). -->
+<div class="sheet" id="punchSheet" style="z-index:65;">
+  <div class="sheet-head">
+    <h2 id="punchTitle">✍️ تسجيل يدوي</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('punchSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="punchBody"></div>
 </div>
 
 <!-- ===== 💰 المخصومات والمرتبات =====
@@ -385,7 +399,9 @@ async function loadMonth(){
   const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
   try{
     const { data, error } = await sb.from('attendance')
-      .select('user_email,user_name,kind,at,work_date,distance_m,verified')
+      // ⚠️ id لازم يكون هنا — من غيره مفيش تعديل ولا مسح.
+      //    و manual_by هو ختم «اتكتب بإيد HR».
+      .select('id,user_email,user_name,kind,at,work_date,distance_m,verified,manual_by,manual_note')
       .gte('work_date', from).lte('work_date', to)
       .order('at', { ascending:true });
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
@@ -626,6 +642,7 @@ function renderEmpSheet(email, days){
 
     <div class="emp-acts">
       <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
+      <button onclick="openPunch('${esc(email)}')">✍️ تسجيل يدوي</button>
       <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
       <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
@@ -692,12 +709,21 @@ function dayHtml(d, punches, email){
     ${rules}
     ${punches.map(p => `
       <div class="punch">
-        <span>${KIND[p.kind].icon} ${KIND[p.kind].t}
-          ${p.verified ? '' : '<span class="meta">(من غير بصمة)</span>'}</span>
+        <span style="flex:1;min-width:0;">${KIND[p.kind].icon} ${KIND[p.kind].t}
+          ${p.manual_by
+            ? '<span class="meta manual">✍️ يدوي</span>'
+            : (p.verified ? '' : '<span class="meta">(من غير بصمة)</span>')}</span>
         <span>${fmtTime(p.at)}
           <span class="meta">${p.distance_m != null ? Math.round(p.distance_m) + 'م' : ''}</span>
         </span>
+        ${email && p.id ? `
+          <button class="mini-btn" title="تعديل"
+                  onclick="openPunch('${esc(email)}','${esc(d)}','${esc(p.id)}')">✏️</button>
+          <button class="mini-btn danger" title="مسح"
+                  onclick="deletePunch('${esc(p.id)}')">🗑️</button>` : ''}
       </div>`).join('')}
+    ${email ? `<button class="mini-btn" style="width:100%;margin-top:8px;"
+        onclick="openPunch('${esc(email)}','${esc(d)}')">➕ ضيف تسجيل لليوم ده</button>` : ''}
   </div>`;
 }
 
@@ -1455,6 +1481,170 @@ async function notifyPay(email, body){
 }
 function notifyDeduction(email, amount, reason){
   return notifyPay(email, `حصل خصم ${amount} ج.م — ${reason}`);
+}
+
+// ============================================================
+// ✍️ التسجيل اليدوي — إضافة · تعديل · مسح
+// ------------------------------------------------------------
+// 🔴 جدول attendance **لسه مقفول** على الإدخال المباشر. كل حاجة
+//    هنا بتمر من ٣ دوال في السيرفر بتفحص إن اللي بينده HR أو أدمن،
+//    وبتحط ختم على الصف: مين كتبه بإيده وإمتى.
+//
+// 🔴 والختم بيظهر للموظف نفسه في سجله («✍️ يدوي»). لو HR قدرت
+//    تعدّل السجل في الخفا، السجل كله يفقد قيمته كدليل — والموظف
+//    يبقى معاه حق يشك في أي رقم.
+//
+// ⚠️ الوقت بيتبعت **نص** ('YYYY-MM-DD HH:MM') والسيرفر بيحوّله
+//    بتوقيت القاهرة. لو بنينا timestamp في المتصفح، كان هيتبني
+//    بساعة **الجهاز** — ولو جهاز الـ HR على توقيت تاني، كل
+//    التسجيلات تتكتب غلط ومحدش ياخد باله.
+// ============================================================
+let PUNCH = { email:'', id:null, day:'' };
+
+const PUNCH_KINDS = [
+  { k:'in',     t:'🟢 حضور' },
+  { k:'out',    t:'🔴 انصراف' },
+  { k:'break',  t:'☕ بريك' },
+  { k:'resume', t:'▶️ استئناف العمل' }
+];
+
+function openPunch(email, day, id){
+  PUNCH = { email:(email||'').toLowerCase(), id:id || null, day:day || '' };
+  renderPunch();
+  openSheet('punchSheet');
+}
+
+function findPunch(id){
+  return ROWS.find(r => String(r.id) === String(id)) || null;
+}
+
+// الوقت بتوقيت القاهرة في صيغة خانة datetime-local
+function cairoLocal(iso){
+  const p = new Date(iso).toLocaleString('sv-SE', { timeZone:'Africa/Cairo' });
+  return p.slice(0,16).replace(' ', 'T');   // 'YYYY-MM-DDTHH:MM'
+}
+
+function renderPunch(){
+  const editing = !!PUNCH.id;
+  const row = editing ? findPunch(PUNCH.id) : null;
+  const list = allPeople();
+
+  if(editing && !row){
+    document.getElementById('punchBody').innerHTML =
+      '<div class="empty">التسجيل ده مش موجود — اقفل وافتح تاني</div>';
+    return;
+  }
+
+  const kind = row ? row.kind : 'in';
+  const day  = row ? row.work_date : (PUNCH.day || todayCairo());
+  // الوقت الافتراضي: نص اليوم — عشان HR تكتبه بإيدها بدل ما تسيب
+  // ساعة عشوائية تعدّي بالغلط
+  const at   = row ? cairoLocal(row.at) : (day + 'T00:00');
+
+  document.getElementById('punchTitle').textContent =
+    (editing ? '✏️ تعديل تسجيل — ' : '✍️ تسجيل يدوي — ') + nameOf(PUNCH.email || (list[0]||''));
+
+  document.getElementById('punchBody').innerHTML = `
+    <div class="hintbox">
+      التسجيل ده هيتكتب <b>باسمك</b> وهيظهر للموظف بعلامة «✍️ يدوي».<br>
+      ومش هيبقى موثّق ببصمة ولا لوكيشن — طبيعي، الموظف مش موجود دلوقتي.<br>
+      وأي تعديل هنا <b>بيعيد حساب الساعات والخصومات</b> لليوم ده لوحده.
+    </div>
+
+    ${editing ? '' : `
+    <label class="fld"><span>👤 الموظف</span>
+      <select id="pkEmail" onchange="PUNCH.email=this.value; renderPunch()">
+        ${list.map(e => `<option value="${esc(e)}"${e===PUNCH.email?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>`}
+
+    <label class="fld"><span>📌 نوع التسجيل</span>
+      <select id="pkKind">
+        ${PUNCH_KINDS.map(x => `<option value="${x.k}"${x.k===kind?' selected':''}>${x.t}</option>`).join('')}
+      </select>
+    </label>
+
+    <label class="fld"><span>🕐 وقت التسجيل الفعلي</span>
+      <small>بتوقيت القاهرة. لو الموظف مشي بعد نص الليل، حط التاريخ الحقيقي هنا
+        وسيب اليوم المحاسبي تحت على يوم الوردية.</small>
+      <input type="datetime-local" id="pkAt" value="${esc(at)}">
+    </label>
+
+    <label class="fld"><span>📅 اليوم المحاسبي</span>
+      <small>الوردية بتتبع يوم <b>الحضور</b>. اللي حضر ٣١ ومشي ٢ الفجر يوم ١،
+        انصرافه يومه المحاسبي ٣١.</small>
+      <input type="date" id="pkDay" value="${esc(day)}">
+    </label>
+
+    <label class="fld"><span>📝 ملاحظة (اختياري)</span>
+      <input type="text" id="pkNote" placeholder="مثال: نسي يسجّل الانصراف"
+             value="${esc(row && row.manual_note ? row.manual_note : '')}">
+    </label>
+
+    <button class="save" id="pkSave" onclick="savePunch()">
+      ${editing ? '💾 احفظ التعديل' : '➕ اكتب التسجيل'}</button>
+
+    ${editing ? `<button class="save" style="margin-top:10px;background:var(--red);"
+      onclick="deletePunch('${esc(PUNCH.id)}')">🗑️ امسح التسجيل ده</button>` : ''}`;
+}
+
+function todayCairo(){
+  return new Date().toLocaleDateString('sv-SE', { timeZone:'Africa/Cairo' });
+}
+
+async function savePunch(){
+  const g   = id => ((document.getElementById(id) || {}).value || '').trim();
+  const btn = document.getElementById('pkSave');
+  const kind = g('pkKind'), day = g('pkDay'), note = g('pkNote');
+  const atv  = g('pkAt');
+
+  if(!kind || !day || !atv){ alert('املا نوع التسجيل والوقت واليوم'); return; }
+  // السيرفر عايز 'YYYY-MM-DD HH:MM' — الخانة بتدي 'YYYY-MM-DDTHH:MM'
+  const local = atv.replace('T', ' ').slice(0,16);
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    let error;
+    if(PUNCH.id){
+      ({ error } = await sb.rpc('hr_edit_punch', {
+        p_id: PUNCH.id, p_kind: kind, p_work_date: day, p_local: local, p_note: note || null }));
+    }else{
+      const em = g('pkEmail') || PUNCH.email;
+      if(!em){ alert('اختار الموظف'); return; }
+      ({ error } = await sb.rpc('hr_manual_punch', {
+        p_email: em, p_kind: kind, p_work_date: day, p_local: local, p_note: note || null }));
+    }
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+
+    closeSheet('punchSheet');
+    // إعادة تحميل كاملة: الساعات والخصومات كلها بتتحسب من أول وجديد
+    await loadMonth();
+    alert('✅ اتحفظ');
+  }catch(e){
+    console.error('savePunch failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف 37-hr-manual-attendance.sql'
+      : '❌ ' + t);
+  }finally{
+    if(btn){ btn.disabled = false; }
+  }
+}
+
+async function deletePunch(id){
+  const r = findPunch(id);
+  const what = r ? (KIND[r.kind] ? KIND[r.kind].t : r.kind) + ' ' + fmtTime(r.at) : 'التسجيل ده';
+  if(!confirm('متأكد إنك عايز تمسح ' + what + '؟\n\nالساعات والخصومات هتتحسب من أول وجديد.')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_punch', { p_id: id });
+    if(error) throw error;
+    closeSheet('punchSheet');
+    await loadMonth();
+  }catch(e){
+    console.error('deletePunch failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
 }
 
 // ============================================================

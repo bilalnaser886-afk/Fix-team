@@ -585,7 +585,10 @@ async function attMyMonth(ym){
   const from = `${y}-${String(m).padStart(2,'0')}-01`;
   const to   = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
   const { data, error } = await sb.from('attendance')
-    .select('kind,at,work_date,distance_m,verified')
+    // ⚠️ manual_by = ختم «اتكتب من شؤون العاملين». الموظف لازم
+    //    يشوفه في سجله. سجل بيتعدّل من غير ما صاحبه يعرف = سجل
+    //    مالوش قيمة كدليل.
+    .select('kind,at,work_date,distance_m,verified,manual_by')
     .gte('work_date', from).lte('work_date', to)
     .order('at', { ascending:true });
   if(error) throw error;
@@ -676,7 +679,8 @@ async function attRenderLog(){
         <div class="att-day-h">${new Date(d).toLocaleDateString('ar-EG',
           { weekday:'long', day:'numeric', month:'long' })}</div>
         ${days[d].map(r => `<div class="att-row">
-          <span>${ATT_LABELS[r.kind].icon} ${ATT_LABELS[r.kind].t}</span>
+          <span>${ATT_LABELS[r.kind].icon} ${ATT_LABELS[r.kind].t}
+            ${r.manual_by ? '<span class="att-manual">✍️ اتكتب من شؤون العاملين</span>' : ''}</span>
           <span>${new Date(r.at).toLocaleTimeString('ar-EG',
             { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' })}</span>
         </div>`).join('')}
@@ -770,6 +774,10 @@ function closeAttendance(){
   .att-day-h{font-weight:800; font-size:13.5px; margin-bottom:8px; color:var(--a-ink);}
   .att-row{display:flex; justify-content:space-between; font-size:13.5px; padding:5px 0;
     color:var(--a-ink2);}
-  .att-empty{text-align:center; color:var(--a-mut); padding:24px; font-size:13.5px;}`;
+  .att-empty{text-align:center; color:var(--a-mut); padding:24px; font-size:13.5px;}
+  .att-manual{display:inline-block; margin-inline-start:6px; font-size:10.5px;
+    font-weight:800; color:#2B6CB0; background:rgba(43,108,176,.13);
+    border-radius:6px; padding:1px 6px;}
+  html[data-theme="dark"] #attOverlay .att-manual{color:#7BA9DC;}`;
   (document.head || document.documentElement).appendChild(s);
 })();
