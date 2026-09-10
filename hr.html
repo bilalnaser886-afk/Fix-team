@@ -154,6 +154,32 @@
     color:var(--ink-2); border-radius:11px; padding:11px 6px; font-family:inherit;
     font-size:12.5px; font-weight:800; cursor:pointer;}
   .emp-acts button:hover{background:var(--surface);}
+  /* ===== كروت صفحة المخصومات والمرتبات ===== */
+  .pr-card{background:var(--surface); border:1px solid var(--border);
+    border-radius:15px; padding:13px 14px; margin-bottom:11px;}
+  .pr-card.alert{border-color:var(--red);}
+  .pr-top{display:flex; align-items:center; gap:11px;}
+  .pr-top .card-id b{font-size:15px;}
+  .pr-top .card-id span{font-size:11px; color:var(--muted); direction:ltr; display:block;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pr-sal{display:flex; align-items:center; gap:7px; margin-top:11px;}
+  .pr-sal label{flex:none; font-size:12.5px; font-weight:800; color:var(--ink-2);}
+  .pr-sal input{flex:1; min-width:0; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink); border-radius:10px; padding:10px 11px; font-family:inherit;
+    font-size:15px; font-weight:800; text-align:center;}
+  .pr-sal button{flex:none; border:none; border-radius:10px; padding:10px 13px;
+    background:var(--done); color:#fff; font-family:inherit; font-size:14px;
+    font-weight:800; cursor:pointer;}
+  .pr-sal button:disabled{opacity:.5; cursor:default;}
+  .pr-nums{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;
+    padding-top:10px; border-top:1px solid var(--border);}
+  .pr-nums div{text-align:center;}
+  .pr-nums b{display:block; font-family:'Cairo',sans-serif; font-weight:900; font-size:17px;}
+  .pr-nums span{font-size:11px; color:var(--muted);}
+  .pr-ded-btn{width:100%; margin-top:10px; border:none; border-radius:11px; padding:11px;
+    background:var(--red); color:#fff; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
+  .pr-bell{margin-top:9px; font-size:11.5px; font-weight:800; color:var(--red);}
   .card-ded{background:var(--rejected-bg,#FEF2F2); color:var(--red); font-size:12px;
     font-weight:800; padding:8px 13px; border-top:1px solid var(--border);}
   html[data-theme="dark"] .card-ded{background:rgba(240,85,74,.13);}
@@ -184,6 +210,7 @@
   <div class="menu-wrap">
     <button class="icon-btn" title="القايمة" onclick="toggleMenu(event)">⋮</button>
     <div class="menu-drop" id="menuDrop">
+      <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
       <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
       <button onclick="closeMenu(); openGeneral()">⚙️ الإعدادات العامة</button>
       <hr>
@@ -211,6 +238,26 @@
             onclick="closeEmpLog()">×</button>
   </div>
   <div class="sheet-body" id="empSheetBody"></div>
+</div>
+
+<!-- ===== 💰 المخصومات والمرتبات =====
+     ⚠️ z-index:55 عن قصد — أقل من dedSheet (60) عشان شاشة الخصم
+        تفتح فوقها مش تحتها. -->
+<div class="sheet" id="paySheet" style="z-index:55;">
+  <!-- ⚠️ خانة البحث **جوه** الهيدر اللي sticky، على سطر تاني
+       (flex-basis:100%). لو حطيناها تحته كانت هتروح مع السكرول
+       وإنت بتدوّر على موظف في نص قايمة طويلة. -->
+  <div class="sheet-head" style="flex-wrap:wrap;">
+    <h2>💰 المخصومات والمرتبات</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('paySheet')">×</button>
+    <input type="search" id="paySearch" placeholder="🔍 ابحث باسم الموظف أو إيميله…"
+           oninput="PAY_Q=this.value; renderPayrollAdmin()"
+           style="flex-basis:100%; border:1px solid var(--border);
+                  background:var(--surface-2); color:var(--ink); border-radius:11px;
+                  padding:11px 13px; font-family:inherit; font-size:15px;">
+  </div>
+  <div class="sheet-body" id="payBody"></div>
 </div>
 
 <!-- ===== 💸 خصم جديد ===== -->
@@ -1174,7 +1221,7 @@ function dedSectionHtml(email){
 // ===== شاشة إضافة خصم =====
 function openDeduction(email){
   DED_EMAIL = (email || '').toLowerCase();
-  const list = allEmployees();
+  const list = allPeople();
   if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
   if(list.indexOf(DED_EMAIL) < 0) DED_EMAIL = list[0];
   renderDeduction();
@@ -1182,7 +1229,7 @@ function openDeduction(email){
 }
 
 function renderDeduction(){
-  const list = allEmployees();
+  const list = allPeople();
   const m = manualDed(DED_EMAIL);
   document.getElementById('dedTitle').textContent = '💸 خصم — ' + nameOf(DED_EMAIL);
   document.getElementById('dedBody').innerHTML = `
@@ -1253,6 +1300,9 @@ async function saveDeduction(){
     await loadDeductions();
     render();
     renderDeduction();
+    // ⚠️ لو الخصم اتعمل من صفحة المرتبات، لازم أرقامها تتحدّث كمان —
+    //    من غير السطر ده الصافي بيفضل قديم قدام عين المستخدم.
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
     const a = document.getElementById('dedAmt'); if(a) a.value = '';
     const w = document.getElementById('dedWhy'); if(w) w.value = '';
     alert('✅ اتسجّل الخصم — هيوصل للموظف في شاشة «مرتبك»');
@@ -1275,6 +1325,7 @@ async function deleteDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
     alert('اتمسح ✅');
   }catch(e){
     console.error('deleteDeduction failed:', e);
@@ -1303,6 +1354,180 @@ async function notifyDeduction(email, amount, reason){
     if(error) throw error;
   }catch(e){
     console.warn('send-push failed (الخصم اتسجّل عادي):', e);
+  }
+}
+
+// ============================================================
+// 💰 صفحة «المخصومات والمرتبات»
+// ------------------------------------------------------------
+// 🔴 الفرق الجوهري بينها وبين الصفحة الرئيسية:
+//    الصفحة الرئيسية بتبني كروتها **من سجل الحضور** — يعني
+//    الموظف اللي ما سجّلش حضور ولا مرة مالوش كارت أصلاً، ومكانش
+//    ينفع تحطله مرتب ولا تخصم منه.
+//
+//    الصفحة دي بتبني كروتها **من قايمة الأدمن** (user-roles).
+//    فأي حد الأدمن سجّله بيبان هنا، حضر أو ما حضرش.
+//
+// ⚠️ الكتابة كلها من دوال السيرفر. جدول hr_salaries زي جدول
+//    hr_deductions بالظبط: **مفيهوش سياسة كتابة خالص**.
+// ============================================================
+let SALS  = {};    // إيميل → مرتبه
+let PAY_Q = '';    // نص البحث
+
+// كل الناس اللي الأدمن سجّلهم — ما عدا السوبر أدمن (صاحب المحل)
+// ⚠️ مش بنستخدم allEmployees() هنا لأنها بتشيل دور hr، وشؤون
+//    العاملين نفسها ليها مرتب زي أي حد.
+function allPeople(){
+  const out = [];
+  for(const em of Object.keys(ROLES_MAP || {})){
+    const v = ROLES_MAP[em];
+    const r = typeof v === 'string' ? v : (v && v.role) || '';
+    if(r === 'super_admin') continue;
+    out.push(em.toLowerCase());
+  }
+  // وأي حد ظهر في سجل الحضور ومش في الخريطة (حساب اتشال مثلاً) —
+  // مينفعش يختفي وعليه خصومات
+  ROWS.forEach(r => {
+    const e = (r.user_email||'').toLowerCase();
+    if(e && out.indexOf(e) < 0) out.push(e);
+  });
+  return out.sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+}
+
+async function loadSalaries(){
+  try{
+    const { data, error } = await sb.from('hr_salaries').select('user_email,amount');
+    if(error) throw error;
+    SALS = {};
+    (data || []).forEach(r => { SALS[(r.user_email||'').toLowerCase()] = Number(r.amount || 0); });
+  }catch(e){
+    // بنقول بصوت عالي بدل ما الصفحة توري «مفيش مرتب» لكل الناس
+    console.error('loadSalaries failed:', e);
+    SALS = {};
+    if(e && (e.code === '42P01' || /hr_salaries/i.test(e.message||'')))
+      console.warn('⚠️ جدول المرتبات لسه ماتعملش — شغّل 34-hr-salaries.sql');
+  }
+}
+
+async function openPayrollAdmin(){
+  PAY_Q = '';
+  const box = document.getElementById('payBody');
+  if(box) box.innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('paySheet');
+  const q = document.getElementById('paySearch'); if(q) q.value = '';
+  // ⚠️ بنعيد التحميل عن قصد: ممكن الأدمن يكون ضاف موظف جديد
+  //    والصفحة مفتوحة من ساعة
+  await loadSalaries();
+  await loadDeductions();
+  renderPayrollAdmin();
+}
+
+function renderPayrollAdmin(){
+  const box = document.getElementById('payBody');
+  if(!box) return;
+
+  let list = allPeople();
+  if(PAY_Q){
+    const q = PAY_Q.trim().toLowerCase();
+    list = list.filter(e => e.includes(q) || nameOf(e).toLowerCase().includes(q));
+  }
+
+  if(!list.length){
+    box.innerHTML = '<div class="empty">' +
+      (PAY_Q ? 'مفيش موظف بالاسم ده' :
+       'مفيش موظفين متسجّلين<br><small>ضيفهم من لوحة الأدمن الأول</small>') +
+      '</div>';
+    return;
+  }
+
+  // ملخص فوق: كام مرتب متحدد، وإجمالي المرتبات والخصومات
+  let setN = 0, totSal = 0, totDed = 0;
+  allPeople().forEach(e => {
+    if(SALS[e] != null){ setN++; totSal += SALS[e]; }
+    totDed += manualDed(e).total;
+  });
+
+  box.innerHTML = `
+    <div class="kpis" style="margin:14px 0 16px;">
+      <div class="kpi"><div class="v">${setN}/${allPeople().length}</div><div class="l">مرتب متحدد</div></div>
+      <div class="kpi"><div class="v">${totSal.toLocaleString('en-US')}</div><div class="l">إجمالي المرتبات</div></div>
+      <div class="kpi"><div class="v" style="color:${totDed?'var(--red)':'inherit'}">${totDed.toLocaleString('en-US')}</div><div class="l">إجمالي الخصومات</div></div>
+    </div>
+    ${list.map(prCardHtml).join('')}`;
+}
+
+function prCardHtml(e){
+  const m   = manualDed(e);
+  const sal = SALS[e];
+  const has = sal != null;
+  const net = (has ? sal : 0) - m.total;
+  // معرّف آمن للخانة: الإيميل فيه @ و . فمينفعش يبقى id مباشرة
+  const uid = 'sal_' + e.replace(/[^a-z0-9]/gi, '_');
+  return `
+  <div class="pr-card${m.unseen ? ' alert' : ''}">
+    <div class="pr-top">
+      <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
+      <div class="card-id">
+        <b>${esc(nameOf(e))}</b>
+        <span>${esc(e)}</span>
+      </div>
+    </div>
+
+    <div class="pr-sal">
+      <label>💵 المرتب</label>
+      <input type="number" id="${uid}" min="0" step="50" inputmode="decimal"
+             placeholder="لسه مش متحدد" value="${has ? sal : ''}">
+      <button onclick="saveSalary('${esc(e)}','${uid}')">💾</button>
+    </div>
+
+    <div class="pr-nums">
+      <div>
+        <b style="color:${m.total ? 'var(--red)' : 'inherit'}">${m.total.toLocaleString('en-US')}</b>
+        <span>خصومات ج.م</span>
+      </div>
+      <div>
+        <b style="color:${has ? (net < 0 ? 'var(--red)' : 'var(--done)') : 'var(--muted)'}">${
+          has ? net.toLocaleString('en-US') : '—'}</b>
+        <span>الصافي ج.م</span>
+      </div>
+    </div>
+
+    ${m.unseen ? `<div class="pr-bell">🔔 ${m.unseen} خصم لسه ما قراهوش الموظف</div>` : ''}
+
+    <button class="pr-ded-btn" onclick="openDeduction('${esc(e)}')">💸 خصم</button>
+  </div>`;
+}
+
+async function saveSalary(email, uid){
+  const el = document.getElementById(uid);
+  if(!el) return;
+  const raw = (el.value || '').trim();
+
+  // خانة فاضية = «لسه مش متحدد». مش بنكتب صفر عشان الموظف
+  // ما يشوفش «مرتبك ٠ ج.م» وده مجرد إن حد نسي يكتبه.
+  if(raw === ''){ alert('اكتب المرتب الأول'); el.focus(); return; }
+
+  const amt = parseFloat(raw);
+  if(isNaN(amt) || amt < 0){ alert('المرتب مينفعش يكون بالسالب'); return; }
+
+  const btn = el.parentNode.querySelector('button');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳'; }
+  try{
+    const { error } = await sb.rpc('hr_set_salary', { p_email: email, p_amount: amt });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. من غير السطر ده
+    //    الزرار هيوري ✅ والمرتب ما اتكتبش.
+    if(error) throw error;
+    SALS[email] = amt;
+    if(btn){ btn.textContent = '✅'; }
+    // بنعيد الرسم بعد لحظة عشان الصافي يتحدّث، والعلامة تبان للمستخدم
+    setTimeout(renderPayrollAdmin, 700);
+  }catch(e){
+    console.error('saveSalary failed:', e);
+    if(btn){ btn.disabled = false; btn.textContent = '💾'; }
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883|42P01/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش في قاعدة البيانات — شغّل ملف 34-hr-salaries.sql'
+      : '❌ فشل حفظ المرتب: ' + t);
   }
 }
 

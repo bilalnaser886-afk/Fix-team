@@ -39,7 +39,8 @@
 const PAY_VAPID_PUBLIC_KEY = '';
 
 let _payRows   = [];
-let _payTotals = { total_all: 0, total_month: 0, unseen_count: 0, unseen_amount: 0 };
+let _payTotals = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
+                   salary:0, has_salary:false, net_month:0 };
 let _payErr    = '';
 let _payBusy   = false;
 let _payLoaded = false;
@@ -86,7 +87,8 @@ async function payLoad(){
     const t = await sb.rpc('hr_my_deduction_totals');
     if(t.error) throw t.error;
     const r = Array.isArray(t.data) ? t.data[0] : t.data;
-    _payTotals = r || { total_all:0, total_month:0, unseen_count:0, unseen_amount:0 };
+    _payTotals = r || { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
+                        salary:0, has_salary:false, net_month:0 };
     _payLoaded = true;
   }catch(e){
     // ⚠️ الفشل الصامت هنا خطر: الشاشة تقول «مفيش خصومات ✅»
@@ -94,7 +96,8 @@ async function payLoad(){
     console.error('payLoad failed:', e);
     _payErr    = (e && e.message) ? e.message : String(e);
     _payRows   = [];
-    _payTotals = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0 };
+    _payTotals = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
+                   salary:0, has_salary:false, net_month:0 };
     _payLoaded = false;
   }
   paySyncBadge();
@@ -203,18 +206,10 @@ function payRender(busyMsg){
           <div class="pay-ok">✅ مفيش خصومات جديدة</div>
         `)}
 
-        <!-- ⚠️ المجموع تحت الكروت عن قصد: هو الرقم اللي بيفضل
-             بعد ما كل الكروت تختفي. لو حطيناه فوق، الشاشة كانت
-             هتبان فاضية تماماً لما يقرا كل حاجة. -->
-        <div class="pay-tot">
-          <div class="pay-tot-big">
-            <span class="pay-tot-n">${payMoney(_payTotals.total_month)}</span>
-            <span class="pay-tot-c">ج.م</span>
-          </div>
-          <div class="pay-tot-l">إجمالي خصومات ${_payMonthName()}</div>
-          <div class="pay-tot-all">وإجمالي كل الخصومات من أول الشغل:
-            <b>${payMoney(_payTotals.total_all)} ج.م</b></div>
-        </div>
+        <!-- ⚠️ الكشف تحت الكروت عن قصد: هو اللي بيفضل بعد ما كل
+             الكروت تختفي. لو حطيناه فوق، الشاشة كانت هتبان فاضية
+             تماماً لما يقرا كل حاجة. -->
+        ${payTotalsHtml()}
 
         ${seen.length ? `
           <button class="pay-more" onclick="payToggleOld()">
@@ -232,6 +227,56 @@ function payRender(busyMsg){
         </div>
       </div>
     </div>`;
+}
+
+// ============================================================
+// كشف المرتب
+// ------------------------------------------------------------
+// ⚠️ has_salary مش نفس salary > 0.
+//    مرتب = صفر معناه «HR كتبته صفر».
+//    مفيش مرتب خالص معناه «لسه ماتحددش».
+//    لو خلطناهم، الموظف اللي HR نسيت تكتب مرتبه هيقرا «مرتبك ٠
+//    ج.م» — وده أسوأ بكتير من إننا نقوله «لسه ماتحددش».
+// ============================================================
+function payTotalsHtml(){
+  const t   = _payTotals;
+  const has = !!t.has_salary;
+  const ded = Number(t.total_month || 0);
+
+  // مفيش مرتب متحدد؟ نوري الخصومات بس — ومنخترعش صافي
+  if(!has){
+    return `
+    <div class="pay-tot">
+      <div class="pay-tot-big">
+        <span class="pay-tot-n">${payMoney(ded)}</span>
+        <span class="pay-tot-c">ج.م</span>
+      </div>
+      <div class="pay-tot-l">إجمالي خصومات ${_payMonthName()}</div>
+      <div class="pay-tot-hint">💵 مرتبك لسه ماتحددش في النظام —
+        كلّم شؤون العاملين.</div>
+      <div class="pay-tot-all">وإجمالي كل الخصومات من أول الشغل:
+        <b>${payMoney(t.total_all)} ج.م</b></div>
+    </div>`;
+  }
+
+  const net = Number(t.net_month || 0);
+  return `
+  <div class="pay-tot">
+    <div class="pay-tot-l" style="margin:0 0 4px;">صافي مرتب ${_payMonthName()}</div>
+    <div class="pay-tot-big">
+      <span class="pay-tot-n net">${payMoney(net)}</span>
+      <span class="pay-tot-c net">ج.م</span>
+    </div>
+
+    <div class="pay-calc">
+      <div><span>المرتب</span><b>${payMoney(t.salary)}</b></div>
+      <div><span>− الخصومات</span><b class="minus">${payMoney(ded)}</b></div>
+      <div class="eq"><span>= الصافي</span><b>${payMoney(net)}</b></div>
+    </div>
+
+    <div class="pay-tot-all">وإجمالي كل الخصومات من أول الشغل:
+      <b>${payMoney(t.total_all)} ج.م</b></div>
+  </div>`;
 }
 
 function _payMonthName(){
@@ -539,6 +584,18 @@ function payUrlB64ToU8(s){
     color:var(--p-red); line-height:1;}
   .pay-tot-c{font-size:15px; font-weight:800; color:var(--p-red); opacity:.85;}
   .pay-tot-l{margin-top:7px; font-size:13px; font-weight:800; color:var(--p-ink2);}
+  .pay-tot-n.net{color:var(--p-green);}
+  .pay-tot-c.net{color:var(--p-green);}
+  .pay-tot-hint{margin-top:9px; font-size:12px; line-height:1.9; color:var(--p-mut);}
+  .pay-calc{margin-top:14px; padding-top:12px; border-top:1px dashed var(--p-line);
+    text-align:start;}
+  .pay-calc div{display:flex; justify-content:space-between; align-items:baseline;
+    gap:10px; padding:5px 0; font-size:14px; color:var(--p-ink2);}
+  .pay-calc b{font-family:'Cairo',sans-serif; font-weight:900; font-size:16px;
+    color:var(--p-ink);}
+  .pay-calc b.minus{color:var(--p-red);}
+  .pay-calc .eq{margin-top:5px; padding-top:8px; border-top:1px solid var(--p-line);}
+  .pay-calc .eq b{color:var(--p-green); font-size:18px;}
   .pay-tot-all{margin-top:9px; padding-top:9px; border-top:1px solid var(--p-line);
     font-size:12px; color:var(--p-mut); line-height:1.9;}
   .pay-tot-all b{color:var(--p-ink2);}
