@@ -738,7 +738,8 @@ function dayHtml(d, punches, email){
       <span style="color:${STATE_LBL[r.state].c}; font-weight:800;">${STATE_LBL[r.state].t}
         ${r.penalty ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">خصم ${r.penalty} ج.م</span>` : ''}
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
-      <span class="meta">حضر ${fmtMinTime(r.arrived)} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
+      <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
+        r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
     </div>
     ${r.beforeStart ? `
       <div class="punch" style="padding-bottom:7px;">
@@ -1075,6 +1076,15 @@ function toMin(t){
   const [h,m] = String(t).slice(0,5).split(':').map(Number);
   return h*60 + m;
 }
+// مدة بالساعة والدقيقة
+function fmtDur(mins){
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(m / 60), r = m % 60;
+  if(!h) return r + ' د';
+  if(!r) return h + ' س';
+  return h + ' س و ' + r + ' د';
+}
+
 function fmtMinTime(mins){
   mins = ((mins % 1440) + 1440) % 1440;
   return String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
@@ -1103,6 +1113,12 @@ function applyRules(email, punches, workDate){
   const need = Number(row.need_min || 0);
   return {
     arrived: Number(row.arrived_min),
+    // ⚠️ shift = ميعاده الحقيقي · counted = الوقت اللي بيتحسب منه
+    //    شغله. الاتنين بيتساووا لو جه بدري أو جوه السماح، وبيختلفوا
+    //    لو اتأخر. خلطهم كان بيطلع «حضرت ١٨ وميعادك ١٨» على يوم
+    //    فيه خصم — كلام متناقض.
+    shift:   Number(row.shift_min != null ? row.shift_min : row.counted_min),
+    lateBy:  Number(row.late_min || 0),
     counted: Number(row.counted_min),
     leaveAt: Number(row.counted_min) + need,
     need,
@@ -1752,13 +1768,14 @@ function penStartHtml(){
   return `
   <div class="pen-start${set ? '' : ' warn'}">
     <div class="pen-start-h">
-      <b>🛡️ خصم التأخير بيبدأ من</b>
+      <b>🛡️ نظام المرتبات بيبدأ من</b>
       ${set ? `<span>${esc(nice)}</span>` : `<span class="bad">⚠️ مش متحدد</span>`}
     </div>
 
     ${set
       ? `<small>أي يوم قبل التاريخ ده بيبان في السجل إن الموظف كان متأخر —
-           <b>بس من غير خصم فلوس</b>.</small>`
+           <b>بس من غير خصم فلوس</b>.<br>
+           والكشوف بتبدأ من الشهر ده كمان — الشهور اللي قبله مش بتظهر.</small>`
       : `<small><b>النظام دلوقتي بيخصم على كل التاريخ</b>، بما فيه شهور الموظفين
            ما كانوش يعرفوا فيها إن فيه نظام خصم أصلاً. حدد تاريخ بداية.</small>`}
 
@@ -1782,8 +1799,10 @@ async function savePenaltyStart(){
   }else{
     const nice = new Date(v).toLocaleDateString('ar-EG',
       { day:'numeric', month:'long', year:'numeric' });
-    if(!confirm('خصم التأخير هيبدأ من ' + nice + '.\n\n'
-              + 'كل الأيام اللي قبله خصمها هيبقى صفر عند كل الموظفين.')) return;
+    if(!confirm('نظام المرتبات هيبدأ من ' + nice + '.\n\n'
+              + '• كل الأيام اللي قبله خصمها هيبقى صفر\n'
+              + '• والكشوف اللي قبل الشهر ده مش هتظهر\n\n'
+              + '(الكشف اللي اتصرف فعلاً بيفضل ظاهر في السجل.)')) return;
   }
 
   try{

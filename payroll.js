@@ -473,8 +473,9 @@ function payLateCard(r){
       <div class="pay-amt">− ${payMoney(r.penalty)} <small>ج.م</small></div>
       <div class="pay-when">${_payEsc(d)}</div>
     </div>
-    <div class="pay-why"><b>السبب:</b> تأخير — حضرت
-      <b>${_payHm(r.arrived_min)}</b> وميعادك <b>${_payHm(r.counted_min)}</b>.</div>
+    <div class="pay-why"><b>السبب:</b> تأخير — ميعادك
+      <b>${_payHm(r.shift_min)}</b> وحضرت <b>${_payHm(r.arrived_min)}</b>
+      (متأخر ${_payDur(r.late_min)}).</div>
     <div class="pay-why" style="font-size:12px;opacity:.85;">
       الخصم ده اتحسب تلقائي من مواعيدك. لو شايف إنه غلط، كلّم شؤون العاملين.</div>
     <button class="pay-ok-btn" onclick="payAckPenalty('${_payEsc(r.work_date)}')">👍 فهمت</button>
@@ -517,7 +518,8 @@ function payLateHtml(){
       <div class="pay-late-row${r.waived ? ' off' : ''}">
         <span class="d">${_payEsc(new Date(r.work_date).toLocaleDateString('ar-EG',
           { weekday:'short', day:'numeric', month:'short' }))}</span>
-        <span class="t">حضرت ${_payHm(r.arrived_min)} · ميعادك ${_payHm(r.counted_min)}</span>
+        <span class="t">ميعادك ${_payHm(r.shift_min)} · حضرت ${_payHm(r.arrived_min)}
+          · متأخر ${_payDur(r.late_min)}</span>
         <span class="v">${r.waived
           ? '<b class="ok">✋ اتشال</b>'
           : '<b>−' + payMoney(r.penalty) + '</b>'}</span>
@@ -532,6 +534,20 @@ function payLateHtml(){
   </div>`;
 }
 
+// مدة بالساعة والدقيقة — «ساعتين و ١٥ د» مش «١٣٥»
+function _payDur(mins){
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(m / 60), r = m % 60;
+  if(!h) return r + ' د';
+  if(!r) return h + ' س';
+  return h + ' س و ' + r + ' د';
+}
+
+// ⚠️ shift_min = ميعاده الحقيقي.
+//    counted_min = الوقت اللي بيتحسب منه شغله — وده بيساوي وقت
+//    وصوله لو كان متأخر. عرض counted وتسميته «ميعادك» كان بيطلع
+//    «حضرت ١٨:٠٠ وميعادك ١٨:٠٠» على يوم فيه خصم، وده كلام
+//    متناقض: لو جه في معاده مكانش هياخد خصم أصلاً.
 function _payHm(mins){
   const m = ((Number(mins) % 1440) + 1440) % 1440;
   return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
