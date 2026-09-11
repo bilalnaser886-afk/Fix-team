@@ -427,6 +427,21 @@
   .di-v{color:var(--ink); font-size:14px; font-weight:600; text-align:left;
     line-height:1.6; word-break:break-word;}
   .di-contact{display:flex; gap:9px; margin-top:11px;}
+  /* ✏️ زراير التعديل الصغيرة (العطل والفني) */
+  .di-issue .di-issue-t{flex:1; min-width:0; word-break:break-word;}
+  .di-edit{flex:none; border:1px solid var(--line); background:var(--card); color:var(--repairing);
+    border-radius:9px; padding:6px 10px; font:800 12px/1 inherit; cursor:pointer; white-space:nowrap;}
+  .di-edit:active{transform:scale(.96);}
+  .di-edit.lock{color:var(--muted);}
+  .di-v .di-edit{margin-inline-start:8px; vertical-align:middle;}
+  /* فورم التعديل جوه الشيت */
+  .de-cur{font-size:13px; color:var(--muted); margin:4px 2px 12px;}
+  .de-cur b{color:var(--ink);}
+  .de-ta{width:100%; box-sizing:border-box; min-height:90px; font:inherit; font-size:15px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:11px; padding:11px 12px;
+    resize:vertical; line-height:1.7; margin-bottom:14px;}
+  .de-ta:focus{outline:none; border-color:var(--repairing);}
+  .de-hint{font-size:12px; color:var(--muted); line-height:1.8; margin:-6px 2px 14px;}
   .di-btn{flex:1; text-align:center; text-decoration:none; border-radius:11px;
     padding:11px; font-size:13.5px; font-weight:800;}
   .di-call{background:var(--blue-bg,#EAF1F8); color:var(--blue,#2B6CB0);}
@@ -1491,7 +1506,11 @@ function showInfo(id){
         <span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>
       </div>
 
-      ${d.issue ? `<div class="di-issue"><span>🛠️</span><span>${esc(d.issue)}</span></div>` : ''}
+      <!-- العطل — دايماً ظاهر (حتى لو فاضي) عشان زرار التعديل يبقى ليه مكان -->
+      <div class="di-issue"><span>🛠️</span>
+        <span class="di-issue-t">${d.issue ? esc(d.issue) : '<span style="color:var(--muted)">— مفيش عطل مكتوب</span>'}</span>
+        <button class="di-edit" onclick="editIssue('${d.id}')">✏️ ${d.issue ? 'تعديل' : 'اكتب'}</button>
+      </div>
 
       <div class="di-card">
         <div class="di-card-h">👤 ${esc(t('rp.customer'))}</div>
@@ -1507,7 +1526,9 @@ function showInfo(id){
 
       <div class="di-card">
         <div class="di-card-h">🔧 الصيانة</div>
-        ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')))}
+        ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')) + (dpCanChangeTech(d)
+            ? `<button class="di-edit" onclick="editTech('${d.id}')">✏️ تغيير</button>`
+            : `<button class="di-edit lock" onclick="toast(dpTechLockMsg())">🔒</button>`))}
         ${row(t('rp.by'), d.by ? esc(d.by) : '')}
         ${row(t('dp.intake'), esc(fmtDate(d.intake)))}
       </div>
@@ -1519,6 +1540,136 @@ function showInfo(id){
 
       <div class="di-actions">${actions}</div>
     </div>`);
+}
+
+// ============================================================
+// ✏️ تعديل الفني والعطل من الديسباتشر
+// ------------------------------------------------------------
+// من شاشة التفاصيل: زرار ✏️ جنب العطل وجنب الفني.
+// الحفظ عبر device_patch — والسيرفر هو اللي بيحدد المسموح (migration 43).
+//
+// 🔒 تغيير الفني مسموح **بس** والجهاز لسه شغّال:
+//    قيد الانتظار · جاري الكشف · جاري الصيانة
+// ⚠️ ليه؟ نقط الفني بتتحسب على اسم الفني المكتوب على الجهاز لما
+//    يخلص. لو الديسباتشر غيّر فني جهاز خلص/اتسلّم، النقط (يعني
+//    فلوس) بتتنقل من فني لفني من غير ما المحاسب يعرف. والمرتجعات
+//    ليها نظام نقط خاص عند المحاسب («رجع وراح لفني تاني»).
+//    نفس القاعدة متطبّقة على السيرفر — مش على الشاشة بس.
+// ============================================================
+const DP_TECH_EDITABLE = ['waiting', 'diagnosing', 'repairing'];
+function dpCanChangeTech(d){ return !!d && DP_TECH_EDITABLE.includes(d.status); }
+function dpTechLockMsg(){ return '🔒 الجهاز ده مش في الصيانة — تغيير الفني بيحرّك النقط، فده من عند المحاسب'; }
+
+// ⚠️ Supabase مبيرميش خطأ لو السيرفر تجاهل حقل (لو migration 43
+//    مااتشغّلتش مثلاً). فبعد الحفظ بنقرا الحقل ده بس ونتأكد إنه اتكتب.
+//    لو القراية نفسها فشلت (نت) بنعدّيها — الحفظ نفسه قال إنه نجح.
+async function deVerify(id, key, expected, label){
+  try{
+    const { data, error } = await sb.from('devices_dispatch')
+      .select('v:data->>' + key).eq('id', id).maybeSingle();
+    if(error) throw error;
+    if(!data || (data.v || '') !== expected){
+      toast('⚠️ السيرفر مسجّلش ' + label + ' — الديسباتشر مش مسموحله يعدّل «' + key + '». بلّغ الإدارة');
+      console.error(key + ' لم يُحفظ:', id, data);
+      return false;
+    }
+  }catch(e){ console.error('تأكيد ' + key + ':', e); }
+  return true;
+}
+
+// تحديث الجهاز في الذاكرة بعد الحفظ — عشان الشاشة تتحدّث من غير تحميل
+function deApplyLocal(d, raw){
+  if(!d._raw) d._raw = {};
+  Object.assign(d._raw, raw);
+  if('technician'    in raw) d.tech  = (raw.technician || '').trim();
+  if('reportedIssue' in raw) d.issue = raw.reportedIssue || '';
+  // الفهرس بيتخزن على الجهاز نفسه — لازم يتبني تاني عشان البحث
+  // بالفني/العطل الجديد يلاقيه
+  try{ if(window.IFixSearch) IFixSearch.invalidate(d); }catch(e){}
+  reindexSearch();
+  render();
+}
+
+// ---------- 🔄 تغيير الفني ----------
+function editTech(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  if(!dpCanChangeTech(d)){ toast(dpTechLockMsg()); return; }
+  const cur  = (d.tech || '').trim();
+  const list = allTechNames().filter(x => x.name !== cur);
+  if(!list.length){ toast('مفيش فنيين تانيين تنقل ليهم'); return; }
+  openAct('🔄 تغيير الفني', `
+    ${actDevBlock(d)}
+    <div class="de-cur">الفني دلوقتي: <b>${esc(cur || t('tp.noTechYet'))}</b></div>
+    <select id="deTech" class="tech-select" style="margin-bottom:14px;">
+      <option value="">— اختار الفني الجديد —</option>
+      ${list.map(x => `<option value="${esc(x.name)}">${esc(x.name)}${x.pending ? ' ⏳' : ''}</option>`).join('')}
+    </select>
+    <div class="de-hint">الجهاز هيختفي من عند «${esc(cur || '—')}» ويظهر عند الفني الجديد.</div>
+    <button class="act-btn act-primary" id="deGo" onclick="doEditTech('${d.id}')">🔄 انقل الجهاز</button>
+    <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">${t('rp.cancel')}</button>`);
+}
+
+async function doEditTech(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const target = (($('deTech') || {}).value || '').trim();
+  if(!target){ toast('اختار الفني الجديد'); return; }
+  if(!dpCanChangeTech(d)){ toast(dpTechLockMsg()); return; }   // الحالة ممكن تكون اتغيّرت وهو فاتح الشيت
+  const from = (d.tech || '').trim();
+  if(target === from){ showInfo(id); return; }
+
+  const raw = d._raw || {};
+  const note = mkNote('🔄 الفني اتغيّر من «' + (from || '—') + '» لـ «' + target + '»');
+  const p = { technician: target,
+              activityNotes: [...(raw.activityNotes || []), note],
+              lastModifiedAt: nowIso(), lastModifiedBy: ME };
+
+  const btn = $('deGo'); if(btn) btn.disabled = true;
+  const ok = await patch(id, p) && await deVerify(id, 'technician', target, 'الفني الجديد');
+  if(btn) btn.disabled = false;
+  if(!ok) return;
+
+  // لو الفني الجديد كان مساعد على نفس الجهاز، مبقاش مساعد — بقى الأساسي.
+  // السيرفر بيعمل ده لوحده (migration 43) — إحنا بس بنحدّث الشاشة.
+  if((raw.assistTechnician || '').trim() === target) p.assistTechnician = '';
+  deApplyLocal(d, p);
+  toast('🔄 الجهاز اتنقل لـ ' + target);
+  showInfo(id);
+}
+
+// ---------- 🛠️ تعديل العطل ----------
+function editIssue(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  openAct('🛠️ تعديل العطل', `
+    ${actDevBlock(d)}
+    <textarea id="deIssue" class="de-ta" maxlength="300" placeholder="اكتب العطل…">${esc(d.issue || '')}</textarea>
+    <button class="act-btn act-primary" id="deGo" onclick="doEditIssue('${d.id}')">💾 حفظ العطل</button>
+    <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">${t('rp.cancel')}</button>`);
+  // المؤشر في آخر الكلام — عشان يكمّل على طول
+  setTimeout(() => { const ta = $('deIssue'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 250);
+}
+
+async function doEditIssue(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const val = (($('deIssue') || {}).value || '').trim();
+  if(!val){ toast('اكتب العطل'); return; }
+  const old = (d.issue || '').trim();
+  if(val === old){ showInfo(id); return; }
+
+  const raw = d._raw || {};
+  // القديم بيتحفظ في الملاحظة — عشان لو اتعدّل غلط، الأصل لسه موجود
+  const note = mkNote('🛠️ العطل اتعدّل من «' + (old || '—') + '» لـ «' + val + '»');
+  const p = { reportedIssue: val,
+              activityNotes: [...(raw.activityNotes || []), note],
+              lastModifiedAt: nowIso(), lastModifiedBy: ME };
+
+  const btn = $('deGo'); if(btn) btn.disabled = true;
+  const ok = await patch(id, p) && await deVerify(id, 'reportedIssue', val, 'العطل');
+  if(btn) btn.disabled = false;
+  if(!ok) return;
+
+  deApplyLocal(d, p);
+  toast('✅ العطل اتعدّل');
+  showInfo(id);
 }
 
 // ============================================================
