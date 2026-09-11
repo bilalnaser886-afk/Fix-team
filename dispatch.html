@@ -442,6 +442,44 @@
     resize:vertical; line-height:1.7; margin-bottom:14px;}
   .de-ta:focus{outline:none; border-color:var(--repairing);}
   .de-hint{font-size:12px; color:var(--muted); line-height:1.8; margin:-6px 2px 14px;}
+  /* 📝 ملاحظات الجهاز في التفاصيل — نفس شكل الداشبورد */
+  .dn-list{margin:4px 0 10px;}
+  .dn{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:7px;}
+  .dn-t{font-size:13.5px; line-height:1.7; color:var(--ink); white-space:pre-wrap; word-break:break-word;}
+  .dn-m{font-size:11px; color:var(--muted); margin-top:4px;}
+  .dn-empty{font-size:12.5px; color:var(--muted); padding:4px 2px 10px;}
+  .dn-ta{width:100%; box-sizing:border-box; min-height:64px; font:inherit; font-size:14px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px;
+    resize:vertical; line-height:1.7; margin-bottom:8px;}
+  .dn-ta:focus{outline:none; border-color:var(--repairing);}
+  .dn-add{width:100%; border:1px solid var(--line); background:var(--card); color:var(--repairing);
+    border-radius:11px; padding:11px; font:800 13.5px/1 inherit; cursor:pointer;}
+  .dn-add:disabled{opacity:.55; cursor:default;}
+
+  /* ===== 🔒 باسورد الجهاز — نفس فكرة الداشبورد (تبويبين) ===== */
+  .lk-tabs{display:flex; gap:7px; margin-bottom:10px;}
+  .lk-tab{flex:1; border:1px solid var(--line); background:var(--card); color:var(--muted);
+    border-radius:10px; padding:9px 6px; font:800 12.5px/1 inherit; cursor:pointer;}
+  .lk-tab.on{background:var(--repairing); border-color:var(--repairing); color:#fff;}
+  .lk-wrap{position:relative;}
+  .lk-in{width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:11px;
+    padding:12px 44px 12px 13px; font-family:var(--mono,monospace); font-size:15px;
+    background:var(--card); color:var(--ink);}
+  .lk-in:focus{outline:none; border-color:var(--repairing);}
+  .lk-eye{position:absolute; inset-inline-end:6px; top:50%; transform:translateY(-50%);
+    background:none; border:none; font-size:18px; cursor:pointer; padding:6px; line-height:1;}
+  #dpPatPad{position:relative; margin:0 auto 8px; touch-action:none;}
+  .lk-hint{text-align:center; font-size:12.5px; color:var(--muted); margin-bottom:7px;}
+  .lk-redraw{display:block; margin:0 auto; border:1px solid var(--line); background:var(--card);
+    color:var(--ink); border-radius:10px; padding:8px 16px; font:700 12.5px/1 inherit; cursor:pointer;}
+  /* عرض الباسورد في التفاصيل */
+  .lk-code{font-family:var(--mono,monospace); font-weight:800; font-size:17px; letter-spacing:1px; color:var(--ink);}
+  .lk-img{width:130px; height:130px; border:1px solid var(--line); border-radius:12px;
+    object-fit:cover; cursor:pointer; background:#fff;}
+  .lk-none{font-size:13px; color:var(--muted); padding:2px 0 8px;}
+  .lk-btn{width:100%; border:1px solid var(--line); background:var(--card); color:var(--repairing);
+    border-radius:11px; padding:11px; font:800 13.5px/1 inherit; cursor:pointer; margin-top:9px;}
+  .lk-btn:disabled{opacity:.55; cursor:default;}
   .di-btn{flex:1; text-align:center; text-decoration:none; border-radius:11px;
     padding:11px; font-size:13.5px; font-weight:800;}
   .di-call{background:var(--blue-bg,#EAF1F8); color:var(--blue,#2B6CB0);}
@@ -760,6 +798,11 @@
       <select id="f_tech" class="tech-select"></select>
       <div id="f_techHint" class="fld-hint" style="display:none;"></div></div>
     <div class="fld"><label data-i18n="dp.issueLabel">العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." data-i18n-ph="dp.issuePh"></textarea></div>
+    <!-- 📝 ملاحظات وقت الاستلام — بتتحفظ كأول ملاحظة في سجل الجهاز
+         (نفس القايمة اللي المحاسب والفني بيشوفوها وبيضيفوا عليها) -->
+    <!-- 🔒 باسورد الجهاز — المحتوى بيتبني من dpMountLock() -->
+    <div class="fld"><label>🔒 باسورد الجهاز (اختياري)</label><div id="dpLockHostIntake"></div></div>
+    <div class="fld"><label>📝 ملاحظات (اختياري)</label><textarea id="f_note" maxlength="500" placeholder="أي حاجة تحب الفني أو المحاسب يعرفها… (خدش، العميل مستعجل، معاه جراب…)"></textarea></div>
     <button id="btnSave" class="save" onclick="saveIntake()" data-i18n="dp.submit">سجّل الجهاز في المحل</button>
   </div>
 </div>
@@ -1378,8 +1421,9 @@ async function doApproval(id, kind){
     status: 'pending',
     decidedBy: null, decidedAt: null, reason: null
   };
-  const notes = [...((d._raw && d._raw.activityNotes) || []),
-                 mkNote(t('note.requestPending', { label }), 'note.requestPending', { label })];
+  // ⚠️ على نسخة السيرفر مش نسخة الصفحة — شوف dpNotesWith
+  const notes = await dpNotesWith(id, mkNote(t('note.requestPending', { label }), 'note.requestPending', { label }));
+  if(!notes) return;
 
   if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
                          lastModifiedAt: nowIso(), lastModifiedBy: ME }))) return;
@@ -1418,8 +1462,9 @@ async function doReject(id, inShop){
     status: 'pending',
     decidedBy: null, decidedAt: null, reason: null
   };
-  const notes = [...((d._raw && d._raw.activityNotes) || []),
-                 mkNote(t('note.requestPending', { label: t('rp.reject') }), 'note.requestPending', { label: t('rp.reject') })];
+  // ⚠️ على نسخة السيرفر مش نسخة الصفحة — شوف dpNotesWith
+  const notes = await dpNotesWith(id, mkNote(t('note.requestPending', { label: t('rp.reject') }), 'note.requestPending', { label: t('rp.reject') }));
+  if(!notes) return;
 
   if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
                          lastModifiedAt: nowIso(), lastModifiedBy: ME }))) return;
@@ -1533,6 +1578,20 @@ function showInfo(id){
         ${row(t('dp.intake'), esc(fmtDate(d.intake)))}
       </div>
 
+      <!-- 🔒 الباسورد — بيتحمّل لوحده لما الشاشة تتفتح (dpLoadLock) -->
+      <div class="di-card">
+        <div class="di-card-h">🔒 باسورد الجهاز</div>
+        <div id="dpLockView">${dpLockViewHtml(d)}</div>
+      </div>
+
+      <!-- 📝 الملاحظات — زي المحاسب بالظبط: القايمة + إضافة ملاحظة -->
+      <div class="di-card">
+        <div class="di-card-h">📝 الملاحظات</div>
+        ${dpNotesHtml(d)}
+        <textarea id="dnNew" class="dn-ta" maxlength="500" placeholder="اكتب ملاحظة جديدة…"></textarea>
+        <button class="dn-add" id="dnGo" onclick="dpAddNote('${d.id}')">➕ إضافة ملاحظة</button>
+      </div>
+
       <div class="di-label-row">
         <button class="di-lbl" onclick="dpToggleLabel('${d.id}')">🖨 ${esc(t('ui.printingLabel') || 'طباعة ليبل')}</button>
       </div>
@@ -1540,6 +1599,394 @@ function showInfo(id){
 
       <div class="di-actions">${actions}</div>
     </div>`);
+  // 🔒 الباسورد بيتحمّل لوحده بعد ما الشاشة تتفتح (مش مع قايمة الأجهزة)
+  dpLoadLock(id);
+}
+
+// ============================================================
+// 🔒 باسورد الجهاز — كتابة وعرض وتعديل (زي المحاسب)
+// ------------------------------------------------------------
+// نوعين: «رقم/نص» و«نمط». (نوع «صورة» بيتعمل من الداشبورد بس —
+// الديسباتشر بيشوفه هنا للقراية ويقدر يستبدله.)
+//
+// النمط بيتحفظ حاجتين مع بعض:
+//   lockPattern = ترتيب النقط '1-5-9-6'  ← للتشغيل خطوة بخطوة
+//   lockImage   = صورة صغيرة للرسمة      ← الداشبورد وصفحة الفني
+//                 بيعرضوا النمط **من الصورة دي**. لو مبعتناش
+//                 الصورة، النمط هيبان فاضي عندهم.
+//
+// 🔴 الباسورد **مش** بيتحمّل مع قايمة الأجهزة.
+//    الصور تقيلة (EGRESS-REPORT.md) ولو كانت في الـview كانت
+//    هتتحمّل مع الـ~١٠٠٠ جهاز في كل تحديث. فبنجيبه لجهاز واحد
+//    بس لما الديسباتشر يفتح تفاصيله — device_lock_get (migration 44).
+// ============================================================
+let dpLockTab = 'text';
+let dpPatSeq  = [];
+let dpPatThumb = '';
+
+// بنبني محتوى القفل بالـJS مش في الـHTML عشان نفس الشاشة تتركّب
+// مرة في فورم الاستلام ومرة في شيت التعديل — من غير IDs مكررة.
+function dpMountLock(hostId){
+  ['dpLockHostIntake', 'dpLockHostEdit'].forEach(h => {
+    const el = $(h); if(el && h !== hostId) el.innerHTML = '';
+  });
+  const host = $(hostId); if(!host) return;
+  dpLockTab = 'text'; dpPatSeq = []; dpPatThumb = '';
+  host.innerHTML = `
+    <div class="lk-tabs">
+      <button type="button" class="lk-tab on" id="dpLkT_text"    onclick="dpSetLockTab('text')">١٢٣ رقم / نص</button>
+      <button type="button" class="lk-tab"    id="dpLkT_pattern" onclick="dpSetLockTab('pattern')">⠿ نمط</button>
+    </div>
+    <div id="dpLkP_text">
+      <div class="lk-wrap">
+        <input id="dpLkText" class="lk-in" type="password" inputmode="text" autocomplete="off" maxlength="60" placeholder="رمز الفتح…">
+        <button type="button" class="lk-eye" id="dpLkEye" onclick="dpToggleLockEye()">👁</button>
+      </div>
+    </div>
+    <div id="dpLkP_pattern" style="display:none;">
+      <div id="dpPatPad"></div>
+      <div class="lk-hint" id="dpPatHint">ارسم النمط بإصبعك</div>
+      <button type="button" class="lk-redraw" onclick="dpInitPattern()">إعادة الرسم</button>
+    </div>`;
+}
+
+function dpSetLockTab(k){
+  dpLockTab = k;
+  ['text','pattern'].forEach(x => {
+    const tb = $('dpLkT_' + x); if(tb) tb.classList.toggle('on', x === k);
+    const pn = $('dpLkP_' + x); if(pn) pn.style.display = x === k ? 'block' : 'none';
+  });
+  if(k === 'pattern') dpInitPattern();
+}
+
+function dpToggleLockEye(){
+  const i = $('dpLkText'), e = $('dpLkEye'); if(!i) return;
+  i.type = i.type === 'password' ? 'text' : 'password';
+  if(e) e.textContent = i.type === 'password' ? '👁' : '🙈';
+}
+
+// شبكة ٣×٣ — نفس منطق الداشبورد
+function dpPatPoints(size){
+  const g = size / 3, pts = [];
+  for(let r = 0; r < 3; r++) for(let c = 0; c < 3; c++) pts.push({ n:r*3+c+1, x:g*c+g/2, y:g*r+g/2 });
+  return pts;
+}
+function dpInitPattern(){
+  const pad = $('dpPatPad'); if(!pad) return;
+  const size = 190, pts = dpPatPoints(size);
+  dpPatSeq = []; dpPatThumb = '';
+  pad.style.width = size + 'px'; pad.style.height = size + 'px';
+  pad.innerHTML = `<svg width="${size}" height="${size}" style="position:absolute;inset:0;">
+    <polyline id="dpPatLine" fill="none" stroke="var(--repairing)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points=""/>
+    ${pts.map(p => `<circle data-n="${p.n}" cx="${p.x}" cy="${p.y}" r="9" fill="var(--line)"/>`).join('')}
+  </svg>`;
+  const hint = $('dpPatHint'); if(hint) hint.textContent = 'ارسم النمط بإصبعك';
+  const svg = pad.querySelector('svg'), line = pad.querySelector('#dpPatLine');
+  const R = 30;
+  const pos = e => { const r = svg.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+  const hit = (x,y) => { for(const p of pts){ if(Math.hypot(p.x-x, p.y-y) < R && !dpPatSeq.includes(p.n)) return p; } return null; };
+  function redraw(cur){
+    let str = dpPatSeq.map(n => { const p = pts[n-1]; return p.x + ',' + p.y; }).join(' ');
+    if(cur) str += ' ' + cur.x + ',' + cur.y;
+    line.setAttribute('points', str);
+    svg.querySelectorAll('circle').forEach(c =>
+      c.setAttribute('fill', dpPatSeq.includes(+c.dataset.n) ? 'var(--repairing)' : 'var(--line)'));
+  }
+  let drawing = false;
+  svg.addEventListener('pointerdown', e => { e.preventDefault(); try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+    drawing = true; dpPatSeq = []; const {x,y} = pos(e); const h = hit(x,y); if(h) dpPatSeq.push(h.n); redraw({x,y}); });
+  svg.addEventListener('pointermove', e => { if(!drawing) return; e.preventDefault();
+    const {x,y} = pos(e); const h = hit(x,y); if(h) dpPatSeq.push(h.n); redraw({x,y}); });
+  const finish = () => { if(!drawing) return; drawing = false; redraw(null); dpFinalizePattern(pts, size); };
+  svg.addEventListener('pointerup', finish);
+  svg.addEventListener('pointercancel', finish);
+}
+function dpFinalizePattern(pts, size){
+  const hint = $('dpPatHint');
+  if(dpPatSeq.length < 2){ dpPatThumb = ''; if(hint) hint.textContent = 'النمط لازم نقطتين على الأقل — أعد الرسم'; return; }
+  if(hint) hint.textContent = 'النمط: ' + dpPatSeq.join('-');
+  // ⚠️ الصورة بخلفية بيضا وألوان ثابتة عن قصد — مش متغيّرات الثيم.
+  //    دي بتتحفظ مرة واحدة وبتتعرض في ٣ صفحات بثيمات مختلفة، فلو
+  //    اترسمت بلون الوضع الداكن هتبقى مش واضحة في الفاتح.
+  const S = 200, cvs = document.createElement('canvas'); cvs.width = S; cvs.height = S;
+  const ctx = cvs.getContext('2d'), k = S / size;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, S, S);
+  ctx.strokeStyle = '#2563EB'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
+  dpPatSeq.forEach((n, i) => { const p = pts[n-1]; i ? ctx.lineTo(p.x*k, p.y*k) : ctx.moveTo(p.x*k, p.y*k); });
+  ctx.stroke();
+  pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x*k, p.y*k, dpPatSeq.includes(p.n) ? 9 : 6, 0, Math.PI*2);
+    ctx.fillStyle = dpPatSeq.includes(p.n) ? '#2563EB' : '#CBD5E1'; ctx.fill(); });
+  dpPatThumb = cvs.toDataURL('image/png');
+}
+
+// بيجمع اللي اتكتب. بيرجّع null لو مفيش حاجة (يعني الحقل اتساب فاضي)
+function dpCollectLock(){
+  const txt = (($('dpLkText') || {}).value || '').trim();
+  if(dpLockTab === 'text' && txt)
+    return { lockType:'text', lockText:txt, lockPattern:'', lockImage:'' };
+  if(dpLockTab === 'pattern' && dpPatSeq.length >= 2)
+    return { lockType:'pattern', lockText:'', lockPattern:dpPatSeq.join('-'), lockImage:dpPatThumb };
+  return null;
+}
+
+// ---------- العرض في التفاصيل ----------
+// الباسورد بيتحمّل بعد ما الشاشة تتفتح، فبنبدأ بـ«بنحمّل…»
+function dpLockViewHtml(d){
+  const L = d._lock;
+  if(!L) return `<div class="lk-none">⏳ بنحمّل…</div>`;
+  const btn = `<button class="lk-btn" onclick="dpEditLock('${d.id}')">🔐 ${L.lockType ? 'تعديل الباسورد' : 'إضافة باسورد'}</button>`;
+  if(L.lockType === 'text' && L.lockText)
+    return `<div class="di-row"><span class="di-k">الرمز</span><span class="di-v lk-code">${esc(L.lockText)}</span></div>${btn}`;
+  if((L.lockType === 'pattern' || L.lockType === 'image') && L.lockImage)
+    return `<div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <img id="dpLkImg" class="lk-img" src="${L.lockImage}" onclick="dpViewLockImg('${d.id}')">
+        <div id="dpPatReplay" style="display:none;"></div>
+      </div>
+      ${L.lockPattern ? `<div class="lk-code" style="margin-top:7px;">${esc(L.lockPattern)}</div>
+        <button class="lk-btn" onclick="dpReplayPattern('${esc(L.lockPattern)}')">▶️ إعادة الرسم خطوة خطوة</button>` : ''}
+      ${btn}`;
+  return `<div class="lk-none">🔓 مفيش باسورد على الجهاز ده</div>${btn}`;
+}
+
+// تحميل الباسورد لجهاز واحد — بيتندَه من showInfo
+async function dpLoadLock(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  if(d._lock){ dpPaintLock(id); return; }        // اتحمّل قبل كده
+  try{
+    const { data, error } = await sb.rpc('device_lock_get', { p_id: id });
+    if(error) throw error;
+    d._lock = data || { lockType:'', lockText:'', lockPattern:'', lockImage:'' };
+  }catch(e){
+    console.error('device_lock_get:', e);
+    d._lock = null;
+    const box = $('dpLockView');
+    if(box) box.innerHTML = `<div class="lk-none">⚠️ مقدرناش نجيب الباسورد — اقفل وافتح تاني</div>`;
+    return;
+  }
+  dpPaintLock(id);
+}
+function dpPaintLock(id){
+  const d = devices.find(x => x.id === id);
+  const box = $('dpLockView');
+  if(d && box) box.innerHTML = dpLockViewHtml(d);
+}
+
+function dpViewLockImg(id){
+  const d = devices.find(x => x.id === id);
+  const src = d && d._lock && d._lock.lockImage;
+  if(!src) return;
+  // عارض بسيط فوق كل حاجة — بيتقفل بأي ضغطة
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML = '<img src="' + src + '" style="max-width:100%;max-height:100%;border-radius:12px;">';
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+
+// ▶️ تشغيل النمط خطوة بخطوة (نفس الداشبورد — ٣٠٠ جزء من الثانية للنقطة)
+function dpReplayPattern(seqStr){
+  const seq = String(seqStr || '').split('-').map(n => parseInt(n)).filter(n => n >= 1 && n <= 9);
+  if(seq.length < 2) return;
+  const box = $('dpPatReplay'), img = $('dpLkImg');
+  if(!box) return;
+  box.style.display = 'block';
+  if(img) img.style.display = 'none';
+  const S = 130, g = S / 3, pts = [];
+  for(let r = 0; r < 3; r++) for(let c = 0; c < 3; c++) pts.push({ n:r*3+c+1, x:g*c+g/2, y:g*r+g/2 });
+  box.innerHTML = `<svg width="${S}" height="${S}" style="border:1px solid var(--line);border-radius:12px;background:var(--card);">
+    <polyline id="dpRpLine" fill="none" stroke="var(--repairing)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" points=""/>
+    ${pts.map(p => `<circle data-n="${p.n}" cx="${p.x}" cy="${p.y}" r="6" fill="var(--line)"/>`).join('')}
+  </svg><div id="dpRpStep" style="text-align:center;font-size:12px;color:var(--muted);margin-top:4px;"></div>`;
+  const line = box.querySelector('#dpRpLine'), lbl = box.querySelector('#dpRpStep');
+  let i = 0;
+  const timer = setInterval(() => {
+    // الشاشة اتقفلت وإحنا بنرسم؟ نوقف — مفيش عداد شغال على الفاضي
+    if(!document.body.contains(box)){ clearInterval(timer); return; }
+    if(i >= seq.length){
+      clearInterval(timer);
+      setTimeout(() => { if(img) img.style.display = ''; box.style.display = 'none'; }, 1200);
+      return;
+    }
+    const p = pts[seq[i]-1];
+    const dot = box.querySelector('circle[data-n="' + seq[i] + '"]');
+    if(dot){ dot.setAttribute('fill', 'var(--repairing)'); dot.setAttribute('r', '9'); }
+    const cur = line.getAttribute('points');
+    line.setAttribute('points', (cur ? cur + ' ' : '') + p.x + ',' + p.y);
+    if(lbl) lbl.textContent = `خطوة ${i+1} من ${seq.length} — نقطة ${seq[i]}`;
+    i++;
+  }, 300);
+}
+
+// ---------- التعديل ----------
+function dpEditLock(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const L = d._lock || {};
+  const cur = L.lockType === 'text'    ? 'رمز: ' + (L.lockText || '')
+            : L.lockType === 'pattern' ? 'نمط: ' + (L.lockPattern || 'مرسوم')
+            : L.lockType === 'image'   ? 'صورة'
+            : 'مفيش باسورد';
+  openAct('🔐 باسورد الجهاز', `
+    ${actDevBlock(d)}
+    <div class="de-cur">الحالي: <b>${esc(cur)}</b></div>
+    <div id="dpLockHostEdit"></div>
+    <div class="de-hint">اللي هتكتبه هيمسح القديم ويحل محله.</div>
+    <button class="act-btn act-primary" id="dpLkGo" onclick="dpSaveLock('${d.id}')">💾 حفظ الباسورد</button>
+    ${L.lockType ? `<button class="act-btn act-ghost" onclick="dpClearLock('${d.id}')">🗑️ شيل الباسورد</button>` : ''}
+    <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">${t('rp.cancel')}</button>`);
+  dpMountLock('dpLockHostEdit');
+}
+
+async function dpSaveLock(id){
+  const lock = dpCollectLock();
+  if(!lock){ toast(dpLockTab === 'pattern' ? 'ارسم النمط الأول (نقطتين على الأقل)' : 'اكتب الرمز الأول'); return; }
+  await dpWriteLock(id, lock, lock.lockType === 'text' ? 'رمز رقمي/نصي' : 'نمط مرسوم');
+}
+
+async function dpClearLock(id){
+  if(!confirm('متأكد إنك عايز تشيل باسورد الجهاز ده؟')) return;
+  await dpWriteLock(id, { lockType:'', lockText:'', lockPattern:'', lockImage:'' }, 'اتشال');
+}
+
+// بيتأكد إن السيرفر كتب القفل فعلاً (لو migration 44 مااتشغّلتش،
+// device_patch بترمي الحقول في صمت)
+async function dpVerifyLock(id, expectType){
+  try{
+    const { data, error } = await sb.rpc('device_lock_get', { p_id: id });
+    if(error) throw error;
+    if(!data || (data.lockType || '') !== expectType){
+      toast('⚠️ السيرفر مسجّلش الباسورد — الديسباتشر مش مسموحله يعدّله. بلّغ الإدارة');
+      console.error('lockType لم يُحفظ:', id, data);
+      return false;
+    }
+  }catch(e){ console.error('تأكيد الباسورد:', e); }
+  return true;
+}
+
+async function dpWriteLock(id, lock, label){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  // نفس ملاحظة الداشبورد (note.lockUpdated) — بتتقري عربي وإنجليزي
+  const args = { label };
+  const note = mkNote(t('note.lockUpdated', args), 'note.lockUpdated', args);
+
+  const btn = $('dpLkGo'); if(btn) btn.disabled = true;
+  const notes = await dpNotesWith(id, note);   // نسخة السيرفر — شوف dpNotesWith
+  const p = notes && { ...lock, activityNotes: notes, lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  // ⚠️ التأكد عبر device_lock_get مش الـview: الـview مبتعرضش حقول
+  //    القفل أصلاً، فقرايتها كانت هتقول «ماتحفظتش» وهي متحفظة.
+  const ok = !!p && await patch(id, p) && await dpVerifyLock(id, lock.lockType);
+  if(btn) btn.disabled = false;
+  if(!ok) return;
+
+  d._lock = { lockType:lock.lockType, lockText:lock.lockText, lockPattern:lock.lockPattern, lockImage:lock.lockImage };
+  if(!d._raw) d._raw = {};
+  d._raw.activityNotes = notes;
+  toast(lock.lockType ? '🔒 الباسورد اتحفظ' : '🔓 الباسورد اتشال');
+  showInfo(id);
+}
+
+// ============================================================
+// 📝 ملاحظات الجهاز — قراءة وإضافة
+// ------------------------------------------------------------
+// 🔴 القاعدة: أي ملاحظة جديدة بتتضاف على **نسخة السيرفر** مش على
+//    النسخة اللي في الصفحة. ليه؟
+//    activityNotes بتتحفظ كقايمة كاملة — يعني اللي بنبعته **بيحلّ
+//    محل** اللي على السيرفر. ولو بعتنا نسخة الصفحة:
+//      ١) الصفحة مفيهاش ريل تايم — لو المحاسب أو الفني كتب ملاحظة
+//         من ساعة، مش عندنا → هتتمسح.
+//      ٢) لو الصفحة اتفتحت من غير نت، الأجهزة جاية من الكاش اللي
+//         بيحتفظ بآخر ٨ ملاحظات بس (saveCache) → الباقي هيتمسح.
+//    زي ما تكتب على صورة آخر ٨ صفحات من الكشكول وتبعتها بدل الكشكول.
+//    فبنجيب الكشكول الأصلي الأول ونكتب في آخره.
+// ⚠️ لو معرفناش نجيبه → **مبنحفظش**. ملاحظة متأخرة أحسن من ملاحظات ممسوحة.
+// ============================================================
+async function dpNotesWith(id, note){
+  try{
+    const { data, error } = await sb.from('devices_dispatch')
+      .select('n:data->activityNotes').eq('id', id).maybeSingle();
+    if(error) throw error;
+    if(!data) throw new Error('الجهاز مش موجود');
+    const fresh = Array.isArray(data.n) ? data.n : [];
+    return [...fresh, note];
+  }catch(e){
+    console.error('dpNotesWith:', e);
+    toast('⚠️ مقدرناش نجيب ملاحظات الجهاز من السيرفر — جرّب تاني');
+    return null;
+  }
+}
+
+// الملاحظات في التفاصيل — الأقدم فوق والأحدث تحت (نفس الداشبورد)
+function dpNotesHtml(d){
+  const list = (d._raw && d._raw.activityNotes) || [];
+  if(!list.length) return `<div class="dn-empty">مفيش ملاحظات لسه</div>`;
+  return `<div class="dn-list">${list.map(n => {
+    let when = '';
+    try{ when = new Date(n.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }); }catch(e){}
+    return `<div class="dn">
+      <div class="dn-t">${esc(noteText(n))}</div>
+      <div class="dn-m">${esc(when)}${n.by ? ' — ' + esc(n.by) : ''}${n.role ? ' (' + esc(n.role) + ')' : ''}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ➕ إضافة ملاحظة من التفاصيل
+// ⚠️ زي المحاسب بالظبط: الملاحظة **مبتحدّثش** lastModifiedAt.
+//    الملاحظة كلام عن الجهاز، مش تعديل فيه — فمبتطلّعهوش في
+//    «النهاردة» في مراجعة قطع الغيار ولا بتغيّر ترتيبه.
+async function dpAddNote(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const ta = $('dnNew');
+  const text = ((ta && ta.value) || '').trim();
+  if(!text){ toast('اكتب الملاحظة الأول'); return; }
+
+  const btn = $('dnGo'); if(btn) btn.disabled = true;
+  const notes = await dpNotesWith(id, mkNote(text));
+  const ok = notes && await patch(id, { activityNotes: notes })
+                   && await deVerifyNote(id, notes.length);
+  if(btn) btn.disabled = false;
+  if(!ok) return;     // الكلام فاضل في المربع — ميضيعش على الديسباتشر
+
+  if(!d._raw) d._raw = {};
+  d._raw.activityNotes = notes;
+  toast('📝 الملاحظة اتضافت');
+  showInfo(id);
+}
+
+// التأكد إن الملاحظة اتكتبت فعلاً على السيرفر (عدد الملاحظات = اللي بعتناه)
+async function deVerifyNote(id, expectedLen){
+  try{
+    const { data, error } = await sb.from('devices_dispatch')
+      .select('n:data->activityNotes').eq('id', id).maybeSingle();
+    if(error) throw error;
+    const len = (data && Array.isArray(data.n)) ? data.n.length : -1;
+    if(len < expectedLen){
+      toast('⚠️ السيرفر مسجّلش الملاحظة — بلّغ الإدارة');
+      console.error('activityNotes لم تُحفظ:', id, len, expectedLen);
+      return false;
+    }
+  }catch(e){ console.error('تأكيد الملاحظة:', e); }
+  return true;
+}
+
+// 📝 الملاحظة و🔒 الباسورد وقت الاستلام → على الجهاز الجديد بعد ما يتسجّل
+// ⚠️ ليه مش جوه device_intake نفسها؟ الدالة دي بتنقّي حقول محددة
+//    من الحمولة وبتتجاهل أي حاجة تانية **في صمت** (SYSTEM.md).
+//    وكودها مش قدامنا — فبدل ما نعدّلها من الذاكرة، بنضيفهم
+//    بعدها بـ device_patch (اللي أصلاً شغالة للديسباتشر في الاعتمادات).
+// نداء واحد للاتنين — مش نداءين.
+// بترجّع true لو اتحفظ اللي مطلوب.
+async function dpAfterIntake(newId, text, lock){
+  if(!newId) return false;
+  const p = {};
+  if(lock) Object.assign(p, lock);
+  if(text){
+    const notes = await dpNotesWith(newId, mkNote('📝 ' + text));
+    if(!notes) return false;
+    p.activityNotes = notes;
+  }
+  if(!await patch(newId, p)) return false;
+  if(text && !await deVerifyNote(newId, p.activityNotes.length)) return false;
+  if(lock && !await dpVerifyLock(newId, lock.lockType)) return false;
+  return true;
 }
 
 // ============================================================
@@ -1618,13 +2065,16 @@ async function doEditTech(id){
   if(target === from){ showInfo(id); return; }
 
   const raw = d._raw || {};
-  const note = mkNote('🔄 الفني اتغيّر من «' + (from || '—') + '» لـ «' + target + '»');
-  const p = { technician: target,
-              activityNotes: [...(raw.activityNotes || []), note],
-              lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  // نفس ترجمة الملاحظة اللي في i18n.js (note.handoffFull) — بتتقري
+  // عربي أو إنجليزي حسب لغة اللي بيقرا
+  const args = { from: from || '—', to: target };
+  const note = mkNote(t('note.handoffFull', args), 'note.handoffFull', args);
 
   const btn = $('deGo'); if(btn) btn.disabled = true;
-  const ok = await patch(id, p) && await deVerify(id, 'technician', target, 'الفني الجديد');
+  const notes = await dpNotesWith(id, note);   // نسخة السيرفر — شوف dpNotesWith
+  const p = notes && { technician: target, activityNotes: notes,
+                       lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  const ok = !!p && await patch(id, p) && await deVerify(id, 'technician', target, 'الفني الجديد');
   if(btn) btn.disabled = false;
   if(!ok) return;
 
@@ -1655,15 +2105,16 @@ async function doEditIssue(id){
   const old = (d.issue || '').trim();
   if(val === old){ showInfo(id); return; }
 
-  const raw = d._raw || {};
   // القديم بيتحفظ في الملاحظة — عشان لو اتعدّل غلط، الأصل لسه موجود
-  const note = mkNote('🛠️ العطل اتعدّل من «' + (old || '—') + '» لـ «' + val + '»');
-  const p = { reportedIssue: val,
-              activityNotes: [...(raw.activityNotes || []), note],
-              lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  // (نفس ترجمة i18n.js: note.issueEdit)
+  const args = { from: old || '—', to: val };
+  const note = mkNote(t('note.issueEdit', args), 'note.issueEdit', args);
 
   const btn = $('deGo'); if(btn) btn.disabled = true;
-  const ok = await patch(id, p) && await deVerify(id, 'reportedIssue', val, 'العطل');
+  const notes = await dpNotesWith(id, note);   // نسخة السيرفر — شوف dpNotesWith
+  const p = notes && { reportedIssue: val, activityNotes: notes,
+                       lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  const ok = !!p && await patch(id, p) && await deVerify(id, 'reportedIssue', val, 'العطل');
   if(btn) btn.disabled = false;
   if(!ok) return;
 
@@ -1834,6 +2285,7 @@ function onDpCustInput(){
 
 function openIntake(){
   buildDpSuggest();
+  dpMountLock('dpLockHostIntake');   // 🔒 شاشة الباسورد (فاضية كل مرة)
   const ph = $('f_phone'); if(ph && ph.dataset) ph.dataset.autoFill = '';
   $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
   setTimeout(()=>$('f_type').focus(),300);
@@ -2001,7 +2453,32 @@ async function saveIntake(){
 
   if(error){ toast('فشل التسجيل: ' + esc(error.message || error)); return; }
 
-  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue'].forEach(id=>{
+  // 📝 الملاحظة و🔒 الباسورد (لو فيه) — بعد ما الجهاز اتسجّل
+  const noteText0 = (($('f_note') || {}).value || '').trim();
+  const lock0 = dpCollectLock();
+  let noteLost = false;
+  if(noteText0 || lock0){
+    // device_intake بترجّع رقم الجهاز — بس شكل الرد مش موثّق،
+    // فبنقبل الأشكال المعقولة كلها بدل ما نفترض واحد.
+    let newId = (typeof data === 'string') ? data
+              : (data && (data.id || (data.data && data.data.id) || data.device_id)) || '';
+    // مش لاقيين الرقم في الرد؟ ندوّر عليه: أحدث جهاز سجّلته أنا بنفس
+    // اسم العميل في آخر دقيقتين — ولازم يكون **واحد بس**، وإلا منخمّنش.
+    if(!newId){
+      try{
+        const since = new Date(Date.now() - 120000).toISOString();
+        const { data: rows } = await sb.from('devices_dispatch').select('id,data')
+          .gte('intake_date', since).order('intake_date', { ascending:false }).limit(10);
+        const mine = (rows || []).filter(r => r.data && r.data.registeredBy === ME
+                                            && (r.data.customerName || '').trim() === cust);
+        if(mine.length === 1) newId = mine[0].id;
+      }catch(e){ console.error('البحث عن الجهاز الجديد:', e); }
+    }
+    noteLost = !(await dpAfterIntake(newId, noteText0, lock0));
+  }
+
+  dpMountLock('dpLockHostIntake');   // 🔒 تصفير شاشة الباسورد
+  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue','f_note'].forEach(id=>{
     const e = $(id); if(!e) return; e.value=''; if(e.dataset) e.dataset.autoFill='';
   });
   ['dpCustList','dpPhoneList'].forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; });
@@ -2009,7 +2486,13 @@ async function saveIntake(){
   closeIntake();
   await loadDevices();
   activeTab='mine'; render();
-  toast(t('dp.logged'));
+  // الجهاز اتسجّل بس الملاحظة لأ → نقول بوضوح بدل ما تضيع في صمت
+  if(noteLost){
+    toast('✅ الجهاز اتسجّل — ⚠️ بس الملاحظة/الباسورد ماتحفظوش، ضيفهم من «تفاصيل»');
+    console.error('ملاحظة/باسورد الاستلام ضاعوا:', noteText0, lock0);
+  } else {
+    toast(t('dp.logged'));
+  }
 }
 
 /* ===== توست ===== */
