@@ -348,6 +348,32 @@ function _paySlipMonth(p){
   return new Date(p).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
 }
 
+// ============================================================
+// سطور الأوفر تايم
+// ------------------------------------------------------------
+// ⚠️ بنكتب الحساب كامل قدام الموظف: ساعات الزيادة، والناقصة،
+//    والصافي، وسعر ساعته. الرقم اللي الموظف مش فاهم جاي منين
+//    بيتحوّل لشك — حتى لو كان في صالحه.
+// ============================================================
+function paySlipOvertime(p){
+  const om  = Number(p.over_min  || 0);
+  const sm  = Number(p.short_min || 0);
+  const nm  = Number(p.net_min   || 0);
+  const amt = Number(p.overtime_amt || 0);
+  if(!om && !sm) return '';
+
+  const plus = nm >= 0;
+  return `
+    <div><span>ساعات زيادة</span><b style="color:var(--p-green)">${_payDur(om)}</b></div>
+    <div><span>ساعات ناقصة</span><b class="minus">${_payDur(sm)}</b></div>
+    <div style="border-top:1px dashed var(--p-line);padding-top:7px;margin-top:3px;">
+      <span>${plus ? '+ أوفر تايم' : '− عجز ساعات'}
+        <small style="opacity:.75;">${_payDur(Math.abs(nm))} × ${
+          Number(p.hour_value || 0).toFixed(2)} ج.م/س</small></span>
+      <b style="color:${plus ? 'var(--p-green)' : 'var(--p-red)'}">${payMoney(Math.abs(amt))}</b>
+    </div>`;
+}
+
 // big = الكشف الحالي: الرقم الكبير فوق. الباقي مضغوط.
 function paySlipCard(p, big){
   return `
@@ -369,6 +395,7 @@ function paySlipCard(p, big){
       <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
       <div><span>− خصومات يدوية</span><b class="minus">${payMoney(p.manual_ded)}</b></div>
       <div><span>− خصومات تأخير</span><b class="minus">${payMoney(p.late_ded)}</b></div>
+      ${paySlipOvertime(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
 
@@ -393,6 +420,10 @@ function payPaidSlipCard(p){
       <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
       <div><span>− الخصومات</span><b class="minus">${payMoney(
         Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>
+      ${Number(p.overtime_amt) ? `<div><span>${
+        Number(p.overtime_amt) >= 0 ? '+ أوفر تايم' : '− عجز ساعات'}</span>
+        <b style="color:${Number(p.overtime_amt) >= 0 ? 'var(--p-green)' : 'var(--p-red)'}">${
+          payMoney(Math.abs(Number(p.overtime_amt)))}</b></div>` : ''}
       <div class="eq"><span>= اللي قبضته</span><b>${payMoney(p.net)}</b></div>
     </div>
     <button class="pay-ok-btn" onclick="payAckSlip('${_payEsc(p.period)}')">👍 فهمت</button>
