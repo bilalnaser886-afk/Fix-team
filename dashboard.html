@@ -1113,6 +1113,14 @@
     font-size:13px;font-weight:700;line-height:1.7;}
   .pr-cm.none{color:var(--muted-2);font-weight:400;font-style:italic;background:none;padding:6px 0;}
   .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
+  /* 🔍 بحث المراجعة — مربوط بالمدة المختارة */
+  .pr-search{width:100%;box-sizing:border-box;border:1.5px solid var(--border);background:var(--surface-2);
+    color:var(--ink);border-radius:12px;padding:11px 14px;font:inherit;font-size:14px;margin-bottom:14px;}
+  .pr-search:focus{outline:none;border-color:var(--accent);}
+  .pr-res-h{font-size:12.5px;color:var(--muted);font-weight:700;margin:0 2px 10px;}
+  /* سطر المحل والفني جوه كارت الجهاز */
+  .pr-dev-m{font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;}
+  .pr-dev-m b{color:var(--ink);font-weight:700;}
 
   /* ===== 👤 حسابي ===== */
   .acc-card{border:1px solid var(--border);background:var(--surface-2);border-radius:14px;
@@ -8190,7 +8198,7 @@ requireAccess().then(ok => {
 // الصلاحية: الأدمن والمحاسب تلقائياً. الديسباتشر لازم الأدمن يفعّل
 // مفتاح الميزة 'parts_review' من الإعدادات.
 // ============================================================
-const PR = { from: '', to: '', tech: null, quick: 'today' };
+const PR = { from: '', to: '', tech: null, quick: 'today', q: '' };   // q = كلمة البحث
 
 // الصلاحية: الأدمن والمحاسب تلقائياً. أي ديسباتشر لازم الأدمن يمنحه
 // صلاحية 'parts_review' من لوحة الأدمن (سويتش تحت اسمه).
@@ -8237,9 +8245,22 @@ function prSetQuick(q){
   prRender();
 }
 
-// الأجهزة داخل الفترة — بنعتمد على آخر لمسة (lastModifiedAt) وإلا تاريخ الاستلام
+// ⏱️ «آخر تعديل» للجهاز — ده اللي المدة بتتحسب عليه، **مش** الدخول ولا الخروج.
+// جهاز داخل من شهرين واتعدل فيه حاجة النهاردة → بيظهر في «النهاردة».
+//   lastModifiedAt = أي تعديل عادي على الجهاز
+//   partsReturnAt  = الفني جاوب «القطع رجعت؟» بعد الرفض (migration 42) —
+//                    مبيحدّثش lastModifiedAt عن قصد، فبنحسبه هنا لوحده.
+// ⚠️ «لسه مجبتش» (partsPendingAt) **مش** محسوب — ده الفني بيقول «مفيش
+//    جديد»، ولو حسبناه كل جهاز مستني قطعة هيظهر في «النهاردة» كل يوم.
+function prTouched(d){
+  let best = '';
+  for(const v of [d.lastModifiedAt, d.partsReturnAt]){
+    if(v && (!best || new Date(v) > new Date(best))) best = v;
+  }
+  return best || d.intakeDate || '';
+}
 function prInRange(d){
-  const k = prDayKey(d.lastModifiedAt || d.intakeDate);
+  const k = prDayKey(prTouched(d));
   if(!k) return false;
   return (!PR.from || k >= PR.from) && (!PR.to || k <= PR.to);
 }
@@ -8256,19 +8277,67 @@ function closePartsReview(){
   const o = document.getElementById('partsReviewOverlay');
   if(o) o.classList.add('hidden');
   PR.tech = null;
+  PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
+// ------------------------------------------------------------
+// 🔍 البحث
+// ------------------------------------------------------------
+// كلمة واحدة كفاية. ولو كتبت أكتر من كلمة («ايفون شاشة»)، كل كلمة
+// لازم تتلاقي في أي خانة — مش لازم الجملة كلها في خانة واحدة.
+// بنستخدم IFixSearch (نفس بحث الصفحة الرئيسية): بيفهم «بلال» و«belal»
+// وأخطاء الكتابة البسيطة. ⚠️ مش بنستخدم الفهرس المشترك بتاعه (index)
+// — ده متبني على حقول تانية للبحث الرئيسي، ولو لمسناه هنبوّظه هناك.
+// الأجهزة هنا قليلة (المدة بس)، فالمطابقة المباشرة سريعة كفاية.
+function prFields(d){
+  return [d.model, d.deviceType, d.customerName, d.shopName,
+          d.reportedIssue, d.partsComment, prTechOf(d)];
+}
+function prMatch(d, q){
+  const words = String(q || '').trim().split(/\s+/).filter(Boolean);
+  if(!words.length) return true;
+  const f = prFields(d);
+  return words.every(w => window.IFixSearch
+    ? IFixSearch.match(w, f)
+    : f.some(v => v && String(v).toLowerCase().includes(w.toLowerCase())));
+}
+
+// كارت الجهاز — كل المعلومات ظاهرة من برا من غير ما تفتحه
+function prDevHtml(d, showTech){
+  const cm   = (d.partsComment || '').trim();
+  const shop = (d.shopName || '').trim();
+  const meta = [];
+  if(shop) meta.push(`🏪 <b>${esc(shop)}</b>`);
+  if(showTech && prTechOf(d)) meta.push(`🔧 <b>${esc(prTechOf(d))}</b>`);
+  return `
+        <div class="pr-dev" onclick="closePartsReview();openDetail('${d.id}')">
+          <div class="pr-dev-t">
+            <span>${esc(d.model || d.deviceType || 'جهاز')} · ${esc(d.customerName || '')}</span>
+            <span class="pr-dev-s">${esc(fullStatusLabel(d))}</span>
+          </div>
+          ${meta.length ? `<div class="pr-dev-m">${meta.join('<span>·</span>')}</div>` : ''}
+          <div class="pr-dev-i">⚠️ ${esc(d.reportedIssue || '—')}</div>
+          ${cm ? `<div class="pr-cm">🔩 ${esc(cm)}</div>`
+               : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
+        </div>`;
+}
+
+function prByTouchedDesc(a, b){ return new Date(prTouched(b) || 0) - new Date(prTouched(a) || 0); }
+
+// الرسم على جزئين:
+//   prRender     = الشريط (المدة + مربع البحث) + القايمة
+//   prRenderList = القايمة بس
+// ⚠️ ليه؟ لو كل حرف بيعيد رسم مربع البحث نفسه، المربع بيتشال ويتحط
+//    تاني → الكيبورد بيقفل بعد كل حرف. فالكتابة بتحدّث القايمة بس.
 function prRender(){
   const host = document.getElementById('prBody');
   if(!host) return;
-  const rows = (devices || []).filter(prInRange).filter(d => prTechOf(d));
+  // لو حد بيكتب في البحث دلوقتي وجه تحديث من بره (ريل تايم / ربط
+  // قطعة) — منرسمش المربع من جديد، نحدّث القايمة بس.
+  const qEl = document.getElementById('prQ');
+  if(qEl && document.activeElement === qEl){ prRenderList(); return; }
 
-  // تجميع حسب الفني
-  const byTech = {};
-  rows.forEach(d => { const t = prTechOf(d); (byTech[t] = byTech[t] || []).push(d); });
-  const techs = Object.keys(byTech).sort((a,b) => byTech[b].length - byTech[a].length);
-
-  const bar = `
+  host.innerHTML = `
     <div class="pr-bar">
       <div class="pr-quick">
         <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
@@ -8279,33 +8348,49 @@ function prRender(){
         <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
         <label>إلى <input type="date" value="${PR.to}" onchange="PR.to=this.value;PR.quick='';PR.tech=null;prRender()"></label>
       </div>
-    </div>`;
+    </div>
+    <input id="prQ" class="pr-search" type="search" autocomplete="off" value="${esc(PR.q)}"
+      placeholder="🔍 دوّر في الفترة دي: جهاز، عميل، محل، عطل، قطعة، فني…"
+      oninput="PR.q=this.value;prRenderList()">
+    <div id="prList"></div>`;
+  prRenderList();
+}
+
+function prRenderList(){
+  const host = document.getElementById('prList');
+  if(!host) return;
+  // الأساس دايماً: أجهزة الفترة اللي ليها فني — نفس اللي المراجعة بتعرضه
+  const rows = (devices || []).filter(prInRange).filter(d => prTechOf(d));
+
+  // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
+  const q = (PR.q || '').trim();
+  if(q){
+    const hits = rows.filter(d => prMatch(d, q)).sort(prByTouchedDesc);
+    host.innerHTML = hits.length
+      ? `<div class="pr-res-h">🔍 ${hits.length} ${hits.length === 1 ? 'نتيجة' : 'نتايج'} في الفترة دي</div>`
+        + hits.map(d => prDevHtml(d, true)).join('')
+      : `<div class="pr-empty">مفيش نتايج لـ «${esc(q)}» في الفترة دي<br><small>جرّب مدة أطول (أسبوع / شهر)</small></div>`;
+    return;
+  }
+
+  // تجميع حسب الفني
+  const byTech = {};
+  rows.forEach(d => { const t = prTechOf(d); (byTech[t] = byTech[t] || []).push(d); });
+  const techs = Object.keys(byTech).sort((a,b) => byTech[b].length - byTech[a].length);
 
   // (١) عرض أجهزة فني محدد
   if(PR.tech){
-    const list = (byTech[PR.tech] || []).slice()
-      .sort((a,b) => new Date(b.lastModifiedAt||b.intakeDate||0) - new Date(a.lastModifiedAt||a.intakeDate||0));
-    host.innerHTML = bar + `
+    const list = (byTech[PR.tech] || []).slice().sort(prByTouchedDesc);
+    host.innerHTML = `
       <button class="pr-back" onclick="PR.tech=null;prRender()">‹ رجوع لكل الفنيين</button>
       <div class="pr-th">🔧 ${esc(PR.tech)} <span class="pr-n">${list.length}</span></div>
-      ${list.length ? list.map(d => {
-        const cm = (d.partsComment || '').trim();
-        return `
-        <div class="pr-dev" onclick="closePartsReview();openDetail('${d.id}')">
-          <div class="pr-dev-t">
-            <span>${esc(d.model || d.deviceType || 'جهاز')} · ${esc(d.customerName || '')}</span>
-            <span class="pr-dev-s">${esc(fullStatusLabel(d))}</span>
-          </div>
-          <div class="pr-dev-i">${esc(d.reportedIssue || '')}</div>
-          ${cm ? `<div class="pr-cm">🔩 ${esc(cm)}</div>`
-               : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
-        </div>`;
-      }).join('') : `<div class="pr-empty">مفيش أجهزة للفني ده في الفترة دي</div>`}`;
+      ${list.length ? list.map(d => prDevHtml(d, false)).join('')
+                    : `<div class="pr-empty">مفيش أجهزة للفني ده في الفترة دي</div>`}`;
     return;
   }
 
   // (٢) كروت الفنيين
-  host.innerHTML = bar + (techs.length ? `
+  host.innerHTML = techs.length ? `
     <div class="pr-grid">
       ${techs.map(t => {
         const l = byTech[t];
@@ -8316,7 +8401,7 @@ function prRender(){
           <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`;
 }
 // ============================================================
 // 👤 حسابي — بيانات المستخدم والاشتراك
