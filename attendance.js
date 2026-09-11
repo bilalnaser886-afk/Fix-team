@@ -96,6 +96,11 @@ const ATT_LABELS = {
 //    الحاجز اللي السيرفر بيفرضه فعلاً هو اللوكيشن.
 // ============================================================
 const ATT_CRED_KEY = 'ifix-att-cred';
+// علامة «بصمة الموبايل ده بايظة» — لكل إيميل على الجهاز ده بس.
+// بتخلص لوحدها بعد ATT_BIO_BROKEN_DAYS، وبعدها النظام يجرّب البصمة تاني
+// (يمكن الموبايل اتصلّح أو اتحدّث).
+const ATT_BIO_BROKEN_KEY  = 'ifix-att-bio-broken';
+const ATT_BIO_BROKEN_DAYS = 7;
 
 function attB64(buf){
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -165,6 +170,50 @@ function attSaveCred(email, id){
   }catch(e){}
 }
 
+function attBioBroken(email){
+  try{
+    const at = JSON.parse(localStorage.getItem(ATT_BIO_BROKEN_KEY) || '{}')[email];
+    return !!at && (Date.now() - at) < ATT_BIO_BROKEN_DAYS * 86400000;
+  }catch(e){ return false; }
+}
+function attMarkBioBroken(email, on){
+  try{
+    const all = JSON.parse(localStorage.getItem(ATT_BIO_BROKEN_KEY) || '{}');
+    if(on) all[email] = Date.now(); else delete all[email];
+    localStorage.setItem(ATT_BIO_BROKEN_KEY, JSON.stringify(all));
+  }catch(e){}
+}
+
+// ============================================================
+// 🔴 NotAllowedError = «لغيت» ولا «الموبايل رفض»؟
+// ------------------------------------------------------------
+// نظام البصمة (WebAuthn) **عن قصد** بيرجّع نفس الخطأ ده في ٣ حالات:
+//   ١) الموظف لغى البصمة بإيده
+//   ٢) الوقت خلص (أو نافذة البصمة مطلعتش خالص — بيحصل مع بصمات
+//      تحت الشاشة في موبايلات أوبو/ريلمي القديمة)
+//   ٣) مفتاح البصمة المحفوظ **مابقاش موجود** على الموبايل (الموظف
+//      ضاف بصمة جديدة، برنامج تنظيف، تحديث Google Play Services…)
+// ليه نفس الخطأ؟ خصوصية: عشان أي موقع ميقدرش يعرف إنت متسجّل
+// عنده ولا لأ. (ده الرابط اللي بيطلع في الرسالة: privacy-considerations)
+//
+// ⚠️ الكود القديم كان بيعتبره دايماً «رفض» ويوقف. في الحالة (٣)
+//    ده بيحبس الموظف **للأبد** — المفتاح القديم فاضل محفوظ في
+//    الصفحة، وكل محاولة بتفشل بنفس الطريقة. (حصل فعلاً: موظف
+//    واحد على Reno 2F والباقيين شغالين.)
+//
+// فبنسأل الموظف نفسه — هو الوحيد اللي يعرف إذا كان لغى ولا لأ.
+// ============================================================
+function attAskDeviceRefused(stage){
+  return confirm(
+    '❌ البصمة ما اتأكدتش.\n\n' +
+    '• لو انت اللي لغيتها بإيدك ← دوس «إلغاء» وجرّب تاني.\n' +
+    '• لو الموبايل رفض لوحده، أو نافذة البصمة مطلعتش أصلاً ← دوس «موافق»' +
+    (stage === 'verify'
+      ? ' وهنسجّل بصمتك من جديد على الموبايل ده.'
+      : ' وهيتسجّل من غير بصمة (HR هتشوف علامة).')
+  );
+}
+
 // تسجيل البصمة أول مرة على الجهاز ده
 async function attBioRegister(email){
   const cred = await navigator.credentials.create({ publicKey: {
@@ -192,26 +241,21 @@ async function attBioVerify(email){
     console.info('[المواعيد] الجهاز مالوش وسيلة تحقق — التسجيل هيتم من غير بصمة');
     return false;
   }
+  // الموظف قال قبل كده إن بصمة الموبايل ده بايظة (خلال آخر ٧ أيام)؟
+  // نعدّي من غير ما نتعبه كل مرة — والتسجيل بيتعلّم «من غير بصمة».
+  if(attBioBroken(email)){
+    console.info('[المواعيد] بصمة الموبايل ده متعلّمة بايظة — من غير بصمة');
+    return false;
+  }
+
   let id = attCredFor(email);
   if(!id){
     const ok = confirm('أول مرة على الجهاز ده — هنسجّل بصمتك/وجهك مرة واحدة.\nكمّل؟');
     // المستخدم رفض بإيده → نوقف. ده قرار منه مش عطل في الجهاز.
     if(!ok) throw new Error('لازم تسجّل البصمة عشان تقدر تسجّل حضور');
-    try{
-      await attBioRegister(email);
-    }catch(e){
-      // ⚠️ التسجيل نفسه فشل رغم إن الجهاز قال إنه قادر.
-      //    بيحصل مع بعض أجهزة أندرويد القديمة والمتصفحات الغريبة.
-      //    ما نقفلش الباب — نعدّي بعلامة "من غير بصمة".
-      //    الموظف موجود في المحل فعلاً (اللوكيشن اتفحص قبلها)،
-      //    ومنعه من تسجيل حضوره عقاب على عطل مالوش فيه.
-      if(e && e.name === 'NotAllowedError') throw e;   // ده رفض حقيقي
-      console.warn('[المواعيد] تسجيل البصمة فشل — هنكمّل من غيرها:', e);
-      return false;
-    }
-    id = attCredFor(email);
-    if(!id) return false;
+    return await attRegisterOrFallback(email);
   }
+
   try{
     const got = await navigator.credentials.get({ publicKey: {
       challenge: attRand(32),
@@ -220,16 +264,47 @@ async function attBioVerify(email){
       timeout: 60000
     }});
     if(!got) throw new Error('التأكيد فشل');
+    attMarkBioBroken(email, false);   // اشتغلت → لو كان فيه علامة قديمة نشيلها
     return true;
   }catch(e){
-    // ⚠️ البصمة المسجّلة بقت مش صالحة؟ (الموظف غيّر بصمته، أو
-    //    مسح بيانات المتصفح، أو الجهاز اترجّع لضبط المصنع)
-    //    بنمسح المسجّل ونطلب تسجيل جديد بدل ما يفضل محبوس.
+    // ⚠️ البصمة المسجّلة بقت مش صالحة بشكل صريح → نسجّل من جديد
     if(e && (e.name === 'InvalidStateError' || e.name === 'NotSupportedError')){
       attForget(email);
       throw new Error('بصمتك المسجّلة مابقتش صالحة — جرّب تاني وهنسجّلها من جديد');
     }
+    // 🔴 الغامض: لغى ولا الموبايل رفض؟ (شوف الشرح فوق attAskDeviceRefused)
+    if(e && e.name === 'NotAllowedError'){
+      if(!attAskDeviceRefused('verify')) throw new Error('البصمة اتلغت — جرّب تاني');
+      // المفتاح القديم غالباً اتمسح من الموبايل — نرميه ونسجّل واحد جديد.
+      attForget(email);
+      return await attRegisterOrFallback(email);
+    }
     throw e;
+  }
+}
+
+// تسجيل بصمة جديدة — ولو الموبايل مش راضي خالص، نعدّي «من غير بصمة».
+// ✅ التسجيل نفسه **تأكيد حقيقي**: userVerification:'required' معناها
+//    الموبايل مش هيعمل المفتاح غير لما صاحبه يحط بصمته/وشه/رمزه.
+//    فلو نجح، بنرجّع true من غير ما نطلب البصمة مرة تانية.
+async function attRegisterOrFallback(email){
+  try{
+    await attBioRegister(email);
+    attMarkBioBroken(email, false);
+    return !!attCredFor(email);
+  }catch(e){
+    console.warn('[المواعيد] تسجيل البصمة فشل:', e);
+    // NotAllowedError هنا برضو غامض — نسأل تاني.
+    // «إلغاء» = هو اللي لغى → نوقف. «موافق» = الموبايل رفض → نعدّي.
+    if(e && e.name === 'NotAllowedError' && !attAskDeviceRefused('register')){
+      throw new Error('لازم تسجّل البصمة عشان تقدر تسجّل حضور');
+    }
+    // ⚠️ الموبايل قال إنه قادر، بس فشل مرتين ورا بعض. ما نقفلش الباب:
+    //    الموظف موجود في المحل فعلاً (اللوكيشن اتفحص قبلها على السيرفر)،
+    //    ومنعه من الحضور عقاب على عطل مالوش فيه. التسجيل بيتعلّم
+    //    «من غير بصمة» وHR بتشوفه، والموبايل بيتعلّم «بايظ» ٧ أيام.
+    attMarkBioBroken(email, true);
+    return false;
   }
 }
 
