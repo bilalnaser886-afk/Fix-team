@@ -387,7 +387,7 @@
   .flash{background:var(--done-bg); border:1px solid #BBE6C8; color:var(--done); font-weight:700; font-size:13px; border-radius:11px; padding:11px 14px; margin:0 0 15px; display:flex; align-items:center; gap:8px;}
 
   /* شارة عرض تجريبي */
-  /* ===== خانة + نافذة "شغلي آخر ٥ أيام" ===== */
+  /* ===== نافذة "🔩 قطع الغيار" (rw-tile اتشال من الشاشة — ستايله سايب ملوش ضرر) ===== */
   .rw-tile{display:flex;align-items:center;gap:12px;width:100%;margin:18px 0 6px;
     padding:14px 16px;border-radius:14px;border:1px solid var(--line);
     background:var(--card);cursor:pointer;text-align:start;font:inherit;color:var(--ink);
@@ -418,10 +418,24 @@
   .rw-cm{margin-top:8px;}
   .rw-cm textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:10px;
     background:var(--bg);color:var(--ink);font:inherit;font-size:13px;padding:8px 10px;resize:vertical;}
-  .rw-cm .row{display:flex;gap:8px;margin-top:6px;align-items:center;}
+  .rw-cm .row{display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap;}
   .rw-save{border:none;border-radius:10px;background:var(--accent,#0891A8);color:#fff;
     font:800 12px/1 inherit;padding:9px 16px;cursor:pointer;}
   .rw-save:disabled{opacity:.55;cursor:default;}
+  /* زرار "لسه مجبتش ليه حاجة" — بلون "مستني" البرتقالي الهادي بتاع الصفحة.
+     ليه اللون ده؟ لأنه نفس لون حالة "في الانتظار" — فالفني يفهم لوحده إن
+     الجهاز ده لسه مستني قطع غيار. ومتعرّف في الفاتح والداكن فبيتظبط لوحده.
+     عرضه على قد الجملة (inline-flex + nowrap) مش بطول السطر كله. */
+  .rw-none{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    border:1.5px dashed var(--waiting);background:var(--waiting-bg);color:var(--waiting);
+    border-radius:10px;font:800 12px/1 inherit;padding:9px 16px;cursor:pointer;}
+  .rw-none:active{transform:scale(.97);}
+  /* ⚠️ الصفحة مفيهاش .hidden عامة — فبنعمل كلاس خاص بالزرارين دول */
+  .rw-off{display:none !important;}
+  /* فاصل اليوم بين الأجهزة (النهاردة / إمبارح / 09/09) */
+  .rw-sep{font-size:12px;font-weight:800;color:var(--muted);margin:14px 4px 8px;
+    display:flex;align-items:center;gap:8px;}
+  .rw-sep::after{content:"";flex:1;height:1px;background:var(--line);}
   .rw-hint{color:var(--muted);font-size:11.5px;}
   .rw-empty{color:var(--muted);text-align:center;padding:26px 8px;font-size:13px;}
 </style>
@@ -446,6 +460,9 @@
       <!-- ⚠️ الكلاس pay-menu-btn مهم: payroll.js بيدوّر عليه بنفسه
            ويظهّره على الموبايل بس ويحط عليه عدد الخصومات الجديدة. -->
       <button class="pay-menu-btn" style="display:none;" onclick="closeKebab(); openPayroll()">💰 مرتبك</button>
+      <!-- 🔩 خانة قطع الغيار: كانت فولدر "شغلي آخر ٥ أيام" في الشاشة الرئيسية.
+           اتنقلت هنا عشان الشاشة الرئيسية تفضل نضيفة للشغل الحالي. -->
+      <button onclick="closeKebab(); openRecentWork()">🔩 قطع الغيار</button>
       <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -535,9 +552,12 @@ const ST = {
   rejected_shop: {label:'درج الرفض',       c:'--rejected'},
 };
 const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
-// حالات "خلصت" — بتظهر في نافذة "شغلي آخر ٥ أيام" بس
+// حالات "خلصت" — مش بتظهر في الشاشة الرئيسية، بتظهر في نافذة "قطع الغيار" بس
 const DONE_STATES = ['done','delivered','rejected','rejected_shop'];
-const RECENT_MS = 5 * 24 * 60 * 60 * 1000;   // آخر ٥ أيام
+// نافذة "قطع الغيار" بتعرض آخر ٤٠ جهاز اتلمسوا عند الفني (بدل آخر ٥ أيام).
+// ليه عدد مش أيام؟ لأن الفني اللي كان أجازة ٦ أيام كان بيفتح يلاقيها فاضية
+// ويضيع عليه يكتب قطع غيار أجهزة قديمة. العدد الثابت دايماً فيه شغل.
+const RW_LIMIT = 40;
 
 // بيتظبطوا بعد تسجيل الدخول (ME فاضي وقت تعريف البيانات التجريبية — عادي، مش مستخدمة)
 let ME = '';
@@ -1025,20 +1045,24 @@ function reindexSearch(){
 }
 
 // ============================================================
-// نافذة "شغلي آخر ٥ أيام" — عرض باليوم + كتابة كومنت قطع الغيار
+// نافذة "🔩 قطع الغيار" — آخر ٤٠ جهاز + كتابة كومنت قطع الغيار
 // ------------------------------------------------------------
-// الفني بيختار يوم من آخر ٥ أيام، بيشوف كل الأجهزة اللي اتلمست
-// في اليوم ده (مهما كانت حالتها)، ويكتب على كل جهاز قطع الغيار
-// اللي جابها له. الحفظ عبر device_patch (بيتأكد من الخطأ دايماً).
+// بتتفتح من قايمة ⋮ فوق. بتعرض آخر ٤٠ جهاز اتلمسوا عند الفني
+// (أساسي أو مساعد) مهما كانت حالتهم، الأحدث الأول، ومقسومين
+// بفواصل أيام عشان الفني يعرف الجهاز ده من إمتى.
+// الحفظ عبر device_patch (بيتأكد من الخطأ دايماً).
+//
+// الزرارين تحت كل مربع:
+//   المربع فاضي   ← يظهر "لسه مجبتش ليه حاجة" بس
+//   المربع فيه كلام ← يظهر "💾 حفظ" بس
 // ============================================================
-let RW = { day: '', open: false };
+let RW = { open: false };
 
 function rwDevices(){
-  const cut = Date.now() - RECENT_MS;
   return devices.filter(d =>
-    (d.tech===ME || d.assist===ME) &&
-    d.touched && new Date(d.touched).getTime() >= cut
-  ).sort((a,b) => new Date(b.touched) - new Date(a.touched));
+    (d.tech===ME || d.assist===ME) && d.touched
+  ).sort((a,b) => new Date(b.touched) - new Date(a.touched))
+   .slice(0, RW_LIMIT);
 }
 
 // مفتاح اليوم بالتوقيت المحلي (مش UTC — عشان جهاز الساعة ١١ بليل ميروحش يوم تاني)
@@ -1057,10 +1081,6 @@ function rwDayLabel(key){
 
 function openRecentWork(){
   RW.open = true;
-  const all = rwDevices();
-  // أيام فيها شغل فعلاً، بالأحدث الأول — واليوم المختار افتراضياً أحدثهم
-  const days = [...new Set(all.map(d => rwDayKey(d.touched)))];
-  if(!RW.day || !days.includes(RW.day)) RW.day = days[0] || '';
   rwPaint();
 }
 function closeRecentWork(){
@@ -1076,54 +1096,95 @@ function rwPaint(){
     ov.onclick = e => { if(e.target === ov) closeRecentWork(); };
     document.body.appendChild(ov);
   }
-  const all  = rwDevices();
-  const days = [...new Set(all.map(d => rwDayKey(d.touched)))];
-  const list = all.filter(d => rwDayKey(d.touched) === RW.day);
+  const list = rwDevices();
 
-  ov.innerHTML = `
-    <div class="rw-sheet" dir="rtl">
-      <div class="rw-head">
-        <h3>🗂️ شغلي آخر ٥ أيام</h3>
-        <button type="button" class="rw-x" onclick="closeRecentWork()">✕</button>
-      </div>
-      <div class="rw-days">
-        ${days.map(k => `<button type="button" class="rw-day${k===RW.day?' on':''}" onclick="RW.day='${k}';rwPaint()">${rwDayLabel(k)} <small>(${all.filter(d=>rwDayKey(d.touched)===k).length})</small></button>`).join('')}
-      </div>
-      ${list.length ? list.map(d => `
+  // بنحط فاصل يوم كل ما اليوم يتغير — زي فواصل الكشكول
+  let lastDay = '';
+  const body = list.map(d => {
+    const k = rwDayKey(d.touched);
+    const sep = (k !== lastDay) ? `<div class="rw-sep">${rwDayLabel(k)}</div>` : '';
+    lastDay = k;
+    const has = !!(d.partsComment || '').trim();
+    return sep + `
         <div class="rw-card">
           <div class="t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer || '')}</span>
             <span class="rw-st">${(ST[d.status]&&ST[d.status].label)||''}</span></div>
           <div class="s">${esc(d.issue || '')}</div>
           <div class="rw-cm">
-            <textarea id="rwc_${d.id}" maxlength="600" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(d.partsComment || '')}</textarea>
+            <textarea id="rwc_${d.id}" maxlength="600" oninput="rwToggle('${d.id}')" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(d.partsComment || '')}</textarea>
             <div class="row">
-              <button type="button" class="rw-save" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
-              <span class="rw-hint" id="rwh_${d.id}">${d.partsComment ? 'متسجّل ✅' : ''}</span>
+              <!-- الزرارين في نفس المكان — واحد بس اللي بيبان في أي لحظة -->
+              <button type="button" class="rw-save${has?'':' rw-off'}" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
+              <button type="button" class="rw-none${has?' rw-off':''}" id="rwn_${d.id}" onclick="rwNone('${d.id}')">⏳ لسه مجبتش ليه حاجة</button>
+              <span class="rw-hint" id="rwh_${d.id}">${has ? 'متسجّل ✅' : ''}</span>
             </div>
           </div>
-        </div>`).join('')
-      : `<div class="rw-empty">مفيش أجهزة في اليوم ده</div>`}
+        </div>`;
+  }).join('');
+
+  ov.innerHTML = `
+    <div class="rw-sheet" dir="rtl">
+      <div class="rw-head">
+        <h3>🔩 قطع الغيار <small style="color:var(--muted);font-weight:700;">(آخر ${list.length} جهاز)</small></h3>
+        <button type="button" class="rw-x" onclick="closeRecentWork()">✕</button>
+      </div>
+      ${list.length ? body : `<div class="rw-empty">مفيش أجهزة اشتغلت عليها لسه</div>`}
     </div>`;
+}
+
+// بتشتغل مع كل حرف بيتكتب أو بيتمسح في المربع.
+// زي لمبة بوشّين: فاضي ← "لسه مجبتش" ، فيه كلام ← "حفظ".
+function rwToggle(id){
+  const ta   = document.getElementById('rwc_' + id);
+  const save = document.getElementById('rws_' + id);
+  const none = document.getElementById('rwn_' + id);
+  const hint = document.getElementById('rwh_' + id);
+  if(!ta) return;
+  const has = !!ta.value.trim();   // مسافات بس = فاضي
+  if(save) save.classList.toggle('rw-off', !has);
+  if(none) none.classList.toggle('rw-off',  has);
+  // علامة "متسجّل" تفضل بس لو الكلام لسه زي المحفوظ بالظبط
+  const d = devices.find(x => x.id === id);
+  const saved = d ? (d.partsComment || '').trim() : '';
+  if(hint) hint.textContent = (saved && ta.value.trim() === saved) ? 'متسجّل ✅' : '';
+}
+
+// زرار "لسه مجبتش ليه حاجة":
+//   - لو الجهاز مكانش متسجّل عليه حاجة ← بيحط المؤشر في المربع عشان تكتب.
+//   - لو كان متسجّل عليه قطع غيار والفني مسح الكلام ← ده الطريق الوحيد
+//     لمسح المتسجّل (لأن زرار الحفظ بيختفي لما المربع يفضى).
+//     وعشان كده بيسأل الأول — مسح بالغلط لقطع غيار = فلوس ضايعة في الحساب.
+async function rwNone(id){
+  const ta = document.getElementById('rwc_' + id);
+  const d  = devices.find(x => x.id === id);
+  const saved = d ? (d.partsComment || '').trim() : '';
+  if(!saved){ if(ta) ta.focus(); return; }
+  if(!confirm('الجهاز ده كان متسجّل عليه قطع غيار.\nعايز تمسحها وتخليه "لسه مجبتش ليه حاجة"؟')) return;
+  await rwSave(id);
 }
 
 async function rwSave(id){
   const ta  = document.getElementById('rwc_' + id);
   const btn = document.getElementById('rws_' + id);
+  const nb  = document.getElementById('rwn_' + id);
   const hint= document.getElementById('rwh_' + id);
   if(!ta) return;
   const val = ta.value.trim();
   if(btn) btn.disabled = true;
+  if(nb)  nb.disabled  = true;
   const ok = await save(id, {
     partsComment: val,
     lastModifiedAt: new Date().toISOString(),
     lastModifiedBy: ME
   });
   if(btn) btn.disabled = false;
+  if(nb)  nb.disabled  = false;
   if(ok){
     const d = devices.find(x => x.id === id);
     if(d){ d.partsComment = val; if(d._raw) d._raw.partsComment = val; }
+    rwToggle(id);   // نظبط الزرارين على الحالة الجديدة
     if(hint) hint.textContent = val ? 'اتحفظ ✅' : 'اتمسح ✅';
-    toast('تم حفظ قطع الغيار ✅');
+    toast(val ? 'تم حفظ قطع الغيار ✅' : 'اتمسحت قطع الغيار ✅');
   }
   // لو فشل، save() نفسها بتطلّع رسالة الخطأ الحقيقية — مفيش فشل صامت
 }
@@ -1153,15 +1214,9 @@ function render(){
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
   // المرتجعات: أي جهاز رجع والفني ده شغّال عليه — أساسي أو بديل
   const returns = devices.filter(d => d.status==='returned' && (d.tech===ME || d.assist===ME) && match(d));
-  // شغلي آخر يومين: أي جهاز دخل عليّ مهما كانت حالته (خلص/اتسلّم/اترفض)
-  // خلال آخر ٤٨ ساعة. الأجهزة اللي لسه شغّالة موجودة فوق، فمنكررهاش هنا.
-  const _cut = Date.now() - RECENT_MS;
-  const recent = devices.filter(d =>
-    (d.tech===ME || d.assist===ME) &&
-    (DONE_STATES.includes(d.status)) &&
-    d.touched && new Date(d.touched).getTime() >= _cut &&
-    match(d)
-  ).sort((a,b) => new Date(b.touched) - new Date(a.touched));
+  // ℹ️ خانة "شغلي آخر ٥ أيام" اتشالت من هنا خالص.
+  //    بقت "🔩 قطع الغيار" جوه قايمة ⋮ فوق — عشان الشاشة الرئيسية
+  //    تفضل للشغل اللي في إيد الفني دلوقتي بس.
 
   const cards = (list,canAct) => list.length
     ? `<div class="grid">${list.map(d=>ticketHtml(d,canAct)).join('')}</div>`
@@ -1181,16 +1236,7 @@ function render(){
     <div class="sec">
       <div class="sec-head"><span class="ic">🤝</span><h2 data-i18n="tp.assisting">بشارك في صيانتها</h2><span class="n">${assist.length}</span><span class="rule"></span></div>
       ${cards(assist,false)}
-    </div>
-    ${recent.length ? `
-    <button type="button" class="rw-tile" onclick="openRecentWork()">
-      <span class="rw-ic">🗂️</span>
-      <span class="rw-tx">
-        <b>شغلي آخر ٥ أيام</b>
-        <small>${recent.length} جهاز — دوس للعرض وكتابة قطع الغيار</small>
-      </span>
-      <span class="rw-arrow">‹</span>
-    </button>` : ''}`;
+    </div>`;
 }
 
 /* ===== أكشنز ===== */
