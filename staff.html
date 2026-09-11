@@ -24,6 +24,7 @@
 <script src="common.js"></script>
 <script src="i18n.js"></script>
 <script src="attendance.js"></script>
+<script src="payroll.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -65,11 +66,32 @@
   }
   .topbar h1{font-family:'Cairo',sans-serif; font-size:17px; margin:0; font-weight:900;}
   .who{font-size:12px; opacity:.75; margin-top:2px;}
-  .logout{
-    flex:none; border:1px solid rgba(255,255,255,.25); background:transparent;
-    color:var(--on-chrome); border-radius:9px; padding:8px 13px;
-    font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  /* ===== قايمة التلت نقط ===== */
+  .kebab-wrap{position:relative; flex:none;}
+  .kebab-btn{
+    /* ⚠️ position:relative مطلوب — payroll.js بيحط نقطة حمرا
+       جواه لما يبقى فيه خصم جديد، والنقطة position:absolute. */
+    position:relative;
+    width:40px; height:40px; border:none; border-radius:11px;
+    background:rgba(255,255,255,.12); color:var(--on-chrome);
+    font-size:20px; line-height:1; cursor:pointer;
   }
+  .kebab-menu{
+    position:absolute; top:48px; inset-inline-end:0; min-width:190px;
+    background:var(--surface); border:1px solid var(--border); border-radius:13px;
+    box-shadow:0 12px 30px rgba(16,16,20,.22); overflow:hidden; z-index:30;
+  }
+  .kebab-menu.hidden{display:none;}
+  .kebab-menu button{
+    display:block; width:100%; text-align:start; border:none; background:none;
+    color:var(--ink); padding:14px 16px; font-family:inherit; font-size:14.5px;
+    font-weight:700; cursor:pointer;
+  }
+  .kebab-menu button + button{border-top:1px solid var(--border);}
+  .kebab-menu button:active{background:var(--surface-2);}
+  .kebab-menu button.danger{color:var(--red, #DC2626);}
+  .kebab-shield{position:fixed; inset:0; z-index:25;}
+  .kebab-shield.hidden{display:none;}
 
   .wrap{padding:18px; padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 60px);}
 
@@ -97,7 +119,21 @@
     <h1>⏰ المواعيد</h1>
     <div class="who" id="whoLbl">…</div>
   </div>
-  <button class="logout" onclick="doLogout()">خروج</button>
+  <!-- ⚠️ الدرع (kebab-shield) بيغطي الشاشة كلها ورا القايمة.
+       من غيره، الدوسة على أي حتة تانية بتنفّذ اللي تحتها بدل ما
+       تقفل القايمة — وده بيخلّي الموظف يدوس على حاجة مش قاصدها. -->
+  <div class="kebab-shield hidden" id="kebabShield" onclick="closeKebab()"></div>
+
+  <div class="kebab-wrap">
+    <button class="kebab-btn" onclick="toggleKebab()" aria-label="قايمة">⋮</button>
+    <div class="kebab-menu hidden" id="kebabMenu">
+      <!-- ⚠️ الكلاس pay-menu-btn مهم: payroll.js بيدوّر عليه بنفسه
+           ويظهّره على الموبايل بس ويحط عليه عدد الخصومات الجديدة. -->
+      <button class="pay-menu-btn" style="display:none;"
+              onclick="closeKebab(); openPayroll()">💰 مرتبك</button>
+      <button class="danger" onclick="closeKebab(); doLogout()">↩️ تسجيل الخروج</button>
+    </div>
+  </div>
 </div>
 
 <div class="wrap">
@@ -120,6 +156,9 @@
 
 <!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
 <div id="attOverlay" class="hidden"></div>
+
+<!-- شاشة «مرتبك» — بتتبني بالكامل من payroll.js -->
+<div id="payOverlay" class="hidden"></div>
 
 <script>
 // ============================================================
@@ -184,6 +223,21 @@ function nameOf(email){
   const n = (v && typeof v === 'object' && v.techName) ? v.techName : '';
   return n || (email || '').split('@')[0];
 }
+// ============================================================
+// قايمة التلت نقط
+// ============================================================
+function toggleKebab(){
+  const m = document.getElementById('kebabMenu');
+  const sh = document.getElementById('kebabShield');
+  const open = m.classList.contains('hidden');
+  m.classList.toggle('hidden', !open);
+  sh.classList.toggle('hidden', !open);
+}
+function closeKebab(){
+  document.getElementById('kebabMenu').classList.add('hidden');
+  document.getElementById('kebabShield').classList.add('hidden');
+}
+
 async function doLogout(){
   try{ await sb.auth.signOut(); }catch(e){}
   location.href = 'index.html';

@@ -537,8 +537,13 @@ async function attDayWarning(kind){
   if(kind === 'in'){
     if(r.waived) return '';                       // HR شالت الخصم خلاص
     if(!(Number(r.penalty) > 0)) return '';       // مفيش خصم = مفيش داعي نخوّفه
+    // ⚠️ counted_min مش «ميعادك» — ده الوقت اللي بيتحسب منه شغلك،
+    //    وبيساوي وقت وصولك لو كنت متأخر. الميعاد الحقيقي هو
+    //    shift_min. الخلط بينهم كان بيطلع «حضرت ١٨ وميعادك ١٨»
+    //    على يوم فيه خصم — كلام متناقض.
+    const shift = (r.shift_min != null) ? r.shift_min : r.counted_min;
     return '\n\n⚠️ إنت متأخر النهاردة.\n'
-         + 'حضرت ' + clock(r.arrived_min) + ' وميعادك ' + clock(r.counted_min) + '.\n'
+         + 'ميعادك ' + clock(shift) + ' وحضرت ' + clock(r.arrived_min) + '.\n'
          + '💸 هيتخصم منك ' + Number(r.penalty) + ' ج.م.\n'
          + 'شوف التفاصيل في شاشة «مرتبك».';
   }

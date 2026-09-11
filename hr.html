@@ -211,6 +211,34 @@
     background:var(--red); color:#fff; font-family:inherit; font-size:13.5px;
     font-weight:800; cursor:pointer;}
   .pr-bell{margin-top:9px; font-size:11.5px; font-weight:800; color:var(--red);}
+  .pr-slip-btn{flex:1; border:1px solid var(--border); border-radius:11px; padding:11px;
+    background:var(--surface-2); color:var(--ink); font-family:inherit;
+    font-size:13.5px; font-weight:800; cursor:pointer;}
+  /* كروت كشف الراتب */
+  .slip{background:var(--surface); border:1px solid var(--border); border-radius:15px;
+    padding:14px; margin-bottom:11px;}
+  .slip.paid{border-color:var(--done);}
+  .slip.due{border-color:var(--waiting);}
+  .slip-h{display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
+  .slip-h b{font-size:15px;}
+  .slip-tag{font-size:11px; font-weight:800; border-radius:7px; padding:3px 9px;}
+  .slip-tag.ok{background:var(--done-bg); color:var(--done);}
+  .slip-tag.wait{background:var(--waiting-bg); color:var(--waiting);}
+  .slip-lines{margin-top:11px; padding-top:10px; border-top:1px solid var(--border);}
+  .slip-lines div{display:flex; justify-content:space-between; align-items:baseline;
+    gap:10px; padding:4px 0; font-size:13px; color:var(--muted);}
+  .slip-lines b{font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;
+    color:var(--ink);}
+  .slip-lines b.minus{color:var(--red);}
+  .slip-lines .eq{margin-top:5px; padding-top:8px; border-top:1px solid var(--border);
+    color:var(--ink);}
+  .slip-lines .eq b{color:var(--done); font-size:18px;}
+  .slip-btn{width:100%; margin-top:11px; border:none; border-radius:11px; padding:12px;
+    font-family:inherit; font-size:14px; font-weight:800; cursor:pointer;
+    background:var(--done); color:#fff;}
+  .slip-btn.undo{background:var(--surface-2); color:var(--muted);
+    border:1px solid var(--border); font-size:12.5px; padding:9px;}
+  .slip-meta{margin-top:8px; font-size:11px; color:var(--muted); line-height:1.8;}
   .card-ded{background:var(--rejected-bg,#FEF2F2); color:var(--red); font-size:12px;
     font-weight:800; padding:8px 13px; border-top:1px solid var(--border);}
   html[data-theme="dark"] .card-ded{background:rgba(240,85,74,.13);}
@@ -269,6 +297,17 @@
             onclick="closeEmpLog()">×</button>
   </div>
   <div class="sheet-body" id="empSheetBody"></div>
+</div>
+
+<!-- ===== 🧾 كشوف الرواتب =====
+     z-index:62 — فوق صفحة المرتبات (55) وتحت التسجيل اليدوي (65) -->
+<div class="sheet" id="slipSheet" style="z-index:62;">
+  <div class="sheet-head">
+    <h2 id="slipTitle">🧾 كشوف الرواتب</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('slipSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="slipBody"></div>
 </div>
 
 <!-- ===== ✍️ تسجيل يدوي (إضافة / تعديل) =====
@@ -428,6 +467,7 @@ async function loadMonth(){
     await loadEmpSettings();   // القواعد لازم تكون موجودة قبل الرسم
     await loadPenaltyStart();       // الحاجز لازم يتقرا قبل العرض
     await loadPenalties(from, to);  // 🔴 خصم التأخير — من السيرفر
+    await loadOvertime(from, to);   // 🔴 والأوفر تايم كمان
     await loadDeductions();    // والخصومات اليدوية كمان
     render();
   }catch(e){
@@ -699,7 +739,8 @@ function dayHtml(d, punches, email){
       <span style="color:${STATE_LBL[r.state].c}; font-weight:800;">${STATE_LBL[r.state].t}
         ${r.penalty ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">خصم ${r.penalty} ج.م</span>` : ''}
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
-      <span class="meta">حضر ${fmtMinTime(r.arrived)} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
+      <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
+        r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
     </div>
     ${r.beforeStart ? `
       <div class="punch" style="padding-bottom:7px;">
@@ -813,6 +854,31 @@ async function loadPenaltyStart(){
     const t = (e && e.message) ? e.message : String(e);
     if(/does not exist|42883/i.test(t))
       console.warn('⚠️ ميزة تاريخ بدء الخصم لسه ماتركبتش — شغّل 38-penalty-start-date.sql');
+  }
+}
+
+// 🔴 الأوفر تايم والعجز — محسوبين في السيرفر
+//    شكلها: OVER['fanie@fix.com']['2026-09-10'] = { ...صف اليوم }
+let OVER = {};
+
+async function loadOvertime(from, to){
+  try{
+    const { data, error } = await sb.rpc('hr_overtime',
+      { p_email: null, p_from: from, p_to: to });
+    if(error) throw error;
+    OVER = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (OVER[e] = OVER[e] || {})[r.work_date] = r;
+    });
+  }catch(e){
+    // الفشل الصامت هنا معناه إن كل الساعات هتبان صفر و HR تفتكر
+    // إن محدش عمل أوفر تايم
+    console.error('loadOvertime failed:', e);
+    OVER = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42883/i.test(t))
+      console.warn('⚠️ دالة الأوفر تايم لسه ماتعملتش — شغّل 41-overtime.sql');
   }
 }
 
@@ -1036,6 +1102,15 @@ function toMin(t){
   const [h,m] = String(t).slice(0,5).split(':').map(Number);
   return h*60 + m;
 }
+// مدة بالساعة والدقيقة
+function fmtDur(mins){
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(m / 60), r = m % 60;
+  if(!h) return r + ' د';
+  if(!r) return h + ' س';
+  return h + ' س و ' + r + ' د';
+}
+
 function fmtMinTime(mins){
   mins = ((mins % 1440) + 1440) % 1440;
   return String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
@@ -1064,6 +1139,12 @@ function applyRules(email, punches, workDate){
   const need = Number(row.need_min || 0);
   return {
     arrived: Number(row.arrived_min),
+    // ⚠️ shift = ميعاده الحقيقي · counted = الوقت اللي بيتحسب منه
+    //    شغله. الاتنين بيتساووا لو جه بدري أو جوه السماح، وبيختلفوا
+    //    لو اتأخر. خلطهم كان بيطلع «حضرت ١٨ وميعادك ١٨» على يوم
+    //    فيه خصم — كلام متناقض.
+    shift:   Number(row.shift_min != null ? row.shift_min : row.counted_min),
+    lateBy:  Number(row.late_min || 0),
     counted: Number(row.counted_min),
     leaveAt: Number(row.counted_min) + need,
     need,
@@ -1090,21 +1171,35 @@ function applyRules(email, punches, workDate){
 //    والبريك مش داخل في الحساب أصلاً (dayMinutes بتقفل العدّاد
 //    عنده)، فالأوفر تايم شغل حقيقي مش قعدة.
 // ============================================================
+// 🔴 زي applyRules — **مبقتش بتحسب**، بقت بتقرا من السيرفر.
+// ------------------------------------------------------------
+// الأوفر تايم بقى بيتحوّل لفلوس في كشف الراتب. فلو الحساب اتكتب
+// هنا وكمان في السيرفر، أول تعديل على واحد فيهم من غير التاني
+// معناه إن HR شايفة «٣ ساعات زيادة» والكشف بيحسب ساعتين — وده
+// فرق فلوس مباشر.
+//
+// ⚠️ النقص بيرجع صفر لليوم اللي لسه ما اتقفلش بانصراف. من غير
+//    الشرط ده، اليوم اللي الموظف شغال فيه دلوقتي كان هيبان عليه
+//    عجز يوم كامل — وكل واحد يفتح الشاشة الصبح يلاقي «عجز ٨
+//    ساعات» وهو لسه بادئ.
 function dayOvertime(email, punches, workDate){
-  const r = applyRules(email, punches, workDate);
-  const raw = dayMinutes(punches);
-  if(!r) return { worked: raw.minutes, over: 0, short: 0, need: 0, has: false };
+  const byDay = OVER[(email || '').toLowerCase()];
+  const row = byDay && workDate ? byDay[workDate] : null;
 
-  // الوقت اللي اتسامحنا فيه بيتضاف لشغله
-  const graceBonus = Math.max(0, r.arrived - r.counted);
-  const worked = raw.minutes + graceBonus;
+  // السيرفر مبيرجّعش اليوم ده (مفيش ميعاد محدد، أو مفيش «حضور»)
+  // → نوري ساعاته الخام من غير ما نخترع زيادة ولا نقص
+  if(!row){
+    const raw = dayMinutes(punches);
+    return { worked: raw.minutes, over: 0, short: 0, need: 0, has: false };
+  }
 
   return {
-    worked,
-    over:  Math.max(0, worked - r.need),
-    short: Math.max(0, r.need - worked),
-    need:  r.need,
-    has:   true
+    worked: Number(row.worked_min || 0),
+    over:   Number(row.over_min   || 0),
+    short:  Number(row.short_min  || 0),
+    need:   Number(row.need_min   || 0),
+    closed: !!row.closed,
+    has:    true
   };
 }
 
@@ -1529,6 +1624,203 @@ function notifyDeduction(email, amount, reason){
 }
 
 // ============================================================
+// 🧾 كشوف الرواتب
+// ------------------------------------------------------------
+// 🔴 الكشف **قبل الصرف حي، وبعد الصرف متجمّد**.
+//
+//    قبل الصرف: الأرقام بتتحسب لحظة السؤال. لو شلتي خصم أو
+//    ظبّطتي تسجيل، الكشف بيتصحّح لوحده. وده المفروض.
+//
+//    بعد الصرف: الأرقام بتتصوّر في جدول hr_payslips وتتقفل.
+//    لو سيبناها حية، أي تعديل في السجل بعد سنة كان هيغيّر ورقة
+//    قبض الموظف بأثر رجعي — والورقة مبقاش ليها معنى.
+//
+// ⚠️ التراجع بيمسح الصورة فالكشف يرجع حي. وده صح: التراجع معناه
+//    «الصرف ده ما حصلش»، مش «حصل وبنعدّله».
+// ============================================================
+let SLIP = { email:'', rows:[], busy:false };
+
+async function openPayslips(email){
+  SLIP = { email:(email||'').toLowerCase(), rows:[], busy:false };
+  document.getElementById('slipTitle').textContent = '🧾 كشوف — ' + nameOf(SLIP.email);
+  document.getElementById('slipBody').innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('slipSheet');
+  await loadPayslips();
+  renderPayslips();
+}
+
+async function loadPayslips(){
+  try{
+    const { data, error } = await sb.rpc('hr_payroll_periods', { p_email: SLIP.email });
+    if(error) throw error;
+    SLIP.rows = data || [];
+  }catch(e){
+    // بنقول بصوت عالي: لو سكتنا، الشاشة هتقول «مفيش كشوف»
+    // و HR تفتكر إن الموظف مالوش مستحقات
+    console.error('loadPayslips failed:', e);
+    SLIP.rows = [];
+    const t = (e && e.message) ? e.message : String(e);
+    document.getElementById('slipBody').innerHTML =
+      '<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">' +
+      (/does not exist|42883/i.test(t)
+        ? '❌ الميزة لسه ماتركبتش — شغّل ملف 39-payslips.sql'
+        : '❌ مقدرناش نقرا الكشوف: ' + esc(t)) + '</div>';
+    throw e;
+  }
+}
+
+function slipMonthName(p){
+  return new Date(p).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+}
+
+function renderPayslips(){
+  const box = document.getElementById('slipBody');
+  if(!box) return;
+  if(!SLIP.rows.length){
+    box.innerHTML = '<div class="empty">مفيش كشوف للموظف ده لسه<br>' +
+      '<small>الكشف بيظهر أول ما يبقى ليه مرتب أو حضور أو خصم</small></div>';
+    return;
+  }
+
+  const due  = SLIP.rows.filter(r => !r.paid);
+  const paid = SLIP.rows.filter(r =>  r.paid);
+
+  box.innerHTML = `
+    ${due.length ? `
+      <div style="font-weight:900;font-size:13.5px;margin:4px 0 10px;color:var(--waiting);">
+        ⏳ لسه ماتصرفش (${due.length})</div>
+      ${due.map(r => slipCard(r)).join('')}` : `
+      <div class="hintbox" style="background:var(--done-bg);color:var(--done);">
+        ✅ كل الكشوف اتصرفت</div>`}
+
+    ${paid.length ? `
+      <button class="mini-btn" style="width:100%;margin-top:16px;padding:11px;"
+              onclick="slipToggleOld()">
+        <span id="slipArrow">▾</span> 📜 سجل المرتبات المصروفة (${paid.length})
+      </button>
+      <div id="slipOld" class="hidden" style="margin-top:11px;">
+        ${paid.map(r => slipCard(r)).join('')}
+      </div>` : ''}`;
+}
+
+function slipToggleOld(){
+  const box = document.getElementById('slipOld');
+  const arw = document.getElementById('slipArrow');
+  if(!box) return;
+  box.classList.toggle('hidden');
+  if(arw) arw.textContent = box.classList.contains('hidden') ? '▾' : '▴';
+}
+
+// ============================================================
+// سطور الأوفر تايم في كشف الراتب
+// ------------------------------------------------------------
+// ⚠️ الصافي بالموجب = أوفر تايم (بيتزوّد على المرتب).
+//    بالسالب = عجز ساعات (بينزل من المرتب).
+//    بنكتب الاتنين بلون وعلامة مختلفين عشان محدش يقراهم غلط.
+// ============================================================
+function slipOvertimeLines(r){
+  const n  = v => Number(v || 0).toLocaleString('en-US');
+  const om = Number(r.over_min  || 0);
+  const sm = Number(r.short_min || 0);
+  const nm = Number(r.net_min   || 0);
+  const amt = Number(r.overtime_amt || 0);
+  if(!om && !sm) return '';
+
+  const plus = nm >= 0;
+  return `
+    <div><span>ساعات زيادة</span><b style="color:var(--done)">${fmtDur(om)}</b></div>
+    <div><span>ساعات ناقصة</span><b class="minus">${fmtDur(sm)}</b></div>
+    <div style="border-top:1px dashed var(--border);padding-top:7px;margin-top:3px;">
+      <span>${plus ? '+ أوفر تايم' : '− عجز ساعات'}
+        <small style="opacity:.75;">(${fmtDur(Math.abs(nm))} × ${
+          Number(r.hour_value || 0).toFixed(2)} ج.م/س)</small></span>
+      <b style="color:${plus ? 'var(--done)' : 'var(--red)'}">${n(Math.abs(amt))}</b>
+    </div>`;
+}
+
+function slipCard(r){
+  const n = v => Number(v || 0).toLocaleString('en-US');
+  return `
+  <div class="slip ${r.paid ? 'paid' : 'due'}">
+    <div class="slip-h">
+      <b>${esc(slipMonthName(r.period))}</b>
+      <span class="slip-tag ${r.paid ? 'ok' : 'wait'}">${
+        r.paid ? '✅ تم صرف الراتب' : '⏳ لسه ماتصرفش'}</span>
+    </div>
+
+    <div class="slip-lines">
+      <div><span>المرتب</span><b>${n(r.salary)}</b></div>
+      <div><span>− خصومات يدوية</span><b class="minus">${n(r.manual_ded)}</b></div>
+      <div><span>− خصومات تأخير</span><b class="minus">${n(r.late_ded)}</b></div>
+      ${slipOvertimeLines(r)}
+      <div class="eq"><span>= الصافي</span><b>${n(r.net)} ج.م</b></div>
+    </div>
+
+    ${r.paid ? `
+      <div class="slip-meta">
+        اتصرف ${esc(new Date(r.paid_at).toLocaleDateString('ar-EG',
+          { day:'numeric', month:'long', year:'numeric' }))}
+        · بواسطة ${esc(r.paid_by || '—')}
+        · ${r.seen_at ? '✔️ الموظف شافه' : '🔔 لسه ما شافوش'}
+        <br>🔒 الأرقام دي متقفلة — أي تعديل في السجل بعد كده مش هيغيّرها.
+      </div>
+      <button class="slip-btn undo" onclick="unmarkPaid('${esc(r.period)}')">
+        ↩️ تراجع عن الصرف</button>`
+    : `
+      <button class="slip-btn" onclick="markPaid('${esc(r.period)}')">
+        ✅ تم صرف الراتب</button>`}
+  </div>`;
+}
+
+async function markPaid(period){
+  if(SLIP.busy) return;
+  const row = SLIP.rows.find(r => String(r.period) === String(period));
+  if(!row) return;
+
+  if(!confirm('تسجيل صرف راتب ' + slipMonthName(period) + '\n\n'
+            + 'الصافي: ' + Number(row.net || 0) + ' ج.م\n\n'
+            + '⚠️ الأرقام دي هتتقفل. أي تعديل في السجل بعد كده مش هيغيّر الكشف.')) return;
+
+  SLIP.busy = true;
+  try{
+    const { error } = await sb.rpc('hr_mark_paid',
+      { p_email: SLIP.email, p_period: period });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await notifyPay(SLIP.email,
+      `تم صرف راتب ${slipMonthName(period)} — صافي ${Number(row.net || 0)} ج.م`);
+    await loadPayslips();
+    renderPayslips();
+    alert('✅ اتسجّل — والموظف هيشوف الكشف في «مرتبك»');
+  }catch(e){
+    console.error('markPaid failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    SLIP.busy = false;
+  }
+}
+
+async function unmarkPaid(period){
+  if(SLIP.busy) return;
+  if(!confirm('تراجع عن صرف راتب ' + slipMonthName(period) + '؟\n\n'
+            + 'الكشف هيرجع «لسه ماتصرفش» وأرقامه هترجع تتحسب لحظياً تاني.')) return;
+
+  SLIP.busy = true;
+  try{
+    const { error } = await sb.rpc('hr_unmark_paid',
+      { p_email: SLIP.email, p_period: period });
+    if(error) throw error;
+    await loadPayslips();
+    renderPayslips();
+  }catch(e){
+    console.error('unmarkPaid failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    SLIP.busy = false;
+  }
+}
+
+// ============================================================
 // 🛡️ تاريخ بداية تطبيق خصم التأخير
 // ------------------------------------------------------------
 // ⚠️ الشريط الأحمر لما يكون فاضي **مقصود ومهم**. لو سكتنا،
@@ -1544,13 +1836,14 @@ function penStartHtml(){
   return `
   <div class="pen-start${set ? '' : ' warn'}">
     <div class="pen-start-h">
-      <b>🛡️ خصم التأخير بيبدأ من</b>
+      <b>🛡️ نظام المرتبات بيبدأ من</b>
       ${set ? `<span>${esc(nice)}</span>` : `<span class="bad">⚠️ مش متحدد</span>`}
     </div>
 
     ${set
       ? `<small>أي يوم قبل التاريخ ده بيبان في السجل إن الموظف كان متأخر —
-           <b>بس من غير خصم فلوس</b>.</small>`
+           <b>بس من غير خصم فلوس</b>.<br>
+           والكشوف بتبدأ من الشهر ده كمان — الشهور اللي قبله مش بتظهر.</small>`
       : `<small><b>النظام دلوقتي بيخصم على كل التاريخ</b>، بما فيه شهور الموظفين
            ما كانوش يعرفوا فيها إن فيه نظام خصم أصلاً. حدد تاريخ بداية.</small>`}
 
@@ -1574,8 +1867,10 @@ async function savePenaltyStart(){
   }else{
     const nice = new Date(v).toLocaleDateString('ar-EG',
       { day:'numeric', month:'long', year:'numeric' });
-    if(!confirm('خصم التأخير هيبدأ من ' + nice + '.\n\n'
-              + 'كل الأيام اللي قبله خصمها هيبقى صفر عند كل الموظفين.')) return;
+    if(!confirm('نظام المرتبات هيبدأ من ' + nice + '.\n\n'
+              + '• كل الأيام اللي قبله خصمها هيبقى صفر\n'
+              + '• والكشوف اللي قبل الشهر ده مش هتظهر\n\n'
+              + '(الكشف اللي اتصرف فعلاً بيفضل ظاهر في السجل.)')) return;
   }
 
   try{
@@ -2134,6 +2429,17 @@ function renderPayrollAdmin(){
     ${list.map(prCardHtml).join('')}`;
 }
 
+// مجموع ساعات الشهر المعروض لموظف
+function monthHours(email){
+  const byDay = OVER[(email||'').toLowerCase()] || {};
+  let over = 0, short = 0;
+  Object.keys(byDay).forEach(d => {
+    over  += Number(byDay[d].over_min  || 0);
+    short += Number(byDay[d].short_min || 0);
+  });
+  return { over, short, net: over - short };
+}
+
 function prCardHtml(e){
   const m   = manualDed(e);
   // ⚠️ خصم التأخير بتاع **الشهر المعروض فوق في الصفحة الرئيسية**
@@ -2177,11 +2483,24 @@ function prCardHtml(e){
       </div>
     </div>
 
+    ${(() => {
+      const h = monthHours(e);
+      if(!h.over && !h.short) return '';
+      const plus = h.net >= 0;
+      return `<div class="pr-bell" style="color:${plus ? 'var(--done)' : 'var(--red)'};">
+        ${plus ? '⏫ أوفر تايم' : '⏬ عجز ساعات'} ${fmtDur(Math.abs(h.net))}
+        <span style="opacity:.75;font-weight:400;">(زيادة ${fmtDur(h.over)} · ناقص ${fmtDur(h.short)})</span>
+      </div>`;
+    })()}
     ${lt.days ? `<div class="pr-bell" style="color:var(--waiting);">⏰ ${lt.days} يوم تأخير
       محسوب تلقائي — تقدر تشيله من 📋 السجل</div>` : ''}
     ${m.unseen ? `<div class="pr-bell">🔔 ${m.unseen} رسالة لسه ما قراهاش الموظف</div>` : ''}
 
-    <button class="pr-ded-btn" onclick="openDeduction('${esc(e)}')">💸 خصم</button>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="pr-ded-btn" style="margin:0;flex:1;"
+              onclick="openDeduction('${esc(e)}')">💸 خصم</button>
+      <button class="pr-slip-btn" onclick="openPayslips('${esc(e)}')">🧾 الكشوف</button>
+    </div>
   </div>`;
 }
 
