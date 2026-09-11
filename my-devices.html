@@ -313,7 +313,12 @@
     position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
     background:var(--steel); color:var(--on-chrome); font-weight:700; font-size:13.5px;
     padding:12px 18px; border-radius:12px; box-shadow:0 12px 30px rgba(23,34,46,.3);
-    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; max-width:88vw;
+    /* ⚠️ كان z-index:80 — ونافذة قطع الغيار 9000 ورسالة الانصراف 9700.
+       فأي رسالة (نجاح أو **خطأ**) كانت بتطلع ورا النافذة ومحدش بيشوفها،
+       والزرار يبان كأنه «مش بيدوس». لازم يبقى فوق كل حاجة — حتى شريط
+       STAGING (99999)، لأن التوست بيطلع في نفس المكان تحت. */
+    z-index:100000;
   }
   .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
   .toast b{color:#8BE0A8;}
@@ -483,6 +488,7 @@
     display:flex;align-items:center;gap:8px;}
   .rw-sep::after{content:"";flex:1;height:1px;background:var(--line);}
   .rw-hint{color:var(--muted);font-size:11.5px;}
+  .rw-hint.err{color:var(--red);font-weight:800;}
   .rw-empty{color:var(--muted);text-align:center;padding:26px 8px;font-size:13px;}
 </style>
 </head>
@@ -1295,6 +1301,7 @@ function rwPaint(){
             <button type="button" class="yes${a==='yes'?' on':''}" id="rwy_${d.id}" onclick="rwReturn('${d.id}','yes')">↩️ أيوه رجّعتها</button>
             <button type="button" class="no${a==='no'?' on':''}"  id="rwx_${d.id}" onclick="rwReturn('${d.id}','no')">✋ لا مرجعتش</button>
           </div>
+          <div class="rw-hint" id="rwh_${d.id}" style="margin-top:6px;"></div>
         </div>`;
     }
 
@@ -1363,7 +1370,10 @@ function rwToggle(id){
   // علامة «متسجّل» تفضل بس لو الكلام لسه زي المحفوظ بالظبط
   const d = devices.find(x => x.id === id);
   const saved = d ? (d.partsComment || '').trim() : '';
-  if(hint) hint.textContent = (saved && ta.value.trim() === saved) ? 'متسجّل ✅' : '';
+  if(hint){
+    hint.classList.remove('err');   // أي خطأ قديم بيتشال أول ما الفني يعمل حاجة جديدة
+    hint.textContent = (saved && ta.value.trim() === saved) ? 'متسجّل ✅' : '';
+  }
 }
 
 // زرار «لسه مجبتش ليه حاجة» — الفني بيقول بنفسه إنه لسه ما جابش.
@@ -1388,7 +1398,7 @@ async function rwNone(id){
   const nb = document.getElementById('rwn_' + id);
   if(nb) nb.disabled = true;
   const ok = await save(id, patch);
-  if(!ok){ if(nb) nb.disabled = false; return; }   // save() طلّعت رسالة الخطأ
+  if(!ok){ if(nb) nb.disabled = false; rwErr(id, '❌ الحفظ فشل — جرّب تاني'); return; }   // save() طلّعت السبب في التوست
 
   if(!(await rwVerify(id, 'partsPendingDay', day, '«لسه مجبتش»'))){
     if(nb) nb.disabled = false;
@@ -1407,6 +1417,15 @@ async function rwNone(id){
   rwRefreshCard(id);
 }
 
+// رسالة خطأ ثابتة جوه الكارت نفسه — التوست بيختفي بعد ثانيتين،
+// والفني ممكن ميلحقش يقراه. ده بيفضل لحد ما ينجح.
+function rwErr(id, msg){
+  const h = document.getElementById('rwh_' + id);
+  if(!h) return;
+  h.textContent = msg || '';
+  h.classList.toggle('err', !!msg);
+}
+
 // ⚠️ Supabase مبيرميش خطأ لو السيرفر تجاهل حقل. فبعد الحفظ بنقرا
 //    الحقل ده بس من السيرفر ونتأكد إنه اتكتب فعلاً — بدل ما الفني
 //    يفتكر إنه رد، ويتمنع من الانصراف من غير ما يفهم ليه.
@@ -1418,7 +1437,11 @@ async function rwVerify(id, key, expected, label){
       .select('v:data->>' + key).eq('id', id).maybeSingle();
     if(error) throw error;
     if(!data || data.v !== expected){
-      toast('⚠️ السيرفر مسجّلش ' + label + ' — بلّغ الإدارة');
+      // السبب المعروف: الحقل مش في قايمة الحقول المسموحة للفني على السيرفر
+      // (device_tech_fields) — فالسيرفر بيرميه في صمت.
+      const msg = '⚠️ السيرفر مسجّلش ' + label + ' — الحقل «' + key + '» مش مسموح للفني. بلّغ الإدارة.';
+      toast(msg);
+      rwErr(id, msg);
       console.error(key + ' لم يُحفظ:', id, data);
       return false;
     }
@@ -1450,7 +1473,10 @@ async function rwReturn(id, ans){
 
   const by = document.getElementById('rwy_' + id), bx = document.getElementById('rwx_' + id);
   if(by) by.disabled = true; if(bx) bx.disabled = true;
-  const ok = await save(id, patch) && await rwVerify(id, 'partsReturn', ans, 'إجابة القطع');
+  const saved1 = await save(id, patch);
+  if(!saved1) rwErr(id, '❌ الحفظ فشل — جرّب تاني');     // save() طلّعت السبب في التوست
+  const ok = saved1 && await rwVerify(id, 'partsReturn', ans, 'إجابة القطع');
+  if(ok) rwErr(id, '');
   if(by) by.disabled = false; if(bx) bx.disabled = false;
   if(!ok) return;
 
