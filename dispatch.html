@@ -532,12 +532,12 @@
   /* ⚠️ الشريطين "جهاز جديد" (z-index:30) والتبويبات (29) sticky —
      يعني بيفضلوا راكبين على الشاشة. الشاشة دي لازم تبقى فوقهم،
      وإلا هيفضلوا ظاهرين فوق الجرد. */
-  #accountsOverlay, #inventoryOverlay{z-index:69;}
+  #accountsOverlay, #inventoryOverlay, #prOverlay{z-index:69;}
   /* ⚠️ .overlay هي flex container، و.acc-page جواها عنصر flex —
      يعني بيتقلّص لعرض محتواه بدل ما ياخد الشاشة كلها. لازم
      width:100% صريحة، وإلا الصفحة بتطلع في ثلثين الشاشة والكروت
      بتنزل واحد تحت التاني. */
-  #inventoryOverlay .acc-page{width:100%;}
+  #inventoryOverlay .acc-page, #prOverlay .acc-page{width:100%;}
   /* ⚠️ شيت التفاصيل (.sheet = 61) أقل من شاشة الجرد (69)، فلما
      تتفتح من جوه الجرد بتتفتح **ورا** الشاشة — يعني الشاشة بتبان
      كأنها مابتعملش حاجة. بنرفعها فوق الجرد وقت ما يكون مفتوح بس،
@@ -759,13 +759,18 @@
   <div class="sh-body" id="actBody"></div>
 </div>
 
-<div class="sheet-bg" id="prBg" onclick="closePartsReview()"></div>
-<div class="sheet" id="prOverlay" style="max-height:90vh;">
-  <div class="sheet-head">
-    <div class="grab"></div>
-    <div class="sh-row"><div class="sh-title">🔩 مراجعة قطع الغيار</div><button class="sh-x" onclick="closePartsReview()">×</button></div>
+<!-- 🔩 مراجعة قطع الغيار — صفحة كاملة (كانت شيت بيطلع من تحت)
+     نفس هيكل صفحة الجرد والحسابات بالحرف (overlay + acc-page + acc-head).
+     ⚠️ acc-head مش sheet-head: فيها env(safe-area-inset-top) اللي بينزّل
+        الرأس تحت نتش الأيفون — من غيرها زرار × بيستخبى تحت الساعة. -->
+<div id="prOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="acc-page">
+    <div class="acc-head">
+      <h2>🔩 مراجعة قطع الغيار</h2>
+      <button class="acc-close" onclick="closePartsReview()">×</button>
+    </div>
+    <div id="prBody" style="padding:14px 20px 40px;"></div>
   </div>
-  <div class="sh-body" id="prBody"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2087,13 +2092,23 @@ function prInRange(d){
 
 function openPartsReview(){
   if(!CAN_PARTS_REVIEW){ toast('الميزة دي مقفولة عندك'); return; }
+  // الشاشة من ورا: الدرع الشفاف بتاع قايمة ⋮ لازم يتشال — وإلا بيفضل
+  // فوق الصفحة وياكل أول ضغطة (نفس اللي الجرد بيعمله)
+  const _shield = document.getElementById('kebabShield'); if(_shield) _shield.classList.add('hidden');
   if(!PR.from) prSetQuick('today'); else prRender();
-  $('prOverlay').classList.add('on');
-  $('prBg').classList.add('on');
+  $('prOverlay').classList.remove('hidden');
+  // ⚠️ inv-open بيرفع الشيتات (61 → 79) فوق الصفحات الكاملة (69).
+  //    من غيره أي شيت يتفتح من جوه المراجعة هيتفتح **ورا** الصفحة —
+  //    نفس الباج اللي حصل في الجرد (شوف الكومنت عند body.inv-open).
+  document.body.classList.add('inv-open');
+  // نبدأ من فوق كل مرة — مش من مكان ما سبناها المرة اللي فاتت
+  $('prOverlay').scrollTop = 0;
 }
 function closePartsReview(){
-  $('prOverlay').classList.remove('on');
-  $('prBg').classList.remove('on');
+  $('prOverlay').classList.add('hidden');
+  // inv-open بيتشال بس لو الجرد نفسه مش مفتوح — عشان منبوّظلوش طبقاته
+  const inv = document.getElementById('inventoryOverlay');
+  if(!inv || inv.classList.contains('hidden')) document.body.classList.remove('inv-open');
   PR.tech = null;
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
