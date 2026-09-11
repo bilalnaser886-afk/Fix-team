@@ -791,6 +791,8 @@
          **والرقم** من أقدم تسجيل مش أحدث واحد. -->
     <div class="fld"><label data-i18n="dp.customerName">اسم العميل</label><input id="f_cust" list="dpCustList" autocomplete="off" oninput="onDpCustInput()" placeholder="اسم صاحب الجهاز" data-i18n-ph="dp.customerNamePh"></div>
     <datalist id="dpCustList"></datalist>
+    <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
+    <div class="fld"><label>🎨 لون الجهاز <b style="color:var(--rejected)">*</b></label><input id="f_color" autocomplete="off" maxlength="40" placeholder="أسود، أبيض، أزرق فاتح…"></div>
     <div class="frow">
       <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" list="dpPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill='';" placeholder="010..." style="direction:ltr;text-align:right;"></div>
       <datalist id="dpPhoneList"></datalist>
@@ -1088,6 +1090,7 @@ function adapt(d){
     id:      d.id,
     type:    d.deviceType || '',
     model:   d.model || '',
+    color:   d.deviceColor || '',
     customer:d.customerName || '',
     phone:   d.customerPhone || '',
     shop:    d.shopName || '',
@@ -1574,6 +1577,7 @@ function showInfo(id){
 
       <div class="di-card">
         <div class="di-card-h">🔧 الصيانة</div>
+        ${row('🎨 اللون', esc(d.color || ''))}
         ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')) + (dpCanChangeTech(d)
             ? `<button class="di-edit" onclick="editTech('${d.id}')">✏️ تغيير</button>`
             : `<button class="di-edit lock" onclick="toast(dpTechLockMsg())">🔒</button>`))}
@@ -1982,10 +1986,11 @@ async function deVerifyNote(id, expectedLen){
 //    بعدها بـ device_patch (اللي أصلاً شغالة للديسباتشر في الاعتمادات).
 // نداء واحد للاتنين — مش نداءين.
 // بترجّع true لو اتحفظ اللي مطلوب.
-async function dpAfterIntake(newId, text, lock){
+async function dpAfterIntake(newId, text, lock, color){
   if(!newId) return false;
   const p = {};
   if(lock) Object.assign(p, lock);
+  if(color) p.deviceColor = color;
   if(text){
     const notes = await dpNotesWith(newId, mkNote('📝 ' + text));
     if(!notes) return false;
@@ -1994,7 +1999,7 @@ async function dpAfterIntake(newId, text, lock){
   if(!await patch(newId, p)) return false;
   if(text && !await deVerifyNote(newId, p.activityNotes.length)) return false;
   if(lock && !await dpVerifyLock(newId, lock.lockType)) return false;
-  return true;
+  return true;   // اللون مش بنتأكد منه هنا — بيتشاف في التفاصيل على طول
 }
 
 // ============================================================
@@ -2436,7 +2441,9 @@ let saving = false;
 async function saveIntake(){
   if(saving) return;
   const type=$('f_type').value.trim(), model=$('f_model').value.trim(), cust=$('f_cust').value.trim();
+  const color=$('f_color').value.trim();
   if(!type || !cust){ toast(t('dp.needFields')); return; }
+  if(!color){ toast('🎨 اكتب لون الجهاز الأول'); const c=$('f_color'); if(c) c.focus(); return; }
   if(!navigator.onLine){ toast(t('dp.offlineIntake')); return; }
 
   const btn = $('btnSave');
@@ -2453,6 +2460,7 @@ async function saveIntake(){
     shopName:      $('f_shop').value.trim(),
     reportedIssue: $('f_issue').value.trim(),
     technician:    ($('f_tech') ? $('f_tech').value : ''),
+    deviceColor:   color,
     registeredBy:  ME
   }});
 
@@ -2464,8 +2472,12 @@ async function saveIntake(){
   // 📝 الملاحظة و🔒 الباسورد (لو فيه) — بعد ما الجهاز اتسجّل
   const noteText0 = (($('f_note') || {}).value || '').trim();
   const lock0 = dpCollectLock();
+  // ⚠️ اللون بيتبعت مرتين عن قصد: مرة جوه device_intake (لو السيرفر
+  //    بياخده) ومرة في الترقيع بعدها. الدالة بتتجاهل أي حقل مش في
+  //    قايمتها **في صمت** (SYSTEM.md) وكودها مش قدامنا — فالترقيع
+  //    هو الضمان. الكتابة مرتين بنفس القيمة مالهاش أي ضرر.
   let noteLost = false;
-  if(noteText0 || lock0){
+  if(noteText0 || lock0 || color){
     // device_intake بترجّع رقم الجهاز — بس شكل الرد مش موثّق،
     // فبنقبل الأشكال المعقولة كلها بدل ما نفترض واحد.
     let newId = (typeof data === 'string') ? data
@@ -2482,11 +2494,11 @@ async function saveIntake(){
         if(mine.length === 1) newId = mine[0].id;
       }catch(e){ console.error('البحث عن الجهاز الجديد:', e); }
     }
-    noteLost = !(await dpAfterIntake(newId, noteText0, lock0));
+    noteLost = !(await dpAfterIntake(newId, noteText0, lock0, color));
   }
 
   dpMountLock('dpLockHostIntake');   // 🔒 تصفير شاشة الباسورد
-  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue','f_note'].forEach(id=>{
+  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue','f_note','f_color'].forEach(id=>{
     const e = $(id); if(!e) return; e.value=''; if(e.dataset) e.dataset.autoFill='';
   });
   ['dpCustList','dpPhoneList'].forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; });

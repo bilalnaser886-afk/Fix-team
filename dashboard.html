@@ -1347,6 +1347,8 @@
         <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
         <label class="field"><span data-i18n="add.model">الموديل</span><input id="f_model" /></label>
       </div>
+      <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
+      <label class="field"><span>🎨 لون الجهاز <b style="color:var(--danger)">*</b></span><input id="f_deviceColor" autocomplete="off" placeholder="أسود، أبيض، أزرق فاتح…" /></label>
       <label class="field"><span data-i18n="add.serial">الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
       <div id="lockHostAdd"></div>
       <div class="field" id="lockSection" style="display:block;">
@@ -3320,7 +3322,7 @@ async function markPaid(){
 
 // Add device modal
 function openAddModal(){
-  ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
+  ['customerName','shopName','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
@@ -3580,7 +3582,7 @@ document.addEventListener('click', (e) => {
 // (Shift+Enter بيعمل سطر جديد في خانات الملاحظات)
 function setupAddFormEnterNav(){
   const order = ['f_customerName','f_shopName','f_registeredBy','f_customerPhone',
-                 'f_deviceType','f_model','f_serialNumber','f_reportedIssue',
+                 'f_deviceType','f_model','f_deviceColor','f_serialNumber','f_reportedIssue',
                  'f_conditionNotes','f_agreedPrice','f_intakeDateOnly','f_intakeTimeOnly'];
   order.forEach((id, i) => {
     const el = document.getElementById(id);
@@ -3599,7 +3601,19 @@ async function submitAdd(){
   const get = id => document.getElementById('f_'+id).value.trim();
   const customerName = get('customerName');
   const deviceType = get('deviceType');
-  if(!customerName || !deviceType) return;
+  const deviceColor = get('deviceColor');
+  // ⚠️ كان `return;` ساكت — الزرار يتداس وميحصلش حاجة والمحاسب مش فاهم ليه.
+  //    دلوقتي بنقول الناقص إيه وبنوديه على الخانة.
+  const missing = [];
+  if(!customerName) missing.push('اسم العميل');
+  if(!deviceType)   missing.push('نوع الجهاز');
+  if(!deviceColor)  missing.push('لون الجهاز');
+  if(missing.length){
+    alert('لازم تكتب: ' + missing.join('، '));
+    const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : 'f_deviceColor');
+    const el = document.getElementById(first); if(el) el.focus();
+    return;
+  }
   const serialNumber = get('serialNumber');
   if(serialNumber){
     const dup = devices.find(d => d.serialNumber && d.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase());
@@ -3612,7 +3626,7 @@ async function submitAdd(){
   const newDevice = {
     id: 'dev_' + Date.now(),
     trackToken: genTrackToken(),
-    customerName, deviceType,
+    customerName, deviceType, deviceColor,
     shopName: get('shopName'),
     registeredBy: get('registeredBy'),
     customerPhone: get('customerPhone'),
@@ -3814,6 +3828,7 @@ function renderDetailNow(){
   const roB = isRet ? ' disabled' : '';   // أزرار وقوائم التفاصيل القديمة
   const rows = [
     [t('det.intakeAt'), formatDateTime(d.intakeDate)],
+    d.deviceColor ? ['🎨 اللون', d.deviceColor] : null,
     d.serialNumber ? [t('det.serial'), d.serialNumber, true] : null,
     d.conditionNotes ? [t('det.condition'), d.conditionNotes] : null,
     d.lastModifiedAt ? [t('det.lastEdit'), formatDateTime(d.lastModifiedAt)] : null,
