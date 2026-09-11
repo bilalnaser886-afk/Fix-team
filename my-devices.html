@@ -400,8 +400,10 @@
   .rw-arrow{color:var(--muted);font-size:20px;font-weight:800;}
   .rw-ov{position:fixed;inset:0;z-index:9000;background:rgba(10,16,22,.55);
     display:flex;align-items:flex-end;justify-content:center;}
+  /* ⚠️ كانت background:var(--bg) — والصفحة دي مفيهاش --bg خالص، فالنافذة
+     كانت شفافة والشاشة اللي وراها باينة من خلالها. --paper هو لون خلفية الصفحة. */
   .rw-sheet{width:100%;max-width:560px;max-height:88vh;overflow-y:auto;
-    background:var(--bg);border-radius:18px 18px 0 0;padding:14px 14px 40px;}
+    background:var(--paper);border-radius:18px 18px 0 0;padding:14px 14px 40px;}
   .rw-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
   .rw-head h3{margin:0;font-size:15.5px;flex:1;}
   .rw-x{border:none;background:var(--card);color:var(--ink);width:34px;height:34px;
@@ -417,7 +419,7 @@
   .rw-st{font-size:11px;font-weight:800;color:var(--muted);}
   .rw-cm{margin-top:8px;}
   .rw-cm textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:10px;
-    background:var(--bg);color:var(--ink);font:inherit;font-size:13px;padding:8px 10px;resize:vertical;}
+    background:var(--paper);color:var(--ink);font:inherit;font-size:13px;padding:8px 10px;resize:vertical;}
   .rw-cm .row{display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap;}
   .rw-save{border:none;border-radius:10px;background:var(--accent,#0891A8);color:#fff;
     font:800 12px/1 inherit;padding:9px 16px;cursor:pointer;}
@@ -430,6 +432,50 @@
     border:1.5px dashed var(--waiting);background:var(--waiting-bg);color:var(--waiting);
     border-radius:10px;font:800 12px/1 inherit;padding:9px 16px;cursor:pointer;}
   .rw-none:active{transform:scale(.97);}
+  /* بعد ما الفني يدوس: الزرار يهدى ويبقى رمادي بعلامة ✓ — خلاص اتسجّل للنهاردة */
+  .rw-none.done{border-style:solid;border-color:var(--line);background:var(--card);
+    color:var(--muted);cursor:default;}
+  .rw-none.done:active{transform:none;}
+
+  /* ===== ألوان الكارت (إشارة المرور) =====
+     🟠 need = محتاج رد · ⚪ pend = داس «لسه مجبتش» النهاردة · 🟢 ok = قطع الغيار مكتوبة */
+  .rw-card.need{border-color:var(--waiting);background:var(--waiting-bg);}
+  .rw-card.pend{border-style:dashed;}
+  .rw-card.ok{border-color:var(--done);background:var(--done-bg);}
+  .rw-card.need .rw-cm textarea, .rw-card.ok .rw-cm textarea{background:var(--card);}
+  .rw-tag{font-size:10.5px;font-weight:800;color:var(--muted);margin-inline-start:6px;}
+
+  /* ===== سؤال الجهاز المرفوض: «القطع رجعت؟» ===== */
+  .rw-parts{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--card);
+    border:1px solid var(--line);font-size:13px;line-height:1.7;}
+  .rw-parts .k{color:var(--muted);font-weight:700;font-size:11.5px;}
+  .rw-q{margin-top:10px;font-size:13px;font-weight:800;color:var(--rejected);}
+  .rw-ans{display:flex;gap:8px;margin-top:8px;}
+  .rw-ans button{flex:1;border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:10px;font:800 13px/1 inherit;padding:11px 8px;cursor:pointer;}
+  .rw-ans button:active{transform:scale(.97);}
+  /* الإجابة المختارة بتتلوّن — رجعت = أخضر · مرجعتش = أحمر */
+  .rw-ans button.on.yes{background:var(--done);border-color:var(--done);color:#fff;}
+  .rw-ans button.on.no {background:var(--rejected);border-color:var(--rejected);color:#fff;}
+  html[data-theme="dark"] .rw-ans button.on{color:#0E1721;}
+  .rw-info{font-size:12px;color:var(--muted);line-height:1.8;margin:-2px 2px 10px;}
+  .rw-info b{color:var(--waiting);}
+
+  /* ===== رسالة «الانصراف مش هيتم» ===== */
+  /* فوق شاشة المواعيد (9400) عشان تبان عليها */
+  .pg-ov{position:fixed;inset:0;z-index:9700;background:rgba(10,16,22,.6);
+    display:flex;align-items:center;justify-content:center;padding:20px;}
+  .pg-box{width:100%;max-width:380px;background:var(--card);color:var(--ink);
+    border-radius:16px;padding:20px 18px 16px;text-align:center;border:1px solid var(--line);}
+  .pg-ic{font-size:36px;line-height:1;margin-bottom:8px;}
+  .pg-box h3{margin:0 0 8px;font-size:16.5px;color:var(--red);}
+  .pg-box p{margin:0 0 16px;font-size:13.5px;line-height:1.9;color:var(--ink-2);}
+  .pg-box p b{color:var(--waiting);font-size:15px;}
+  .pg-go{display:block;width:100%;border:none;border-radius:12px;background:var(--waiting);
+    color:#fff;font:800 14.5px/1 inherit;padding:14px;cursor:pointer;}
+  html[data-theme="dark"] .pg-go{color:#1B1206;}
+  .pg-back{display:block;width:100%;margin-top:8px;border:none;background:none;
+    color:var(--muted);font:700 13px/1 inherit;padding:10px;cursor:pointer;}
   /* ⚠️ الصفحة مفيهاش .hidden عامة — فبنعمل كلاس خاص بالزرارين دول */
   .rw-off{display:none !important;}
   /* فاصل اليوم بين الأجهزة (النهاردة / إمبارح / 09/09) */
@@ -559,6 +605,16 @@ const DONE_STATES = ['done','delivered','rejected','rejected_shop'];
 // ويضيع عليه يكتب قطع غيار أجهزة قديمة. العدد الثابت دايماً فيه شغل.
 const RW_LIMIT = 40;
 
+// 📅 تاريخ بداية منع الانصراف بسبب قطع الغيار (بتوقيت القاهرة)
+// ------------------------------------------------------------
+// الأجهزة اللي آخر لمسة ليها **قبل** اليوم ده بتظهر في النافذة عادي
+// والفني يقدر يكتب عليها، بس **مبتمنعش** الانصراف.
+// ⚠️ ليه؟ نفس درس «تاريخ بداية خصم التأخير»: لو شغّلنا المنع على
+//    كل الأجهزة القديمة، الفني هيلاقي ٤٠ جهاز برتقالي في أول يوم
+//    ومش هيعرف ينصرف — صدمة ملهاش لازمة على شغل قبل النظام ما يبدأ.
+// 🔧 غيّر التاريخ ده ليوم ما ترفع على الإنتاج.
+const PARTS_GATE_FROM = '2026-09-11';
+
 // بيتظبطوا بعد تسجيل الدخول (ME فاضي وقت تعريف البيانات التجريبية — عادي، مش مستخدمة)
 let ME = '';
 let MY_EMAIL = '';
@@ -594,6 +650,13 @@ function adapt(d){
     intake:    d.intakeDate || '',
     touched:   d.lastModifiedAt || d.intakeDate || '',   // آخر لمسة — لحساب الـ ٤٨ ساعة
     partsComment: d.partsComment || '',                  // كومنت قطع الغيار (الفني بيكتبه)
+    // «لسه مجبتش ليه حاجة» — ختم يومي. partsPendingDay = يوم الشغل اللي
+    // الفني داس فيه. بيصلح لليوم ده بس — بكرا لازم يرد تاني.
+    partsPendingDay: d.partsPendingDay || '',
+    partsPendingAt:  d.partsPendingAt  || '',
+    // سؤال الجهاز المرفوض اللي عليه قطع: «القطع رجعت؟» → 'yes' | 'no' | ''
+    partsReturn:   d.partsReturn   || '',
+    partsReturnAt: d.partsReturnAt || '',
     // ⚠️ لازم نمرّر أنواع القفل التلاتة (نص/نمط/صورة). قبل كده كان
     //    بيمرّر النص بس، فلو المحاسب عدّل الرمز لنمط أو صورة بعد
     //    الاستلام، الفني كان بيشوف "اتعدّل رمز القفل" من غير الرمز.
@@ -1049,20 +1112,89 @@ function reindexSearch(){
 // ------------------------------------------------------------
 // بتتفتح من قايمة ⋮ فوق. بتعرض آخر ٤٠ جهاز اتلمسوا عند الفني
 // (أساسي أو مساعد) مهما كانت حالتهم، الأحدث الأول، ومقسومين
-// بفواصل أيام عشان الفني يعرف الجهاز ده من إمتى.
-// الحفظ عبر device_patch (بيتأكد من الخطأ دايماً).
+// بفواصل أيام. الحفظ عبر device_patch (بيتأكد من الخطأ دايماً).
 //
-// الزرارين تحت كل مربع:
-//   المربع فاضي   ← يظهر "لسه مجبتش ليه حاجة" بس
-//   المربع فيه كلام ← يظهر "💾 حفظ" بس
+// كل جهاز ليه ٣ حالات (زي إشارة المرور):
+//   🟢 ok   = قطع الغيار مكتوبة → خلاص، مش هيتسأل تاني
+//   ⚪ pend = داس «لسه مجبتش ليه حاجة» في يوم الشغل ده → ينفع للنهاردة بس
+//   🟠 need = لا ده ولا ده → بيمنع الانصراف
+//
+// الجهاز المرفوض (تم الرفض / درج الرفض — الاتنين status='rejected'):
+//   - من غير قطع غيار → مبيظهرش في النافذة خالص (مفيش حاجة نسأل عليها)
+//   - عليه قطع غيار   → بيظهر بسؤال واحد: «القطع دي رجّعتها؟»
+//     🟠 لسه مجاوبش → بيمنع الانصراف · 🟢 جاوب (أيوه/لا) → خلاص
+//
+// ⚠️ ليه «لسه مجبتش» بيخلص بآخر اليوم؟ عشان مبيقفلش الموضوع —
+//    هو وعد إن الفني هيرجع يكتب. لو فضل صالح على طول، الجهاز
+//    هيتنسي. فكل وردية جديدة الفني لازم يرد تاني.
 // ============================================================
-let RW = { open: false };
+let RW = { open: false, needAtOpen: 0 };
+
+// الجهاز المرفوض — «درج الرفض» مش حالة متخزّنة، هو rejected + علامة
+// rejectedInShop. بنحط الاتنين احتياطي لو اتخزّنت في يوم.
+function rwIsRejected(d){ return d.status === 'rejected' || d.status === 'rejected_shop'; }
+
+// «مفيش» وأخواتها = الفني قال إن الجهاز مش محتاج قطع. ده مش قطع غيار.
+// ⚠️ من غيرها: جهاز كاتب عليه «مفيش» واترفض، هيتسأل «القطع رجعت؟»
+//    على قطع مش موجودة أصلاً.
+function rwNoParts(txt){
+  const t = String(txt || '').replace(/[\s.,،!؟?\-—_]+/g, '').replace(/ه$/,'ة');
+  return ['', 'مفيش', 'مافيش', 'مفيشحاجة', 'مافيشحاجة', 'لايوجد', 'لاشيء', 'لاشئ', 'لا', '0', 'ولاحاجة'].includes(t);
+}
+function rwHasParts(d){ return !rwNoParts(d.partsComment); }
 
 function rwDevices(){
   return devices.filter(d =>
-    (d.tech===ME || d.assist===ME) && d.touched
+    (d.tech===ME || d.assist===ME) && d.touched &&
+    // المرفوض بيدخل بس لو عليه قطع غيار نسأل عنها
+    (!rwIsRejected(d) || rwHasParts(d))
   ).sort((a,b) => new Date(b.touched) - new Date(a.touched))
    .slice(0, RW_LIMIT);
+}
+
+// يوم بتوقيت القاهرة بشكل YYYY-MM-DD (نفس شكل work_date في الحضور)
+function rwCairoDay(dt){
+  try{ return new Intl.DateTimeFormat('en-CA', { timeZone:'Africa/Cairo' }).format(dt); }
+  catch(e){ return rwDayKey(dt.toISOString()); }
+}
+
+// «النهاردة» بالنسبة لقطع الغيار = يوم الوردية المفتوحة، مش يوم الساعة.
+// ⚠️ نفس مبدأ الحضور: الانصراف تبع الحضور. الفني اللي حضر ١٠ الصبح
+//    ومنصرف ١ بالليل، لو داس «لسه مجبتش» الساعة ١١ بليل، مينفعش
+//    الانصراف يرفضه الساعة ١ عشان «اليوم اتغير». فبناخد work_date
+//    من شاشة المواعيد لو فيه وردية مفتوحة، وإلا يوم القاهرة.
+function rwToday(st){
+  const a = st || ((typeof _attState !== 'undefined') ? _attState : null);
+  if(a && a.work_date && a.last_kind && a.last_kind !== 'out'){
+    return String(a.work_date).slice(0, 10);
+  }
+  return rwCairoDay(new Date());
+}
+
+function rwStateOf(d, st){
+  // المرفوض: السؤال الوحيد «القطع رجعت؟» — جاوب مرة = خلاص (مش يومي)
+  if(rwIsRejected(d)) return d.partsReturn ? 'ok' : 'need';
+  if((d.partsComment || '').trim()) return 'ok';
+  if(d.partsPendingDay && d.partsPendingDay === rwToday(st)) return 'pend';
+  return 'need';
+}
+
+// مين المطلوب منه يرد؟ الفني الأساسي بس — هو اللي بيجيب القطع.
+// المساعد بيشوف الجهاز ويقدر يكتب، بس مبيتمنعش من الانصراف بسببه.
+// وكمان لازم آخر لمسة ليه تكون من يوم PARTS_GATE_FROM أو بعده.
+function rwBeforeStart(d){ return rwCairoDay(new Date(d.touched)) < PARTS_GATE_FROM; }
+function rwRequired(d){ return d.tech === ME && !rwBeforeStart(d); }
+
+function rwNeedList(st){
+  return rwDevices().filter(d => rwRequired(d) && rwStateOf(d, st) === 'need');
+}
+
+// عدد بالعربي المظبوط: جهاز واحد · جهازين · ٥ أجهزة · ١٥ جهاز
+function rwCount(n){
+  if(n === 1) return 'جهاز واحد';
+  if(n === 2) return 'جهازين';
+  if(n >= 3 && n <= 10) return n + ' أجهزة';
+  return n + ' جهاز';
 }
 
 // مفتاح اليوم بالتوقيت المحلي (مش UTC — عشان جهاز الساعة ١١ بليل ميروحش يوم تاني)
@@ -1079,13 +1211,51 @@ function rwDayLabel(key){
   return dd + '/' + m;
 }
 
-function openRecentWork(){
+async function openRecentWork(opts){
   RW.open = true;
+  // بنحدّث حالة الحضور الأول عشان «النهاردة» يبقى يوم الوردية الصح.
+  // لو فشلت، rwToday بترجع ليوم القاهرة — مش هنوقف النافذة عشانها.
+  if(typeof attLoadState === 'function'){
+    try{ await attLoadState(); }catch(e){ console.error('attLoadState (parts):', e); }
+  }
+  if(!RW.open) return;               // اتقفلت وإحنا مستنيين
+  RW.needAtOpen = rwNeedList().length;
   rwPaint();
+  // جاي من رسالة «الانصراف مش هيتم»؟ ننزل على أول جهاز محتاج رد
+  if(opts && opts.jump){
+    const first = document.querySelector('#rwOv .rw-card.need');
+    if(first) first.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
 }
 function closeRecentWork(){
   RW.open = false;
   const ov = document.getElementById('rwOv'); if(ov) ov.remove();
+}
+
+// كلاس الكارت حسب حالته. جهاز المساعدة مبيبقاش برتقالي (مش مطلوب منه)
+function rwCardClass(d){
+  const st = rwStateOf(d);
+  if(st === 'ok') return 'rw-card ok';
+  if(!rwRequired(d)) return 'rw-card';
+  return 'rw-card ' + st;
+}
+
+// بنقسم الناقص نوعين عشان الفني يعرف المطلوب منه بالظبط
+function rwNeedSplit(st){
+  const l = rwNeedList(st);
+  return { all: l.length,
+           ret:   l.filter(rwIsRejected).length,       // مرفوض — القطع رجعت؟
+           parts: l.filter(d => !rwIsRejected(d)).length };  // جبت إيه؟
+}
+
+function rwInfoHtml(){
+  const n = rwNeedSplit();
+  if(!n.all) return `✅ كله متسجّل — تقدر تنصرف.`;
+  const lines = [];
+  if(n.parts) lines.push(`<b>${rwCount(n.parts)}</b> محتاجين تكتب جبت ليهم إيه أو تدوس «لسه مجبتش ليه حاجة».`);
+  if(n.ret)   lines.push(`<b>${rwCount(n.ret)}</b> اترفضوا — قول القطع اللي عليهم رجعت ولا لا.`);
+  lines.push(`لازم ترد عليهم قبل الانصراف. لو الجهاز مش محتاج قطع غيار خالص، اكتب «مفيش» واحفظ.`);
+  return lines.join('<br>');
 }
 
 function rwPaint(){
@@ -1104,18 +1274,40 @@ function rwPaint(){
     const k = rwDayKey(d.touched);
     const sep = (k !== lastDay) ? `<div class="rw-sep">${rwDayLabel(k)}</div>` : '';
     lastDay = k;
-    const has = !!(d.partsComment || '').trim();
-    return sep + `
-        <div class="rw-card">
-          <div class="t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer || '')}</span>
+    // علامات صغيرة جنب الاسم: مساعدة · قبل بداية النظام
+    const tag = !rwRequired(d)
+      ? (d.tech !== ME ? '<span class="rw-tag">🤝 مساعدة</span>'
+                       : '<span class="rw-tag">📁 قبل بداية النظام</span>')
+      : '';
+    const head = `
+          <div class="t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer || '')}${tag}</span>
             <span class="rw-st">${(ST[d.status]&&ST[d.status].label)||''}</span></div>
-          <div class="s">${esc(d.issue || '')}</div>
+          <div class="s">${esc(d.issue || '')}</div>`;
+
+    // ---- الجهاز المرفوض: سؤال «القطع رجعت؟» بدل مربع الكتابة ----
+    if(rwIsRejected(d)){
+      const a = d.partsReturn;
+      return sep + `
+        <div class="${rwCardClass(d)}" id="rwk_${d.id}">${head}
+          <div class="rw-parts"><span class="k">🔩 القطع اللي جبتها:</span> ${esc(d.partsComment)}</div>
+          <div class="rw-q">❌ الجهاز اترفض — القطع دي رجّعتها؟</div>
+          <div class="rw-ans">
+            <button type="button" class="yes${a==='yes'?' on':''}" id="rwy_${d.id}" onclick="rwReturn('${d.id}','yes')">↩️ أيوه رجّعتها</button>
+            <button type="button" class="no${a==='no'?' on':''}"  id="rwx_${d.id}" onclick="rwReturn('${d.id}','no')">✋ لا مرجعتش</button>
+          </div>
+        </div>`;
+    }
+
+    const has  = !!(d.partsComment || '').trim();
+    const pend = rwStateOf(d) === 'pend';
+    return sep + `
+        <div class="${rwCardClass(d)}" id="rwk_${d.id}">${head}
           <div class="rw-cm">
             <textarea id="rwc_${d.id}" maxlength="600" oninput="rwToggle('${d.id}')" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(d.partsComment || '')}</textarea>
             <div class="row">
               <!-- الزرارين في نفس المكان — واحد بس اللي بيبان في أي لحظة -->
               <button type="button" class="rw-save${has?'':' rw-off'}" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
-              <button type="button" class="rw-none${has?' rw-off':''}" id="rwn_${d.id}" onclick="rwNone('${d.id}')">⏳ لسه مجبتش ليه حاجة</button>
+              <button type="button" class="rw-none${has?' rw-off':''}${pend?' done':''}" id="rwn_${d.id}" onclick="rwNone('${d.id}')" ${pend?'disabled':''}>${pend?'✓ لسه مجبتش ليه حاجة':'⏳ لسه مجبتش ليه حاجة'}</button>
               <span class="rw-hint" id="rwh_${d.id}">${has ? 'متسجّل ✅' : ''}</span>
             </div>
           </div>
@@ -1128,12 +1320,29 @@ function rwPaint(){
         <h3>🔩 قطع الغيار <small style="color:var(--muted);font-weight:700;">(آخر ${list.length} جهاز)</small></h3>
         <button type="button" class="rw-x" onclick="closeRecentWork()">✕</button>
       </div>
+      <div class="rw-info" id="rwInfo">${rwInfoHtml()}</div>
       ${list.length ? body : `<div class="rw-empty">مفيش أجهزة اشتغلت عليها لسه</div>`}
     </div>`;
 }
 
+// تحديث كارت واحد بس بعد حفظ — من غير ما نعيد رسم النافذة كلها.
+// ⚠️ إعادة الرسم كانت هتمسح أي كلام الفني كاتبه في كارت تاني ولسه ما حفظهوش.
+function rwRefreshCard(id){
+  const d = devices.find(x => x.id === id);
+  const card = document.getElementById('rwk_' + id);
+  if(d && card) card.className = rwCardClass(d);
+  rwToggle(id);
+  const info = document.getElementById('rwInfo');
+  if(info) info.innerHTML = rwInfoHtml();
+  // لو ده كان آخر جهاز ناقص → نبشّره إنه يقدر ينصرف
+  if(RW.needAtOpen > 0 && rwNeedList().length === 0){
+    RW.needAtOpen = 0;
+    toast('✅ كله متسجّل — تقدر تنصرف دلوقتي');
+  }
+}
+
 // بتشتغل مع كل حرف بيتكتب أو بيتمسح في المربع.
-// زي لمبة بوشّين: فاضي ← "لسه مجبتش" ، فيه كلام ← "حفظ".
+// زي لمبة بوشّين: فاضي ← «لسه مجبتش» ، فيه كلام ← «حفظ».
 function rwToggle(id){
   const ta   = document.getElementById('rwc_' + id);
   const save = document.getElementById('rws_' + id);
@@ -1142,51 +1351,182 @@ function rwToggle(id){
   if(!ta) return;
   const has = !!ta.value.trim();   // مسافات بس = فاضي
   if(save) save.classList.toggle('rw-off', !has);
-  if(none) none.classList.toggle('rw-off',  has);
-  // علامة "متسجّل" تفضل بس لو الكلام لسه زي المحفوظ بالظبط
+  if(none){
+    none.classList.toggle('rw-off', has);
+    // شكل «اتداس خلاص» بس لو الجهاز فعلاً في حالة pend
+    const d = devices.find(x => x.id === id);
+    const pend = !!d && rwStateOf(d) === 'pend';
+    none.classList.toggle('done', pend);
+    none.disabled = pend;
+    none.textContent = pend ? '✓ لسه مجبتش ليه حاجة' : '⏳ لسه مجبتش ليه حاجة';
+  }
+  // علامة «متسجّل» تفضل بس لو الكلام لسه زي المحفوظ بالظبط
   const d = devices.find(x => x.id === id);
   const saved = d ? (d.partsComment || '').trim() : '';
   if(hint) hint.textContent = (saved && ta.value.trim() === saved) ? 'متسجّل ✅' : '';
 }
 
-// زرار "لسه مجبتش ليه حاجة":
-//   - لو الجهاز مكانش متسجّل عليه حاجة ← بيحط المؤشر في المربع عشان تكتب.
-//   - لو كان متسجّل عليه قطع غيار والفني مسح الكلام ← ده الطريق الوحيد
-//     لمسح المتسجّل (لأن زرار الحفظ بيختفي لما المربع يفضى).
-//     وعشان كده بيسأل الأول — مسح بالغلط لقطع غيار = فلوس ضايعة في الحساب.
+// زرار «لسه مجبتش ليه حاجة» — الفني بيقول بنفسه إنه لسه ما جابش.
+//   - بيسجّل ختم يوم الشغل على الجهاز (partsPendingDay)
+//   - لو الجهاز كان عليه قطع غيار متسجّلة والفني مسح الكلام:
+//     بيسأل الأول، وبعدين بيمسح القطع ويختم «لسه مجبتش» مع بعض.
+//
+// ⚠️ مقصود إننا **مش** بنحدّث lastModifiedAt هنا. لو حدّثناه، الجهاز
+//    هيطلع أول القايمة كل يوم الفني يدوس فيه، فمش هيخرج أبداً من
+//    آخر ٤٠ — وهيفضل يتسأل عليه للأبد.
 async function rwNone(id){
-  const ta = document.getElementById('rwc_' + id);
-  const d  = devices.find(x => x.id === id);
-  const saved = d ? (d.partsComment || '').trim() : '';
-  if(!saved){ if(ta) ta.focus(); return; }
-  if(!confirm('الجهاز ده كان متسجّل عليه قطع غيار.\nعايز تمسحها وتخليه "لسه مجبتش ليه حاجة"؟')) return;
-  await rwSave(id);
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  if(rwStateOf(d) === 'pend' && !(d.partsComment || '').trim()) return;  // متداس خلاص
+  const saved = (d.partsComment || '').trim();
+  if(saved && !confirm('الجهاز ده كان متسجّل عليه قطع غيار:\n«' + saved + '»\n\nعايز تمسحها وتخليه «لسه مجبتش ليه حاجة»؟')) return;
+
+  const day = rwToday();
+  const patch = { partsPendingDay: day, partsPendingAt: new Date().toISOString(), partsPendingBy: ME };
+  if(saved) patch.partsComment = '';
+
+  const nb = document.getElementById('rwn_' + id);
+  if(nb) nb.disabled = true;
+  const ok = await save(id, patch);
+  if(!ok){ if(nb) nb.disabled = false; return; }   // save() طلّعت رسالة الخطأ
+
+  if(!(await rwVerify(id, 'partsPendingDay', day, '«لسه مجبتش»'))){
+    if(nb) nb.disabled = false;
+    return;
+  }
+
+  Object.assign(d, { partsPendingDay: patch.partsPendingDay, partsPendingAt: patch.partsPendingAt });
+  if(d._raw) Object.assign(d._raw, patch);
+  if(saved){
+    d.partsComment = '';
+    const ta = document.getElementById('rwc_' + id); if(ta) ta.value = '';
+  }
+  // التوست الأول، وبعدين rwRefreshCard — عشان لو ده آخر جهاز،
+  // بشارة «تقدر تنصرف» تبقى هي اللي باينة في الآخر مش تتغطى.
+  toast('⏳ اتسجّل «لسه مجبتش» للنهاردة');
+  rwRefreshCard(id);
+}
+
+// ⚠️ Supabase مبيرميش خطأ لو السيرفر تجاهل حقل. فبعد الحفظ بنقرا
+//    الحقل ده بس من السيرفر ونتأكد إنه اتكتب فعلاً — بدل ما الفني
+//    يفتكر إنه رد، ويتمنع من الانصراف من غير ما يفهم ليه.
+//    بترجّع false لو اتأكدنا إنه **مااتكتبش**. لو القراية نفسها فشلت
+//    (نت مثلاً) بنعدّيها — الحفظ نفسه قال إنه نجح.
+async function rwVerify(id, key, expected, label){
+  try{
+    const { data, error } = await sb.from('devices_safe')
+      .select('v:data->>' + key).eq('id', id).maybeSingle();
+    if(error) throw error;
+    if(!data || data.v !== expected){
+      toast('⚠️ السيرفر مسجّلش ' + label + ' — بلّغ الإدارة');
+      console.error(key + ' لم يُحفظ:', id, data);
+      return false;
+    }
+  }catch(e){ console.error('تأكيد ' + key + ':', e); }
+  return true;
+}
+
+// ============================================================
+// سؤال الجهاز المرفوض: «القطع دي رجّعتها؟»
+// ------------------------------------------------------------
+// الإجابة بتتحفظ على الجهاز (partsReturn) + سطر في ملاحظات الجهاز،
+// عشان الإدارة والمحاسب يشوفوها في الداشبورد — مش مستخبية في حقل.
+// ⚠️ مش بنحدّث lastModifiedAt — نفس سبب «لسه مجبتش»: الجهاز
+//    ميطلعش أول القايمة بسبب الرد بس.
+// ============================================================
+async function rwReturn(id, ans){
+  const d = devices.find(x => x.id === id);
+  if(!d || d.partsReturn === ans) return;          // نفس الإجابة — مفيش تغيير
+  const L = { yes:'↩️ رجّعها', no:'✋ مرجعهاش' };
+  // تغيير إجابة قديمة = حاجة ليها علاقة بفلوس → بنسأل الأول
+  if(d.partsReturn && !confirm('إنت قبل كده قلت إن القطع «' + (d.partsReturn==='yes'?'رجعت':'مرجعتش') +
+       '».\nعايز تغيّرها لـ «' + (ans==='yes'?'رجعت':'مرجعتش') + '»؟')) return;
+
+  const txt  = '🔩 قطع الغيار بعد الرفض: ' + L[ans] + ' الفني — «' + (d.partsComment || '').trim() + '»';
+  const note = mkNote(txt);
+  const now  = new Date().toISOString();
+  const patch = { partsReturn: ans, partsReturnAt: now, partsReturnBy: ME,
+                  activityNotes: notesForSave(d, note) };
+
+  const by = document.getElementById('rwy_' + id), bx = document.getElementById('rwx_' + id);
+  if(by) by.disabled = true; if(bx) bx.disabled = true;
+  const ok = await save(id, patch) && await rwVerify(id, 'partsReturn', ans, 'إجابة القطع');
+  if(by) by.disabled = false; if(bx) bx.disabled = false;
+  if(!ok) return;
+
+  d.partsReturn = ans; d.partsReturnAt = now;
+  if(d._raw){ Object.assign(d._raw, patch); }
+  d.notes = (patch.activityNotes || []).map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
+  if(by) by.classList.toggle('on', ans === 'yes');
+  if(bx) bx.classList.toggle('on', ans === 'no');
+  toast(ans === 'yes' ? '✅ اتسجّل إن القطع رجعت' : '✅ اتسجّل إن القطع مرجعتش');
+  rwRefreshCard(id);   // بعد التوست — عشان بشارة «تقدر تنصرف» تبان في الآخر
 }
 
 async function rwSave(id){
   const ta  = document.getElementById('rwc_' + id);
   const btn = document.getElementById('rws_' + id);
-  const nb  = document.getElementById('rwn_' + id);
   const hint= document.getElementById('rwh_' + id);
   if(!ta) return;
   const val = ta.value.trim();
+  if(!val) return;   // الفاضي بيتمسح من زرار «لسه مجبتش» بس
   if(btn) btn.disabled = true;
-  if(nb)  nb.disabled  = true;
   const ok = await save(id, {
     partsComment: val,
     lastModifiedAt: new Date().toISOString(),
     lastModifiedBy: ME
   });
   if(btn) btn.disabled = false;
-  if(nb)  nb.disabled  = false;
   if(ok){
     const d = devices.find(x => x.id === id);
     if(d){ d.partsComment = val; if(d._raw) d._raw.partsComment = val; }
-    rwToggle(id);   // نظبط الزرارين على الحالة الجديدة
-    if(hint) hint.textContent = val ? 'اتحفظ ✅' : 'اتمسح ✅';
-    toast(val ? 'تم حفظ قطع الغيار ✅' : 'اتمسحت قطع الغيار ✅');
+    toast('تم حفظ قطع الغيار ✅');
+    rwRefreshCard(id);   // بعد التوست — نفس السبب اللي فوق
+    if(hint) hint.textContent = 'اتحفظ ✅';
   }
   // لو فشل، save() نفسها بتطلّع رسالة الخطأ الحقيقية — مفيش فشل صامت
+}
+
+// ============================================================
+// 🚪 بوابة الانصراف
+// ------------------------------------------------------------
+// attendance.js بيندهها قبل ما يسجّل انصراف. لو رجّعت true الانصراف
+// بيتلغي وإحنا بنعرض الرسالة. attendance.js نفسه مبيعرفش حاجة عن
+// قطع الغيار — هو بس بيسأل «فيه حد عايز يوقّف الانصراف؟».
+// ⚠️ لازم تفضل متزامنة (من غير await) — سفاري بيضيّع تصريح الموقع
+//    لو الضغطة استنت أي حاجة قبل طلب الموقع.
+// ============================================================
+window.attBeforeOut = function(attState){
+  const n = rwNeedSplit(attState);
+  if(!n.all) return false;
+  pgShow(n);
+  return true;
+};
+
+function pgShow(n){
+  // n = { all, parts, ret } — بنقول للفني كل نوع لوحده
+  const why = [];
+  if(n.parts) why.push(`<b>${rwCount(n.parts)}</b> لسه مكتبتش جبت ليهم قطع غيار إيه.`);
+  if(n.ret)   why.push(`<b>${rwCount(n.ret)}</b> اترفضوا ولسه مقلتش القطع اللي عليهم رجعت ولا لا.`);
+  pgClose();
+  const ov = document.createElement('div');
+  ov.id = 'pgOv'; ov.className = 'pg-ov';
+  ov.onclick = e => { if(e.target === ov) pgClose(); };
+  ov.innerHTML = `
+    <div class="pg-box" dir="rtl">
+      <div class="pg-ic">🚫</div>
+      <h3>الانصراف مش هيتم</h3>
+      <p>فيه:<br>${why.join('<br>')}</p>
+      <button type="button" class="pg-go" onclick="pgGo()">🔩 روح لقطع الغيار</button>
+      <button type="button" class="pg-back" onclick="pgClose()">رجوع</button>
+    </div>`;
+  document.body.appendChild(ov);
+}
+function pgClose(){ const ov = document.getElementById('pgOv'); if(ov) ov.remove(); }
+function pgGo(){
+  pgClose();
+  if(typeof closeAttendance === 'function') closeAttendance();
+  openRecentWork({ jump:true });
 }
 
 // عارض صورة القفل (نمط أو صورة) — دوس على الصورة تكبر
