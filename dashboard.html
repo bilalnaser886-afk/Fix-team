@@ -702,6 +702,12 @@
     box-shadow:0 0 0 1000px var(--surface-2) inset;
     transition:background-color 9999s ease-in-out 0s;
   }
+  /* 🔒 خانة رمز القفل — لون مثبّت بالـID عشان محدش يعلى عليه.
+     وحجم ١٦px مقصود: أقل من كده الأيفون بيكبّر الصفحة لوحده عند الكتابة. */
+  #f_lockText{
+    background:var(--surface-2); color:var(--ink); -webkit-text-fill-color:var(--ink);
+    caret-color:var(--accent); font-size:16px; font-weight:700; letter-spacing:1.5px;
+  }
   .field input:focus, .field textarea:focus{outline:2px solid rgba(8,145,168,.3); border-color:var(--accent);}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .status-pills{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px;}
@@ -1352,7 +1358,14 @@
         </div>
         <div id="lockPane_text">
           <div style="position:relative;">
-            <input id="f_lockText" type="password" data-i18n-ph="lock.textPh" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
+            <!-- ⚠️ كانت type="password" — ودي كانت بتعمل مشكلتين:
+                 ١) بتخفي اللي بيتكتب نقط، والموظف محتاج يقرا الكود وهو بيكتبه
+                 ٢) الأيفون بيعامل خانات كلمة السر معاملة خاصة (اقتراح كلمة سر
+                    وحفظها) **وبيفرض ألوانه هو** — فاللون اللي في الثيم كان بيتلغي
+                    والكتابة تطلع بلون الخلفية.
+                 رمز قفل الجهاز مش سر عن الموظف، فخليناها خانة عادية،
+                 والزرار 🙈 بيخفيها لو حب. -->
+            <input id="f_lockText" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="device-unlock-code" data-lpignore="true" data-i18n-ph="lock.textPh" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 42px 10px 12px;font-family:monospace;" />
             <button type="button" id="lockEye" onclick="toggleLockText()" style="position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:18px;cursor:pointer;padding:6px;">👁</button>
           </div>
         </div>
@@ -3341,8 +3354,8 @@ let lockImageData = '';
 
 function resetLock(){
   lockTab = 'text'; patternSeq = []; patternThumb = ''; lockImageData = '';
-  const t = document.getElementById('f_lockText'); if(t){ t.value=''; t.type='password'; }
-  const eye = document.getElementById('lockEye'); if(eye) eye.textContent = '👁';
+  const t = document.getElementById('f_lockText'); if(t){ t.value=''; t.type='text'; }
+  const eye = document.getElementById('lockEye'); if(eye) eye.textContent = '🙈';   // ظاهر = الزرار بيخفي
   const prev = document.getElementById('lockImgPreview'); if(prev) prev.innerHTML = '';
   const fi = document.getElementById('f_lockImageInput'); if(fi) fi.value = '';
   const lbl = document.getElementById('patternSeqLabel'); if(lbl) lbl.textContent = 'ارسم النمط بإصبعك';
