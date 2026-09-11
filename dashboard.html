@@ -559,7 +559,9 @@
   .tp-load .bv-spin{width:20px; height:20px;}
 
   .tv-lock{background:var(--warn-tint); border:1px solid var(--warn-border); border-radius:11px; padding:12px 13px; margin-top:6px;}
-  .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:#0F172A; letter-spacing:1px;}
+  /* ⚠️ كان color:#0F172A ثابت — كحلي غامق على خلفية غامقة = مختفي.
+     أي لون نص ثابت بيبوظ في وضع من التنين؛ var(--ink) بيتقلب لوحده. */
+  .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:var(--ink); letter-spacing:1px;}
   .tv-code-hidden{font-family:monospace; font-weight:800; font-size:19px; color:var(--muted-2); letter-spacing:3px;}
   .tv-eye{border:1px solid var(--border); background:var(--surface); border-radius:9px; padding:8px 12px;
           font-family:'Tajawal',sans-serif; font-weight:800; font-size:13px; cursor:pointer; color:var(--ink-2);}
@@ -678,6 +680,27 @@
   .field input, .field textarea{
     width:100%; border:1px solid var(--border); border-radius:8px; padding:9px 11px;
     font-size:13px; font-family:inherit; color:var(--ink); resize:vertical;
+  }
+  /* ⚠️ الخانات كانت مالهاش background ولا -webkit-text-fill-color.
+     يعني اللون كان متسايب للمتصفح — وده بيختلف من موبايل للتاني،
+     وبيخلي الكتابة سودة على خلفية سودة في الوضع الداكن. وخانة
+     الباسورد أوضح واحدة لأن المتصفح بيعاملها معاملة خاصة (حفظ
+     كلمات السر). دلوقتي اللون معلَن صراحةً من متغيّرات الثيم. */
+  .field input, .field textarea, .field select{
+    background:var(--surface-2); color:var(--ink); -webkit-text-fill-color:var(--ink);
+    caret-color:var(--accent);
+  }
+  .field input::placeholder, .field textarea::placeholder{color:var(--muted-2); -webkit-text-fill-color:var(--muted-2); opacity:1;}
+  /* المتصفح بيفرض لونه الخاص على الخانات اللي بيملاها تلقائي —
+     وده اللي بيخلي الباسورد يطلع أسود. بنلغيه بلون الثيم. */
+  .field input:-webkit-autofill,
+  .field input:-webkit-autofill:hover,
+  .field input:-webkit-autofill:focus{
+    -webkit-text-fill-color:var(--ink);
+    caret-color:var(--accent);
+    -webkit-box-shadow:0 0 0 1000px var(--surface-2) inset;
+    box-shadow:0 0 0 1000px var(--surface-2) inset;
+    transition:background-color 9999s ease-in-out 0s;
   }
   .field input:focus, .field textarea:focus{outline:2px solid rgba(8,145,168,.3); border-color:var(--accent);}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
@@ -3436,7 +3459,7 @@ function viewLockImage(id){
 function lockDisplayHtml(d){
   const editBtn = `<button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin:8px 0 10px;"${d.status==='returned'?' disabled':''} onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
-    return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
+    return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:var(--ink);">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
     return `<div style="margin:10px 0;">
       <div style="font-size:13px;color:var(--muted);margin-bottom:5px;">🔒 نمط القفل${d.lockPattern?` — <span style="font-family:monospace;font-weight:700;">${esc(d.lockPattern)}</span>`:''}</div>
