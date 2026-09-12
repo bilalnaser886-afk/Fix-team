@@ -204,7 +204,9 @@
       'dpart.partsCost': 'تكلفة قطع الغيار',
       'dpart.net': 'صافي ربح الجهاز',
       'dpart.unlink': 'إلغاء الربط',
-      'dpart.suppliesNote': 'لوازم الصيانة مش داخلة في تكلفة الجهاز.'
+      'dpart.suppliesNote': 'لوازم الصيانة مش داخلة في تكلفة الجهاز.',
+      'dpart.techNote': '🔩 الفني كتب:',
+      'dpart.techNoteEmpty': 'الفني ما كتبش قطع غيار.'
     },
     en: {
       'pur.menu': 'Purchase Invoices',
@@ -346,7 +348,9 @@
       'dpart.partsCost': 'Spare-parts cost',
       'dpart.net': 'Device net profit',
       'dpart.unlink': 'Unlink',
-      'dpart.suppliesNote': 'Maintenance supplies are excluded from device cost.'
+      'dpart.suppliesNote': 'Maintenance supplies are excluded from device cost.',
+      'dpart.techNote': '🔩 Technician wrote:',
+      'dpart.techNoteEmpty': 'Technician did not write any parts.'
     }
   };
 
@@ -1758,6 +1762,15 @@
     border-radius:10px; padding:11px; font-family:inherit; font-size:13.5px; font-weight:800; cursor:pointer; margin:4px 0 12px;}
   .dp-add:hover{background:var(--surface-alt,#E6F6F9);}
   .dp-empty{font-size:13px; color:var(--muted-2,#94A3B8); text-align:center; padding:12px 0;}
+  /* 🔩 كلام الفني — ده غير القطع المربوطة من المخزن.
+     ده اللي هو كتبه بإيده، وبيتقارن بالمربوط عشان نعرف لو فيه
+     قطعة اتصرفت من غير ما تتسجّل. */
+  .dp-tech{font-size:13px; line-height:1.8; border-radius:10px; padding:9px 11px; margin-bottom:10px;
+    background:var(--warn-bg,#FFF7ED); border:1px solid var(--warn-border,#FDE68A); color:var(--ink,#1A2332);
+    white-space:pre-wrap; word-break:break-word;}
+  .dp-tech b{font-weight:800;}
+  .dp-tech.none{background:none; border:1px dashed var(--border,#E2E8F0);
+    color:var(--muted-2,#94A3B8); font-style:italic; white-space:normal;}
   .dp-fin{background:#0F172A08; border-radius:10px; padding:12px 14px;}
   .dp-fin-row{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding:4px 0; color:var(--ink-2,#475569);}
   .dp-fin-row b{font-family:'Cairo',sans-serif;}
@@ -1959,8 +1972,15 @@
             </div>`).join('')
           : `<div class="dp-empty">${esc(T('dpart.empty'))}</div>`);
 
+    // ⚠️ الداشبورد بيخزّن الحقول بالأسماء الكاملة، والديسباتشر
+    //    بيخزّنها مختصرة وبيسيب الأصل في _raw — فبندوّر في التنين.
+    const techNote = String((d && d.partsComment) || (d && d._raw && d._raw.partsComment) || '').trim();
+
     return `
       <div class="dp-head">${esc(T('dpart.title'))}</div>
+      ${techNote
+        ? `<div class="dp-tech"><b>${esc(T('dpart.techNote'))}</b> ${esc(techNote)}</div>`
+        : `<div class="dp-tech none">${esc(T('dpart.techNoteEmpty'))}</div>`}
       ${list}
       <button type="button" class="dp-add" onclick="INV.openPickForDevice()">${esc(T('dpart.add'))}</button>
       <div class="dp-fin">
