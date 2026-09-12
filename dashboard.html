@@ -1147,6 +1147,13 @@
     color:var(--ink);border-radius:12px;padding:11px 14px;font:inherit;font-size:14px;margin-bottom:14px;}
   .pr-search:focus{outline:none;border-color:var(--accent);}
   .pr-res-h{font-size:12.5px;color:var(--muted);font-weight:700;margin:0 2px 10px;}
+  /* 🧰 القطع المربوطة من المخزن جوه كارت المراجعة */
+  .pr-link{margin-top:6px;font-size:12.5px;line-height:1.75;color:var(--ink);
+    background:var(--done-bg);border:1px solid var(--done);border-radius:9px;padding:7px 9px;}
+  .pr-link b{font-weight:800;}
+  .pr-link-t{font-weight:800;color:var(--done);white-space:nowrap;}
+  .pr-link.none,.pr-link.wait{background:none;border:1px dashed var(--border);color:var(--muted);font-style:italic;}
+
   /* سطر المحل والفني جوه كارت الجهاز */
   .pr-dev-m{font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;}
   .pr-dev-m b{color:var(--ink);font-weight:700;}
@@ -8340,6 +8347,55 @@ function closePartsReview(){
 // وأخطاء الكتابة البسيطة. ⚠️ مش بنستخدم الفهرس المشترك بتاعه (index)
 // — ده متبني على حقول تانية للبحث الرئيسي، ولو لمسناه هنبوّظه هناك.
 // الأجهزة هنا قليلة (المدة بس)، فالمطابقة المباشرة سريعة كفاية.
+
+// ------------------------------------------------------------
+// 🔩 القطع المربوطة من المخزن
+// ------------------------------------------------------------
+// فرق مهم: `partsComment` هو اللي **الفني كتبه بإيده**، والقطع دي
+// هي اللي **اتربطت فعلاً من المخزن** (جدول spare_parts) وليها تكلفة.
+// الاتنين بيظهروا مع بعض عشان المحاسب يقارن: الفني قال «شاشة»
+// وهل اتربطت شاشة فعلاً ولا لأ.
+//
+// ⚠️ بنجيبها للأجهزة الظاهرة في الفترة بس — مش كل المخزن.
+//    وعلى دفعات صغيرة لأن الرابط بيتبعت في العنوان وليه حد أقصى.
+var PR_LINK = {};          // رقم الجهاز → [قطع]
+var PR_LINK_DONE = {};     // اللي اتجاب قبل كده (حتى لو فاضي)
+
+async function prLoadLinked(ids){
+  const need = (ids || []).filter(id => id && !PR_LINK_DONE[id]);
+  if(!need.length) return false;
+  const CH = 60;
+  try{
+    for(let i = 0; i < need.length; i += CH){
+      const chunk = need.slice(i, i + CH);
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id,name,total_cost').in('device_id', chunk);
+      if(error) throw error;
+      (data || []).forEach(p => {
+        (PR_LINK[p.device_id] = PR_LINK[p.device_id] || []).push(p);
+      });
+      chunk.forEach(id => { PR_LINK_DONE[id] = 1; });
+    }
+    return true;
+  }catch(e){
+    // بنعلّم الدفعة كأنها اتجابت عشان مندخلش في لفة تحميل لا تنتهي
+    need.forEach(id => { PR_LINK_DONE[id] = 1; });
+    console.error('prLoadLinked failed:', e);
+    return false;
+  }
+}
+
+// سطر القطع المربوطة جوه كارت الجهاز
+function prLinkHtml(id){
+  if(!PR_LINK_DONE[id]) return `<div class="pr-link wait">⏳ بنجيب القطع المربوطة…</div>`;
+  const list = PR_LINK[id] || [];
+  if(!list.length) return `<div class="pr-link none">🧰 مفيش قطع مربوطة من المخزن</div>`;
+  const tot = list.reduce((a, p) => a + Number(p.total_cost || 0), 0);
+  return `<div class="pr-link">🧰 <b>مربوط من المخزن (${list.length}):</b> ` +
+    list.map(p => esc(p.name)).join('، ') +
+    ` <span class="pr-link-t">${tot.toLocaleString()} ج.م</span></div>`;
+}
+
 function prFields(d){
   return [d.model, d.deviceType, d.customerName, d.shopName,
           d.reportedIssue, d.partsComment, prTechOf(d)];
@@ -8370,6 +8426,7 @@ function prDevHtml(d, showTech){
           <div class="pr-dev-i">⚠️ ${esc(d.reportedIssue || '—')}</div>
           ${cm ? `<div class="pr-cm">🔩 ${esc(cm)}</div>`
                : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
+          ${prLinkHtml(d.id)}
         </div>`;
 }
 
@@ -8412,6 +8469,8 @@ function prRenderList(){
   if(!host) return;
   // الأساس دايماً: أجهزة الفترة اللي ليها فني — نفس اللي المراجعة بتعرضه
   const rows = (devices || []).filter(prInRange).filter(d => prTechOf(d));
+  // القطع المربوطة بتتجاب بعد الرسم، وأول ما توصل بنعيد الرسم مرة واحدة
+  prLoadLinked(rows.map(d => d.id)).then(got => { if(got) prRenderList(); });
 
   // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
