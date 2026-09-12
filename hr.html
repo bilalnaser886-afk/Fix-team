@@ -242,6 +242,14 @@
   .card-ded{background:var(--rejected-bg,#FEF2F2); color:var(--red); font-size:12px;
     font-weight:800; padding:8px 13px; border-top:1px solid var(--border);}
   html[data-theme="dark"] .card-ded{background:rgba(240,85,74,.13);}
+  /* 🏖️ شاشة الغياب */
+  .abs-head{margin-bottom:12px;}
+  .abs-head .meta{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .abs-warn{margin-top:8px; background:var(--waiting-bg,#FFF7ED); color:var(--waiting,#B45309);
+    border:1px solid var(--waiting,#B45309); border-radius:10px; padding:9px 11px;
+    font-size:12.5px; font-weight:800; line-height:1.7;}
+  .abs-acts{display:flex; gap:7px; margin-top:8px;}
+  .abs-acts .mini-btn{flex:1; padding:9px 6px;}
   .card-ded i{font-style:normal; opacity:.85;}
   /* قايمة الخصومات جوه سجل الموظف */
   .ded-row{display:flex; align-items:flex-start; gap:10px; background:var(--surface);
@@ -350,6 +358,16 @@
             onclick="closeSheet('dedSheet')">×</button>
   </div>
   <div class="sheet-body" id="dedBody"></div>
+</div>
+
+<!-- ===== 🏖️ مراجعة الغياب ===== -->
+<div class="sheet" id="absSheet">
+  <div class="sheet-head">
+    <h2>🏖️ مراجعة الغياب</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeAbsences()">×</button>
+  </div>
+  <div class="sheet-body" id="absBody"></div>
 </div>
 
 <!-- ===== الإعدادات العامة ===== -->
@@ -469,6 +487,7 @@ async function loadMonth(){
     await loadPenalties(from, to);  // 🔴 خصم التأخير — من السيرفر
     await loadOvertime(from, to);   // 🔴 والأوفر تايم كمان
     await loadDeductions();    // والخصومات اليدوية كمان
+    await loadAbsences(from, to);   // 🏖️ الغياب المقترح خصمه
     render();
   }catch(e){
     console.error('loadMonth failed:', e);
@@ -637,6 +656,7 @@ function cardHtml(e, days){
       return `<div class="card-ded">💸 خصم يدوي: <b>${m.total}</b> ج.م${
         m.unseen ? ` · <i>${m.unseen} لسه ما اتقراش</i>` : ''}</div>`;
     })()}
+    ${absBoxHtml(e)}
     <div class="card-foot">
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
       <button onclick="openDeduction('${esc(e)}')" title="خصم">💸</button>
@@ -916,6 +936,171 @@ async function loadPenalties(from, to){
   }
 }
 
+// ============================================================
+// 🏖️ الغياب — اقتراح خصم مش خصم
+// ------------------------------------------------------------
+// السيرفر بيحسب أيام الغياب الزيادة عن المسموح والمبلغ المقترح.
+// 🔴 مفيش فلوس بتتحرك من هنا. لازم HR تدوس «بإذن» أو «اخصم».
+// «اخصم» بتحوّله لخصم يدوي عادي — فالموظف بياخد إشعاره المعتاد.
+// ============================================================
+let ABS = {};   // إيميل → { تاريخ: صف }
+
+async function loadAbsences(from, to){
+  try{
+    const { data, error } = await sb.rpc('hr_absences',
+      { p_email: null, p_from: from, p_to: to });
+    if(error) throw error;
+    ABS = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (ABS[e] = ABS[e] || {})[r.work_date] = r;
+    });
+  }catch(e){
+    // ⚠️ الفشل الصامت هنا = HR تفتكر إن مفيش غياب خالص
+    console.error('loadAbsences failed:', e);
+    ABS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42883|42P01/i.test(t))
+      console.warn('⚠️ ميزة الغياب لسه ماتركبتش — شغّل 47-absence.sql');
+  }
+}
+
+// ملخص غياب الموظف في الشهر المعروض
+function absSum(email){
+  const byDay = ABS[(email||'').toLowerCase()] || {};
+  const days = Object.keys(byDay).sort().reverse();
+  let pending = 0, pendingDays = 0, charged = 0, excused = 0, free = 0;
+  days.forEach(d => {
+    const r = byDay[d];
+    if(r.status === 'charged'){ charged += Number(r.amount || r.total_amount || 0); return; }
+    if(r.status === 'excused'){ excused++; return; }
+    if(r.is_over){ pending += Number(r.total_amount || 0); pendingDays++; }
+    else free++;
+  });
+  return { days, pending: Math.round(pending*100)/100, pendingDays,
+           charged: Math.round(charged*100)/100, excused, free, count: days.length };
+}
+
+function absBoxHtml(email){
+  const a = absSum(email);
+  if(!a.count) return '';
+  const bits = [];
+  if(a.pendingDays) bits.push(`<b>${a.pendingDays}</b> يوم زيادة`);
+  if(a.free)    bits.push(`${a.free} جوه المسموح`);
+  if(a.excused) bits.push(`${a.excused} بإذن`);
+  if(a.charged) bits.push(`اتخصم ${a.charged} ج.م`);
+  return `
+    <div class="card-ded" style="background:var(--waiting-bg,#FFF7ED);color:var(--waiting,#B45309);border-color:var(--waiting,#B45309)">
+      🏖️ غياب: ${bits.join(' · ')}
+      ${a.pending ? `<div style="margin-top:4px;font-weight:800;">المقترح خصمه: ${a.pending} ج.م</div>
+        <div style="margin-top:2px;font-size:11.5px;font-weight:700;opacity:.9;">
+          ⚠️ المبلغ ده <u>لسه ما اتخصمش</u> — واقف على قرارك</div>` : ''}
+      <button class="mini-btn" style="margin-top:6px;" onclick="openAbsences('${esc(email)}')">📋 راجع الأيام</button>
+    </div>`;
+}
+
+// شاشة مراجعة الأيام — بتستخدم نفس شيت السجل
+let ABS_EMAIL = '';
+function openAbsences(email){
+  ABS_EMAIL = email;
+  renderAbsences();
+  const sh = document.getElementById('absSheet');
+  if(sh) sh.classList.add('open');
+}
+function closeAbsences(){
+  const sh = document.getElementById('absSheet');
+  if(sh) sh.classList.remove('open');
+}
+
+function renderAbsences(){
+  const host = document.getElementById('absBody');
+  if(!host) return;
+  const byDay = ABS[(ABS_EMAIL||'').toLowerCase()] || {};
+  const days = Object.keys(byDay).sort().reverse();
+  const a = absSum(ABS_EMAIL);
+  host.innerHTML = `
+    <div class="abs-head">
+      <b>${esc(nameOf(ABS_EMAIL))}</b>
+      <div class="meta">المسموح في الشهر: ${days.length ? (byDay[days[0]].allowance + ' يوم (منهم ' + byDay[days[0]].off_in_month + ' راحة)') : '—'}</div>
+      ${a.pending ? `<div class="abs-warn">⚠️ ${a.pending} ج.م مقترحة — لسه ما اتخصمتش. أي خصم بيتم بقرارك إنت بس.</div>` : ''}
+    </div>
+    ${days.length ? days.map(d => absDayHtml(byDay[d])).join('') : '<div class="empty">مفيش غياب في الشهر ده</div>'}`;
+}
+
+function absDayHtml(r){
+  const d = new Date(r.work_date).toLocaleDateString('ar-EG',
+    { weekday:'long', day:'numeric', month:'long' });
+  const money = Number(r.total_amount || 0);
+  let body;
+  if(r.status === 'charged'){
+    body = `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">💸 اتخصم ${Number(r.amount||0)} ج.م</span>
+      <div class="meta">الخصم موجود في شاشة الخصومات — لو غلط شيله من هناك عشان يفضل ليه سبب.</div>`;
+  }else if(r.status === 'excused'){
+    body = `<span class="flag" style="background:var(--done-bg);color:var(--done)">✅ بإذن</span>
+      ${r.reason ? `<div class="meta">${esc(r.reason)}</div>` : ''}
+      <button class="mini-btn" onclick="absUndo('${esc(r.work_date)}')">↩️ تراجع</button>`;
+  }else if(!r.is_over){
+    body = `<span class="flag">جوه المسموح (يوم رقم ${r.used_no} من ${r.allowance})</span>`;
+  }else{
+    body = `
+      <div class="meta">يوم رقم <b>${r.used_no}</b> والمسموح <b>${r.allowance}</b> —
+        المقترح: ${Number(r.day_amount||0)} (المرتب ÷ ٣٠)${
+        Number(r.penalty_amount||0) ? ' + ' + Number(r.penalty_amount) + ' عقوبة' : ''} =
+        <b>${money} ج.م</b></div>
+      <div class="abs-acts">
+        <button class="mini-btn" onclick="absDecide('${esc(r.work_date)}','excused')">✅ بإذن</button>
+        <button class="mini-btn danger" onclick="absDecide('${esc(r.work_date)}','charged')">💸 اخصم ${money}</button>
+      </div>`;
+  }
+  return `<div class="day"><div class="day-h"><span>${esc(d)}</span></div>${body}</div>`;
+}
+
+async function absDecide(date, status){
+  const nm = nameOf(ABS_EMAIL);
+  const byDay = ABS[(ABS_EMAIL||'').toLowerCase()] || {};
+  const r = byDay[date];
+  if(!r) return;
+  let why = '';
+  if(status === 'excused'){
+    why = prompt('سبب الإذن (هيتسجّل):', '');
+    if(why === null) return;
+  }else{
+    // 🔴 تأكيد صريح: دي فلوس بتتشال من مرتب حد
+    if(!confirm(`تأكيد الخصم\n\nالموظف: ${nm}\nاليوم: ${date}\nالمبلغ: ${Number(r.total_amount||0)} ج.م\n\nهيتسجّل كخصم والموظف هيتبلّغ بيه.`)) return;
+    why = prompt('سبب إضافي (اختياري):', '') || '';
+  }
+  try{
+    const { error } = await sb.rpc('hr_absence_decide',
+      { p_email: ABS_EMAIL, p_date: date, p_status: status, p_reason: why || null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await loadDeductions();
+    await reloadAbsences();
+    render(); renderAbsences();
+    alert(status === 'charged' ? 'اتخصم ✅' : 'اتسجّل إذن ✅');
+  }catch(e){
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+async function absUndo(date){
+  if(!confirm('تتراجع عن الإذن؟ اليوم هيرجع مقترح للخصم.')) return;
+  try{
+    const { error } = await sb.rpc('hr_absence_undo', { p_email: ABS_EMAIL, p_date: date });
+    if(error) throw error;
+    await reloadAbsences();
+    render(); renderAbsences();
+  }catch(e){ alert('❌ ' + (e.message || e)); }
+}
+
+// إعادة تحميل الغياب لنفس الشهر المعروض
+async function reloadAbsences(){
+  const y = +MONTH.slice(0,4), m = +MONTH.slice(5,7);
+  const from = MONTH + '-01';
+  const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
+  await loadAbsences(from, to);
+}
+
 const DAY_NAMES = ['الأحد','الاتنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
 async function loadEmpSettings(){
@@ -1013,6 +1198,16 @@ function renderHrSettings(){
       <input type="number" id="fPenalty" min="0" step="5" value="${Number(c.late_penalty != null ? c.late_penalty : 50)}">
     </label>
 
+    <label class="fld"><span>🏖️ عدد الإجازات في الشهر</span>
+      <small>أيام الراحة الأسبوعية محسوبة جوّه العدد ده. سيبه فاضي = تلقائي (عدد أيام الراحة في الشهر)، يعني أي غياب زيادة يتحسب.</small>
+      <input type="number" id="fLeave" min="0" max="31" placeholder="تلقائي" value="${c.monthly_leave_days != null ? Number(c.monthly_leave_days) : ''}">
+    </label>
+
+    <label class="fld"><span>💸 عقوبة الغياب بدون إذن (بالجنيه)</span>
+      <small>بتتزاد على خصم اليوم (المرتب ÷ ٣٠). صفر = اليوم بس من غير عقوبة.</small>
+      <input type="number" id="fAbsPen" min="0" step="5" value="${Number(c.absence_penalty||0)}">
+    </label>
+
     <div class="fld"><span>📅 يوم الإجازة</span>
       <small>تقدر تختار أكتر من يوم. دوس على اليوم عشان تشيله أو تحطه.</small>
       <div class="days">
@@ -1067,6 +1262,10 @@ function stashForm(c){
   if(g('fBreak')      !== undefined) c.break_minutes       = parseInt(g('fBreak'),10) || 0;
   if(g('fBreakGrace') !== undefined) c.break_grace_minutes = parseInt(g('fBreakGrace'),10) || 0;
   if(g('fBreakPen')   !== undefined) c.break_penalty       = parseFloat(g('fBreakPen')) || 0;
+  // ⚠️ الإجازات: فاضي معناه «تلقائي» مش صفر — والفرق كبير.
+  //    صفر = مفيش أي إجازة والكل يتخصم.
+  if(g('fLeave')      !== undefined) c.monthly_leave_days  = (g('fLeave') === '' ? null : (parseInt(g('fLeave'),10) || 0));
+  if(g('fAbsPen')     !== undefined) c.absence_penalty     = parseFloat(g('fAbsPen')) || 0;
   if(g('fNote')    !== undefined) c.note          = g('fNote') || null;
 }
 
@@ -1090,6 +1289,8 @@ async function saveEmpSettings(){
     break_minutes: c.break_minutes || 0,
     break_grace_minutes: c.break_grace_minutes || 0,
     break_penalty: c.break_penalty || 0,
+    monthly_leave_days: c.monthly_leave_days != null ? c.monthly_leave_days : null,
+    absence_penalty: c.absence_penalty || 0,
     note: c.note || null,
     updated_at: new Date().toISOString(),
     updated_by: ME
