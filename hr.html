@@ -627,7 +627,7 @@ function cardHtml(e, days){
     <div class="card-stats" style="padding-top:0;">
       <div><b style="color:${short ? 'var(--waiting)' : 'inherit'}">${fmtHm(short)}</b><span>نقص</span></div>
       <div><b style="color:${late ? 'var(--red)' : 'inherit'}">${late}</b><span>تأخير</span></div>
-      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم تأخير</span></div>
+      <div><b style="color:${penalty ? 'var(--red)' : 'inherit'}">${penalty || 0}</b><span>خصم تلقائي</span></div>
     </div>
     ${(() => {
       // شريط الخصم اليدوي — بيظهر لو فيه خصم بس، عشان الكارت
@@ -730,6 +730,14 @@ function renderEmpSheet(email, days){
     </div>`;
 }
 
+// سبب الخصم بالكلام — الموظف والـHR لازم يعرفوا الفلوس راحت ليه
+function penaltyWhy(r){
+  const bits = [];
+  if(r.latePen)  bits.push(`تأخير ${r.latePen} ج.م`);
+  if(r.breakPen) bits.push(`تعدّي البريك ${r.breakPen} ج.م (بريك ${fmtDur(r.breakMin)} والمسموح ${fmtDur(r.breakLimit)})`);
+  return bits.length ? 'خصم تلقائي: ' + bits.join(' + ') : 'الخصم ده تلقائي حسب المواعيد';
+}
+
 function dayHtml(d, punches, email){
   const s = dayMinutes(punches);
   const r = email ? applyRules(email, punches, d) : null;
@@ -738,9 +746,13 @@ function dayHtml(d, punches, email){
     <div class="punch" style="border-bottom:1px solid var(--border); padding-bottom:7px; margin-bottom:5px;">
       <span style="color:${STATE_LBL[r.state].c}; font-weight:800;">${STATE_LBL[r.state].t}
         ${r.penalty ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">خصم ${r.penalty} ج.م</span>` : ''}
+        ${r.breakPen ? `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)">☕ زوّد البريك ${fmtDur(r.breakOver)}</span>` : ''}
+        ${(!r.breakPen && r.breakOver && r.breakLimit) ? `<span class="flag">☕ زوّد ${fmtDur(r.breakOver)}</span>` : ''}
+        ${r.breakOpen ? `<span class="flag">☕ بريك مفتوح</span>` : ''}
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
       <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
-        r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}</span>
+        r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}${
+        r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}</span>
     </div>
     ${r.beforeStart ? `
       <div class="punch" style="padding-bottom:7px;">
@@ -753,7 +765,7 @@ function dayHtml(d, punches, email){
       </div>` :
       (r.penalty ? `
       <div class="punch" style="padding-bottom:7px;">
-        <span class="meta" style="flex:1;">الخصم ده تلقائي حسب المواعيد</span>
+        <span class="meta" style="flex:1;">${penaltyWhy(r)}</span>
         <button class="mini-btn danger" onclick="waivePenalty('${esc(email)}','${esc(d)}')">✋ شيل الخصم</button>
       </div>` : ''))}`;
   return `
@@ -1010,7 +1022,18 @@ function renderHrSettings(){
     </div>
 
     <label class="fld"><span>☕ البريك المسموح (بالدقايق في اليوم)</span>
+      <small>مجموع البريكات في اليوم. سيبه صفر لو مفيش بريك مسموح.</small>
       <input type="number" id="fBreak" min="0" max="480" value="${Number(c.break_minutes||0)}">
+    </label>
+
+    <label class="fld"><span>⏳ سماح البريك (بالدقايق)</span>
+      <small>مثال: مسموح ٣٠ وسماح ٥ — اللي ياخد ٣٤ مايتخصمش، واللي ياخد ٣٦ يتخصم.</small>
+      <input type="number" id="fBreakGrace" min="0" max="240" value="${Number(c.break_grace_minutes||0)}">
+    </label>
+
+    <label class="fld"><span>💸 خصم تعدّي البريك (بالجنيه)</span>
+      <small>مبلغ ثابت مرة واحدة في اليوم مهما زوّد. صفر = مفيش خصم.</small>
+      <input type="number" id="fBreakPen" min="0" step="5" value="${Number(c.break_penalty||0)}">
     </label>
 
     <label class="fld"><span>📝 ملاحظات</span>
@@ -1041,7 +1064,9 @@ function stashForm(c){
   if(g('fHours')   !== undefined) c.work_hours    = parseFloat(g('fHours')) || 8;
   if(g('fBackup')  !== undefined) c.backup_start  = g('fBackup') || null;
   if(g('fPenalty') !== undefined) c.late_penalty  = parseFloat(g('fPenalty')) || 0;
-  if(g('fBreak')   !== undefined) c.break_minutes = parseInt(g('fBreak'),10) || 0;
+  if(g('fBreak')      !== undefined) c.break_minutes       = parseInt(g('fBreak'),10) || 0;
+  if(g('fBreakGrace') !== undefined) c.break_grace_minutes = parseInt(g('fBreakGrace'),10) || 0;
+  if(g('fBreakPen')   !== undefined) c.break_penalty       = parseFloat(g('fBreakPen')) || 0;
   if(g('fNote')    !== undefined) c.note          = g('fNote') || null;
 }
 
@@ -1063,6 +1088,8 @@ async function saveEmpSettings(){
     late_penalty: c.late_penalty != null ? c.late_penalty : 50,
     off_days: Array.isArray(c.off_days) ? c.off_days : [],
     break_minutes: c.break_minutes || 0,
+    break_grace_minutes: c.break_grace_minutes || 0,
+    break_penalty: c.break_penalty || 0,
     note: c.note || null,
     updated_at: new Date().toISOString(),
     updated_by: ME
@@ -1149,7 +1176,15 @@ function applyRules(email, punches, workDate){
     leaveAt: Number(row.counted_min) + need,
     need,
     // السيرفر بيصفّر الخصم لوحده لو HR شالته — مش بنكرّر الفحص هنا
+    // 🔴 penalty = المجموع (تأخير + بريك) — السيرفر بيجمعهم.
+    //    التفصيل تحت عشان العرض يقول السبب الصح.
     penalty: Number(row.penalty || 0),
+    latePen:   Number(row.late_penalty_amt  || 0),
+    breakPen:  Number(row.break_penalty_amt || 0),
+    breakMin:  Number(row.break_min || 0),
+    breakLimit:Number(row.break_allow_min || 0),
+    breakOver: Number(row.break_over_min || 0),
+    breakOpen: !!row.break_open,
     state:   row.state,
     waived:  !!row.waived,
     waiveReason: row.waive_reason || '',
