@@ -494,7 +494,22 @@ function payWaivedDedCard(r){
   </div>`;
 }
 
-// خصم تأخير تلقائي جديد — الموظف لسه ما شافوش
+// سبب الخصم بالكلام.
+// ⚠️ الخصم التلقائي بقى نوعين: تأخير و/أو تعدّي البريك (migration 46)،
+//    و r.penalty هو **المجموع**. لو سبنا الكلام «تأخير» زي الأول،
+//    الموظف اللي اتخصم على البريك هيقرا سبب غلط ويجي يتخانق.
+function _payWhy(r){
+  const late  = Number(r.late_penalty_amt  || 0);
+  const brk   = Number(r.break_penalty_amt || 0);
+  const bits  = [];
+  // الأعمدة الجديدة مش موجودة؟ (السيرفر لسه ما اتحدّثش) — نرجع للكلام القديم
+  if(!late && !brk) return `تأخير — ميعادك <b>${_payHm(r.shift_min)}</b> وحضرت <b>${_payHm(r.arrived_min)}</b> (متأخر ${_payDur(r.late_min)}).`;
+  if(late) bits.push(`تأخير — ميعادك <b>${_payHm(r.shift_min)}</b> وحضرت <b>${_payHm(r.arrived_min)}</b> (متأخر ${_payDur(r.late_min)}) = ${payMoney(late)} ج.م`);
+  if(brk)  bits.push(`تعدّي البريك — أخدت <b>${_payDur(r.break_min)}</b> والمسموح <b>${_payDur(r.break_allow_min)}</b> (زوّدت ${_payDur(r.break_over_min)}) = ${payMoney(brk)} ج.م`);
+  return bits.join('<br>');
+}
+
+// خصم تلقائي جديد (تأخير و/أو بريك) — الموظف لسه ما شافوش
 function payLateCard(r){
   const d = new Date(r.work_date).toLocaleDateString('ar-EG',
     { weekday:'long', day:'numeric', month:'long' });
@@ -504,9 +519,7 @@ function payLateCard(r){
       <div class="pay-amt">− ${payMoney(r.penalty)} <small>ج.م</small></div>
       <div class="pay-when">${_payEsc(d)}</div>
     </div>
-    <div class="pay-why"><b>السبب:</b> تأخير — ميعادك
-      <b>${_payHm(r.shift_min)}</b> وحضرت <b>${_payHm(r.arrived_min)}</b>
-      (متأخر ${_payDur(r.late_min)}).</div>
+    <div class="pay-why"><b>السبب:</b> ${_payWhy(r)}</div>
     <div class="pay-why" style="font-size:12px;opacity:.85;">
       الخصم ده اتحسب تلقائي من مواعيدك. لو شايف إنه غلط، كلّم شؤون العاملين.</div>
     <button class="pay-ok-btn" onclick="payAckPenalty('${_payEsc(r.work_date)}')">👍 فهمت</button>
@@ -522,7 +535,7 @@ function payWaivedLateCard(w){
       <div class="pay-when">${_payEsc(new Date(w.work_date).toLocaleDateString('ar-EG',
         { weekday:'long', day:'numeric', month:'long' }))}</div>
     </div>
-    <div class="pay-why">خصم التأخير بتاع اليوم ده اتشال.</div>
+    <div class="pay-why">الخصم التلقائي بتاع اليوم ده اتشال.</div>
     <div class="pay-why" style="color:var(--p-green);">
       <b>السبب:</b> ${_payEsc(w.reason || '—')}</div>
     <button class="pay-ok-btn" onclick="payAckWaiver('${_payEsc(w.work_date)}')">👍 فهمت</button>

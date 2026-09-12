@@ -559,7 +559,9 @@
   .tp-load .bv-spin{width:20px; height:20px;}
 
   .tv-lock{background:var(--warn-tint); border:1px solid var(--warn-border); border-radius:11px; padding:12px 13px; margin-top:6px;}
-  .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:#0F172A; letter-spacing:1px;}
+  /* ⚠️ كان color:#0F172A ثابت — كحلي غامق على خلفية غامقة = مختفي.
+     أي لون نص ثابت بيبوظ في وضع من التنين؛ var(--ink) بيتقلب لوحده. */
+  .tv-code{font-family:monospace; font-weight:800; font-size:19px; color:var(--ink); letter-spacing:1px;}
   .tv-code-hidden{font-family:monospace; font-weight:800; font-size:19px; color:var(--muted-2); letter-spacing:3px;}
   .tv-eye{border:1px solid var(--border); background:var(--surface); border-radius:9px; padding:8px 12px;
           font-family:'Tajawal',sans-serif; font-weight:800; font-size:13px; cursor:pointer; color:var(--ink-2);}
@@ -678,6 +680,33 @@
   .field input, .field textarea{
     width:100%; border:1px solid var(--border); border-radius:8px; padding:9px 11px;
     font-size:13px; font-family:inherit; color:var(--ink); resize:vertical;
+  }
+  /* ⚠️ الخانات كانت مالهاش background ولا -webkit-text-fill-color.
+     يعني اللون كان متسايب للمتصفح — وده بيختلف من موبايل للتاني،
+     وبيخلي الكتابة سودة على خلفية سودة في الوضع الداكن. وخانة
+     الباسورد أوضح واحدة لأن المتصفح بيعاملها معاملة خاصة (حفظ
+     كلمات السر). دلوقتي اللون معلَن صراحةً من متغيّرات الثيم. */
+  .field input, .field textarea, .field select{
+    background:var(--surface-2); color:var(--ink); -webkit-text-fill-color:var(--ink);
+    caret-color:var(--accent);
+  }
+  .field input::placeholder, .field textarea::placeholder{color:var(--muted-2); -webkit-text-fill-color:var(--muted-2); opacity:1;}
+  /* المتصفح بيفرض لونه الخاص على الخانات اللي بيملاها تلقائي —
+     وده اللي بيخلي الباسورد يطلع أسود. بنلغيه بلون الثيم. */
+  .field input:-webkit-autofill,
+  .field input:-webkit-autofill:hover,
+  .field input:-webkit-autofill:focus{
+    -webkit-text-fill-color:var(--ink);
+    caret-color:var(--accent);
+    -webkit-box-shadow:0 0 0 1000px var(--surface-2) inset;
+    box-shadow:0 0 0 1000px var(--surface-2) inset;
+    transition:background-color 9999s ease-in-out 0s;
+  }
+  /* 🔒 خانة رمز القفل — لون مثبّت بالـID عشان محدش يعلى عليه.
+     وحجم ١٦px مقصود: أقل من كده الأيفون بيكبّر الصفحة لوحده عند الكتابة. */
+  #f_lockText{
+    background:var(--surface-2); color:var(--ink); -webkit-text-fill-color:var(--ink);
+    caret-color:var(--accent); font-size:16px; font-weight:700; letter-spacing:1.5px;
   }
   .field input:focus, .field textarea:focus{outline:2px solid rgba(8,145,168,.3); border-color:var(--accent);}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
@@ -1318,6 +1347,8 @@
         <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
         <label class="field"><span data-i18n="add.model">الموديل</span><input id="f_model" /></label>
       </div>
+      <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
+      <label class="field"><span>🎨 لون الجهاز <b style="color:var(--danger)">*</b></span><input id="f_deviceColor" autocomplete="off" placeholder="أسود، أبيض، أزرق فاتح…" /></label>
       <label class="field"><span data-i18n="add.serial">الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
       <div id="lockHostAdd"></div>
       <div class="field" id="lockSection" style="display:block;">
@@ -1329,7 +1360,14 @@
         </div>
         <div id="lockPane_text">
           <div style="position:relative;">
-            <input id="f_lockText" type="password" data-i18n-ph="lock.textPh" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 42px 10px 12px;font-size:14px;font-family:monospace;" />
+            <!-- ⚠️ كانت type="password" — ودي كانت بتعمل مشكلتين:
+                 ١) بتخفي اللي بيتكتب نقط، والموظف محتاج يقرا الكود وهو بيكتبه
+                 ٢) الأيفون بيعامل خانات كلمة السر معاملة خاصة (اقتراح كلمة سر
+                    وحفظها) **وبيفرض ألوانه هو** — فاللون اللي في الثيم كان بيتلغي
+                    والكتابة تطلع بلون الخلفية.
+                 رمز قفل الجهاز مش سر عن الموظف، فخليناها خانة عادية،
+                 والزرار 🙈 بيخفيها لو حب. -->
+            <input id="f_lockText" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="device-unlock-code" data-lpignore="true" data-i18n-ph="lock.textPh" placeholder="رمز الفتح (أرقام أو نص)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 42px 10px 12px;font-family:monospace;" />
             <button type="button" id="lockEye" onclick="toggleLockText()" style="position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:18px;cursor:pointer;padding:6px;">👁</button>
           </div>
         </div>
@@ -3284,7 +3322,7 @@ async function markPaid(){
 
 // Add device modal
 function openAddModal(){
-  ['customerName','shopName','registeredBy','customerPhone','deviceType','model','serialNumber','reportedIssue','conditionNotes','agreedPrice']
+  ['customerName','shopName','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
@@ -3318,8 +3356,8 @@ let lockImageData = '';
 
 function resetLock(){
   lockTab = 'text'; patternSeq = []; patternThumb = ''; lockImageData = '';
-  const t = document.getElementById('f_lockText'); if(t){ t.value=''; t.type='password'; }
-  const eye = document.getElementById('lockEye'); if(eye) eye.textContent = '👁';
+  const t = document.getElementById('f_lockText'); if(t){ t.value=''; t.type='text'; }
+  const eye = document.getElementById('lockEye'); if(eye) eye.textContent = '🙈';   // ظاهر = الزرار بيخفي
   const prev = document.getElementById('lockImgPreview'); if(prev) prev.innerHTML = '';
   const fi = document.getElementById('f_lockImageInput'); if(fi) fi.value = '';
   const lbl = document.getElementById('patternSeqLabel'); if(lbl) lbl.textContent = 'ارسم النمط بإصبعك';
@@ -3436,7 +3474,7 @@ function viewLockImage(id){
 function lockDisplayHtml(d){
   const editBtn = `<button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin:8px 0 10px;"${d.status==='returned'?' disabled':''} onclick="openEditLock()">🔐 ${t('lock.edit')}</button>`;
   if(d.lockType==='text' && d.lockText)
-    return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:#0F172A;">${esc(d.lockText)}</span></div>${editBtn}`;
+    return `<div class="detail-row"><span>🔒 ${t('ui.lockCode')}</span><span style="font-family:monospace;font-weight:800;font-size:16px;color:var(--ink);">${esc(d.lockText)}</span></div>${editBtn}`;
   if(d.lockType==='pattern' && d.lockImage)
     return `<div style="margin:10px 0;">
       <div style="font-size:13px;color:var(--muted);margin-bottom:5px;">🔒 نمط القفل${d.lockPattern?` — <span style="font-family:monospace;font-weight:700;">${esc(d.lockPattern)}</span>`:''}</div>
@@ -3544,7 +3582,7 @@ document.addEventListener('click', (e) => {
 // (Shift+Enter بيعمل سطر جديد في خانات الملاحظات)
 function setupAddFormEnterNav(){
   const order = ['f_customerName','f_shopName','f_registeredBy','f_customerPhone',
-                 'f_deviceType','f_model','f_serialNumber','f_reportedIssue',
+                 'f_deviceType','f_model','f_deviceColor','f_serialNumber','f_reportedIssue',
                  'f_conditionNotes','f_agreedPrice','f_intakeDateOnly','f_intakeTimeOnly'];
   order.forEach((id, i) => {
     const el = document.getElementById(id);
@@ -3563,7 +3601,19 @@ async function submitAdd(){
   const get = id => document.getElementById('f_'+id).value.trim();
   const customerName = get('customerName');
   const deviceType = get('deviceType');
-  if(!customerName || !deviceType) return;
+  const deviceColor = get('deviceColor');
+  // ⚠️ كان `return;` ساكت — الزرار يتداس وميحصلش حاجة والمحاسب مش فاهم ليه.
+  //    دلوقتي بنقول الناقص إيه وبنوديه على الخانة.
+  const missing = [];
+  if(!customerName) missing.push('اسم العميل');
+  if(!deviceType)   missing.push('نوع الجهاز');
+  if(!deviceColor)  missing.push('لون الجهاز');
+  if(missing.length){
+    alert('لازم تكتب: ' + missing.join('، '));
+    const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : 'f_deviceColor');
+    const el = document.getElementById(first); if(el) el.focus();
+    return;
+  }
   const serialNumber = get('serialNumber');
   if(serialNumber){
     const dup = devices.find(d => d.serialNumber && d.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase());
@@ -3576,7 +3626,7 @@ async function submitAdd(){
   const newDevice = {
     id: 'dev_' + Date.now(),
     trackToken: genTrackToken(),
-    customerName, deviceType,
+    customerName, deviceType, deviceColor,
     shopName: get('shopName'),
     registeredBy: get('registeredBy'),
     customerPhone: get('customerPhone'),
@@ -3778,6 +3828,7 @@ function renderDetailNow(){
   const roB = isRet ? ' disabled' : '';   // أزرار وقوائم التفاصيل القديمة
   const rows = [
     [t('det.intakeAt'), formatDateTime(d.intakeDate)],
+    d.deviceColor ? ['🎨 اللون', d.deviceColor] : null,
     d.serialNumber ? [t('det.serial'), d.serialNumber, true] : null,
     d.conditionNotes ? [t('det.condition'), d.conditionNotes] : null,
     d.lastModifiedAt ? [t('det.lastEdit'), formatDateTime(d.lastModifiedAt)] : null,
