@@ -3696,16 +3696,14 @@ function togglePointsBox(){
 }
 
 // ============================================================
-// 🔩 سطر قطع الغيار في تفاصيل الجهاز
+// 🔩 قراءة رد الفني على قطع الغيار
 // ------------------------------------------------------------
-// `partsComment` هو اللي **الفني كتبه بإيده** من صفحته. تلات حالات:
-//   • فاضي            → لسه مردّش
-//   • «محتاجش قطع»    → الفني داس الزرار الأخضر: الجهاز اتصلح من
-//                       غير أي قطعة. بنوريه أخضر عشان ده رد مكتمل
-//                       مش خانة فاضية.
-//   • أي كلام تاني    → القطع اللي جابها، بنعرضها زي ما هي
+// `partsComment` هو اللي **الفني كتبه بإيده** من صفحته، وبيظهر
+// للمحاسب في مكان واحد بس: قسم «🧰 قطع الغيار المستخدمة» تحت.
+// الدوال دي بتفهم بس هل الكلام معناه «مفيش قطع غيار» ولا لأ —
+// عشان شاشة «مراجعة قطع الغيار» توريه أخضر كرد مكتمل.
 //
-// ⚠️ ده عرض بحت — مفيش أي كتابة من هنا. اللي بيكتب هو الفني بس.
+// ⚠️ عرض بحت — مفيش أي كتابة من هنا. اللي بيكتب هو الفني بس.
 // ============================================================
 function detPartsNorm(s){
   return String(s || '').replace(/[\s.,،!؟?\-—_]+/g, '').replace(/ه$/,'ة');
@@ -3717,29 +3715,14 @@ function detPartsIsNone(s){
   return ['مفيش', 'مافيش', 'مفيشحاجة', 'مافيشحاجة', 'لايوجد', 'لاشيء', 'لاشئ', 'لا', '0', 'ولاحاجة',
           detPartsNorm('مفيش — الجهاز خلص ومحتاجش قطع غيار')].includes(t);
 }
-// بندوّر على ملاحظة الفني عشان نعرف مين قالها وإمتى
-function detPartsNote(d){
-  const list = (d && d.activityNotes) || [];
-  for(let i = list.length - 1; i >= 0; i--){
-    if(String((list[i] && list[i].text) || '').indexOf('محتاجش قطع غيار') >= 0) return list[i];
-  }
-  return null;
-}
-function detPartsHtml(d){
-  const cm = ((d && d.partsComment) || '').trim();
-  const box = 'border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.7;';
-  if(!cm){
-    return `<div style="${box}background:var(--surface-2);border:1px solid var(--border);color:var(--muted-2);">
-      — الفني لسه ما كتبش قطع غيار للجهاز ده</div>`;
-  }
-  if(detPartsIsNone(cm)){
-    const n = detPartsNote(d);
-    const who = n ? `<div style="font-size:11px;color:var(--muted-2);margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by || '')}${n.role ? ` (${esc(n.role)})` : ''}</div>` : '';
-    return `<div style="${box}background:var(--success-bg);border:1px solid var(--success-border);">
-      <b style="color:var(--success);">✅ الفني قال: الجهاز خلص ومحتاجش قطع غيار</b>${who}</div>`;
-  }
-  return `<div style="${box}background:var(--surface-2);border:1px solid var(--border);white-space:pre-wrap;">
-    🔩 ${esc(cm)}</div>`;
+// ملاحظات الجهاز للعرض — من غير ملاحظة «محتاجش قطع غيار» التلقائية.
+// ⚠️ الملاحظة **لسه متسجّلة** في الجهاز (السجل ميتغيّرش) — إحنا بنخفيها
+//    من الشاشة دي بس، لأن نفس الكلام ظاهر تحت «🧰 قطع الغيار المستخدمة».
+//    من غير كده المحاسب بيقرا نفس الجملة مرتين في نفس الصفحة.
+const DET_NONE_NOTE = 'الفني قال: الجهاز خلص ومحتاجش قطع غيار';
+function detNotes(d){
+  return ((d && d.activityNotes) || [])
+    .filter(n => String((n && n.text) || '').indexOf(DET_NONE_NOTE) < 0);
 }
 
 function openDetail(id){
@@ -4111,11 +4094,9 @@ function renderDetailNow(){
     </div>` : ''}
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${t('det.statusLog')}</div>
     <div style="margin-bottom:10px;">${history}</div>
-    <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">🔩 قطع الغيار (كلام الفني)</div>
-    <div style="margin-bottom:8px;">${detPartsHtml(d)}</div>
     <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
-    <div style="margin-bottom:8px;">${(d.activityNotes||[]).length
-      ? (d.activityNotes||[]).map(n => `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+    <div style="margin-bottom:8px;">${detNotes(d).length
+      ? detNotes(d).map(n => `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
           <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc((n.kind && I18N.has(n.kind)) ? t(n.kind, n.args||{}) : n.text)}</div>
           <div style="font-size:11px;color:var(--muted-2);margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by||'')}${n.role?` (${esc(n.role)})`:''}</div>
         </div>`).join('')
