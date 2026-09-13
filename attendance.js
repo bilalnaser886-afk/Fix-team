@@ -662,10 +662,40 @@ async function attDayWarning(kind){
   }
 
   // ---- انصراف ----
-  if(!(Number(r.short_min) > 0)) return '';
+  // ⚠️ بنجيب تفاصيل اليوم من hr_overtime مش من hr_my_day_status،
+  //    لأننا محتاجين البريك المسموح عشان نقول للموظف الحضور
+  //    المطلوب كامل (شغل + بريك) مش الشغل لوحده. الموظف اللي
+  //    بيقرا «المطلوب ٩ ساعات» وهو عارف إنه بيقعد ١٠ بيتلخبط.
+  // صياغة عربي مظبوطة: «١٠ ساعات» مش «10 ساعة و 0 دقيقة»
+  const hmAr = m => {
+    m = Math.max(0, Math.round(Number(m) || 0));
+    const H = Math.floor(m / 60), M = m % 60;
+    const unit = (n, one, two, few, many) =>
+      n === 1 ? one : n === 2 ? two : (n <= 10 ? n + ' ' + few : n + ' ' + many);
+    const hs = H ? unit(H, 'ساعة', 'ساعتين', 'ساعات', 'ساعة') : '';
+    const ms = M ? unit(M, 'دقيقة', 'دقيقتين', 'دقايق', 'دقيقة') : '';
+    return hs && ms ? hs + ' و' + ms : (hs || ms || 'صفر');
+  };
+
+  let d = null;
+  try{
+    const { data:ov, error:e2 } = await sb.rpc('hr_overtime',
+      { p_email:null, p_from:_attState.work_date, p_to:_attState.work_date });
+    if(!e2 && ov && ov.length) d = ov[0];
+  }catch(e){ console.error('hr_overtime (warning):', e); }
+
+  const short = Number((d && d.short_min) != null ? d.short_min : r.short_min) || 0;
+  if(!(short > 0)) return '';
+
+  const need   = Number((d && d.need_min) != null ? d.need_min : r.need_min) || 0;
+  const worked = Number((d && d.worked_min) != null ? d.worked_min : r.worked_min) || 0;
+  const allow  = Number((d && d.break_allow_min) || 0);
+
   return '\n\n⚠️ ساعاتك ناقصة النهاردة.\n'
-       + 'شغلت ' + hm(r.worked_min) + ' والمطلوب ' + hm(r.need_min) + '.\n'
-       + '⏳ ناقصك ' + hm(r.short_min) + '.';
+       + 'المطلوب منك تقعد ' + hmAr(need + allow)
+       + (allow ? ' (' + hmAr(need) + ' شغل + ' + hmAr(allow) + ' بريك)' : '') + '.\n'
+       + 'وإنت اشتغلت ' + hmAr(worked) + '.\n'
+       + '⏳ فلسه عليك ' + hmAr(short) + '.';
 }
 
 // ============================================================

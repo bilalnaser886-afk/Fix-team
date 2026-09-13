@@ -776,9 +776,9 @@ function dayHtml(d, punches, email){
       <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
         r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}${
         r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}${(() => {
-          // البريك اللي اتحسبله شغل — عشان الرقم يبقى مفهوم
+          // البريك اللي ضحّى بيه — بيفسّر ليه مفيش أوفر تايم
           const o = email ? dayOvertime(email, punches, d) : null;
-          return (o && o.has && o.brkCr) ? ' · ☕ محسوب شغل ' + fmtDur(o.brkCr) : '';
+          return (o && o.has && o.brkUnused) ? ' · ☕ ضحّى بـ ' + fmtDur(o.brkUnused) : '';
         })()}</span>
     </div>
     ${r.beforeStart ? `
@@ -1326,8 +1326,8 @@ function renderHrSettings(){
       <input type="number" id="fGrace" min="0" max="240" value="${Number(c.grace_minutes||0)}">
     </label>
 
-    <label class="fld"><span>⏱️ عدد ساعات العمل (شاملة البريك)</span>
-      <small>ده وقت الحضور كله. مثال: ١٠ ساعات وبريك ٦٠ دقيقة = ٩ شغل + ساعة بريك.<br>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
+    <label class="fld"><span>⏱️ عدد ساعات العمل (شغل صافي)</span>
+      <small>من غير البريك. مثال: اكتب ٩ والبريك ٦٠ دقيقة → حضوره ١٠ ساعات والقياس على الـ٩.<br>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
       <input type="number" id="fHours" min="1" max="24" step="0.25" value="${Number(c.work_hours||8)}">
     </label>
 
@@ -1359,18 +1359,13 @@ function renderHrSettings(){
     </div>
 
     <label class="fld"><span>☕ البريك المسموح (بالدقايق في اليوم)</span>
-      <small>مجموع البريكات في اليوم، و<b>بيتحسب شغل</b> جوه ساعات العمل فوق.<br>اللي ما بياخدش بريكه مش بياخد أوفر تايم عليه. سيبه صفر لو مفيش بريك.</small>
+      <small>بيتزاد على ساعات العمل فوق. اللي بيضحّي ببريكه <b>مش بياخد عليه أوفر تايم</b> — بيتحسبله يوم مظبوط.<br>سيبه صفر لو مفيش بريك.</small>
       <input type="number" id="fBreak" min="0" max="480" value="${Number(c.break_minutes||0)}">
     </label>
 
     <label class="fld"><span>⏳ سماح البريك (بالدقايق)</span>
-      <small>مثال: مسموح ٣٠ وسماح ٥ — اللي ياخد ٣٤ مايتخصمش، واللي ياخد ٣٦ يتخصم.</small>
+      <small>تسامح بسيط فوق المسموح. الدقايق دي مش بتتحسب شغل، بس مش بتتعلّم «زوّد البريك» في المراجعة.</small>
       <input type="number" id="fBreakGrace" min="0" max="240" value="${Number(c.break_grace_minutes||0)}">
-    </label>
-
-    <label class="fld"><span>💸 خصم تعدّي البريك (بالجنيه)</span>
-      <small>مبلغ ثابت مرة واحدة في اليوم مهما زوّد. صفر = مفيش خصم.</small>
-      <input type="number" id="fBreakPen" min="0" step="5" value="${Number(c.break_penalty||0)}">
     </label>
 
     <label class="fld"><span>📝 ملاحظات</span>
@@ -1403,7 +1398,6 @@ function stashForm(c){
   if(g('fPenalty') !== undefined) c.late_penalty  = parseFloat(g('fPenalty')) || 0;
   if(g('fBreak')      !== undefined) c.break_minutes       = parseInt(g('fBreak'),10) || 0;
   if(g('fBreakGrace') !== undefined) c.break_grace_minutes = parseInt(g('fBreakGrace'),10) || 0;
-  if(g('fBreakPen')   !== undefined) c.break_penalty       = parseFloat(g('fBreakPen')) || 0;
   // ⚠️ الإجازات: فاضي معناه «تلقائي» مش صفر — والفرق كبير.
   //    صفر = مفيش أي إجازة والكل يتخصم.
   if(g('fLeave')      !== undefined) c.monthly_leave_days  = (g('fLeave') === '' ? null : (parseInt(g('fLeave'),10) || 0));
@@ -1430,7 +1424,6 @@ async function saveEmpSettings(){
     off_days: Array.isArray(c.off_days) ? c.off_days : [],
     break_minutes: c.break_minutes || 0,
     break_grace_minutes: c.break_grace_minutes || 0,
-    break_penalty: c.break_penalty || 0,
     monthly_leave_days: c.monthly_leave_days != null ? c.monthly_leave_days : null,
     absence_penalty: c.absence_penalty || 0,
     note: c.note || null,
@@ -1516,7 +1509,10 @@ function applyRules(email, punches, workDate){
     shift:   Number(row.shift_min != null ? row.shift_min : row.counted_min),
     lateBy:  Number(row.late_min || 0),
     counted: Number(row.counted_min),
-    leaveAt: Number(row.counted_min) + need,
+    // ⚠️ ميعاد الانصراف = اللي بيتحسب منه + الشغل المطلوب + البريك
+    //    اللي أخده فعلاً. اللي ما خدش بريك بيمشي أبدر — وده حقه،
+    //    لأن البريك المتساب مش بيتحوّل أوفر تايم أصلاً.
+    leaveAt: Number(row.counted_min) + need + Number(row.break_min || 0),
     need,
     // السيرفر بيصفّر الخصم لوحده لو HR شالته — مش بنكرّر الفحص هنا
     // 🔴 penalty = المجموع (تأخير + بريك) — السيرفر بيجمعهم.
@@ -1579,8 +1575,8 @@ function dayOvertime(email, punches, workDate){
     closed: !!row.closed,
     // ⏱️ تعديل HR اليدوي على اليوم (موجب = اتشال من الساعات)
     adj:    Number(row.adjust_min || 0),
-    brk:    Number(row.break_min || 0),          // البريك اللي أخده
-    brkCr:  Number(row.break_credit_min || 0),   // واتحسبله منه شغل
+    brk:       Number(row.break_min || 0),          // البريك اللي أخده
+    brkUnused: Number(row.break_unused_min || 0),   // وضحّى بكام منه
     adjWhy: row.adjust_reason || '',
     raw:    Number(row.raw_min != null ? row.raw_min : (row.worked_min || 0)),
     has:    true
