@@ -559,7 +559,19 @@
       'adm.roleDisp': 'مسؤول الحركة',
       'adm.roleTech': 'فني',
       'adm.roleHr': 'شؤون العاملين (HR)',
+      'adm.roleStaff': 'موظف',
       'adm.delete': 'حذف',
+      /* ⚠️ المفاتيح دي كانت ناقصة خالص — يعني زرار «إضافة مستخدم»
+         وكل خطواته كانت بتظهر بأسم المفتاح الخام (adm.addRole)،
+         فالأدمن مكانش فاهم الزرار ده بيعمل إيه أصلاً. */
+      'adm.addRole':       'إضافة مستخدم',
+      'adm.emailPrompt':   'إيميل المستخدم:',
+      'adm.pickRole':      'اختار الدور — اكتب رقمه:',
+      'adm.badEmail':      'الإيميل مش مظبوط',
+      'adm.badRole':       'اختار رقم من القايمة',
+      'adm.techNamePrompt':'اسم الفني زي ما هو مكتوب على الأجهزة:',
+      'adm.namePrompt':    'الاسم الظاهر (اختياري — هيظهر في الملاحظات والتقارير):',
+      'adm.needTechName':  'اسم الفني إجباري — بيربط الحساب بأجهزته',
 
       /* صفحة الاشتراك */
       'chk.expired': 'انتهت فترتك المجانية',
@@ -1223,7 +1235,16 @@
       'adm.roleDisp': 'Dispatcher',
       'adm.roleTech': 'Technician',
       'adm.roleHr': 'HR',
+      'adm.roleStaff': 'Staff',
       'adm.delete': 'Delete',
+      'adm.addRole':       'Add user',
+      'adm.emailPrompt':   'User email:',
+      'adm.pickRole':      'Pick a role — type its number:',
+      'adm.badEmail':      'Invalid email',
+      'adm.badRole':       'Pick a number from the list',
+      'adm.techNamePrompt':'Technician name exactly as written on devices:',
+      'adm.namePrompt':    'Display name (optional — shown in notes and reports):',
+      'adm.needTechName':  'Technician name is required — it links the account to devices',
 
       /* Checkout page */
       'chk.expired': 'Your free trial has ended',

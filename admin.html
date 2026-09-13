@@ -700,7 +700,8 @@ const ROLE_LABEL_KEYS = {
   accountant:  'adm.roleAcc',
   dispatcher:  'adm.roleDisp',
   technician:  'adm.roleTech',
-  hr:          'adm.roleHr'
+  hr:          'adm.roleHr',
+  staff:       'adm.roleStaff'
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
@@ -773,19 +774,27 @@ async function addRole(){
   const e = (em||'').trim().toLowerCase();
   if(!e || !e.includes('@')){ toast(t('adm.badEmail'), false); return; }
 
+  // ⚠️ الترتيب هنا هو نفس ترتيب ROLES — الرقم اللي بيتكتب بيتقرا منه.
+  //    لو غيّرت ترتيب ROLES، الأرقام بتتغير معاه تلقائي.
   const menu = ROLES.map((r,i) => (i+1) + ') ' + roleLabel(r)).join('\n');
-  const pick = prompt(t('adm.pickRole') + '\n' + menu, '2');
+  const pick = prompt(t('adm.pickRole') + '\n\n' + menu + '\n', '2');
   if(pick===null) return;
   const role = ROLES[(parseInt(pick,10) || 0) - 1];
   if(!role){ toast(t('adm.badRole'), false); return; }
 
-  // الفني بس هو اللي محتاج ربط بالاسم المكتوب على الأجهزة
-  let techName = '';
-  if(role === 'technician'){
-    const nm = prompt(t('adm.techNamePrompt'));
-    if(nm===null) return;
-    techName = (nm||'').trim();
-  }
+  // 🔴 الاسم الظاهر — لكل الأدوار مش الفني بس.
+  //    بيتخزّن في نفس الحقل (techName) عن قصد: ده الحقل اللي كل
+  //    الصفحات بتقرا منه الاسم أصلاً (شاشة HR، قايمة الفنيين،
+  //    الداشبورد). لو عملنا حقل جديد، كل صفحة كانت هتحتاج تعديل،
+  //    ومكان واحد ينساه = اسم بيظهر في شاشة ومش بيظهر في التانية.
+  //    الفني بس هو اللي الاسم عنده **إجباري**، لأنه بيربط الحساب
+  //    بالأجهزة المكتوب عليها اسمه.
+  const prevName = normRole(userRoles[e]).techName;
+  const nm = prompt(role === 'technician' ? t('adm.techNamePrompt') : t('adm.namePrompt'),
+                    prevName || '');
+  if(nm === null) return;
+  const techName = (nm || '').trim();
+  if(role === 'technician' && !techName){ toast(t('adm.needTechName'), false); return; }
 
   try{
     // بنحافظ على الصلاحيات الموجودة — تعديل الدور مش المفروض يمسحها
