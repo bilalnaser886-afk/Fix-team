@@ -664,6 +664,7 @@ async function attLoadState(){
     if(error) throw error;
     const r = Array.isArray(data) ? data[0] : data;
     _attState = r || { last_kind:null, last_at:null, work_date:null, punches:0 };
+    await attLoadNoBreak();   // ☕🚫 هل أعلن «مطلعتش بريك» لليوم ده؟
   }catch(e){
     // ⚠️ الفشل الصامت هنا كان أخطر من الخطأ نفسه.
     //    لما قراءة الحالة كانت بتفشل، الصفحة كانت بتحط قيم فاضية
@@ -747,6 +748,10 @@ function attRender(busyMsg){
         <div class="att-grid">
           ${btn('in')}${btn('out')}${btn('break')}${btn('resume')}
         </div>
+        <!-- ☕🚫 إعلان «مطلعتش بريك» — ده **مش تسجيل حضور**، ده
+             معلومة لـ HR وقت المراجعة ومالهاش أي تأثير على الساعات.
+             بيبان بس لو الوردية مفتوحة (حاضر أو راجع من بريك). -->
+        ${_attNoBreakBtn(busyMsg)}
         <div class="att-note">
           📍 التسجيل من داخل المحل بس · 🔐 بيتطلب بصمتك أو وجهك
         </div>
@@ -758,6 +763,63 @@ function attRender(busyMsg){
       </div>
     </div>`;
   attRenderLog();
+}
+
+// ============================================================
+// ☕🚫 «مطلعتش بريك»
+// ------------------------------------------------------------
+// إعلان من الموظف إنه ما أخدش بريك النهاردة، عشان HR تشوفه وهي
+// بتراجع. 🔴 مش بيتسجّل في سجل الحضور: أي تسجيل مش «حضور/استئناف»
+// بيقفل عدّاد الساعات، والزرار ده المفروض ميأثرش على أي حساب.
+// ============================================================
+let _attNoBreak = false;   // اتسجّل لليوم ده؟
+
+function _attNoBreakBtn(busyMsg){
+  // الوردية لازم تكون مفتوحة — مفيش معنى للإعلان قبل الحضور
+  const open = _attState.last_kind && _attState.last_kind !== 'out';
+  if(!open) return '';
+  // أخد بريك فعلاً؟ الزرار ملوش لازمة (والسيرفر هيرفضه برضه)
+  if(_attState.last_kind === 'break' || _attState.last_kind === 'resume') return '';
+  if(_attNoBreak){
+    return `<button class="att-nobreak done" disabled>✅ متسجّل: مطلعتش بريك النهاردة</button>`;
+  }
+  return `<button class="att-nobreak" ${busyMsg ? 'disabled' : ''}
+    onclick="attNoBreak()">☕🚫 مطلعتش بريك النهاردة</button>`;
+}
+
+async function attNoBreak(){
+  if(_attBusy) return;
+  if(!confirm('تأكيد: إنت ما أخدتش بريك النهاردة؟\nده هيتسجّل لشؤون العاملين.')) return;
+  _attBusy = true;
+  attRender('⏳ بنسجّل…');
+  try{
+    const { data, error } = await sb.rpc('hr_declare_no_break');
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    _attNoBreak = true;
+    alert('✅ اتسجّل — شؤون العاملين هتشوفه في يوم ' + (data || ''));
+  }catch(e){
+    alert('❌ ' + ((e && e.message) || e));
+  }finally{
+    _attBusy = false;
+    attRender();
+  }
+}
+
+// بنقرا حالة اليوم مع حالة الحضور — عشان الزرار يبان متسجّل
+// لو الموظف قفل الصفحة وفتحها تاني
+async function attLoadNoBreak(){
+  _attNoBreak = false;
+  if(!_attState.work_date) return;
+  try{
+    const { data, error } = await sb.from('hr_no_break')
+      .select('work_date').eq('work_date', _attState.work_date).limit(1);
+    if(error) throw error;
+    _attNoBreak = !!(data && data.length);
+  }catch(e){
+    // مش مشكلة تمنع الشاشة — أسوأ حاجة إن الزرار يبان مرة زيادة
+    console.error('attLoadNoBreak:', e);
+  }
 }
 
 function _attMonthValue(){
@@ -861,6 +923,11 @@ function closeAttendance(){
   .att-warn-d{display:block; margin-top:5px; font-size:11px; opacity:.8; direction:ltr;
     word-break:break-word;}
   .att-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
+  .att-nobreak{width:100%; border:1.5px dashed var(--a-line,#2F4356); background:none;
+    color:var(--a-muted,#92A6B8); border-radius:12px; padding:12px; font:800 13.5px/1 inherit;
+    cursor:pointer; margin-bottom:4px;}
+  .att-nobreak:disabled{opacity:.6; cursor:default;}
+  .att-nobreak.done{border-style:solid; border-color:var(--a-ok,#34D399); color:var(--a-ok,#34D399);}
   .att-btn{padding:18px 10px; border:none; border-radius:14px; font-family:inherit;
     font-size:15px; font-weight:800; color:#fff; cursor:pointer;}
   .att-btn:disabled{opacity:.35; cursor:not-allowed;}

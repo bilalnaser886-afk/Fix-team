@@ -489,6 +489,7 @@ async function loadMonth(){
     await loadOvertime(from, to);   // 🔴 والأوفر تايم كمان
     await loadDeductions();    // والخصومات اليدوية كمان
     await loadAbsences(from, to);   // 🏖️ الغياب المقترح خصمه
+    await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
     render();
   }catch(e){
     console.error('loadMonth failed:', e);
@@ -794,7 +795,9 @@ function dayHtml(d, punches, email){
     <div class="day-h">
       <span>${new Date(d).toLocaleDateString('ar-EG',
         { weekday:'long', day:'numeric', month:'long' })}
-        ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}</span>
+        ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}
+        ${(email && NOBRK[(email||'').toLowerCase()] && NOBRK[(email||'').toLowerCase()][d])
+          ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}</span>
       <span class="hrs">${fmtHm(s.minutes)}${(() => {
         const o = email ? dayOvertime(email, punches, d) : null;
         if(!o || !o.has || s.missingOut) return '';
@@ -1173,6 +1176,29 @@ async function reloadAbsences(){
   const from = MONTH + '-01';
   const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
   await loadAbsences(from, to);
+}
+
+// ☕🚫 إعلانات «مطلعتش بريك» — معلومة للمراجعة، مالهاش أي أثر على
+// الساعات ولا الخصومات. شكلها: NOBRK['fanie@x.com']['2026-09-11'] = 1
+let NOBRK = {};
+
+async function loadNoBreak(from, to){
+  try{
+    const { data, error } = await sb.from('hr_no_break')
+      .select('user_email,work_date').gte('work_date', from).lte('work_date', to);
+    if(error) throw error;
+    NOBRK = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (NOBRK[e] = NOBRK[e] || {})[r.work_date] = 1;
+    });
+  }catch(e){
+    console.error('loadNoBreak failed:', e);
+    NOBRK = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42P01/i.test(t))
+      console.warn('⚠️ ميزة «مطلعتش بريك» لسه ماتركبتش — شغّل 49-no-break.sql');
+  }
 }
 
 const DAY_NAMES = ['الأحد','الاتنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
