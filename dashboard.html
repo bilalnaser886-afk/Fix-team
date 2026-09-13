@@ -1141,6 +1141,9 @@
   .pr-cm{margin-top:8px;background:var(--surface-3);border-radius:9px;padding:8px 10px;
     font-size:13px;font-weight:700;line-height:1.7;}
   .pr-cm.none{color:var(--muted-2);font-weight:400;font-style:italic;background:none;padding:6px 0;}
+  /* الفني قال إن الجهاز محتاجش قطع غيار — رد مكتمل، بلون أخضر عشان
+     المحاسب يفرّق بينه وبين الجهاز اللي الفني لسه ما ردّش عليه */
+  .pr-cm.ok0{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);}
   .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
   /* 🔍 بحث المراجعة — مربوط بالمدة المختارة */
   .pr-search{width:100%;box-sizing:border-box;border:1.5px solid var(--border);background:var(--surface-2);
@@ -3692,6 +3695,53 @@ function togglePointsBox(){
   if(arrow) arrow.textContent = pointsBoxOpen ? '▲' : '▼';
 }
 
+// ============================================================
+// 🔩 سطر قطع الغيار في تفاصيل الجهاز
+// ------------------------------------------------------------
+// `partsComment` هو اللي **الفني كتبه بإيده** من صفحته. تلات حالات:
+//   • فاضي            → لسه مردّش
+//   • «محتاجش قطع»    → الفني داس الزرار الأخضر: الجهاز اتصلح من
+//                       غير أي قطعة. بنوريه أخضر عشان ده رد مكتمل
+//                       مش خانة فاضية.
+//   • أي كلام تاني    → القطع اللي جابها، بنعرضها زي ما هي
+//
+// ⚠️ ده عرض بحت — مفيش أي كتابة من هنا. اللي بيكتب هو الفني بس.
+// ============================================================
+function detPartsNorm(s){
+  return String(s || '').replace(/[\s.,،!؟?\-—_]+/g, '').replace(/ه$/,'ة');
+}
+// نفس قايمة my-devices.html — أي صيغة معناها «مفيش قطع غيار»
+function detPartsIsNone(s){
+  const t = detPartsNorm(s);
+  if(!t) return false;   // الفاضي حالة تانية خالص (لسه مردّش)
+  return ['مفيش', 'مافيش', 'مفيشحاجة', 'مافيشحاجة', 'لايوجد', 'لاشيء', 'لاشئ', 'لا', '0', 'ولاحاجة',
+          detPartsNorm('مفيش — الجهاز خلص ومحتاجش قطع غيار')].includes(t);
+}
+// بندوّر على ملاحظة الفني عشان نعرف مين قالها وإمتى
+function detPartsNote(d){
+  const list = (d && d.activityNotes) || [];
+  for(let i = list.length - 1; i >= 0; i--){
+    if(String((list[i] && list[i].text) || '').indexOf('محتاجش قطع غيار') >= 0) return list[i];
+  }
+  return null;
+}
+function detPartsHtml(d){
+  const cm = ((d && d.partsComment) || '').trim();
+  const box = 'border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.7;';
+  if(!cm){
+    return `<div style="${box}background:var(--surface-2);border:1px solid var(--border);color:var(--muted-2);">
+      — الفني لسه ما كتبش قطع غيار للجهاز ده</div>`;
+  }
+  if(detPartsIsNone(cm)){
+    const n = detPartsNote(d);
+    const who = n ? `<div style="font-size:11px;color:var(--muted-2);margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by || '')}${n.role ? ` (${esc(n.role)})` : ''}</div>` : '';
+    return `<div style="${box}background:var(--success-bg);border:1px solid var(--success-border);">
+      <b style="color:var(--success);">✅ الفني قال: الجهاز خلص ومحتاجش قطع غيار</b>${who}</div>`;
+  }
+  return `<div style="${box}background:var(--surface-2);border:1px solid var(--border);white-space:pre-wrap;">
+    🔩 ${esc(cm)}</div>`;
+}
+
 function openDetail(id){
   // الفني مايشوفش المودال الإداري (أسعار/أرباح/حذف) — يتحوّل للمبسّط
   if(isTechnician()){ openTechDevice(id); return; }
@@ -4061,6 +4111,8 @@ function renderDetailNow(){
     </div>` : ''}
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${t('det.statusLog')}</div>
     <div style="margin-bottom:10px;">${history}</div>
+    <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">🔩 قطع الغيار (كلام الفني)</div>
+    <div style="margin-bottom:8px;">${detPartsHtml(d)}</div>
     <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
     <div style="margin-bottom:8px;">${(d.activityNotes||[]).length
       ? (d.activityNotes||[]).map(n => `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
@@ -8440,7 +8492,9 @@ function prDevHtml(d, showTech){
           </div>
           ${meta.length ? `<div class="pr-dev-m">${meta.join('<span>·</span>')}</div>` : ''}
           <div class="pr-dev-i">⚠️ ${esc(d.reportedIssue || '—')}</div>
-          ${cm ? `<div class="pr-cm">🔩 ${esc(cm)}</div>`
+          ${cm ? (detPartsIsNone(cm)
+                   ? `<div class="pr-cm ok0">✅ الفني قال: الجهاز محتاجش قطع غيار</div>`
+                   : `<div class="pr-cm">🔩 ${esc(cm)}</div>`)
                : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
           ${prLinkHtml(d.id)}
         </div>`;

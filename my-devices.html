@@ -442,6 +442,19 @@
     color:var(--muted);cursor:default;}
   .rw-none.done:active{transform:none;}
 
+  /* زرار "الجهاز خلص ومحتاجش قطع غيار" — بلون "خلصت" الأخضر.
+     ليه أخضر؟ عشان ده قرار نهائي (مش يومي زي «لسه مجبتش») — الفني
+     بيقفل الموضوع خالص: الجهاز اتصلح من غير ما يجيب ليه أي قطعة.
+     نفس مقاسات .rw-none بالظبط عشان الزرارين يقفوا جنب بعض متساويين. */
+  .rw-ok0{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    border:1.5px dashed var(--done);background:var(--done-bg);color:var(--done);
+    border-radius:10px;font:800 12px/1 inherit;padding:9px 16px;cursor:pointer;}
+  .rw-ok0:active{transform:scale(.97);}
+  /* بعد ما يدوس: يهدى بعلامة ✓ — الكارت نفسه بقى أخضر فمفيش داعي للصوت العالي */
+  .rw-ok0.done{border-style:solid;border-color:var(--line);background:var(--card);
+    color:var(--muted);cursor:default;}
+  .rw-ok0.done:active{transform:none;}
+
   /* ===== ألوان الكارت (إشارة المرور) =====
      🟠 need = محتاج رد · ⚪ pend = داس «لسه مجبتش» النهاردة · 🟢 ok = قطع الغيار مكتوبة */
   .rw-card.need{border-color:var(--waiting);background:var(--waiting-bg);}
@@ -1140,13 +1153,34 @@ let RW = { open: false, needAtOpen: 0 };
 // rejectedInShop. بنحط الاتنين احتياطي لو اتخزّنت في يوم.
 function rwIsRejected(d){ return d.status === 'rejected' || d.status === 'rejected_shop'; }
 
+// الجملة اللي بتتكتب في خانة قطع الغيار لما الفني يدوس زرار
+// «الجهاز خلص ومحتاجش قطع غيار». بنخزّنها كلام عادي في نفس الخانة
+// (مش حقل جديد) عشان:
+//   ١) المحاسب والديسباتشر يشوفوها فوراً في «مراجعة قطع الغيار»
+//      من غير أي تعديل على قاعدة البيانات ولا صلاحيات جديدة.
+//   ٢) الجهاز يتحسب 🟢 خلاص ومبيمنعش الانصراف — زي أي كومنت متكتوب.
+const RW_NONE_TXT = 'مفيش — الجهاز خلص ومحتاجش قطع غيار';
+
+// تبسيط النص قبل المقارنة: بنشيل المسافات وعلامات الترقيم عشان
+// «مفيش.» و«مفيش » و«ما فيش» يبقوا حاجة واحدة.
+function rwNorm(txt){
+  return String(txt || '').replace(/[\s.,،!؟?\-—_]+/g, '').replace(/ه$/,'ة');
+}
+
 // «مفيش» وأخواتها = الفني قال إن الجهاز مش محتاج قطع. ده مش قطع غيار.
 // ⚠️ من غيرها: جهاز كاتب عليه «مفيش» واترفض، هيتسأل «القطع رجعت؟»
 //    على قطع مش موجودة أصلاً.
+// ⚠️ بنقارن جملة الزرار بنسختها المبسّطة (مش مكتوبة بإيدينا مرتين) —
+//    فلو غيّرت صياغة RW_NONE_TXT بكرا، المقارنة بتفضل شغّالة لوحدها.
 function rwNoParts(txt){
-  const t = String(txt || '').replace(/[\s.,،!؟?\-—_]+/g, '').replace(/ه$/,'ة');
+  const t = rwNorm(txt);
+  if(t === rwNorm(RW_NONE_TXT)) return true;
   return ['', 'مفيش', 'مافيش', 'مفيشحاجة', 'مافيشحاجة', 'لايوجد', 'لاشيء', 'لاشئ', 'لا', '0', 'ولاحاجة'].includes(t);
 }
+
+// هل الكلام المكتوب هو بالظبط جملة الزرار؟ (مش أي «مفيش» الفني كتبها بإيده)
+// ده اللي بيخلّي الزرار يبان بعلامة ✓ بدل ما يختفي.
+function rwIsNoneBtn(txt){ return String(txt || '').trim() === RW_NONE_TXT; }
 function rwHasParts(d){ return !rwNoParts(d.partsComment); }
 
 function rwDevices(){
@@ -1260,7 +1294,7 @@ function rwInfoHtml(){
   const lines = [];
   if(n.parts) lines.push(`<b>${rwCount(n.parts)}</b> محتاجين تكتب جبت ليهم إيه أو تدوس «لسه مجبتش ليه حاجة».`);
   if(n.ret)   lines.push(`<b>${rwCount(n.ret)}</b> اترفضوا — قول القطع اللي عليهم رجعت ولا لا.`);
-  lines.push(`لازم ترد عليهم قبل الانصراف. لو الجهاز مش محتاج قطع غيار خالص، اكتب «مفيش» واحفظ.`);
+  lines.push(`لازم ترد عليهم قبل الانصراف. لو الجهاز اتصلح من غير أي قطعة، دوس «✅ الجهاز خلص ومحتاجش قطع غيار».`);
   return lines.join('<br>');
 }
 
@@ -1305,16 +1339,23 @@ function rwPaint(){
         </div>`;
     }
 
-    const has  = !!(d.partsComment || '').trim();
+    // ٣ أزرار في نفس السطر، بس مش بيبانوا كلهم مع بعض:
+    //   الخانة فاضية        → «لسه مجبتش» + «خلص ومحتاجش قطع غيار»
+    //   الفني كتب أي كلام   → «حفظ» لوحده
+    //   داس «محتاجش قطع»    → الزرار الأخضر بعلامة ✓ لوحده
+    const txt  = (d.partsComment || '').trim();
+    const has  = !!txt;
     const pend = rwStateOf(d) === 'pend';
+    const none = rwIsNoneBtn(txt);               // داس الزرار الأخضر قبل كده
     return sep + `
         <div class="${rwCardClass(d)}" id="rwk_${d.id}">${head}
           <div class="rw-cm">
             <textarea id="rwc_${d.id}" maxlength="600" oninput="rwToggle('${d.id}')" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(d.partsComment || '')}</textarea>
             <div class="row">
-              <!-- الزرارين في نفس المكان — واحد بس اللي بيبان في أي لحظة -->
-              <button type="button" class="rw-save${has?'':' rw-off'}" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
+              <!-- الأزرار في نفس المكان — واحد بس اللي بيبان في أي لحظة -->
+              <button type="button" class="rw-save${(has && !none)?'':' rw-off'}" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
               <button type="button" class="rw-none${has?' rw-off':''}${pend?' done':''}" id="rwn_${d.id}" onclick="rwNone('${d.id}')" ${pend?'disabled':''}>${pend?'✓ لسه مجبتش ليه حاجة':'⏳ لسه مجبتش ليه حاجة'}</button>
+              <button type="button" class="rw-ok0${(has && !none)?' rw-off':''}${none?' done':''}" id="rwd_${d.id}" onclick="rwNoNeed('${d.id}')" ${none?'disabled':''}>${none?'✓ محتاجش قطع غيار':'✅ الجهاز خلص ومحتاجش قطع غيار'}</button>
               <span class="rw-hint" id="rwh_${d.id}">${has ? 'متسجّل ✅' : ''}</span>
             </div>
           </div>
@@ -1354,10 +1395,16 @@ function rwToggle(id){
   const ta   = document.getElementById('rwc_' + id);
   const save = document.getElementById('rws_' + id);
   const none = document.getElementById('rwn_' + id);
+  const nod  = document.getElementById('rwd_' + id);
   const hint = document.getElementById('rwh_' + id);
   if(!ta) return;
-  const has = !!ta.value.trim();   // مسافات بس = فاضي
-  if(save) save.classList.toggle('rw-off', !has);
+  const val = ta.value.trim();     // مسافات بس = فاضي
+  const has = !!val;
+  // الكلام المكتوب دلوقتي هو نفسه جملة الزرار الأخضر؟
+  // ساعتها الزرار الأخضر هو اللي بيبان (بعلامة ✓) — مش «حفظ»،
+  // لأن مفيش حاجة جديدة تتحفظ.
+  const isNone = rwIsNoneBtn(val);
+  if(save) save.classList.toggle('rw-off', !has || isNone);
   if(none){
     none.classList.toggle('rw-off', has);
     // شكل «اتداس خلاص» بس لو الجهاز فعلاً في حالة pend
@@ -1367,12 +1414,20 @@ function rwToggle(id){
     none.disabled = pend;
     none.textContent = pend ? '✓ لسه مجبتش ليه حاجة' : '⏳ لسه مجبتش ليه حاجة';
   }
+  if(nod){
+    // بيختفي بس لما الفني يكتب قطع غيار حقيقية.
+    // فاضي → بيبان عادي · جملة الزرار → بيبان بعلامة ✓ ومقفول
+    nod.classList.toggle('rw-off', has && !isNone);
+    nod.classList.toggle('done', isNone);
+    nod.disabled = isNone;
+    nod.textContent = isNone ? '✓ محتاجش قطع غيار' : '✅ الجهاز خلص ومحتاجش قطع غيار';
+  }
   // علامة «متسجّل» تفضل بس لو الكلام لسه زي المحفوظ بالظبط
   const d = devices.find(x => x.id === id);
   const saved = d ? (d.partsComment || '').trim() : '';
   if(hint){
     hint.classList.remove('err');   // أي خطأ قديم بيتشال أول ما الفني يعمل حاجة جديدة
-    hint.textContent = (saved && ta.value.trim() === saved) ? 'متسجّل ✅' : '';
+    hint.textContent = (saved && val === saved) ? 'متسجّل ✅' : '';
   }
 }
 
@@ -1414,6 +1469,64 @@ async function rwNone(id){
   // التوست الأول، وبعدين rwRefreshCard — عشان لو ده آخر جهاز،
   // بشارة «تقدر تنصرف» تبقى هي اللي باينة في الآخر مش تتغطى.
   toast('⏳ اتسجّل «لسه مجبتش» للنهاردة');
+  rwRefreshCard(id);
+}
+
+// ============================================================
+// زرار «✅ الجهاز خلص ومحتاجش قطع غيار»
+// ------------------------------------------------------------
+// الفرق بينه وبين «لسه مجبتش ليه حاجة»:
+//   ⏳ لسه مجبتش  = وعد مؤقت. بيصلح لليوم ده بس، وبكرا الجهاز
+//                   بيرجع يسأل تاني. (ختم يومي)
+//   ✅ محتاجش قطع = قرار نهائي. الجهاز اتصلح من غير أي قطعة،
+//                   فالسؤال بيقفل خالص ومبيتكررش.
+//
+// بيعمل حاجتين مع بعض:
+//   ١) بيكتب الجملة في نفس خانة قطع الغيار (partsComment) — عشان
+//      المحاسب والديسباتشر يشوفوها في «مراجعة قطع الغيار»، والجهاز
+//      يتحسب 🟢 خلاص ومبيمنعش الانصراف.
+//   ٢) بيسجّل ملاحظة على الجهاز باسم الفني وتاريخها — عشان تبان في
+//      «تفاصيل الجهاز» لأي حد بيفتحه، مش مستخبية في خانة.
+//
+// ⚠️ مفيش حقل جديد في قاعدة البيانات هنا بالمرة — بنستخدم حقول
+//    الفني مسموح له يكتب فيها من زمان (partsComment + activityNotes).
+//    فمفيش ملف SQL ولا صلاحيات جديدة مع التعديل ده.
+// ============================================================
+async function rwNoNeed(id){
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  const saved = (d.partsComment || '').trim();
+  if(rwIsNoneBtn(saved)) return;                 // متسجّل خلاص
+  // الفني كان كاتب قطع غيار حقيقية؟ نسأله قبل ما نمسحها.
+  // (الزرار بيكون مخفي في الحالة دي، بس ده أمان لو الشاشة قديمة)
+  if(saved && !confirm('الجهاز ده كان متسجّل عليه قطع غيار:\n«' + saved +
+      '»\n\nعايز تمسحها وتقول إن الجهاز محتاجش قطع غيار؟')) return;
+
+  const note  = mkNote('🔩 الفني قال: الجهاز خلص ومحتاجش قطع غيار');
+  const patch = { partsComment: RW_NONE_TXT,
+                  activityNotes: notesForSave(d, note),
+                  lastModifiedAt: nowIso(), lastModifiedBy: ME };
+
+  const db = document.getElementById('rwd_' + id);
+  if(db) db.disabled = true;
+  const ok = await save(id, patch);
+  if(!ok){ if(db) db.disabled = false; rwErr(id, '❌ الحفظ فشل — جرّب تاني'); return; }
+
+  // بنتأكد إن السيرفر كتبها فعلاً — Supabase مبيرميش خطأ لو تجاهل حقل
+  if(!(await rwVerify(id, 'partsComment', RW_NONE_TXT, '«محتاجش قطع غيار»'))){
+    if(db) db.disabled = false;
+    return;
+  }
+
+  d.partsComment = RW_NONE_TXT;
+  if(d._raw) Object.assign(d._raw, patch);
+  d.notes = (patch.activityNotes || []).map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
+  const ta = document.getElementById('rwc_' + id);
+  if(ta) ta.value = RW_NONE_TXT;
+  rwErr(id, '');
+  // التوست الأول وبعدين الكارت — عشان لو ده آخر جهاز ناقص،
+  // بشارة «تقدر تنصرف» تبقى هي الأخيرة اللي الفني يشوفها.
+  toast('✅ اتسجّل: الجهاز محتاجش قطع غيار');
   rwRefreshCard(id);
 }
 
