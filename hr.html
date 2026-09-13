@@ -773,8 +773,8 @@ function dayHtml(d, punches, email){
         ${(!r.breakPen && r.breakOver && r.breakLimit) ? `<span class="flag">☕ زوّد ${fmtDur(r.breakOver)}</span>` : ''}
         ${r.breakOpen ? `<span class="flag">☕ بريك مفتوح</span>` : ''}
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
-      <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
-        r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}${
+      <span class="meta">${r.isOff ? '🏖️ يوم إجازته — نزل ' + fmtMinTime(r.arrived) + ' · كل ساعاته أوفر تايم' : 'ميعاده ' + fmtMinTime(r.shift) + ' · حضر ' + fmtMinTime(r.arrived)}${
+        (!r.isOff && r.lateBy) ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''}${r.isOff ? '' : ' · يتحسب ' + fmtMinTime(r.counted) + ' · ينصرف ' + fmtMinTime(r.leaveAt)}${
         r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}${(() => {
           // البريك اللي ضحّى بيه + الشغل الخام قبل ما يتشال منه
           const o = email ? dayOvertime(email, punches, d) : null;
@@ -811,6 +811,11 @@ function dayHtml(d, punches, email){
           const nB = kinds.filter(x => x === 'break').length;
           const nR = kinds.filter(x => x === 'resume').length;
           return nB > nR ? '<span class="flag">☕ بريك من غير استئناف</span>' : '';
+        })()}
+        ${(() => {
+          const o = email ? dayOvertime(email, punches, d) : null;
+          return (o && o.has && o.isOff)
+            ? '<span class="flag" style="background:var(--done-bg);color:var(--done)">🏖️ نزل في إجازته</span>' : '';
         })()}
         ${(email && NOBRK[(email||'').toLowerCase()] && NOBRK[(email||'').toLowerCase()][d])
           ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}
@@ -1535,6 +1540,7 @@ function applyRules(email, punches, workDate){
     breakLimit:Number(row.break_allow_min || 0),
     breakOver: Number(row.break_over_min || 0),
     breakOpen: !!row.break_open,
+    isOff:   !!row.is_off_day,        // 🏖️ يوم إجازة نزل فيه
     state:   row.state,
     waived:  !!row.waived,
     waiveReason: row.waive_reason || '',
@@ -1609,6 +1615,7 @@ function dayOvertime(email, punches, workDate){
     adj:    Number(row.adjust_min || 0),
     brk:       Number(row.break_min || 0),          // البريك اللي أخده
     brkUnused: Number(row.break_unused_min || 0),   // وضحّى بكام منه
+    isOff:     !!row.is_off_day,
     adjWhy: row.adjust_reason || '',
     raw:    Number(row.raw_min != null ? row.raw_min : (row.worked_min || 0)),
     has:    true
