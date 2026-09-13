@@ -825,8 +825,13 @@ function _attNoBreakBtn(busyMsg){
   // الوردية لازم تكون مفتوحة — مفيش معنى للإعلان قبل الحضور
   const open = _attState.last_kind && _attState.last_kind !== 'out';
   if(!open) return '';
-  // أخد بريك فعلاً؟ الزرار ملوش لازمة (والسيرفر هيرفضه برضه)
-  if(_attState.last_kind === 'break' || _attState.last_kind === 'resume') return '';
+  // أخد بريك فعلاً؟ الزرار ملوش لازمة (والسيرفر هيرفضه برضه).
+  // ⚠️ بنبص على تسجيلات اليوم كلها مش على آخر واحدة بس — اللي
+  //    راح بريك ورجع واشتغل، آخر تسجيل عنده «استئناف»، وقبل كده
+  //    كان الزرار بيختفي. بس اللي راح بريك ورجع وبعدين... الحالة
+  //    الوحيدة اللي كانت بتعدّي هي إن يومه فيه بريك وهو بيقول
+  //    مطلعتش — وده اللي بنقفله هنا.
+  if((_attDayKinds || []).includes('break')) return '';
   if(_attNoBreak){
     return `<button class="att-nobreak done" disabled>✅ متسجّل: مطلعتش بريك النهاردة</button>`;
   }
@@ -912,14 +917,22 @@ function attShowBreakAsk(){
     box.id = 'attAskBox';
     document.body.appendChild(box);
   }
+  // 🔴 فيه ضغطة «بريك» متسجّلة النهاردة؟ يبقى «مطلعتش بريك» كذب
+  //    صريح ضد السجل — بنشيل الاختيار خالص بدل ما نسيبه ونرفضه
+  //    بعدين. (السيرفر بيرفضه كمان، الشاشة مش حماية لوحدها.)
+  const hasBreak = (_attDayKinds || []).includes('break');
   box.innerHTML = `
     <div class="att-ask-bg" onclick="attCloseAsk(event)">
       <div class="att-ask" onclick="event.stopPropagation()">
         <div class="att-ask-h">⚠️ بيانات البريك ناقصة</div>
-        <p class="att-ask-p">ما سجّلتش بريك واستئناف النهاردة.<br>قول حصل إيه عشان نقفل يومك صح:</p>
+        <p class="att-ask-p">${hasBreak
+          ? 'إنت سجّلت <b>بريك</b> النهاردة وما سجّلتش استئناف.<br>قول حصل إيه:'
+          : 'ما سجّلتش بريك واستئناف النهاردة.<br>قول حصل إيه عشان نقفل يومك صح:'}</p>
         <button class="att-ask-b took" onclick="attAnswerBreak('took_returned')">☕ طلعت ورجعت</button>
-        <button class="att-ask-b none" onclick="attAnswerBreak('no_break')">🚫 مطلعتش بريك</button>
+        ${hasBreak ? '' :
+          `<button class="att-ask-b none" onclick="attAnswerBreak('no_break')">🚫 مطلعتش بريك</button>`}
         <button class="att-ask-b left" onclick="attAnswerBreak('left_no_return')">🚶 طلعت ومرجعتش</button>
+        ${hasBreak ? `<p class="att-ask-n">🔒 «مطلعتش بريك» مش متاح — فيه بريك متسجّل عليك النهاردة.</p>` : ''}
         <button class="att-ask-x" onclick="attCloseAsk()">إلغاء</button>
       </div>
     </div>`;
@@ -1111,6 +1124,7 @@ function closeAttendance(){
   .att-ask-b.left{background:#4C1D95;}
   .att-ask-x{display:block; width:100%; border:none; background:none; color:var(--a-mut,#92A6B8);
     font:700 13px/1 inherit; padding:10px; cursor:pointer;}
+  .att-ask-n{font-size:12px; line-height:1.8; color:var(--a-mut,#92A6B8); margin:4px 0 0;}
   .att-log-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
     margin:20px 0 10px; color:var(--a-ink);}
   .att-log-head input{border:1px solid var(--a-line); border-radius:9px; padding:8px 10px;
