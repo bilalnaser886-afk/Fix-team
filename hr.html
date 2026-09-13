@@ -775,7 +775,11 @@ function dayHtml(d, punches, email){
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
       <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
         r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}${
-        r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}</span>
+        r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}${(() => {
+          // البريك اللي اتحسبله شغل — عشان الرقم يبقى مفهوم
+          const o = email ? dayOvertime(email, punches, d) : null;
+          return (o && o.has && o.brkCr) ? ' · ☕ محسوب شغل ' + fmtDur(o.brkCr) : '';
+        })()}</span>
     </div>
     ${r.beforeStart ? `
       <div class="punch" style="padding-bottom:7px;">
@@ -1322,8 +1326,8 @@ function renderHrSettings(){
       <input type="number" id="fGrace" min="0" max="240" value="${Number(c.grace_minutes||0)}">
     </label>
 
-    <label class="fld"><span>⏱️ عدد ساعات العمل</span>
-      <small>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
+    <label class="fld"><span>⏱️ عدد ساعات العمل (شاملة البريك)</span>
+      <small>ده وقت الحضور كله. مثال: ١٠ ساعات وبريك ٦٠ دقيقة = ٩ شغل + ساعة بريك.<br>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
       <input type="number" id="fHours" min="1" max="24" step="0.25" value="${Number(c.work_hours||8)}">
     </label>
 
@@ -1355,18 +1359,13 @@ function renderHrSettings(){
     </div>
 
     <label class="fld"><span>☕ البريك المسموح (بالدقايق في اليوم)</span>
-      <small>مجموع البريكات في اليوم. سيبه صفر لو مفيش بريك مسموح.</small>
+      <small>مجموع البريكات في اليوم، و<b>بيتحسب شغل</b> جوه ساعات العمل فوق.<br>اللي ما بياخدش بريكه مش بياخد أوفر تايم عليه. سيبه صفر لو مفيش بريك.</small>
       <input type="number" id="fBreak" min="0" max="480" value="${Number(c.break_minutes||0)}">
     </label>
 
     <label class="fld"><span>⏳ سماح البريك (بالدقايق)</span>
       <small>مثال: مسموح ٣٠ وسماح ٥ — اللي ياخد ٣٤ مايتخصمش، واللي ياخد ٣٦ يتخصم.</small>
       <input type="number" id="fBreakGrace" min="0" max="240" value="${Number(c.break_grace_minutes||0)}">
-    </label>
-
-    <label class="fld"><span>💸 خصم البريك المش مسجّل (بالجنيه)</span>
-      <small>لو الموظف أقر وقت الانصراف إنه طلع بريك وما سجّلوش. صفر = مفيش خصم فلوس.</small>
-      <input type="number" id="fUnlogged" min="0" step="5" value="${c.unlogged_break_penalty != null ? Number(c.unlogged_break_penalty) : 50}">
     </label>
 
     <label class="fld"><span>💸 خصم تعدّي البريك (بالجنيه)</span>
@@ -1409,7 +1408,6 @@ function stashForm(c){
   //    صفر = مفيش أي إجازة والكل يتخصم.
   if(g('fLeave')      !== undefined) c.monthly_leave_days  = (g('fLeave') === '' ? null : (parseInt(g('fLeave'),10) || 0));
   if(g('fAbsPen')     !== undefined) c.absence_penalty     = parseFloat(g('fAbsPen')) || 0;
-  if(g('fUnlogged')   !== undefined) c.unlogged_break_penalty = parseFloat(g('fUnlogged')) || 0;
   if(g('fNote')    !== undefined) c.note          = g('fNote') || null;
 }
 
@@ -1435,7 +1433,6 @@ async function saveEmpSettings(){
     break_penalty: c.break_penalty || 0,
     monthly_leave_days: c.monthly_leave_days != null ? c.monthly_leave_days : null,
     absence_penalty: c.absence_penalty || 0,
-    unlogged_break_penalty: c.unlogged_break_penalty != null ? c.unlogged_break_penalty : 50,
     note: c.note || null,
     updated_at: new Date().toISOString(),
     updated_by: ME
@@ -1582,6 +1579,8 @@ function dayOvertime(email, punches, workDate){
     closed: !!row.closed,
     // ⏱️ تعديل HR اليدوي على اليوم (موجب = اتشال من الساعات)
     adj:    Number(row.adjust_min || 0),
+    brk:    Number(row.break_min || 0),          // البريك اللي أخده
+    brkCr:  Number(row.break_credit_min || 0),   // واتحسبله منه شغل
     adjWhy: row.adjust_reason || '',
     raw:    Number(row.raw_min != null ? row.raw_min : (row.worked_min || 0)),
     has:    true
