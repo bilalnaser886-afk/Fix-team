@@ -248,6 +248,7 @@
   .abs-warn{margin-top:8px; background:var(--waiting-bg,#FFF7ED); color:var(--waiting,#B45309);
     border:1px solid var(--waiting,#B45309); border-radius:10px; padding:9px 11px;
     font-size:12.5px; font-weight:800; line-height:1.7;}
+  .adj-line{background:var(--waiting-bg,#FFF7ED); border-radius:8px; padding:6px 9px; margin-top:6px;}
   .abs-acts{display:flex; gap:7px; margin-top:8px;}
   .abs-acts .mini-btn{flex:1; padding:9px 6px;}
   .card-ded i{font-style:normal; opacity:.85;}
@@ -818,11 +819,84 @@ function dayHtml(d, punches, email){
           <button class="mini-btn danger" title="مسح"
                   onclick="deletePunch('${esc(p.id)}')">🗑️</button>` : ''}
       </div>`).join('')}
-    ${email ? `<button class="mini-btn" style="width:100%;margin-top:8px;"
-        onclick="openPunch('${esc(email)}','${esc(d)}')">➕ ضيف تسجيل لليوم ده</button>` : ''}
+    ${email ? (() => {
+      // ⏱️ تعديل الساعات — سطر بيبان بس لو فيه تعديل، وزرار دايماً
+      const o = dayOvertime(email, punches, d);
+      const cur = o && o.has ? Number(o.adj || 0) : 0;
+      const line = cur ? `
+        <div class="punch adj-line">
+          <span style="flex:1;min-width:0;">⏱️ ${cur > 0 ? 'اتخصم' : 'اتزاد'} ${fmtDur(Math.abs(cur))}
+            <span class="meta">${esc(o.adjWhy || '')}</span>
+            <span class="meta">(الأصل ${fmtHm(o.raw)})</span></span>
+          <button class="mini-btn danger" title="شيل التعديل"
+                  onclick="adjustHours('${esc(email)}','${esc(d)}', 0)">↩️</button>
+        </div>` : '';
+      return line + `
+        <button class="mini-btn" style="width:100%;margin-top:8px;"
+          onclick="openPunch('${esc(email)}','${esc(d)}')">➕ ضيف تسجيل لليوم ده</button>
+        <button class="mini-btn" style="width:100%;margin-top:6px;"
+          onclick="adjustHours('${esc(email)}','${esc(d)}')">⏱️ ${cur ? 'عدّل خصم الساعات' : 'اخصم ساعات من اليوم ده'}</button>`;
+    })() : ''}
   </div>`;
 }
 
+
+// ============================================================
+// ⏱️ خصم ساعات من يوم معيّن
+// ------------------------------------------------------------
+// سجل الحضور نفسه مبيتلمسش — بنسجّل تعديل منفصل على اليوم بسبب
+// مكتوب. الساعات بتقل، والأوفر تايم/العجز بيتحدّثوا من السيرفر.
+// 🔴 مفيش فلوس بتتخصم هنا: الساعات بتترجم لفلوس في كشف الراتب
+//    بنفس المعادلة الموجودة. لو عايز خصم فلوس مباشر استخدم «💸 خصم».
+// ============================================================
+async function adjustHours(email, date, force){
+  // بنقرا التعديل الحالي من صف السيرفر مباشرة — مش محتاجين التسجيلات هنا
+  const row = (OVER[(email || '').toLowerCase()] || {})[date];
+  const cur = row ? Number(row.adjust_min || 0) : 0;
+
+  let mins = 0, why = '';
+  if(force === 0){
+    if(!confirm('تشيل تعديل الساعات عن اليوم ده؟\nالساعات هترجع زي ما كانت.')) return;
+  }else{
+    const ans = prompt(
+      'اخصم كام ساعة من اليوم ده؟\n' +
+      'مثال: 2 يعني ساعتين · 0.5 يعني نص ساعة\n' +
+      'اكتب رقم بالسالب لو عايز تزوّد ساعات (تعويض).',
+      cur ? String(Math.round((cur / 60) * 100) / 100) : '');
+    if(ans === null) return;
+    const h = parseFloat(String(ans).replace(',', '.'));
+    if(isNaN(h)){ alert('اكتب رقم صحيح'); return; }
+    mins = Math.round(h * 60);
+    if(mins === 0){
+      if(!confirm('صفر = شيل التعديل خالص. تمام؟')) return;
+    }else{
+      if(Math.abs(mins) > 1440){ alert('التعديل مينفعش يزيد عن ٢٤ ساعة'); return; }
+      // 🔴 السبب إجباري — ده وقت بيتشال من حساب موظف
+      why = prompt('السبب (إجباري — الموظف هيشوفه):', '') || '';
+      if(!why.trim()){ alert('لازم تكتب السبب'); return; }
+      const label = mins > 0 ? 'خصم' : 'إضافة';
+      if(!confirm(`تأكيد ${label} الساعات\n\nالموظف: ${nameOf(email)}\nاليوم: ${date}\nالمقدار: ${fmtDur(Math.abs(mins))}\nالسبب: ${why.trim()}`)) return;
+    }
+  }
+
+  try{
+    const { error } = await sb.rpc('hr_adjust_hours',
+      { p_email: email, p_date: date, p_minutes: mins, p_reason: why.trim() || null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    // الساعات بتتحسب في السيرفر، فلازم نعيد تحميلها مش نعدّلها محلياً
+    const y = +MONTH.slice(0,4), m = +MONTH.slice(5,7);
+    const from = MONTH + '-01';
+    const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
+    await loadOvertime(from, to);
+    render();
+    // لو شاشة سجل الموظف مفتوحة، تتحدّث هي كمان
+    if(typeof OPEN_EMP !== 'undefined' && OPEN_EMP) renderEmpSheet(OPEN_EMP, daysOf(OPEN_EMP));
+    alert(mins === 0 ? 'اتشال ✅' : 'اتسجّل ✅');
+  }catch(e){
+    alert('❌ ' + (e.message || e));
+  }
+}
 
 // ============================================================
 // القايمة والشاشات
@@ -1435,6 +1509,10 @@ function dayOvertime(email, punches, workDate){
     short:  Number(row.short_min  || 0),
     need:   Number(row.need_min   || 0),
     closed: !!row.closed,
+    // ⏱️ تعديل HR اليدوي على اليوم (موجب = اتشال من الساعات)
+    adj:    Number(row.adjust_min || 0),
+    adjWhy: row.adjust_reason || '',
+    raw:    Number(row.raw_min != null ? row.raw_min : (row.worked_min || 0)),
     has:    true
   };
 }
