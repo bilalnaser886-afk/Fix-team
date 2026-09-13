@@ -803,6 +803,15 @@ function dayHtml(d, punches, email){
       <span>${new Date(d).toLocaleDateString('ar-EG',
         { weekday:'long', day:'numeric', month:'long' })}
         ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}
+        ${(() => {
+          // ☕ بريك من غير استئناف: العدّاد بيقف عند البريك، والوقت
+          // اللي بعده مش شغل. من غير التوضيح ده الرقم بيبان «ملوش
+          // مبرر» — وده اللي حصل فعلاً في المراجعة.
+          const kinds = punches.map(x => x.kind);
+          const nB = kinds.filter(x => x === 'break').length;
+          const nR = kinds.filter(x => x === 'resume').length;
+          return nB > nR ? '<span class="flag">☕ بريك من غير استئناف</span>' : '';
+        })()}
         ${(email && NOBRK[(email||'').toLowerCase()] && NOBRK[(email||'').toLowerCase()][d])
           ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}
         ${breakDeclFlag(email, d)}</span>
@@ -2440,6 +2449,38 @@ function punchWorkDate(){
 // بتوري لـ HR الكارت اللي التسجيل هيروحه **قبل** ما تحفظ.
 // ⚠️ ده مش زينة: الغلطة اللي حصلت كانت إن التسجيل راح لكارت يوم
 //    تاني ومحدش عرف غير بعد ما دوّر. الشاشة بقت بتقول قبل الحفظ.
+// 🔴 الغلطة الشائعة: انصراف بعد نص الليل بيتكتب بتاريخ نفس اليوم
+//    من غير ما تتعلّم خانة «بعد نص الليل». النتيجة إن التسجيل
+//    بيترتب **قبل** الحضور، فالوقت بعده مش بيتحسب شغل، والرقم
+//    اللي فوق بيطلع أقل من الحقيقة من غير سبب واضح.
+//    الدالة دي بتكشفها: التسجيل الجديد قبل أول تسجيل في اليوم؟
+// بترجّع { bad, firstAt } أو null لو مفيش تسجيلات
+function punchOrderIssue(){
+  const atv = ((document.getElementById('pkAt') || {}).value || '').trim();
+  const wd  = punchWorkDate();
+  if(!atv || !wd) return null;
+  const em = (PUNCH.email || '').toLowerCase();
+  // تسجيلات اليوم — من غير اللي بنعدّله دلوقتي
+  const same = ROWS.filter(r => (r.user_email || '').toLowerCase() === em
+                             && r.work_date === wd
+                             && String(r.id) !== String(PUNCH.id || ''));
+  if(!same.length) return null;
+  const firstAt = same.map(r => new Date(r.at).getTime()).sort((a,b) => a - b)[0];
+  // الوقت المكتوب بتوقيت القاهرة → مللي ثانية للمقارنة
+  const t = new Date(atv.replace('T', ' ').replace(/-/g, '/') + ':00').getTime();
+  return { bad: t < firstAt, firstAt };
+}
+
+// بتظبط التسجيل: تعلّم «بعد نص الليل» وتزوّد يوم على التاريخ
+function punchFixMidnight(){
+  const el = document.getElementById('pkAt');
+  const cb = document.getElementById('pkPrev');
+  if(!el || !cb) return;
+  el.value = shiftDay(el.value.slice(0,10), 1) + el.value.slice(10);
+  cb.checked = true;
+  punchPreview();
+}
+
 function punchPreview(){
   const box = document.getElementById('pkPreview');
   if(!box) return;
@@ -2447,7 +2488,23 @@ function punchPreview(){
   if(!wd){ box.textContent = 'اكتب الوقت الأول'; return; }
   const nice = new Date(wd).toLocaleDateString('ar-EG',
     { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  box.innerHTML = '📍 هيتحط في كارت: <b>' + esc(nice) + '</b>';
+  let html = '📍 هيتحط في كارت: <b>' + esc(nice) + '</b>';
+
+  const iss = punchOrderIssue();
+  if(iss && iss.bad){
+    const ft = new Date(iss.firstAt).toLocaleTimeString('ar-EG',
+      { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' });
+    html += `<div style="margin-top:9px;padding:9px 11px;border-radius:9px;
+        background:var(--waiting-bg,#FFF7ED);color:var(--waiting,#B45309);
+        border:1px solid var(--waiting,#B45309);font-weight:700;line-height:1.8;">
+      ⚠️ الوقت ده <b>قبل</b> أول تسجيل في اليوم (${esc(ft)}).<br>
+      لو ده انصراف بعد نص الليل، الوقت لازم يبقى اليوم اللي بعده.
+      من غير كده الساعات هتطلع ناقصة.
+      <button class="mini-btn" style="margin-top:7px;" onclick="punchFixMidnight()">
+        ✅ ظبّطها (يوم بعده + بعد نص الليل)</button>
+    </div>`;
+  }
+  box.innerHTML = html;
 }
 
 async function savePunch(){
@@ -2460,6 +2517,13 @@ async function savePunch(){
   const day  = punchWorkDate();
 
   if(!kind || !day || !atv){ alert('املا نوع التسجيل والوقت'); return; }
+
+  // 🔴 آخر حاجز قبل الحفظ — المعاينة ممكن تكون اتقرت بسرعة
+  const iss = punchOrderIssue();
+  if(iss && iss.bad && !confirm(
+      'الوقت ده قبل أول تسجيل في اليوم.\n\n' +
+      'لو ده انصراف بعد نص الليل، لازم يتكتب باليوم اللي بعده مع علامة «بعد نص الليل».\n' +
+      'لو حفظت كده، الساعات هتطلع ناقصة.\n\nتحفظ برضه؟')) return;
   // السيرفر عايز 'YYYY-MM-DD HH:MM' — الخانة بتدي 'YYYY-MM-DDTHH:MM'
   const local = atv.replace('T', ' ').slice(0,16);
 
