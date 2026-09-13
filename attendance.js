@@ -495,6 +495,13 @@ async function attPunch(kind){
   // ⚠️ لو الدالة وقعت بخطأ، الانصراف بيكمّل: توقيف انصراف موظف
   //    بسبب باج (ساعاته تتحسب غلط) أخطر من إنه يعدّي مرة.
   // ============================================================
+  // ⚠️ فحص البريك قبل أي حاجة — وبيرجع من غير await عشان تصريح
+  //    الموقع في سفاري ما يضيعش (نفس سبب ترتيب السطور تحت).
+  if(kind === 'out' && !_attAnswer && attNeedBreakAsk()){
+    attShowBreakAsk();
+    return;
+  }
+
   if(kind === 'out' && typeof window.attBeforeOut === 'function'){
     let stop = false;
     try{ stop = window.attBeforeOut(_attState) === true; }
@@ -558,6 +565,15 @@ async function attPunch(kind){
     if(error) throw new Error(error.message || 'فشل التسجيل');
 
     await attLoadState();
+
+    // الانصراف تم ✅ — دلوقتي بس ننفّذ إقرار البريك (خصم/إعلان).
+    // 🔴 بعد النجاح مش قبله: اللي برّه نطاق المحل مكانش ينفع ياخد
+    //    خصم وهو أصلاً ما نجحش ينصرف.
+    if(kind === 'out' && _attAnswer){
+      const ans = _attAnswer; _attAnswer = null;
+      await attApplyAnswer(ans);
+      await attLoadState();
+    }
     attRender('');
 
     // ⚠️ التنبيه بيتحط في **نفس الرسالة** مش في alert تانية.
@@ -646,10 +662,40 @@ async function attDayWarning(kind){
   }
 
   // ---- انصراف ----
-  if(!(Number(r.short_min) > 0)) return '';
+  // ⚠️ بنجيب تفاصيل اليوم من hr_overtime مش من hr_my_day_status،
+  //    لأننا محتاجين البريك المسموح عشان نقول للموظف الحضور
+  //    المطلوب كامل (شغل + بريك) مش الشغل لوحده. الموظف اللي
+  //    بيقرا «المطلوب ٩ ساعات» وهو عارف إنه بيقعد ١٠ بيتلخبط.
+  // صياغة عربي مظبوطة: «١٠ ساعات» مش «10 ساعة و 0 دقيقة»
+  const hmAr = m => {
+    m = Math.max(0, Math.round(Number(m) || 0));
+    const H = Math.floor(m / 60), M = m % 60;
+    const unit = (n, one, two, few, many) =>
+      n === 1 ? one : n === 2 ? two : (n <= 10 ? n + ' ' + few : n + ' ' + many);
+    const hs = H ? unit(H, 'ساعة', 'ساعتين', 'ساعات', 'ساعة') : '';
+    const ms = M ? unit(M, 'دقيقة', 'دقيقتين', 'دقايق', 'دقيقة') : '';
+    return hs && ms ? hs + ' و' + ms : (hs || ms || 'صفر');
+  };
+
+  let d = null;
+  try{
+    const { data:ov, error:e2 } = await sb.rpc('hr_overtime',
+      { p_email:null, p_from:_attState.work_date, p_to:_attState.work_date });
+    if(!e2 && ov && ov.length) d = ov[0];
+  }catch(e){ console.error('hr_overtime (warning):', e); }
+
+  const short = Number((d && d.short_min) != null ? d.short_min : r.short_min) || 0;
+  if(!(short > 0)) return '';
+
+  const need   = Number((d && d.need_min) != null ? d.need_min : r.need_min) || 0;
+  const worked = Number((d && d.worked_min) != null ? d.worked_min : r.worked_min) || 0;
+  const allow  = Number((d && d.break_allow_min) || 0);
+
   return '\n\n⚠️ ساعاتك ناقصة النهاردة.\n'
-       + 'شغلت ' + hm(r.worked_min) + ' والمطلوب ' + hm(r.need_min) + '.\n'
-       + '⏳ ناقصك ' + hm(r.short_min) + '.';
+       + 'المطلوب منك تقعد ' + hmAr(need + allow)
+       + (allow ? ' (' + hmAr(need) + ' شغل + ' + hmAr(allow) + ' بريك)' : '') + '.\n'
+       + 'وإنت اشتغلت ' + hmAr(worked) + '.\n'
+       + '⏳ فلسه عليك ' + hmAr(short) + '.';
 }
 
 // ============================================================
@@ -664,6 +710,8 @@ async function attLoadState(){
     if(error) throw error;
     const r = Array.isArray(data) ? data[0] : data;
     _attState = r || { last_kind:null, last_at:null, work_date:null, punches:0 };
+    await attLoadNoBreak();   // ☕🚫 هل أعلن «مطلعتش بريك» لليوم ده؟
+    await attLoadDayKinds();  // أنواع تسجيلات اليوم — لفحص البريك
   }catch(e){
     // ⚠️ الفشل الصامت هنا كان أخطر من الخطأ نفسه.
     //    لما قراءة الحالة كانت بتفشل، الصفحة كانت بتحط قيم فاضية
@@ -747,6 +795,10 @@ function attRender(busyMsg){
         <div class="att-grid">
           ${btn('in')}${btn('out')}${btn('break')}${btn('resume')}
         </div>
+        <!-- ☕🚫 إعلان «مطلعتش بريك» — ده **مش تسجيل حضور**، ده
+             معلومة لـ HR وقت المراجعة ومالهاش أي تأثير على الساعات.
+             بيبان بس لو الوردية مفتوحة (حاضر أو راجع من بريك). -->
+        ${_attNoBreakBtn(busyMsg)}
         <div class="att-note">
           📍 التسجيل من داخل المحل بس · 🔐 بيتطلب بصمتك أو وجهك
         </div>
@@ -758,6 +810,191 @@ function attRender(busyMsg){
       </div>
     </div>`;
   attRenderLog();
+}
+
+// ============================================================
+// ☕🚫 «مطلعتش بريك»
+// ------------------------------------------------------------
+// إعلان من الموظف إنه ما أخدش بريك النهاردة، عشان HR تشوفه وهي
+// بتراجع. 🔴 مش بيتسجّل في سجل الحضور: أي تسجيل مش «حضور/استئناف»
+// بيقفل عدّاد الساعات، والزرار ده المفروض ميأثرش على أي حساب.
+// ============================================================
+let _attNoBreak = false;   // اتسجّل لليوم ده؟
+
+function _attNoBreakBtn(busyMsg){
+  // الوردية لازم تكون مفتوحة — مفيش معنى للإعلان قبل الحضور
+  const open = _attState.last_kind && _attState.last_kind !== 'out';
+  if(!open) return '';
+  // أخد بريك فعلاً؟ الزرار ملوش لازمة (والسيرفر هيرفضه برضه).
+  // ⚠️ بنبص على تسجيلات اليوم كلها مش على آخر واحدة بس — اللي
+  //    راح بريك ورجع واشتغل، آخر تسجيل عنده «استئناف»، وقبل كده
+  //    كان الزرار بيختفي. بس اللي راح بريك ورجع وبعدين... الحالة
+  //    الوحيدة اللي كانت بتعدّي هي إن يومه فيه بريك وهو بيقول
+  //    مطلعتش — وده اللي بنقفله هنا.
+  if((_attDayKinds || []).includes('break')) return '';
+  if(_attNoBreak){
+    return `<button class="att-nobreak done" disabled>✅ متسجّل: مطلعتش بريك النهاردة</button>`;
+  }
+  return `<button class="att-nobreak" ${busyMsg ? 'disabled' : ''}
+    onclick="attNoBreak()">☕🚫 مطلعتش بريك النهاردة</button>`;
+}
+
+async function attNoBreak(){
+  if(_attBusy) return;
+  if(!confirm('تأكيد: إنت ما أخدتش بريك النهاردة؟\nده هيتسجّل لشؤون العاملين.')) return;
+  _attBusy = true;
+  attRender('⏳ بنسجّل…');
+  try{
+    const { data, error } = await sb.rpc('hr_declare_no_break');
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    _attNoBreak = true;
+    alert('✅ اتسجّل — شؤون العاملين هتشوفه في يوم ' + (data || ''));
+  }catch(e){
+    alert('❌ ' + ((e && e.message) || e));
+  }finally{
+    _attBusy = false;
+    attRender();
+  }
+}
+
+// بنقرا حالة اليوم مع حالة الحضور — عشان الزرار يبان متسجّل
+// لو الموظف قفل الصفحة وفتحها تاني
+async function attLoadNoBreak(){
+  _attNoBreak = false;
+  if(!_attState.work_date) return;
+  try{
+    const { data, error } = await sb.from('hr_no_break')
+      .select('work_date').eq('work_date', _attState.work_date).limit(1);
+    if(error) throw error;
+    _attNoBreak = !!(data && data.length);
+  }catch(e){
+    // مش مشكلة تمنع الشاشة — أسوأ حاجة إن الزرار يبان مرة زيادة
+    console.error('attLoadNoBreak:', e);
+  }
+}
+
+// ============================================================
+// ⚠️ إنذار البريك وقت الانصراف
+// ------------------------------------------------------------
+// بيانات البريك ناقصة؟ بنسأل الأول بدل ما اليوم يتقفل غلط.
+//   ☕ طلعت ورجعت    → خصم ضعف مدة البريك من الساعات (مفيش فلوس)
+//   🚫 مطلعتش بريك   → انصراف عادي
+//   🚶 طلعت ومرجعتش  → انصراف من وقت البريك، مفيش فلوس
+// ============================================================
+let _attDayKinds = [];     // أنواع تسجيلات يوم الوردية
+let _attAnswer   = null;   // إجابة مستنية تتنفذ بعد الانصراف
+
+async function attLoadDayKinds(){
+  _attDayKinds = [];
+  if(!_attState.work_date) return;
+  try{
+    const { data, error } = await sb.from('attendance')
+      .select('kind,at').eq('work_date', _attState.work_date).order('at', { ascending:true });
+    if(error) throw error;
+    _attDayKinds = (data || []).map(r => r.kind);
+  }catch(e){
+    // مش بنوقف الانصراف بسبب ده — أسوأ حاجة إن السؤال ما يطلعش
+    console.error('attLoadDayKinds:', e);
+  }
+}
+
+// محتاجين نسأل؟
+function attNeedBreakAsk(){
+  if(_attNoBreak) return false;                 // أعلن بالزرار خلاص
+  const k = _attDayKinds || [];
+  const nBreak  = k.filter(x => x === 'break').length;
+  const nResume = k.filter(x => x === 'resume').length;
+  if(nBreak === 0) return true;                 // ما سجّلش بريك خالص
+  if(nBreak > nResume) return true;             // طلع بريك وما رجعش
+  return false;                                 // بريك مكتمل — تمام
+}
+
+function attShowBreakAsk(){
+  let box = document.getElementById('attAskBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'attAskBox';
+    document.body.appendChild(box);
+  }
+  // 🔴 فيه ضغطة «بريك» متسجّلة النهاردة؟ يبقى «مطلعتش بريك» كذب
+  //    صريح ضد السجل — بنشيل الاختيار خالص بدل ما نسيبه ونرفضه
+  //    بعدين. (السيرفر بيرفضه كمان، الشاشة مش حماية لوحدها.)
+  const hasBreak = (_attDayKinds || []).includes('break');
+  box.innerHTML = `
+    <div class="att-ask-bg" onclick="attCloseAsk(event)">
+      <div class="att-ask" onclick="event.stopPropagation()">
+        <div class="att-ask-h">⚠️ بيانات البريك ناقصة</div>
+        <p class="att-ask-p">${hasBreak
+          ? 'إنت سجّلت <b>بريك</b> النهاردة وما سجّلتش استئناف.<br>قول حصل إيه:'
+          : 'ما سجّلتش بريك واستئناف النهاردة.<br>قول حصل إيه عشان نقفل يومك صح:'}</p>
+        <button class="att-ask-b took" onclick="attAnswerBreak('took_returned')">☕ طلعت ورجعت</button>
+        ${hasBreak ? '' :
+          `<button class="att-ask-b none" onclick="attAnswerBreak('no_break')">🚫 مطلعتش بريك</button>`}
+        <button class="att-ask-b left" onclick="attAnswerBreak('left_no_return')">🚶 طلعت ومرجعتش</button>
+        ${hasBreak ? `<p class="att-ask-n">🔒 «مطلعتش بريك» مش متاح — فيه بريك متسجّل عليك النهاردة.</p>` : ''}
+        <button class="att-ask-x" onclick="attCloseAsk()">إلغاء</button>
+      </div>
+    </div>`;
+}
+function attCloseAsk(ev){
+  if(ev && ev.target !== ev.currentTarget) return;
+  const box = document.getElementById('attAskBox');
+  if(box) box.remove();
+}
+
+async function attAnswerBreak(ans){
+  attCloseAsk();
+
+  // 🚶 طلعت ومرجعتش — مفيش انصراف عادي، السيرفر بيسجّله بوقت البريك
+  if(ans === 'left_no_return'){
+    if(!confirm('هنسجّل انصرافك من وقت ما دوست بريك.\nالساعات بعد كده مش هتتحسب. تمام؟')) return;
+    _attBusy = true; attRender('⏳ بنسجّل…');
+    try{
+      const { data, error } = await sb.rpc('hr_checkout_at_break');
+      // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+      if(error) throw error;
+      if(data === 'no_break_punch'){
+        alert('⚠️ إنت ما دوستش بريك أصلاً، فمعندناش وقت نسجّل عليه الانصراف.\nيومك هيفضل مفتوح — كلّم الإدارة تظبطه.');
+      }else{
+        alert('✅ اتسجّل انصرافك من وقت البريك.');
+      }
+      await attLoadState();
+    }catch(e){
+      alert('❌ ' + ((e && e.message) || e));
+    }finally{
+      _attBusy = false; attRender();
+    }
+    return;
+  }
+
+  // ☕ / 🚫 — الانصراف العادي الأول (موقع + بصمة)، والنتيجة بعده
+  if(ans === 'took_returned'){
+    if(!confirm('هيتخصم من ساعاتك ضعف مدة البريك. متأكد؟')) return;
+  }
+  _attAnswer = ans;
+  attPunch('out');     // بيعدّي من الفحص دلوقتي لأن _attAnswer اتحطت
+}
+
+// بتتنفذ بعد ما الانصراف ينجح
+async function attApplyAnswer(ans){
+  try{
+    const { data, error } = await sb.rpc('hr_break_answer', { p_answer: ans });
+    if(error) throw error;
+    const mins = Number((data && data.hours_min) || 0);
+    const amt  = Number((data && data.amount) || 0);
+    // 🔕 «مطلعتش بريك» مبيطلعش أي رسالة عن قصد — مفيش خصم أصلاً
+    if(mins){
+      alert('اتسجّل ✅\n• اتخصم من ساعاتك: ' + Math.round(mins) + ' دقيقة');
+    }else if(amt){
+      alert('اتسجّل ✅\n• وخصم: ' + amt + ' ج.م (هتلاقيه في «مرتبك»)');
+    }
+  }catch(e){
+    // ⚠️ الانصراف اتم خلاص — فمش هنخوّف الموظف برسالة فشل كبيرة،
+    //    بس لازم نقول بوضوح إن الإقرار ما اتسجّلش عشان يبلّغ.
+    console.error('hr_break_answer:', e);
+    alert('⚠️ انصرافك اتسجّل، بس إقرار البريك ما اتسجّلش.\nقول لشؤون العاملين.');
+  }
 }
 
 function _attMonthValue(){
@@ -861,12 +1098,33 @@ function closeAttendance(){
   .att-warn-d{display:block; margin-top:5px; font-size:11px; opacity:.8; direction:ltr;
     word-break:break-word;}
   .att-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
+  /* نفس شكل أزرار الحضور بالظبط — لون واحد مصمت وخط أبيض.
+     بنّي أغمق شوية من زرار البريك عشان يتفرق عنه بالبصر. */
+  .att-nobreak{width:100%; border:none; border-radius:14px; padding:18px 10px;
+    font-family:inherit; font-size:15px; font-weight:800; color:#fff;
+    background:#7C4A12; cursor:pointer; margin-bottom:14px;}
+  .att-nobreak:disabled{opacity:.35; cursor:not-allowed;}
+  .att-nobreak.done{background:#166534; opacity:1;}
   .att-btn{padding:18px 10px; border:none; border-radius:14px; font-family:inherit;
     font-size:15px; font-weight:800; color:#fff; cursor:pointer;}
   .att-btn:disabled{opacity:.35; cursor:not-allowed;}
   .att-in{background:#16A34A;} .att-out{background:#DC2626;}
   .att-break{background:#B45309;} .att-resume{background:#0891A8;}
   .att-note{font-size:12.5px; line-height:1.9; color:var(--a-mut); text-align:center;}
+  /* ⚠️ سؤال البريك */
+  .att-ask-bg{position:fixed; inset:0; z-index:99990; background:rgba(6,11,17,.72);
+    display:flex; align-items:center; justify-content:center; padding:20px;}
+  .att-ask{width:100%; max-width:380px; background:var(--a-card,#1B2A3A); color:var(--a-ink,#E9EFF5);
+    border:1px solid var(--a-line,#2F4356); border-radius:18px; padding:20px 18px 16px; text-align:center;}
+  .att-ask-h{font-size:16.5px; font-weight:800; color:#FBBF24; margin-bottom:8px;}
+  .att-ask-p{font-size:13.5px; line-height:1.9; color:var(--a-ink2,#C3D2DF); margin:0 0 16px;}
+  .att-ask-b{display:block; width:100%; border:none; border-radius:13px; padding:15px 10px;
+    font-family:inherit; font-size:14.5px; font-weight:800; color:#fff; cursor:pointer; margin-bottom:9px;}
+  .att-ask-b.took{background:#B45309;} .att-ask-b.none{background:#166534;}
+  .att-ask-b.left{background:#4C1D95;}
+  .att-ask-x{display:block; width:100%; border:none; background:none; color:var(--a-mut,#92A6B8);
+    font:700 13px/1 inherit; padding:10px; cursor:pointer;}
+  .att-ask-n{font-size:12px; line-height:1.8; color:var(--a-mut,#92A6B8); margin:4px 0 0;}
   .att-log-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
     margin:20px 0 10px; color:var(--a-ink);}
   .att-log-head input{border:1px solid var(--a-line); border-radius:9px; padding:8px 10px;
