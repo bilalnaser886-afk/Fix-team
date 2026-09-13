@@ -547,6 +547,8 @@
   .pr-cm{margin-top:8px;background:var(--bg);border-radius:9px;padding:8px 10px;
     font-size:13px;font-weight:700;line-height:1.7;}
   .pr-cm.none{color:var(--muted);font-weight:400;font-style:italic;background:none;padding:6px 0;}
+  /* الفني قال إن الجهاز محتاجش قطع غيار — رد مكتمل مش خانة فاضية */
+  .pr-cm.ok0{background:var(--done-bg);border:1px solid var(--done);color:var(--done);}
   .pr-empty{text-align:center;color:var(--muted);padding:36px 10px;font-size:13.5px;}
   /* 🔍 بحث المراجعة — مربوط بالمدة المختارة */
   .pr-search{width:100%;box-sizing:border-box;border:1.5px solid var(--line);background:var(--paper);
@@ -1548,6 +1550,49 @@ function ticketHtml(d){
 //     الكارت من برّه بس، فلو فتحت التفاصيل تتأكد كنت تقفل وتدوّر
 //     على الكارت تاني
 // ============================================================
+// ============================================================
+// 🔩 قطع الغيار في تفاصيل الجهاز — عرض بحت
+// ------------------------------------------------------------
+// `partsComment` هو اللي الفني كتبه بإيده من صفحته. تلات حالات:
+//   • فاضي          → الفني لسه ما ردّش
+//   • «محتاجش قطع»  → داس الزرار الأخضر: الجهاز اتصلح من غير أي قطعة
+//   • أي كلام تاني  → القطع اللي جابها زي ما هي
+// ⚠️ الديسباتشر بيشوف بس — الكتابة من صفحة الفني.
+// ============================================================
+function dpPartsNorm(s){
+  return String(s || '').replace(/[\s.,،!؟?\-—_]+/g, '').replace(/ه$/,'ة');
+}
+function dpPartsIsNone(s){
+  const t = dpPartsNorm(s);
+  if(!t) return false;                      // الفاضي حالة تانية خالص
+  return ['مفيش', 'مافيش', 'مفيشحاجة', 'مافيشحاجة', 'لايوجد', 'لاشيء', 'لاشئ', 'لا', '0', 'ولاحاجة',
+          dpPartsNorm('مفيش — الجهاز خلص ومحتاجش قطع غيار')].includes(t);
+}
+// ملاحظة الفني — عشان نعرف مين قالها وإمتى
+function dpPartsNote(d){
+  const list = (d && d._raw && d._raw.activityNotes) || [];
+  for(let i = list.length - 1; i >= 0; i--){
+    if(String((list[i] && list[i].text) || '').indexOf('محتاجش قطع غيار') >= 0) return list[i];
+  }
+  return null;
+}
+function dpPartsHtml(d){
+  const cm = ((d && d._raw && d._raw.partsComment) || '').trim();
+  const box = 'border-radius:9px;padding:8px 10px;font-size:13px;line-height:1.7;';
+  if(!cm){
+    return `<div style="${box}background:var(--card);border:1px solid var(--line);color:var(--muted);">
+      — الفني لسه ما كتبش قطع غيار للجهاز ده</div>`;
+  }
+  if(dpPartsIsNone(cm)){
+    const n = dpPartsNote(d);
+    const who = n ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by || '')}${n.role ? ` (${esc(n.role)})` : ''}</div>` : '';
+    return `<div style="${box}background:var(--done-bg);border:1px solid var(--done);">
+      <b style="color:var(--done);">✅ الفني قال: الجهاز خلص ومحتاجش قطع غيار</b>${who}</div>`;
+  }
+  return `<div style="${box}background:var(--card);border:1px solid var(--line);white-space:pre-wrap;">
+    🔩 ${esc(cm)}</div>`;
+}
+
 function showInfo(id){
   const d = devices.find(x => x.id === id); if(!d) return;
   const s = ST[d.status] || {label:d.status, c:'--muted'};
@@ -1608,6 +1653,12 @@ function showInfo(id){
       <div class="di-card">
         <div class="di-card-h">🔒 باسورد الجهاز</div>
         <div id="dpLockView">${dpLockViewHtml(d)}</div>
+      </div>
+
+      <!-- 🔩 قطع الغيار — كلام الفني نفسه (عرض بحت، الديسباتشر مبيكتبش فيه) -->
+      <div class="di-card">
+        <div class="di-card-h">🔩 قطع الغيار (كلام الفني)</div>
+        ${dpPartsHtml(d)}
       </div>
 
       <!-- 📝 الملاحظات — زي المحاسب بالظبط: القايمة + إضافة ملاحظة -->
@@ -2986,7 +3037,9 @@ async function prShowDeviceParts(id){
     <button class="pr-back" onclick="prPickingId=null;prRender()">‹ ${PR.q ? 'رجوع لنتايج البحث' : (PR.tech ? 'رجوع لأجهزة الفني' : 'رجوع')}</button>
     <div class="pr-th">📱 ${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</div>
     ${((d._raw&&d._raw.partsComment)||'').trim()
-      ? `<div class="pr-cm">🔩 ${esc(d._raw.partsComment)}</div>` : ''}
+      ? (dpPartsIsNone(d._raw.partsComment)
+          ? `<div class="pr-cm ok0">✅ الفني قال: الجهاز محتاجش قطع غيار</div>`
+          : `<div class="pr-cm">🔩 ${esc(d._raw.partsComment)}</div>`) : ''}
     <div id="prLinked" class="pr-empty">بنجيب القطع المربوطة…</div>
     <button class="pr-q on" style="width:100%;margin-top:10px;padding:12px;"
       onclick="prPickParts()">➕ اربط قطعة غيار بالجهاز</button>`;
