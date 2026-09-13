@@ -561,7 +561,7 @@ function render(){
   for(const e of Object.keys(emps)){
     for(const d of Object.keys(emps[e])){
       const s = dayMinutes(emps[e][d]);
-      totalMin += s.minutes; totalDays++;
+      totalMin += effMin(e, emps[e][d], d); totalDays++;
       if(s.missingOut) flagged++;
     }
   }
@@ -614,7 +614,7 @@ function cardHtml(e, days){
   const dkeys = Object.keys(days);
   dkeys.forEach(d => {
     const st = dayMinutes(days[d]);
-    mins += st.minutes;
+    mins += effMin(e, days[d], d);
     if(st.missingOut) flags++;
     const r = applyRules(e, days[d], d);
     if(r){ penalty += r.penalty; if(r.state === 'late') late++; }
@@ -694,7 +694,7 @@ function renderEmpSheet(email, days){
   let mins=0, over=0, short=0, pen=0, late=0, flags=0;
   dkeys.forEach(d => {
     const st = dayMinutes(days[d]);
-    mins += st.minutes;
+    mins += effMin(email, days[d], d);
     if(st.missingOut) flags++;
     const r = applyRules(email, days[d], d);
     if(r){ pen += r.penalty; if(r.state === 'late') late++; }
@@ -776,9 +776,11 @@ function dayHtml(d, punches, email){
       <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
         r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}${
         r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}${(() => {
-          // البريك اللي ضحّى بيه — بيفسّر ليه مفيش أوفر تايم
+          // البريك اللي ضحّى بيه + الشغل الخام قبل ما يتشال منه
           const o = email ? dayOvertime(email, punches, d) : null;
-          return (o && o.has && o.brkUnused) ? ' · ☕ ضحّى بـ ' + fmtDur(o.brkUnused) : '';
+          if(!o || !o.has || !o.brkUnused) return '';
+          return ' · ☕ ضحّى بـ ' + fmtDur(o.brkUnused) +
+                 (o.eff !== o.worked ? ' · شغل فعلي ' + fmtHm(o.worked) : '');
         })()}</span>
     </div>
     ${r.beforeStart ? `
@@ -804,7 +806,7 @@ function dayHtml(d, punches, email){
         ${(email && NOBRK[(email||'').toLowerCase()] && NOBRK[(email||'').toLowerCase()][d])
           ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}
         ${breakDeclFlag(email, d)}</span>
-      <span class="hrs">${fmtHm(s.minutes)}${(() => {
+      <span class="hrs">${fmtHm(email ? effMin(email, punches, d) : s.minutes)}${(() => {
         const o = email ? dayOvertime(email, punches, d) : null;
         if(!o || !o.has || s.missingOut) return '';
         if(o.over)  return ` <span style="color:var(--done)">+${fmtHm(o.over)}</span>`;
@@ -1556,6 +1558,12 @@ function applyRules(email, punches, workDate){
 //    الشرط ده، اليوم اللي الموظف شغال فيه دلوقتي كان هيبان عليه
 //    عجز يوم كامل — وكل واحد يفتح الشاشة الصبح يلاقي «عجز ٨
 //    ساعات» وهو لسه بادئ.
+// الساعات المعروضة لأي يوم — من السيرفر لو موجود، وإلا الخام
+function effMin(email, punches, d){
+  const o = email ? dayOvertime(email, punches, d) : null;
+  return (o && o.has) ? o.eff : dayMinutes(punches).minutes;
+}
+
 function dayOvertime(email, punches, workDate){
   const byDay = OVER[(email || '').toLowerCase()];
   const row = byDay && workDate ? byDay[workDate] : null;
@@ -1564,11 +1572,26 @@ function dayOvertime(email, punches, workDate){
   // → نوري ساعاته الخام من غير ما نخترع زيادة ولا نقص
   if(!row){
     const raw = dayMinutes(punches);
-    return { worked: raw.minutes, over: 0, short: 0, need: 0, has: false };
+    return { worked: raw.minutes, eff: raw.minutes, over: 0, short: 0, need: 0, has: false };
   }
 
+  // 🔴 «الساعات المحسوبة» = الشغل الفعلي ناقص البريك اللي ضحّى بيه،
+  //    بس **في حدود الزيادة بس**. يعني:
+  //      • قعد ١٠:٣١ ومطلوب ٨:٣٠ وضحّى بساعتين → يتحسبله ٨:٣١
+  //        (بدل ما يبان ١٠:٣١ وكأن عنده ساعتين أوفر تايم)
+  //      • قعد ٤ ساعات ومطلوب ٩ → يفضل ٤، والنقص ٥ ساعات
+  //        ⚠️ البريك المتساب **مبيغطّيش النقص** — اللي بيمشي بدري
+  //           مكانش ينفع ياخد ساعتين مجاناً كل يوم.
+  //    والنتيجة إن الرقم المعروض دايماً = المطلوب ± الزيادة/النقص،
+  //    فمفيش رقمين متناقضين قدام عين الموظف.
+  const _w = Number(row.worked_min || 0);
+  const _n = Number(row.need_min   || 0);
+  const _u = Number(row.break_unused_min || 0);
+  const _eff = _w - Math.min(_u, Math.max(0, _w - _n));
+
   return {
-    worked: Number(row.worked_min || 0),
+    worked: _w,
+    eff:    _eff,
     over:   Number(row.over_min   || 0),
     short:  Number(row.short_min  || 0),
     need:   Number(row.need_min   || 0),
@@ -1604,7 +1627,7 @@ function empRows(email){
     const lastOut = [...p].reverse().find(x => x.kind === 'out');
     if(st.missingOut) flags++;
     const counted = !st.missingOut && o.has;
-    if(counted){ tW += o.worked; tO += o.over; tS += o.short; }
+    if(counted){ tW += o.eff; tO += o.over; tS += o.short; }
     if(r) tP += r.penalty;
     out.push({
       date: d,
@@ -1613,7 +1636,7 @@ function empRows(email){
       out:  lastOut ? fmtTime(lastOut.at) : '—',
       counted: r ? fmtMinTime(r.counted) : '—',
       due:  r ? fmtMinTime(r.leaveAt) : '—',
-      worked: fmtHm(st.minutes),
+      worked: fmtHm(o.has ? o.eff : st.minutes),
       over:  counted && o.over  ? fmtHm(o.over)  : '',
       short: counted && o.short ? fmtHm(o.short) : '',
       pen:   r && r.penalty ? r.penalty : '',
