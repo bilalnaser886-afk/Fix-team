@@ -1707,6 +1707,22 @@ async function loadUserRoles(){
     if(r && r.value) userRoles = JSON.parse(r.value) || {};
   }catch(e){ userRoles = {}; }
 }
+// 🔴 الاسم الظاهر من لوحة الأدمن بيعلى على اسم ملف الحساب.
+//    ليه؟ لأن ملف الحساب (profiles) المستخدم هو اللي بيملاه، ولوحة
+//    الأدمن هي اللي بتحدد الاسم الرسمي اللي بيتكتب في الملاحظات
+//    والتقارير. بيتنده بعد تحميل الأدوار، لأن الاسم الأول بيتحط
+//    وقت الدخول قبل ما الأدوار توصل.
+function applyRoleName(){
+  try{
+    const n = (roleEntry(currentUser.email).techName || '').trim();
+    if(!n) return;
+    currentUser.name = n;
+    try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
+    const el = document.getElementById('userName');
+    if(el) el.textContent = n;
+  }catch(e){ console.error('applyRoleName:', e); }
+}
+
 async function saveUserRoles(){
   try{ await window.storage.set(ROLES_KEY, JSON.stringify(userRoles)); }catch(e){}
 }
@@ -8229,7 +8245,7 @@ requireAccess().then(ok => {
   //    كانت بتتنادى فوراً، فبتلاقي featureFlags لسه فاضية وتخرج
   //    من أول سطر — والإشعارات مبتوصلش أبداً. وكمان بتحتاج
   //    myRole() عشان تعرف تقرا أنهي مفتاح.
-  loadUserRoles().then(loadPendingTechs).then(loadFeatureFlags).then(() => { try{ prSyncMenu(); }catch(e){} }).then(loadAudit)
+  loadUserRoles().then(applyRoleName).then(loadPendingTechs).then(loadFeatureFlags).then(() => { try{ prSyncMenu(); }catch(e){} }).then(loadAudit)
     .catch(e => { try{ console.warn('roles/flags load failed:', e); }catch(_){} })
     .then(applyRoleVisibility)
     .then(() => { try{ loadBroadcast(); }catch(e){} try{ syncAccountMenu(); }catch(e){} });

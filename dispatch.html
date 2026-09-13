@@ -1351,12 +1351,20 @@ async function boot(){
     document.querySelectorAll('.cap-inventory').forEach(el => el.style.display = '');
   }
 
-  // الاسم: من ملف الحساب، وإلا الجزء الأول من الإيميل
+  // الاسم: من لوحة الأدمن الأول، وإلا ملف الحساب، وإلا الإيميل.
+  // 🔴 لوحة الأدمن بتعلى على ملف الحساب عن قصد: الموظف هو اللي
+  //    بيملا ملف حسابه، والإدارة هي اللي بتحدد الاسم الرسمي اللي
+  //    بيتكتب في الملاحظات والتقارير.
   ME = MY_EMAIL.split('@')[0];
   try{
     const { data:prof } = await sb.from('profiles').select('full_name').eq('id', session.user.id).single();
     if(prof && prof.full_name && prof.full_name.trim()) ME = prof.full_name.trim();
   }catch(e){}
+  try{
+    const _ent = userRoles[MY_EMAIL];
+    const _nm = (_ent && typeof _ent === 'object' && _ent.techName || '').trim();
+    if(_nm) ME = _nm;
+  }catch(e){ console.error('اسم لوحة الأدمن:', e); }
 
   localStorage.setItem('ifix_disp_me', JSON.stringify({ name:ME, email:MY_EMAIL }));
   loadNotices();   // من غير await — ما توقفش عرض الصفحة

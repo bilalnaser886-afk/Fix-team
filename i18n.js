@@ -570,6 +570,8 @@
       'adm.badEmail':      'الإيميل مش مظبوط',
       'adm.badRole':       'اختار رقم من القايمة',
       'adm.techNamePrompt':'اسم الفني زي ما هو مكتوب على الأجهزة:',
+      'adm.namePrompt':    'الاسم الظاهر (اختياري — هيظهر في الملاحظات والتقارير):',
+      'adm.needTechName':  'اسم الفني إجباري — بيربط الحساب بأجهزته',
 
       /* صفحة الاشتراك */
       'chk.expired': 'انتهت فترتك المجانية',
@@ -1241,6 +1243,8 @@
       'adm.badEmail':      'Invalid email',
       'adm.badRole':       'Pick a number from the list',
       'adm.techNamePrompt':'Technician name exactly as written on devices:',
+      'adm.namePrompt':    'Display name (optional — shown in notes and reports):',
+      'adm.needTechName':  'Technician name is required — it links the account to devices',
 
       /* Checkout page */
       'chk.expired': 'Your free trial has ended',
