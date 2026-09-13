@@ -489,6 +489,8 @@ async function loadMonth(){
     await loadOvertime(from, to);   // 🔴 والأوفر تايم كمان
     await loadDeductions();    // والخصومات اليدوية كمان
     await loadAbsences(from, to);   // 🏖️ الغياب المقترح خصمه
+    await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
+    await loadBreakDecl(from, to);  // ⚠️ إقرارات البريك وقت الانصراف
     render();
   }catch(e){
     console.error('loadMonth failed:', e);
@@ -773,7 +775,11 @@ function dayHtml(d, punches, email){
         ${r.waived ? `<span class="flag" style="background:var(--done-bg);color:var(--done)">✋ الخصم اتشال</span>` : ''}</span>
       <span class="meta">ميعاده ${fmtMinTime(r.shift)} · حضر ${fmtMinTime(r.arrived)}${
         r.lateBy ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''} · يتحسب ${fmtMinTime(r.counted)} · ينصرف ${fmtMinTime(r.leaveAt)}${
-        r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}</span>
+        r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}${(() => {
+          // البريك اللي ضحّى بيه — بيفسّر ليه مفيش أوفر تايم
+          const o = email ? dayOvertime(email, punches, d) : null;
+          return (o && o.has && o.brkUnused) ? ' · ☕ ضحّى بـ ' + fmtDur(o.brkUnused) : '';
+        })()}</span>
     </div>
     ${r.beforeStart ? `
       <div class="punch" style="padding-bottom:7px;">
@@ -794,7 +800,10 @@ function dayHtml(d, punches, email){
     <div class="day-h">
       <span>${new Date(d).toLocaleDateString('ar-EG',
         { weekday:'long', day:'numeric', month:'long' })}
-        ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}</span>
+        ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}
+        ${(email && NOBRK[(email||'').toLowerCase()] && NOBRK[(email||'').toLowerCase()][d])
+          ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}
+        ${breakDeclFlag(email, d)}</span>
       <span class="hrs">${fmtHm(s.minutes)}${(() => {
         const o = email ? dayOvertime(email, punches, d) : null;
         if(!o || !o.has || s.missingOut) return '';
@@ -1175,6 +1184,65 @@ async function reloadAbsences(){
   await loadAbsences(from, to);
 }
 
+// ☕🚫 إعلانات «مطلعتش بريك» — معلومة للمراجعة، مالهاش أي أثر على
+// الساعات ولا الخصومات. شكلها: NOBRK['fanie@x.com']['2026-09-11'] = 1
+let NOBRK = {};
+
+async function loadNoBreak(from, to){
+  try{
+    const { data, error } = await sb.from('hr_no_break')
+      .select('user_email,work_date').gte('work_date', from).lte('work_date', to);
+    if(error) throw error;
+    NOBRK = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (NOBRK[e] = NOBRK[e] || {})[r.work_date] = 1;
+    });
+  }catch(e){
+    console.error('loadNoBreak failed:', e);
+    NOBRK = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42P01/i.test(t))
+      console.warn('⚠️ ميزة «مطلعتش بريك» لسه ماتركبتش — شغّل 49-no-break.sql');
+  }
+}
+
+// ⚠️ إقرارات البريك وقت الانصراف (migration 50)
+let BRKD = {};
+
+async function loadBreakDecl(from, to){
+  try{
+    const { data, error } = await sb.from('hr_break_declarations')
+      .select('user_email,work_date,answer,hours_min,amount')
+      .gte('work_date', from).lte('work_date', to);
+    if(error) throw error;
+    BRKD = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (BRKD[e] = BRKD[e] || {})[r.work_date] = r;
+    });
+  }catch(e){
+    console.error('loadBreakDecl failed:', e);
+    BRKD = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42P01/i.test(t))
+      console.warn('⚠️ إقرارات البريك لسه ماتركبتش — شغّل 50-break-declare.sql');
+  }
+}
+
+function breakDeclFlag(email, d){
+  const r = (BRKD[(email||'').toLowerCase()] || {})[d];
+  if(!r) return '';
+  if(r.answer === 'no_break') return '';   // العلامة التانية بتغطيه
+  if(r.answer === 'left_no_return')
+    return '<span class="flag" title="انصراف اتسجّل من وقت البريك">🚶 طلع وما رجعش</span>';
+  const bits = [];
+  if(Number(r.hours_min)) bits.push(fmtDur(Number(r.hours_min)));
+  if(Number(r.amount))    bits.push(Number(r.amount) + ' ج.م');
+  return `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)"
+    title="الموظف أقر إنه طلع بريك وما سجّلوش">☕ بريك مش مسجّل${bits.length ? ' − ' + bits.join(' + ') : ''}</span>`;
+}
+
 const DAY_NAMES = ['الأحد','الاتنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
 async function loadEmpSettings(){
@@ -1258,8 +1326,8 @@ function renderHrSettings(){
       <input type="number" id="fGrace" min="0" max="240" value="${Number(c.grace_minutes||0)}">
     </label>
 
-    <label class="fld"><span>⏱️ عدد ساعات العمل</span>
-      <small>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
+    <label class="fld"><span>⏱️ عدد ساعات العمل (شغل صافي)</span>
+      <small>من غير البريك. مثال: اكتب ٩ والبريك ٦٠ دقيقة → حضوره ١٠ ساعات والقياس على الـ٩.<br>بيقبل الكسور — اكتب 8.5 لو تمن ساعات ونص.</small>
       <input type="number" id="fHours" min="1" max="24" step="0.25" value="${Number(c.work_hours||8)}">
     </label>
 
@@ -1291,18 +1359,13 @@ function renderHrSettings(){
     </div>
 
     <label class="fld"><span>☕ البريك المسموح (بالدقايق في اليوم)</span>
-      <small>مجموع البريكات في اليوم. سيبه صفر لو مفيش بريك مسموح.</small>
+      <small>بيتزاد على ساعات العمل فوق. اللي بيضحّي ببريكه <b>مش بياخد عليه أوفر تايم</b> — بيتحسبله يوم مظبوط.<br>سيبه صفر لو مفيش بريك.</small>
       <input type="number" id="fBreak" min="0" max="480" value="${Number(c.break_minutes||0)}">
     </label>
 
     <label class="fld"><span>⏳ سماح البريك (بالدقايق)</span>
-      <small>مثال: مسموح ٣٠ وسماح ٥ — اللي ياخد ٣٤ مايتخصمش، واللي ياخد ٣٦ يتخصم.</small>
+      <small>تسامح بسيط فوق المسموح. الدقايق دي مش بتتحسب شغل، بس مش بتتعلّم «زوّد البريك» في المراجعة.</small>
       <input type="number" id="fBreakGrace" min="0" max="240" value="${Number(c.break_grace_minutes||0)}">
-    </label>
-
-    <label class="fld"><span>💸 خصم تعدّي البريك (بالجنيه)</span>
-      <small>مبلغ ثابت مرة واحدة في اليوم مهما زوّد. صفر = مفيش خصم.</small>
-      <input type="number" id="fBreakPen" min="0" step="5" value="${Number(c.break_penalty||0)}">
     </label>
 
     <label class="fld"><span>📝 ملاحظات</span>
@@ -1335,7 +1398,6 @@ function stashForm(c){
   if(g('fPenalty') !== undefined) c.late_penalty  = parseFloat(g('fPenalty')) || 0;
   if(g('fBreak')      !== undefined) c.break_minutes       = parseInt(g('fBreak'),10) || 0;
   if(g('fBreakGrace') !== undefined) c.break_grace_minutes = parseInt(g('fBreakGrace'),10) || 0;
-  if(g('fBreakPen')   !== undefined) c.break_penalty       = parseFloat(g('fBreakPen')) || 0;
   // ⚠️ الإجازات: فاضي معناه «تلقائي» مش صفر — والفرق كبير.
   //    صفر = مفيش أي إجازة والكل يتخصم.
   if(g('fLeave')      !== undefined) c.monthly_leave_days  = (g('fLeave') === '' ? null : (parseInt(g('fLeave'),10) || 0));
@@ -1362,7 +1424,6 @@ async function saveEmpSettings(){
     off_days: Array.isArray(c.off_days) ? c.off_days : [],
     break_minutes: c.break_minutes || 0,
     break_grace_minutes: c.break_grace_minutes || 0,
-    break_penalty: c.break_penalty || 0,
     monthly_leave_days: c.monthly_leave_days != null ? c.monthly_leave_days : null,
     absence_penalty: c.absence_penalty || 0,
     note: c.note || null,
@@ -1448,7 +1509,10 @@ function applyRules(email, punches, workDate){
     shift:   Number(row.shift_min != null ? row.shift_min : row.counted_min),
     lateBy:  Number(row.late_min || 0),
     counted: Number(row.counted_min),
-    leaveAt: Number(row.counted_min) + need,
+    // ⚠️ ميعاد الانصراف = اللي بيتحسب منه + الشغل المطلوب + البريك
+    //    اللي أخده فعلاً. اللي ما خدش بريك بيمشي أبدر — وده حقه،
+    //    لأن البريك المتساب مش بيتحوّل أوفر تايم أصلاً.
+    leaveAt: Number(row.counted_min) + need + Number(row.break_min || 0),
     need,
     // السيرفر بيصفّر الخصم لوحده لو HR شالته — مش بنكرّر الفحص هنا
     // 🔴 penalty = المجموع (تأخير + بريك) — السيرفر بيجمعهم.
@@ -1511,6 +1575,8 @@ function dayOvertime(email, punches, workDate){
     closed: !!row.closed,
     // ⏱️ تعديل HR اليدوي على اليوم (موجب = اتشال من الساعات)
     adj:    Number(row.adjust_min || 0),
+    brk:       Number(row.break_min || 0),          // البريك اللي أخده
+    brkUnused: Number(row.break_unused_min || 0),   // وضحّى بكام منه
     adjWhy: row.adjust_reason || '',
     raw:    Number(row.raw_min != null ? row.raw_min : (row.worked_min || 0)),
     has:    true
