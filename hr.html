@@ -490,6 +490,7 @@ async function loadMonth(){
     await loadDeductions();    // والخصومات اليدوية كمان
     await loadAbsences(from, to);   // 🏖️ الغياب المقترح خصمه
     await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
+    await loadBreakDecl(from, to);  // ⚠️ إقرارات البريك وقت الانصراف
     render();
   }catch(e){
     console.error('loadMonth failed:', e);
@@ -797,7 +798,8 @@ function dayHtml(d, punches, email){
         { weekday:'long', day:'numeric', month:'long' })}
         ${s.missingOut ? '<span class="flag">ناقص انصراف</span>' : ''}
         ${(email && NOBRK[(email||'').toLowerCase()] && NOBRK[(email||'').toLowerCase()][d])
-          ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}</span>
+          ? '<span class="flag" title="الموظف أعلن إنه ما أخدش بريك">☕🚫 مطلعش بريك</span>' : ''}
+        ${breakDeclFlag(email, d)}</span>
       <span class="hrs">${fmtHm(s.minutes)}${(() => {
         const o = email ? dayOvertime(email, punches, d) : null;
         if(!o || !o.has || s.missingOut) return '';
@@ -1201,6 +1203,42 @@ async function loadNoBreak(from, to){
   }
 }
 
+// ⚠️ إقرارات البريك وقت الانصراف (migration 50)
+let BRKD = {};
+
+async function loadBreakDecl(from, to){
+  try{
+    const { data, error } = await sb.from('hr_break_declarations')
+      .select('user_email,work_date,answer,hours_min,amount')
+      .gte('work_date', from).lte('work_date', to);
+    if(error) throw error;
+    BRKD = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (BRKD[e] = BRKD[e] || {})[r.work_date] = r;
+    });
+  }catch(e){
+    console.error('loadBreakDecl failed:', e);
+    BRKD = {};
+    const t = (e && e.message) ? e.message : String(e);
+    if(/does not exist|42P01/i.test(t))
+      console.warn('⚠️ إقرارات البريك لسه ماتركبتش — شغّل 50-break-declare.sql');
+  }
+}
+
+function breakDeclFlag(email, d){
+  const r = (BRKD[(email||'').toLowerCase()] || {})[d];
+  if(!r) return '';
+  if(r.answer === 'no_break') return '';   // العلامة التانية بتغطيه
+  if(r.answer === 'left_no_return')
+    return '<span class="flag" title="انصراف اتسجّل من وقت البريك">🚶 طلع وما رجعش</span>';
+  const bits = [];
+  if(Number(r.hours_min)) bits.push(fmtDur(Number(r.hours_min)));
+  if(Number(r.amount))    bits.push(Number(r.amount) + ' ج.م');
+  return `<span class="flag" style="background:var(--rejected-bg,#FEF2F2);color:var(--red)"
+    title="الموظف أقر إنه طلع بريك وما سجّلوش">☕ بريك مش مسجّل${bits.length ? ' − ' + bits.join(' + ') : ''}</span>`;
+}
+
 const DAY_NAMES = ['الأحد','الاتنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
 async function loadEmpSettings(){
@@ -1326,6 +1364,11 @@ function renderHrSettings(){
       <input type="number" id="fBreakGrace" min="0" max="240" value="${Number(c.break_grace_minutes||0)}">
     </label>
 
+    <label class="fld"><span>💸 خصم البريك المش مسجّل (بالجنيه)</span>
+      <small>لو الموظف أقر وقت الانصراف إنه طلع بريك وما سجّلوش. صفر = مفيش خصم فلوس.</small>
+      <input type="number" id="fUnlogged" min="0" step="5" value="${c.unlogged_break_penalty != null ? Number(c.unlogged_break_penalty) : 50}">
+    </label>
+
     <label class="fld"><span>💸 خصم تعدّي البريك (بالجنيه)</span>
       <small>مبلغ ثابت مرة واحدة في اليوم مهما زوّد. صفر = مفيش خصم.</small>
       <input type="number" id="fBreakPen" min="0" step="5" value="${Number(c.break_penalty||0)}">
@@ -1366,6 +1409,7 @@ function stashForm(c){
   //    صفر = مفيش أي إجازة والكل يتخصم.
   if(g('fLeave')      !== undefined) c.monthly_leave_days  = (g('fLeave') === '' ? null : (parseInt(g('fLeave'),10) || 0));
   if(g('fAbsPen')     !== undefined) c.absence_penalty     = parseFloat(g('fAbsPen')) || 0;
+  if(g('fUnlogged')   !== undefined) c.unlogged_break_penalty = parseFloat(g('fUnlogged')) || 0;
   if(g('fNote')    !== undefined) c.note          = g('fNote') || null;
 }
 
@@ -1391,6 +1435,7 @@ async function saveEmpSettings(){
     break_penalty: c.break_penalty || 0,
     monthly_leave_days: c.monthly_leave_days != null ? c.monthly_leave_days : null,
     absence_penalty: c.absence_penalty || 0,
+    unlogged_break_penalty: c.unlogged_break_penalty != null ? c.unlogged_break_penalty : 50,
     note: c.note || null,
     updated_at: new Date().toISOString(),
     updated_by: ME
