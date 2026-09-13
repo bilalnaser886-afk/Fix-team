@@ -970,7 +970,7 @@ async function attAnswerBreak(ans){
 
   // ☕ / 🚫 — الانصراف العادي الأول (موقع + بصمة)، والنتيجة بعده
   if(ans === 'took_returned'){
-    if(!confirm('هيتخصم من ساعاتك ضعف مدة البريك.\nمفيش خصم فلوس. متأكد؟')) return;
+    if(!confirm('هيتخصم من ساعاتك ضعف مدة البريك. متأكد؟')) return;
   }
   _attAnswer = ans;
   attPunch('out');     // بيعدّي من الفحص دلوقتي لأن _attAnswer اتحطت
