@@ -56,6 +56,7 @@
       'status.rejected_shop': 'درج الرفض',
       'status.rejected': 'تم الرفض',
       'status.returned': 'المرتجعات',
+      'status.trashed': '🗑 المهملات',
 
       /* اللوحة الرئيسية */
       'board.deviceCountHint': 'جهاز — اضغط للعرض',
@@ -615,6 +616,8 @@
       'msg.badDiscount': 'اكتب قيمة خصم صحيحة',
       'msg.badOpening': 'اكتب رصيد افتتاحي صحيح',
       'msg.deleteDevice': 'متأكد إنك عايز تمسح "{name}"؟ الحذف ده نهائي ومش هينفع ترجّعه.',
+      'msg.trashDevice': 'تنقل "{name}" للمهملات؟ هيفضل هناك {n} يوم وتقدر ترجّعه في أي وقت، وبعدها هيتمسح نهائي لوحده.',
+      'msg.purgeDevice': 'مسح نهائي لـ "{name}"؟ مش هينفع يرجع خالص — لا من المهملات ولا من أي مكان.',
 
       /* حركات الحساب + بانرات النظام */
       'acc.by': 'بواسطة',
@@ -743,6 +746,7 @@
       'status.rejected_shop': 'Rejection drawer',
       'status.rejected': 'Rejected',
       'status.returned': 'Returns',
+      'status.trashed': '🗑 Trash',
 
       'board.deviceCountHint': 'devices — tap to view',
       'board.empty': 'No devices',
@@ -1293,6 +1297,8 @@
       'msg.badDiscount': 'Enter a valid discount value',
       'msg.badOpening': 'Enter a valid opening balance',
       'msg.deleteDevice': 'Delete "{name}"? This is permanent and cannot be undone.',
+      'msg.trashDevice': 'Move "{name}" to Trash? It stays there for {n} days and can be restored; after that it is deleted permanently.',
+      'msg.purgeDevice': 'Permanently delete "{name}"? It cannot be restored from anywhere.',
 
       /* Ledger entries + system banners */
       'acc.by': 'by',
