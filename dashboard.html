@@ -1214,9 +1214,6 @@
   .pr-mark.undo{border-color:var(--border);color:var(--ink-2);}
   .pr-mark.undo:hover{background:var(--surface-2);}
   .pr-fnote{font-size:12px;color:var(--muted);}
-  .pr-floor{font-size:12px;color:var(--muted);background:var(--surface-2);
-    border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
-    margin-bottom:12px;line-height:1.8;}
   .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
   .pr-n{background:var(--surface-3);border-radius:20px;padding:2px 9px;font-size:12px;}
   .pr-dev{border:1px solid var(--border);background:var(--surface-2);border-radius:13px;
@@ -7105,11 +7102,11 @@ async function exportShopExcel(shop){
   const ws = wb.addWorksheet('كشف حساب', { views:[{ rightToLeft:true }] });
 
   // العناوين العلوية
-  ws.mergeCells('A1:E1');
+  ws.mergeCells('A1:F1');
   ws.getCell('A1').value = 'كشف حساب — ' + shop;
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF1F3864'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
-  ws.mergeCells('A2:E2');
+  ws.mergeCells('A2:F2');
   ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
@@ -7121,12 +7118,13 @@ async function exportShopExcel(shop){
   ws.getCell('B3').value = debit;
   ws.getCell('C3').value = 'إجمالي المدفوع (له)';
   ws.getCell('D3').value = credit;
-  ws.getCell('E3').value = 'المتبقي على المحل: ' + Number(balance||0).toLocaleString('en-EG') + ' ج.م';
+  // ⚙️ اتزحلق من E لـ F بعد ما عمود «اللون» اتزاد
+  ws.getCell('F3').value = 'المتبقي على المحل: ' + Number(balance||0).toLocaleString('en-EG') + ' ج.م';
   ws.getRow(3).height = 20;
   ws.getCell('B3').numFmt = money;
   ws.getCell('D3').numFmt = money;
   [['A3','FFB45309'], ['B3','FFB45309'], ['C3','FF16A34A'], ['D3','FF16A34A'],
-   ['E3', (Number(balance)||0) > 0 ? 'FFDC2626' : 'FF2563EB']].forEach(([ref,color]) => {
+   ['F3', (Number(balance)||0) > 0 ? 'FFDC2626' : 'FF2563EB']].forEach(([ref,color]) => {
     const c = ws.getCell(ref);
     c.font = { bold:true, color:{argb:'FFFFFFFF'}, size:11 };
     c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:color} };
@@ -7137,7 +7135,7 @@ async function exportShopExcel(shop){
   // رأس الجدول (صف 4) — كحلي بخط أبيض عريض
   const head = ws.getRow(4);
   // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
-  head.values = ['تاريخ التسليم','البيان','العطل','عليه (آجل)','له (دفعات)'];
+  head.values = ['تاريخ التسليم','البيان','العطل','اللون','عليه (آجل)','له (دفعات)'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -7152,30 +7150,31 @@ async function exportShopExcel(shop){
       new Date(stmtDate(e)).toLocaleString('ar-EG'),
       stmtDesc(e),
       stmtIssue(e),
+      stmtColor(e),
       isDebitLike(e) ? (e.amount||0) : null,
       !isDebitLike(e) ? (e.amount||0) : null
     ]);
     r.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { vertical:'middle', wrapText:true }; });
-    // ⚙️ أعمدة الفلوس اتزحلقت من 3ؔ4 لـ 4ؔ5 بعد ما العطل اتحط في 3
-    r.getCell(4).numFmt = money; r.getCell(5).numFmt = money;
-    r.getCell(4).alignment = { horizontal:'center', vertical:'middle' };
+    // ⚙️ أعمدة الفلوس اتزحلقت لـ 5ؔ6 بعد ما «اللون» اتحط في 4
+    r.getCell(5).numFmt = money; r.getCell(6).numFmt = money;
     r.getCell(5).alignment = { horizontal:'center', vertical:'middle' };
+    r.getCell(6).alignment = { horizontal:'center', vertical:'middle' };
   });
 
   ws.addRow([]);
-  // عمود فاضي زيادة (العطل) قبل خانات الفلوس
-  [['','إجمالي الآجل','', debit, null], ['','إجمالي المدفوع/الخصم','', null, credit], ['','المتبقي على المحل','', balance, null]]
+  // عمودين فاضيين زيادة (العطل + اللون) قبل خانات الفلوس
+  [['','إجمالي الآجل','','', debit, null], ['','إجمالي المدفوع/الخصم','','', null, credit], ['','المتبقي على المحل','','', balance, null]]
     .forEach((t, i) => {
       const r = ws.addRow(t);
       r.getCell(2).font = { bold:true };
-      r.getCell(4).numFmt = money; r.getCell(5).numFmt = money;
+      r.getCell(5).numFmt = money; r.getCell(6).numFmt = money;
       r.eachCell({ includeEmpty:true }, cell => {
         cell.border = border;
         cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: i===2 ? 'FFFDE68A' : 'FFF1F5F9'} };
       });
     });
 
-  [22,42,30,16,16].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [22,40,28,14,16,16].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -9190,16 +9189,10 @@ function prRenderFolder(){
   const title = mode === 'noparts'
     ? '📭 مش مربوط بيها قطع غيار'
     : '✅ مش محتاجة قطع غيار';
-  const note = mode === 'noparts'
-    ? `الأجهزة دي مفيش أي قطعة من المخزن مربوطة بيها. لو الجهاز فعلاً محتاجش قطعة، دوس <b>✅ مش محتاج قطعة غيار</b> وهينتقل للفولدر التاني.`
-    : `أجهزة اتعلّم عليها إنها خلصت من غير قطع غيار — سواء من المحاسب هنا، أو من الفني بزراره في صفحته.`;
-
   const loading = mode === 'noparts' && !noParts;
   host.innerHTML = `
     <button class="pr-back" onclick="PR.folder=null;prRender()">‹ رجوع للمراجعة</button>
     <div class="pr-th">${title} <span class="pr-n">${loading ? '…' : list.length}</span></div>
-    <div class="pr-floor">${note}<br>📅 الفترة محسوبة بـ<b>تاريخ آخر تعديل</b> على الجهاز، ومن <b>${PR_FLOOR}</b> وطالع بس.
-    <br>🚫 الأجهزة المرفوضة مش بتدخل الفولدرات خالص.</div>
     ${loading
       ? `<div class="pr-empty">⏳ بنراجع المخزن…</div>`
       : (list.length
