@@ -56,7 +56,6 @@
       'status.rejected_shop': 'درج الرفض',
       'status.rejected': 'تم الرفض',
       'status.returned': 'المرتجعات',
-      'status.trashed': '🗑 المهملات',
 
       /* اللوحة الرئيسية */
       'board.deviceCountHint': 'جهاز — اضغط للعرض',
@@ -464,6 +463,12 @@
       'an.fromShops': 'ومنها دفعات من المحلات',
       'an.deferredAdded': 'آجل اتسجل في الفترة',
       'an.outstanding': 'إجمالي المتبقي على المحلات (كل الوقت)',
+      'an.profit': 'الربح من الشغل',
+      'an.revenue': 'إجمالي قيمة الإصلاح للأجهزة المسلّمة (ج.م)',
+      'an.partsCost': 'تكلفة قطع الغيار على الأجهزة دي (ج.م)',
+      'an.gross': 'مجمل الربح (ج.م)',
+      'an.margin': 'هامش الربح',
+      'an.profitNote': 'مجمل الربح = قيمة الإصلاح − تكلفة قطع الغيار. ⚠️ ده <b>قبل</b> المرتبات والإيجار والكهربا وأي مصاريف تانية — يعني مش صافي الربح النهائي للمحل.',
       'an.topCustomers': 'كبار العملاء (الأكتر تعاملاً في الفترة)',
       'an.noCustomers': 'مفيش عملاء في الفترة دي',
       'an.noName': 'بدون اسم',
@@ -611,8 +616,6 @@
       'msg.badDiscount': 'اكتب قيمة خصم صحيحة',
       'msg.badOpening': 'اكتب رصيد افتتاحي صحيح',
       'msg.deleteDevice': 'متأكد إنك عايز تمسح "{name}"؟ الحذف ده نهائي ومش هينفع ترجّعه.',
-      'msg.trashDevice': 'تنقل "{name}" للمهملات؟ هيفضل هناك {n} يوم وتقدر ترجّعه في أي وقت، وبعدها هيتمسح نهائي لوحده.',
-      'msg.purgeDevice': 'مسح نهائي لـ "{name}"؟ مش هينفع يرجع خالص — لا من المهملات ولا من أي مكان.',
 
       /* حركات الحساب + بانرات النظام */
       'acc.by': 'بواسطة',
@@ -741,7 +744,6 @@
       'status.rejected_shop': 'Rejection drawer',
       'status.rejected': 'Rejected',
       'status.returned': 'Returns',
-      'status.trashed': '🗑 Trash',
 
       'board.deviceCountHint': 'devices — tap to view',
       'board.empty': 'No devices',
@@ -1143,6 +1145,12 @@
       'an.fromShops': 'of which store payments',
       'an.deferredAdded': 'Credit added in period',
       'an.outstanding': 'Total outstanding from stores (all time)',
+      'an.profit': 'Profit from work',
+      'an.revenue': 'Total repair charges for delivered devices (EGP)',
+      'an.partsCost': 'Spare-parts cost for those devices (EGP)',
+      'an.gross': 'Gross profit (EGP)',
+      'an.margin': 'Profit margin',
+      'an.profitNote': 'Gross profit = repair charges − spare-parts cost. ⚠️ This is <b>before</b> salaries, rent, utilities and other overheads — it is not the shop\'s final net profit.',
       'an.topCustomers': 'Top customers (most active in period)',
       'an.noCustomers': 'No customers in this period',
       'an.noName': 'Unnamed',
@@ -1287,8 +1295,6 @@
       'msg.badDiscount': 'Enter a valid discount value',
       'msg.badOpening': 'Enter a valid opening balance',
       'msg.deleteDevice': 'Delete "{name}"? This is permanent and cannot be undone.',
-      'msg.trashDevice': 'Move "{name}" to Trash? It stays there for {n} days and can be restored; after that it is deleted permanently.',
-      'msg.purgeDevice': 'Permanently delete "{name}"? It cannot be restored from anywhere.',
 
       /* Ledger entries + system banners */
       'acc.by': 'by',

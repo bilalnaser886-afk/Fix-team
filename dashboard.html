@@ -1217,6 +1217,11 @@
   .pr-floor{font-size:12px;color:var(--muted);background:var(--surface-2);
     border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
     margin-bottom:12px;line-height:1.8;}
+  /* ملاحظة تحت كروت الربح */
+  .an-note{font-size:12px;color:var(--muted);background:var(--surface-2);
+    border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
+    margin:8px 0 4px;line-height:1.9;}
+  .an-note b{color:var(--ink-2);font-weight:800;}
   .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
   .pr-n{background:var(--surface-3);border-radius:20px;padding:2px 9px;font-size:12px;}
   .pr-dev{border:1px solid var(--border);background:var(--surface-2);border-radius:13px;
@@ -7825,6 +7830,7 @@ function openAnalytics(){
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
+  AN_PARTS.map = null;   // نعيد حساب تكلفة القطع — ممكن حد ربط قطع من آخر مرة
   renderAnalytics();
 }
 function closeAnalytics(){ document.getElementById('analyticsOverlay').classList.add('hidden'); }
@@ -7879,6 +7885,52 @@ function repairDays(d){
   return days >= 0 ? days : null;
 }
 
+// ============================================================
+// 💵 تكلفة قطع الغيار لكل جهاز
+// ------------------------------------------------------------
+// طلب واحد بيجيب عمودين بس (رقم الجهاز + التكلفة) من كل المخزن،
+// وبنعمل منه خريطة: جهاز ← إجمالي تكلفة قطعه.
+//
+// ⚠️ مش بنجيب القطع جهاز جهاز — على ٥٠٠ جهاز مسلّم في الشهر
+//    كان معناه مئات الطلبات كل ما تفتح الصفحة.
+//
+// ⚠️ بنجيب الصفوف اللي ليها device_id بس — القطع المخزنة
+//    والوارد لسه ما اتحمّلوش على جهاز، فمالهمش لازمة هنا.
+// ============================================================
+var AN_PARTS = { map: null, loading: false };
+
+async function anLoadPartsCost(force){
+  if(AN_PARTS.loading) return false;
+  if(AN_PARTS.map && !force) return false;
+  AN_PARTS.loading = true;
+  try{
+    const m = new Map();
+    const PAGE = 1000;
+    let from = 0;
+    for(let guard = 0; guard < 50; guard++){
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id,total_cost').not('device_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      for(const r of data){
+        if(!r.device_id) continue;
+        m.set(r.device_id, (m.get(r.device_id) || 0) + (Number(r.total_cost) || 0));
+      }
+      if(data.length < PAGE) break;
+      from += PAGE;
+    }
+    AN_PARTS.map = m;
+    return true;
+  }catch(e){
+    console.error('[الملخص] فشل جلب تكلفة القطع:', e);
+    AN_PARTS.map = AN_PARTS.map || new Map();
+    return false;
+  }finally{
+    AN_PARTS.loading = false;
+  }
+}
+
 function renderAnalytics(){
   const chip = (mode, label) =>
     `<button class="inv-chip ${anPeriod.mode===mode?'active':''}" onclick="setAnPeriod('${mode}')">${label}</button>`;
@@ -7915,6 +7967,44 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:var(--warn);">${fmt(deferredAdded)}</div><div class="inv-card-label">${t('an.deferredAdded')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? 'var(--danger)' : 'var(--success)'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${t('an.outstanding')}</div></div>
     </div>`;
+
+  // ============================================================
+  // ===== 💵 الربح من الشغل =====
+  // ------------------------------------------------------------
+  // مجمل الربح = قيمة الإصلاح − تكلفة قطع الغيار.
+  //
+  // ⚠️ الأساس هو الأجهزة اللي **اتسلّمت** في الفترة — مش الكاش
+  //    المحصّل. جهاز اتسلّم آجل لسه فلوسه ما وصلتش، بس الشغل
+  //    اتعمل والقطعة اتصرفت، فالربح بتاعه بيتحسب في الفترة دي.
+  //    لو ربطناه بالتحصيل، شهر فيه تحصيل قديم كتير كان هيبان
+  //    مربح وهو مشتغلش، والعكس.
+  //
+  // ⚠️ الرقم ده **قبل** المرتبات والإيجار وأي مصاريف — عشان كده
+  //    اسمه «مجمل الربح» مش «صافي الربح». الفرق ده مش لعب
+  //    بالكلام: محل ممكن يبقى مجمل ربحه ٥٠ ألف وصافيه بالسالب.
+  // ============================================================
+  if(!AN_PARTS.map && !AN_PARTS.loading){
+    anLoadPartsCost().then(got => { if(got) renderAnalytics(); });
+  }
+  const partsReady = !!AN_PARTS.map;
+  const repairRevenue = deliveredInRange
+    .reduce((tt, d) => tt + (parseInt(enDigits(d.agreedPrice)) || 0), 0);
+  const partsSpent = partsReady
+    ? deliveredInRange.reduce((tt, d) => tt + (AN_PARTS.map.get(d.id) || 0), 0)
+    : 0;
+  const grossProfit = repairRevenue - partsSpent;
+  const margin = repairRevenue > 0 ? Math.round((grossProfit / repairRevenue) * 100) : 0;
+  const wait = '<span style="font-size:15px;color:var(--muted);">⏳ بنحسب…</span>';
+
+  const profitCards = `
+    <div class="inv-section-title">💵 ${t('an.profit')}</div>
+    <div class="inv-cards">
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--info);">${fmt(repairRevenue)}</div><div class="inv-card-label">${t('an.revenue')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--warn);">${partsReady ? '− ' + fmt(Math.round(partsSpent)) : wait}</div><div class="inv-card-label">${t('an.partsCost')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? fmt(Math.round(grossProfit)) : wait}</div><div class="inv-card-label">${t('an.gross')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${margin >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? margin + '%' : wait}</div><div class="inv-card-label">${t('an.margin')}</div></div>
+    </div>
+    <div class="an-note">${t('an.profitNote')}</div>`;
 
   // ============================================================
   // ===== كبار العملاء =====
@@ -8014,6 +8104,7 @@ function renderAnalytics(){
   document.getElementById('analyticsBody').innerHTML = `
     ${filterBar}
     ${moneyCards}
+    ${profitCards}
     <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
     <div style="font-size:12.5px; color:var(--muted-2); margin:-4px 0 10px; line-height:1.9;">
       ${VIP_MIN_DEVICES} أجهزة فأكتر خلال <b>${esc(monthName)}</b>
