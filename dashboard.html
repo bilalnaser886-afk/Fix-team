@@ -1193,6 +1193,30 @@
   .pr-tech-s .ok{color:var(--done);font-weight:700;}
   .pr-back{border:none;background:none;color:var(--accent);font:800 13px/1 inherit;
     cursor:pointer;padding:6px 0;margin-bottom:8px;}
+  /* ===== 📁 فولدرات المراجعة ===== */
+  .pr-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:10px;margin-bottom:16px;}
+  .pr-folder{text-align:start;border:1px solid var(--border);background:var(--surface-2);
+    border-radius:14px;padding:14px;cursor:pointer;color:var(--ink);font:inherit;
+    transition:transform .12s,box-shadow .12s;}
+  .pr-folder:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.12);}
+  .pr-folder.warn{border-inline-start:4px solid var(--warn);}
+  .pr-folder.ok{border-inline-start:4px solid var(--done);}
+  .pr-folder-n{font-weight:800;font-size:13.5px;margin-bottom:5px;line-height:1.6;}
+  .pr-folder-s{font-size:12px;color:var(--muted);}
+  .pr-folder-s b{font-size:15px;color:var(--ink);}
+  .pr-fitem{margin-bottom:10px;}
+  .pr-fact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    margin:-4px 2px 0;padding-top:6px;}
+  .pr-mark{border:1px solid var(--done);background:var(--surface);color:var(--done);
+    border-radius:10px;padding:9px 14px;font:800 12.5px/1 inherit;cursor:pointer;}
+  .pr-mark:hover{background:var(--done-bg);}
+  .pr-mark.undo{border-color:var(--border);color:var(--ink-2);}
+  .pr-mark.undo:hover{background:var(--surface-2);}
+  .pr-fnote{font-size:12px;color:var(--muted);}
+  .pr-floor{font-size:12px;color:var(--muted);background:var(--surface-2);
+    border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
+    margin-bottom:12px;line-height:1.8;}
   .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
   .pr-n{background:var(--surface-3);border-radius:20px;padding:2px 9px;font-size:12px;}
   .pr-dev{border:1px solid var(--border);background:var(--surface-2);border-radius:13px;
@@ -8744,7 +8768,18 @@ requireAccess().then(ok => {
 // الصلاحية: الأدمن والمحاسب تلقائياً. الديسباتشر لازم الأدمن يفعّل
 // مفتاح الميزة 'parts_review' من الإعدادات.
 // ============================================================
-const PR = { from: '', to: '', tech: null, quick: 'today', q: '' };   // q = كلمة البحث
+const PR = { from: '', to: '', tech: null, quick: 'today', q: '', folder: null };   // q = كلمة البحث
+
+// ============================================================
+// 📁 فولدرات المراجعة
+// ------------------------------------------------------------
+// ⚠️ أرضية ثابتة: الفولدرات مبتشوفش أي جهاز قبل ١ سبتمبر ٢٠٢٦.
+//    السبب: ربط القطع بالمخزن اتفعّل بعد التاريخ ده — فكل جهاز
+//    أقدم منه هيبان "مش مربوط بيه قطع غيار" وهو مش غلطة حد.
+//    من غير الأرضية دي الفولدر كان هيبقى آلاف الأجهزة القديمة
+//    ومحدش هيبص فيه تاني.
+// ============================================================
+const PR_FLOOR = '2026-09-01';
 
 // الصلاحية: الأدمن والمحاسب تلقائياً. أي ديسباتشر لازم الأدمن يمنحه
 // صلاحية 'parts_review' من لوحة الأدمن (سويتش تحت اسمه).
@@ -8786,6 +8821,8 @@ function prSetQuick(q){
   let start = end;
   if(q === 'week')  start = prDayKey(new Date(now.getTime() - 6*86400000).toISOString());
   if(q === 'month') start = prDayKey(new Date(now.getTime() - 29*86400000).toISOString());
+  // «الكل» = من أول يوم النظام اشتغل فيه، مش من أول الدنيا
+  if(q === 'all')   start = PR_FLOOR;
   PR.from = start; PR.to = end;
   PR.tech = null;
   prRender();
@@ -8816,6 +8853,8 @@ function prTechOf(d){ return (d.technician || '').trim(); }
 function openPartsReview(){
   if(!prCanUse()){ toast('الميزة دي مقفولة — الأدمن بيفعّلها من الإعدادات'); return; }
   const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
+  PR.folder = null;
+  PR_HAS.set = null;   // نعيد كشف المربوط — ممكن حد ربط قطع من آخر مرة
   if(!PR.from) prSetQuick('today'); else prRender();
   document.getElementById('partsReviewOverlay').classList.remove('hidden');
 }
@@ -8823,6 +8862,7 @@ function closePartsReview(){
   const o = document.getElementById('partsReviewOverlay');
   if(o) o.classList.add('hidden');
   PR.tech = null;
+  PR.folder = null;
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
@@ -8920,6 +8960,168 @@ function prDevHtml(d, showTech){
         </div>`;
 }
 
+// ============================================================
+// 📁 مين مربوط بيه قطع غيار؟
+// ------------------------------------------------------------
+// ⚠️ مش بنستعمل PR_LINK هنا. PR_LINK بيجيب القطع للأجهزة الظاهرة
+//    على الشاشة بس وعلى دفعات ٦٠ — لو استعملناه للفولدر، «الكل»
+//    كان هيبعت عشرات الطلبات.
+//    بدالها: طلب واحد بيجيب عمود device_id بس من كل المخزن،
+//    وبنعمل منه Set. سؤال «الجهاز ده مربوط بيه حاجة؟» بيبقى
+//    فوري وببلاش.
+// ============================================================
+var PR_HAS = { set: null, loading: false, tried: false };
+
+async function prLoadHasParts(force){
+  if(PR_HAS.loading) return false;
+  if(PR_HAS.set && !force) return false;
+  PR_HAS.loading = true; PR_HAS.tried = true;
+  try{
+    const ids = new Set();
+    const PAGE = 1000;
+    let from = 0;
+    for(let guard = 0; guard < 50; guard++){
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id').not('device_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      data.forEach(r => { if(r.device_id) ids.add(r.device_id); });
+      if(data.length < PAGE) break;
+      from += PAGE;
+    }
+    PR_HAS.set = ids;
+    return true;
+  }catch(e){
+    console.error('[المراجعة] فشل جلب الأجهزة المربوطة:', e);
+    PR_HAS.set = PR_HAS.set || new Set();
+    return false;
+  }finally{
+    PR_HAS.loading = false;
+  }
+}
+
+// «مش محتاج قطع غيار» — من مصدرين:
+//   ١) المحاسب داس العلامة هنا            → noPartsNeeded === true
+//   ٢) الفني داس زراره في صفحته           → partsComment بيبقى «مفيش…»
+// ⚠️ الترتيب مهم: لو المحاسب رجّعه للمراجعة (noPartsNeeded === false)
+//    ده بيغلب، إلا لو الفني نفسه قايل مفيش — ساعتها الكلام كلامه.
+function prNoNeed(d){
+  if(d.noPartsNeeded === true) return true;
+  return detPartsIsNone(d.partsComment);
+}
+
+// أساس الفولدرين: أجهزة الفترة اللي ليها فني، من ١ سبتمبر وطالع
+function prFolderBase(){
+  return (devices || [])
+    .filter(prInRange)
+    .filter(d => prTechOf(d))
+    .filter(d => prDayKey(prTouched(d)) >= PR_FLOOR);
+}
+
+function prFolderLists(){
+  const base = prFolderBase();
+  const noNeed  = base.filter(prNoNeed);
+  const noParts = PR_HAS.set
+    ? base.filter(d => !prNoNeed(d) && !PR_HAS.set.has(d.id))
+    : null;                       // null = لسه بنحمّل
+  return { base, noNeed, noParts };
+}
+
+function prFolderCardsHtml(){
+  const { noNeed, noParts } = prFolderLists();
+  return `<div class="pr-folders">
+    <button class="pr-folder warn" onclick="PR.folder='noparts';PR.tech=null;prRender()">
+      <div class="pr-folder-n">📭 مش مربوط بيها قطع غيار</div>
+      <div class="pr-folder-s">${noParts ? `<b>${noParts.length}</b> جهاز` : '⏳ بنحسب…'}</div>
+    </button>
+    <button class="pr-folder ok" onclick="PR.folder='noneed';PR.tech=null;prRender()">
+      <div class="pr-folder-n">✅ مش محتاجة قطع غيار</div>
+      <div class="pr-folder-s"><b>${noNeed.length}</b> جهاز</div>
+    </button>
+  </div>`;
+}
+
+// كارت الجهاز جوه الفولدر = الكارت العادي + سطر إجراء تحته.
+// ⚠️ سطر الإجراء **بره** الكارت القابل للضغط عن قصد — لو كان
+//    جواه، أي دوسة على الزرار كانت هتفتح تفاصيل الجهاز كمان.
+function prFolderDevHtml(d, mode){
+  let act;
+  if(mode === 'noparts'){
+    act = `<button class="pr-mark" onclick="prMarkNoNeed('${d.id}')">✅ مش محتاج قطعة غيار</button>`;
+  }else if(d.noPartsNeeded === true && !detPartsIsNone(d.partsComment)){
+    act = `<button class="pr-mark undo" onclick="prUnmarkNoNeed('${d.id}')">↩️ رجّعه للمراجعة</button>`
+        + (d.noPartsBy ? `<span class="pr-fnote">علّمه ${esc(d.noPartsBy)}</span>` : '');
+  }else{
+    act = `<span class="pr-fnote">🔧 الفني هو اللي قال إنه مش محتاج قطع غيار</span>`;
+  }
+  return `<div class="pr-fitem">${prDevHtml(d, true)}<div class="pr-fact">${act}</div></div>`;
+}
+
+function prRenderFolder(){
+  const host = document.getElementById('prList');
+  if(!host) return;
+  const mode = PR.folder;
+  const { noNeed, noParts } = prFolderLists();
+  let list = mode === 'noparts' ? (noParts || []) : noNeed;
+
+  const q = (PR.q || '').trim();
+  if(q) list = list.filter(d => prMatch(d, q));
+  list = list.slice().sort(prByTouchedDesc);
+
+  const title = mode === 'noparts'
+    ? '📭 مش مربوط بيها قطع غيار'
+    : '✅ مش محتاجة قطع غيار';
+  const note = mode === 'noparts'
+    ? `الأجهزة دي مفيش أي قطعة من المخزن مربوطة بيها. لو الجهاز فعلاً محتاجش قطعة، دوس <b>✅ مش محتاج قطعة غيار</b> وهينتقل للفولدر التاني.`
+    : `أجهزة اتعلّم عليها إنها خلصت من غير قطع غيار — سواء من المحاسب هنا، أو من الفني بزراره في صفحته.`;
+
+  const loading = mode === 'noparts' && !noParts;
+  host.innerHTML = `
+    <button class="pr-back" onclick="PR.folder=null;prRender()">‹ رجوع للمراجعة</button>
+    <div class="pr-th">${title} <span class="pr-n">${loading ? '…' : list.length}</span></div>
+    <div class="pr-floor">${note}<br>📅 من <b>${PR_FLOOR}</b> وطالع بس — الأجهزة الأقدم من كده مش بتدخل الفولدرات.</div>
+    ${loading
+      ? `<div class="pr-empty">⏳ بنراجع المخزن…</div>`
+      : (list.length
+          ? list.map(d => prFolderDevHtml(d, mode)).join('')
+          : `<div class="pr-empty">${q ? 'مفيش نتايج لـ «' + esc(q) + '» في الفولدر ده' : 'الفولدر فاضي في الفترة دي'}</div>`)}`;
+}
+
+// ---------- العلامة ----------
+async function prMarkNoNeed(id){
+  const d = (devices || []).find(x => x.id === id);
+  if(!d) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    noPartsNeeded: true,
+    noPartsBy: currentUser.name,
+    noPartsAt: now,
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(x.activityNotes || []),
+      { text: '✅ اتعلّم: الجهاز مش محتاج قطع غيار', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  } : x);
+  prRenderList();      // الشاشة بتتحرّك فوراً
+  await persist();
+  render();
+}
+
+async function prUnmarkNoNeed(id){
+  const d = (devices || []).find(x => x.id === id);
+  if(!d) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    noPartsNeeded: false,
+    noPartsBy: '', noPartsAt: '',
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(x.activityNotes || []),
+      { text: '↩️ اترجع للمراجعة: الجهاز محتاج قطع غيار', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  } : x);
+  prRenderList();
+  await persist();
+  render();
+}
+
 function prByTouchedDesc(a, b){ return new Date(prTouched(b) || 0) - new Date(prTouched(a) || 0); }
 
 // الرسم على جزئين:
@@ -8941,6 +9143,7 @@ function prRender(){
         <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
         <button class="pr-q${PR.quick==='week'?' on':''}"  onclick="prSetQuick('week')">أسبوع</button>
         <button class="pr-q${PR.quick==='month'?' on':''}" onclick="prSetQuick('month')">شهر</button>
+        <button class="pr-q${PR.quick==='all'?' on':''}"   onclick="prSetQuick('all')">الكل</button>
       </div>
       <div class="pr-dates">
         <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
@@ -8961,8 +9164,15 @@ function prRenderList(){
   const rows = (devices || []).filter(prInRange).filter(d => prTechOf(d));
   // القطع المربوطة بتتجاب بعد الرسم، وأول ما توصل بنعيد الرسم مرة واحدة
   prLoadLinked(rows.map(d => d.id)).then(got => { if(got) prRenderList(); });
+  // وكشف «مين مربوط بيه أصلاً» — مرة واحدة لكل فتح للشاشة
+  if(!PR_HAS.set && !PR_HAS.loading){
+    prLoadHasParts().then(got => { if(got) prRenderList(); });
+  }
 
-  // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
+  // (٠) فولدر مفتوح → عرضه لوحده
+  if(PR.folder){ prRenderFolder(); return; }
+
+  // (٠.٥) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
   if(q){
     const hits = rows.filter(d => prMatch(d, q)).sort(prByTouchedDesc);
@@ -8989,8 +9199,8 @@ function prRenderList(){
     return;
   }
 
-  // (٢) كروت الفنيين
-  host.innerHTML = techs.length ? `
+  // (٢) الفولدرات فوق، وتحتها كروت الفنيين
+  host.innerHTML = prFolderCardsHtml() + (techs.length ? `
     <div class="pr-grid">
       ${techs.map(t => {
         const l = byTech[t];
@@ -9001,7 +9211,7 @@ function prRenderList(){
           <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`;
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
 }
 // ============================================================
 // 👤 حسابي — بيانات المستخدم والاشتراك
