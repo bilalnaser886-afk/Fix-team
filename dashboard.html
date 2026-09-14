@@ -1205,9 +1205,9 @@
   .pr-folder-n{font-weight:800;font-size:13.5px;margin-bottom:5px;line-height:1.6;}
   .pr-folder-s{font-size:12px;color:var(--muted);}
   .pr-folder-s b{font-size:15px;color:var(--ink);}
-  .pr-fitem{margin-bottom:10px;}
+  /* سطر الإجراء جوه الكارت — بيتفصل بخط متقطّع عن بيانات الجهاز */
   .pr-fact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-    margin:-4px 2px 0;padding-top:6px;}
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);}
   .pr-mark{border:1px solid var(--done);background:var(--surface);color:var(--done);
     border-radius:10px;padding:9px 14px;font:800 12.5px/1 inherit;cursor:pointer;}
   .pr-mark:hover{background:var(--done-bg);}
@@ -4066,6 +4066,7 @@ function closeDetail(){
   trackResponses = {};
   pointsBoxOpen = false;
   refreshOpenOverlays();   // يعكس أي تغيير في الحالة على الجرد المفتوح ورا التفاصيل فوراً
+  try{ prRestoreAfterDetail(); }catch(e){}   // جاي من مراجعة قطع الغيار؟ نرجّعك لنفس مكانك
 }
 // ============================================================
 // أسماء الفنيين — مصدر واحد للحقيقة
@@ -8863,6 +8864,7 @@ function closePartsReview(){
   if(o) o.classList.add('hidden');
   PR.tech = null;
   PR.folder = null;
+  PR_RETURN = null;   // قفلها بإيده = مفيش رجوع
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
@@ -8938,14 +8940,17 @@ function prMatch(d, q){
 }
 
 // كارت الجهاز — كل المعلومات ظاهرة من برا من غير ما تفتحه
-function prDevHtml(d, showTech){
+// extra = محتوى بيتحط **جوه** الكارت في آخره (سطر الإجراء بتاع الفولدر).
+// ⚠️ أي زرار جواه لازم يعمل event.stopPropagation() — الكارت كله
+//    قابل للضغط، ومن غيرها الدوسة على الزرار بتفتح تفاصيل الجهاز كمان.
+function prDevHtml(d, showTech, extra){
   const cm   = (d.partsComment || '').trim();
   const shop = (d.shopName || '').trim();
   const meta = [];
   if(shop) meta.push(`🏪 <b>${esc(shop)}</b>`);
   if(showTech && prTechOf(d)) meta.push(`🔧 <b>${esc(prTechOf(d))}</b>`);
   return `
-        <div class="pr-dev" onclick="closePartsReview();openDetail('${d.id}')">
+        <div class="pr-dev" onclick="prOpenDevice('${d.id}')">
           <div class="pr-dev-t">
             <span>${esc(d.model || d.deviceType || 'جهاز')} · ${esc(d.customerName || '')}</span>
             <span class="pr-dev-s">${esc(fullStatusLabel(d))}</span>
@@ -8957,6 +8962,7 @@ function prDevHtml(d, showTech){
                    : `<div class="pr-cm">🔩 ${esc(cm)}</div>`)
                : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
           ${prLinkHtml(d.id)}
+          ${extra || ''}
         </div>`;
 }
 
@@ -9046,16 +9052,18 @@ function prFolderCardsHtml(){
 // ⚠️ سطر الإجراء **بره** الكارت القابل للضغط عن قصد — لو كان
 //    جواه، أي دوسة على الزرار كانت هتفتح تفاصيل الجهاز كمان.
 function prFolderDevHtml(d, mode){
+  const stop = 'event.stopPropagation();';   // عشان الدوسة ما تفتحش التفاصيل
   let act;
   if(mode === 'noparts'){
-    act = `<button class="pr-mark" onclick="prMarkNoNeed('${d.id}')">✅ مش محتاج قطعة غيار</button>`;
+    act = `<button class="pr-mark" onclick="${stop}prMarkNoNeed('${d.id}')">✅ مش محتاج قطعة غيار</button>`;
   }else if(d.noPartsNeeded === true && !detPartsIsNone(d.partsComment)){
-    act = `<button class="pr-mark undo" onclick="prUnmarkNoNeed('${d.id}')">↩️ رجّعه للمراجعة</button>`
+    act = `<button class="pr-mark undo" onclick="${stop}prUnmarkNoNeed('${d.id}')">↩️ رجّعه للمراجعة</button>`
         + (d.noPartsBy ? `<span class="pr-fnote">علّمه ${esc(d.noPartsBy)}</span>` : '');
   }else{
     act = `<span class="pr-fnote">🔧 الفني هو اللي قال إنه مش محتاج قطع غيار</span>`;
   }
-  return `<div class="pr-fitem">${prDevHtml(d, true)}<div class="pr-fact">${act}</div></div>`;
+  // سطر الإجراء بيتبعت جوه الكارت نفسه — مش تحته
+  return prDevHtml(d, true, `<div class="pr-fact">${act}</div>`);
 }
 
 function prRenderFolder(){
@@ -9120,6 +9128,35 @@ async function prUnmarkNoNeed(id){
   prRenderList();
   await persist();
   render();
+}
+
+// ============================================================
+// ↩️ الرجوع لنفس المكان بعد ما تقفل تفاصيل الجهاز
+// ------------------------------------------------------------
+// ⚠️ قبل كده كان بينادي closePartsReview() — ودي **بتصفّر** الفني
+//    المفتوح والفولدر وكلمة البحث. فبعد ما تخرج من الجهاز كنت
+//    بتلاقي نفسك رجعت للصفحة الرئيسية من أول وجديد.
+//    دلوقتي: بنصوّر مكانك، نخبّي الشاشة بس من غير تصفير، وأول ما
+//    تقفل التفاصيل بنرجّعك لنفس النقطة بالظبط.
+// ============================================================
+var PR_RETURN = null;
+
+function prOpenDevice(id){
+  PR_RETURN = { tech: PR.tech, folder: PR.folder, q: PR.q,
+                from: PR.from, to: PR.to, quick: PR.quick };
+  const o = document.getElementById('partsReviewOverlay');
+  if(o) o.classList.add('hidden');      // نخبّيها بس — مفيش تصفير
+  openDetail(id);
+}
+
+function prRestoreAfterDetail(){
+  if(!PR_RETURN) return;
+  const snap = PR_RETURN; PR_RETURN = null;
+  if(!prCanUse()) return;
+  Object.assign(PR, snap);
+  const o = document.getElementById('partsReviewOverlay');
+  if(o) o.classList.remove('hidden');
+  prRender();
 }
 
 function prByTouchedDesc(a, b){ return new Date(prTouched(b) || 0) - new Date(prTouched(a) || 0); }
