@@ -158,6 +158,7 @@
     --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --rejected:#BE1D1D; --rejected-bg:#FEF2F2;
     --returned:#9333EA; --returned-bg:#F5EEFC;
+    --trashed:#64748B; --trashed-bg:#EEF1F3;
   }
 
   /* ===== الوضع الداكن ===== */
@@ -193,6 +194,7 @@
     --rejected_shop:#F472B6;    --rejected_shop-bg:rgba(244,114,182,.15);
     --rejected:#F87171;         --rejected-bg:rgba(248,113,113,.15);
     --returned:#C084FC;         --returned-bg:rgba(192,132,252,.15);
+    --trashed:#94A3B8;          --trashed-bg:rgba(148,163,184,.15);
   }
   *{box-sizing:border-box;}
   body{
@@ -450,7 +452,8 @@
      ما بوابته تتفتح. الستارة بتتشال أول ما الدور يتحدد. */
   html.app-booting .topbar,
   html.app-booting #board,
-  html.app-booting #approvalsHost{visibility:hidden !important;}
+  html.app-booting #approvalsHost,
+  html.app-booting #partsLogHost{visibility:hidden !important;}
   html.app-booting #bootVeil{display:flex !important;}
   /* آخر دور معروف = فني → نخفي أدوات المحاسب من قبل ما الأدوار تتحمّل */
   html.pre-technician #backupWrap,
@@ -481,6 +484,7 @@
   body.role-technician > .topbar,
   body.role-technician > #board,
   body.role-technician > #approvalsHost,
+  body.role-technician > #partsLogHost,
   body.role-technician > #detailOverlay,
   body.role-technician > #addOverlay,
   body.role-technician > #columnOverlay,
@@ -585,6 +589,65 @@
   .appr-btn-yes:hover{background:#15803D;}
   .appr-btn-no{background:var(--surface); color:var(--danger); border:1px solid var(--danger-border);}
   .appr-btn-no:hover{background:var(--danger-bg);}
+
+  /* ===== 🧰 لوحة حركة الفنيين على المخزن ===== */
+  /* نفس قياسات لوحة الاعتمادات بالظبط عشان الاتنين يقفوا تحت بعض
+     متساويين — بس بلون أزرق مش أصفر: دي خبر، مش طلب محتاج قرار. */
+  #partsLogHost:empty{display:none;}
+  /* ⚠️ كل الألوان هنا متغيّرات ثيم — ولا لون واحد مكتوب بالإيد.
+     أول نسخة كانت فيها أزرق فاتح ثابت، فالخلفية فضلت فاتحة في
+     الثيم الداكن والكتابة (var(--ink)) بقت فاتحة عليها = مش
+     مقروءة خالص. المتغيّرات بتقلب لوحدها مع الثيم. */
+  .spn-panel{background:var(--surface); border:1px solid var(--info-border); border-radius:16px;
+    margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px var(--shadow);}
+  .spn-head{display:flex; align-items:center; gap:8px; font-family:'Cairo',sans-serif;
+    font-weight:900; font-size:15px; color:var(--info); margin-bottom:12px;}
+  .spn-count{background:var(--info); color:var(--on-accent); font-family:'Tajawal',sans-serif;
+    font-weight:800; font-size:12px; min-width:22px; height:22px; border-radius:11px;
+    display:inline-flex; align-items:center; justify-content:center; padding:0 6px;}
+  .spn-clear{margin-inline-start:auto; background:none; border:none; color:var(--ink-2);
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; cursor:pointer;}
+  .spn-clear:hover{color:var(--ink);}
+  .spn-row{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    background:var(--info-bg); border:1px solid var(--info-border); border-radius:12px;
+    padding:11px 13px; margin-bottom:8px;}
+  .spn-row:last-child{margin-bottom:0;}
+  .spn-row.del{background:var(--danger-bg); border-color:var(--danger-border);}
+  .spn-info{flex:1; min-width:180px;}
+  .spn-t{font-weight:800; font-size:14px; color:var(--ink); line-height:1.5;}
+  .spn-m{font-size:12px; color:var(--muted); margin-top:3px; line-height:1.5;}
+  /* الشارة بتقف على خلفية الصف الملوّنة — فخلفيتها لون السطح
+     نفسه عشان تفضل بارزة في الثيمين */
+  .spn-kind{display:inline-block; font-size:11px; font-weight:800; border-radius:6px;
+    padding:2px 7px; margin-inline-end:6px; vertical-align:middle; background:var(--surface);}
+  .spn-kind.qty{color:var(--info);}
+  .spn-kind.del{color:var(--danger);}
+  .spn-was{color:var(--muted); text-decoration:line-through; font-weight:800;}
+  .spn-now{color:var(--success); font-weight:900;}
+  .spn-ok{border:1px solid var(--border); border-radius:9px; padding:9px 16px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer;
+    background:var(--surface); color:var(--ink-2); flex:none;}
+  .spn-ok:hover{background:var(--surface-2);}
+
+  /* ===== 🗑 كارت المهملات ===== */
+  .tr-card{background:var(--surface); border:1px solid var(--border); border-inline-start:4px solid var(--trashed);
+    border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .tr-top{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px;}
+  .tr-name{font-family:'Cairo',sans-serif; font-weight:800; font-size:14.5px; color:var(--ink); line-height:1.5;}
+  .tr-left{font-size:11.5px; font-weight:800; white-space:nowrap; background:var(--trashed-bg);
+    color:var(--trashed); border-radius:999px; padding:3px 9px;}
+  .tr-left.soon{background:var(--danger-bg); color:var(--danger);}
+  .tr-meta{font-size:12.5px; color:var(--muted); line-height:1.8;}
+  .tr-meta b{color:var(--ink-2); font-weight:800;}
+  .tr-acts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .tr-btn{border:1px solid var(--border); background:var(--surface); color:var(--ink-2);
+    border-radius:9px; padding:9px 14px; font-family:'Tajawal',sans-serif; font-weight:800;
+    font-size:13px; cursor:pointer;}
+  .tr-btn:hover{background:var(--surface-2);}
+  .tr-btn.back{border-color:var(--success-border); color:var(--success);}
+  .tr-btn.kill{border-color:var(--danger-border); color:var(--danger);}
+  .tr-note{font-size:12px; color:var(--muted); background:var(--surface-2);
+    border:1px dashed var(--border); border-radius:10px; padding:10px 12px; margin-bottom:12px; line-height:1.8;}
   .card-tech{font-size:11px; color:var(--ink-2); margin-top:6px; display:flex; align-items:center; gap:4px;}
   .card-tech::before{content:"🔧"; font-size:10px;}
   .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
@@ -1130,6 +1193,30 @@
   .pr-tech-s .ok{color:var(--done);font-weight:700;}
   .pr-back{border:none;background:none;color:var(--accent);font:800 13px/1 inherit;
     cursor:pointer;padding:6px 0;margin-bottom:8px;}
+  /* ===== 📁 فولدرات المراجعة ===== */
+  .pr-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:10px;margin-bottom:16px;}
+  .pr-folder{text-align:start;border:1px solid var(--border);background:var(--surface-2);
+    border-radius:14px;padding:14px;cursor:pointer;color:var(--ink);font:inherit;
+    transition:transform .12s,box-shadow .12s;}
+  .pr-folder:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.12);}
+  .pr-folder.warn{border-inline-start:4px solid var(--warn);}
+  .pr-folder.ok{border-inline-start:4px solid var(--done);}
+  .pr-folder-n{font-weight:800;font-size:13.5px;margin-bottom:5px;line-height:1.6;}
+  .pr-folder-s{font-size:12px;color:var(--muted);}
+  .pr-folder-s b{font-size:15px;color:var(--ink);}
+  /* سطر الإجراء جوه الكارت — بيتفصل بخط متقطّع عن بيانات الجهاز */
+  .pr-fact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);}
+  .pr-mark{border:1px solid var(--done);background:var(--surface);color:var(--done);
+    border-radius:10px;padding:9px 14px;font:800 12.5px/1 inherit;cursor:pointer;}
+  .pr-mark:hover{background:var(--done-bg);}
+  .pr-mark.undo{border-color:var(--border);color:var(--ink-2);}
+  .pr-mark.undo:hover{background:var(--surface-2);}
+  .pr-fnote{font-size:12px;color:var(--muted);}
+  .pr-floor{font-size:12px;color:var(--muted);background:var(--surface-2);
+    border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
+    margin-bottom:12px;line-height:1.8;}
   .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
   .pr-n{background:var(--surface-3);border-radius:20px;padding:2px 9px;font-size:12px;}
   .pr-dev{border:1px solid var(--border);background:var(--surface-2);border-radius:13px;
@@ -1244,6 +1331,7 @@
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
 <div id="approvalsHost"></div>
+<div id="partsLogHost"></div>
 <!-- البحث الرئيسي: بيشوف كل الأجهزة، حتى اللي خرجت من اللوحة -->
 <div class="gs-wrap" id="gsWrap">
   <div class="gs-box">
@@ -1801,6 +1889,8 @@ function applyRoleVisibility(){
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
   try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
+  try{ loadPartsLog(); }catch(e){}   // 🧰 إشعار حركة الفنيين على المخزن (للمحاسب/الأدمن بس)
+  try{ loadTrash(); }catch(e){}      // 🗑 المهملات + المسح التلقائي بعد ٣٠ يوم
   // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
   // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
   try{ syncAccountMenu(); }catch(e){}
@@ -2178,6 +2268,7 @@ function startRealtimeSync(){
         devices = [row.data, ...devices.filter(d => d.id !== row.id)];
         devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
         lastSynced[row.id] = j;
+        splitTrash();          // حد تاني نقله للمهملات؟ يتفرز فوراً
         writeCache(); render();
         // الفني علّم "تم الصيانة" من صفحته → الترتيب اتغيّر → ننشره.
         // مؤجّل ٣ ثواني: التغييرات بتيجي ورا بعض، فمانكتبش مع كل واحد.
@@ -2221,6 +2312,19 @@ function startRealtimeSync(){
         }catch(e){}
       })
       .subscribe();
+
+    // 🧰 حركة الفنيين على المخزن — سطر جديد في الدفتر يطلع فوراً.
+    // ⚠️ insert بس: الدفتر مبيتعدّلش ولا بيتمسح منه (مفيش سياسة أصلاً).
+    sb.channel('spare_parts_log_sync')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'spare_parts_log' }, (payload) => {
+        const row = payload.new;
+        if(!row || !canSeeMoney()) return;
+        if(row.by_role !== 'technician') return;        // حركة المحاسب نفسه مش إشعار
+        if(splRows.some(r => r.id === row.id)) return;  // وصل قبل كده
+        splRows.unshift(row);
+        renderPartsLogPanel();
+      })
+      .subscribe();
   }catch(e){ /* المزامنة اللحظية اختيارية — السيستم شغال من غيرها */ }
 }
 
@@ -2257,6 +2361,21 @@ function effStatus(d){
 }
 const STORAGE_KEY = "repair-devices";
 let devices = [];
+
+// ============================================================
+// 🗑 المهملات
+// ------------------------------------------------------------
+// ⚠️ الأجهزة المحذوفة بتتشال من مصفوفة `devices` خالص وبتتحط في
+//    مصفوفة لوحدها. ليه؟ لأن `devices` بتتحسب فيها الإحصائيات
+//    والنقاط والتقارير والبحث في ٢٠ مكان. لو الجهاز المحذوف فضل
+//    فيها، كان لازم أضيف شرط "مش محذوف" في كل مكان منهم — وأي
+//    مكان أنساه = رقم غلط في تقرير. الفصل بيخلّي كل ده آمن لوحده.
+//
+// ⚠️ الحذف من السيرفر مبيحصلش: الجهاز بيفضل صف في devices_data
+//    بحالة 'trashed'. ده اللي بيخلّيه يرجع.
+// ============================================================
+let trashDevices = [];
+const TRASH_DAYS = 30;
 let selectedId = null;
 let currentColumn = null;
 
@@ -2539,7 +2658,30 @@ function reindexSearch(force){
   }catch(e){}
 }
 
+// بتفرز أي جهاز محذوف من `devices` وتنقله للمهملات.
+// ⚠️ بتتنادى من جوه sortDevices — ودي بتتنادى بعد كل تحميل وكل
+//    مزامنة، فالفرز بيحصل لوحده في كل الطرق من غير ما أنسى واحدة.
+function splitTrash(){
+  if(!Array.isArray(devices) || !devices.length) return;
+  const keep = [], moved = [];
+  for(const d of devices){ (d && d.status === 'trashed' ? moved : keep).push(d); }
+  if(!moved.length) return;
+  devices = keep;
+  const byId = new Map(trashDevices.map(d => [d.id, d]));
+  for(const d of moved){
+    byId.set(d.id, d);
+    // ⚠️⚠️ السطر ده حرج: persist() بتقارن lastSynced بـ devices،
+    //     وأي id موجود في lastSynced ومش موجود في devices بتعتبره
+    //     "اتمسح" وبتبعت DELETE للسيرفر. من غير السطر ده، أول حفظ
+    //     بعد النقل للمهملات كان هيمسح الجهاز من السيرفر نهائياً.
+    delete lastSynced[d.id];
+  }
+  trashDevices = Array.from(byId.values())
+    .sort((a, b) => new Date(b.trashedAt || 0) - new Date(a.trashedAt || 0));
+}
+
 function sortDevices(){
+  splitTrash();
   const ts = new Map();
   for(const d of devices) ts.set(d, Date.parse(d.intakeDate) || 0);
   devices.sort((a,b) => ts.get(b) - ts.get(a));
@@ -3045,6 +3187,7 @@ function hideImportProgress(){
 function render(){
   renderBoard();
   renderApprovalsPanel();
+  renderPartsLogPanel();
   if(currentColumn) renderColumn(true);
   refreshOpenOverlays();
 }
@@ -3053,6 +3196,172 @@ function render(){
 function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
   if(host) host.innerHTML = approvalsPanelHtml();
+}
+
+// ============================================================
+// 🧰 إشعار حركة الفنيين على المخزن
+// ------------------------------------------------------------
+// الفني بقى يقدر يمسح قطعة أو يغيّر كميتها من صفحته. المحاسب
+// لازم يعرف — مش يكتشف الفرق وهو بيجرد آخر الشهر.
+//
+// المصدر: جدول spare_parts_log اللي ترايجر على السيرفر بيكتبه
+// لوحده. يعني الإشعار ده مستحيل يتفوّت: مفيش طريق لحذف قطعة
+// من غير ما السطر يتكتب في نفس اللحظة.
+//
+// ⚠️ ليه مفيش قبول/رفض زي لوحة الاعتمادات؟ لأن ده خبر مش طلب.
+//    الحركة حصلت خلاص. زرار «تمام» بيخفي السطر عن المحاسب ده
+//    بس (localStorage) — والباقي بيفضلوا شايفينه.
+//
+// ⚠️ بيختفي لوحده بعد ٣ أيام حتى لو محدش داس عليه.
+// ============================================================
+const SPL_DAYS = 3;
+const SPL_SEEN_KEY = 'ifix_spl_seen';
+let splRows = [];
+
+function splSeen(){
+  try{ return JSON.parse(localStorage.getItem(SPL_SEEN_KEY) || '[]'); }catch(e){ return []; }
+}
+function splMarkSeen(ids){
+  // بنخزّن المعرّفات اللي لسه جوه الـ ٣ أيام بس — القايمة مبتكبرش للأبد
+  const live = new Set(splRows.map(r => r.id));
+  const next = splSeen().filter(id => live.has(id)).concat(ids);
+  try{ localStorage.setItem(SPL_SEEN_KEY, JSON.stringify([...new Set(next)])); }catch(e){}
+}
+
+// السطور اللي المفروض تبان: حركة فني، جوه ٣ أيام، والمحاسب لسه ما قالش «تمام»
+function splPending(){
+  const seen = new Set(splSeen());
+  const since = Date.now() - SPL_DAYS * 86400000;
+  return splRows.filter(r =>
+    r.by_role === 'technician' &&
+    new Date(r.at).getTime() >= since &&
+    !seen.has(r.id)
+  );
+}
+
+function splAgoTxt(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  if(!(ms >= 0)) return '';
+  const m = Math.floor(ms / 60000);
+  if(m < 1)  return 'دلوقتي';
+  if(m < 60) return 'من ' + m + ' دقيقة';
+  const h = Math.floor(m / 60);
+  if(h < 24) return 'من ' + h + ' ساعة';
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'من يوم' : 'من ' + d + ' أيام';
+}
+
+function partsLogPanelHtml(){
+  if(!canSeeMoney()) return '';
+  const list = splPending();
+  if(list.length === 0) return '';
+  const rows = list.map(r => {
+    const del = r.action === 'delete';
+    const body = del
+      ? `مسح <b>${esc(r.part_name || 'قطعة')}</b>${r.old_qty == null ? '' : ` (كانت ${Number(r.old_qty) || 0} قطعة)`}`
+      : `عدّل كمية <b>${esc(r.part_name || 'قطعة')}</b>:
+         <span class="spn-was">${Number(r.old_qty) || 0}</span> ←
+         <span class="spn-now">${Number(r.new_qty) || 0}</span>`;
+    return `<div class="spn-row ${del ? 'del' : ''}">
+      <div class="spn-info">
+        <div class="spn-t"><span class="spn-kind ${del ? 'del' : 'qty'}">${del ? '🗑 حذف' : '✏️ تعديل كمية'}</span>${body}</div>
+        <div class="spn-m">🔧 ${esc(r.by_name || 'فني')} · ${splAgoTxt(r.at)} · ${new Date(r.at).toLocaleString(getLocale())}</div>
+      </div>
+      <button class="spn-ok" onclick="splDismiss('${r.id}')">✓ تمام</button>
+    </div>`;
+  }).join('');
+  return `<div class="spn-panel">
+    <div class="spn-head">🧰 حركة الفنيين على المخزن <span class="spn-count">${list.length}</span>
+      <button class="spn-clear" onclick="splDismissAll()">تمام على الكل</button></div>
+    ${rows}
+  </div>`;
+}
+
+function renderPartsLogPanel(){
+  const host = document.getElementById('partsLogHost');
+  // اللوحتين في نفس الحاوية — كل واحدة بترجع فاضية لو مفيش عندها حاجة
+  if(host) host.innerHTML = partsLogPanelHtml() + trashPanelHtml();
+}
+
+// ============================================================
+// 🗑 إشعار: محاسب مسح جهاز
+// ------------------------------------------------------------
+// ⚠️ الشرط `trashedByRole === 'accountant'` هو كل الحكاية:
+//    الأدمن وهو فاتح شاشة المحاسب دوره لسه 'super_admin'،
+//    فحذفه مبيطلّعش إشعار. المحاسب الحقيقي بس.
+//
+// ⚠️ مفيش جدول ولا دفتر هنا — الخبر نفسه متخزّن جوه الجهاز
+//    (trashedBy / trashedAt / trashedByRole). يعني مستحيل يضيع.
+// ============================================================
+const TRASH_SEEN_KEY = 'ifix_trash_seen';
+
+function trashSeen(){
+  try{ return JSON.parse(localStorage.getItem(TRASH_SEEN_KEY) || '[]'); }catch(e){ return []; }
+}
+function trashMarkSeen(ids){
+  const live = new Set(trashDevices.map(d => d.id));
+  const next = trashSeen().filter(id => live.has(id)).concat(ids);
+  try{ localStorage.setItem(TRASH_SEEN_KEY, JSON.stringify([...new Set(next)])); }catch(e){}
+}
+
+function trashPending(){
+  const seen = new Set(trashSeen());
+  const since = Date.now() - SPL_DAYS * 86400000;
+  return trashDevices.filter(d =>
+    d.trashedByRole === 'accountant' &&
+    d.trashedAt && new Date(d.trashedAt).getTime() >= since &&
+    !seen.has(d.id)
+  );
+}
+
+function trashPanelHtml(){
+  if(!canSeeMoney()) return '';
+  const list = trashPending();
+  if(list.length === 0) return '';
+  const rows = list.map(d => `
+    <div class="spn-row del">
+      <div class="spn-info">
+        <div class="spn-t"><span class="spn-kind del">🗑 حذف جهاز</span>
+          <b>${esc(d.deviceType || '')} ${esc(d.model || '')}</b>${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">🧾 ${esc(d.trashedBy || 'محاسب')} · ${splAgoTxt(d.trashedAt)} ·
+          ${new Date(d.trashedAt).toLocaleString(getLocale())}</div>
+      </div>
+      <button class="spn-ok" onclick="trashDismiss('${d.id}')">✓ تمام</button>
+    </div>`).join('');
+  return `<div class="spn-panel" style="border-color:var(--danger-border);">
+    <div class="spn-head" style="color:var(--danger);">🗑 أجهزة اتنقلت للمهملات
+      <span class="spn-count" style="background:var(--danger);">${list.length}</span>
+      <button class="spn-clear" onclick="trashDismissAll()">تمام على الكل</button></div>
+    ${rows}
+  </div>`;
+}
+
+function trashDismiss(id){ trashMarkSeen([id]); renderPartsLogPanel(); }
+function trashDismissAll(){ trashMarkSeen(trashPending().map(d => d.id)); renderPartsLogPanel(); }
+
+function splDismiss(id){ splMarkSeen([id]); renderPartsLogPanel(); }
+function splDismissAll(){ splMarkSeen(splPending().map(r => r.id)); renderPartsLogPanel(); }
+
+// جلب الدفتر. بيتنادى مرة عند الإقلاع، والريل تايم بيكمّل بعد كده.
+// ⚠️ لو الجدول لسه مش موجود (الميجريشن ما اتشغّلش)، بنسكت —
+//    الداشبورد مايقعش عشان ميزة إشعار.
+async function loadPartsLog(){
+  if(!canSeeMoney()) return;
+  const since = new Date(Date.now() - SPL_DAYS * 86400000).toISOString();
+  try{
+    const { data, error } = await sb.from('spare_parts_log')
+      .select('id,part_id,part_name,category,action,old_qty,new_qty,by_name,by_role,at')
+      .eq('by_role', 'technician')
+      .gte('at', since)
+      .order('at', { ascending: false })
+      .limit(200);
+    if(error) throw error;
+    splRows = data || [];
+  }catch(e){
+    splRows = [];
+    console.error('[المخزن] دفتر الحركة فشل:', e);
+  }
+  renderPartsLogPanel();
 }
 
 // يحدّث صفحة الجرد المفتوحة في الخلفية لحظياً (مع الحفاظ على مكان السكرول)
@@ -3068,8 +3377,13 @@ function refreshOpenOverlays(){
 
 function renderBoard(){
   const board = document.getElementById('board');
-  board.innerHTML = STATUSES.map(s => {
-    const count = devices.filter(d => effStatus(d) === s.key).length;
+  // خانة المهملات للمحاسب والأدمن بس — مش شغل مسؤول الحركة
+  board.innerHTML = STATUSES.filter(s => s.key !== 'trashed' || canSeeMoney()).map(s => {
+    // ⚠️ المهملات بتتعدّ من مصفوفتها هي — الأجهزة المحذوفة مش
+    //    موجودة في `devices` أصلاً، فـ effStatus مش هيلاقيها.
+    const count = (s.key === 'trashed')
+      ? trashDevices.length
+      : devices.filter(d => effStatus(d) === s.key).length;
     return `<button class="column" onclick="openColumn('${s.key}')">
       <div class="column-head">
         <span class="title" style="color:${accent(s.varname)}">${stLabel(s)}</span>
@@ -3223,8 +3537,13 @@ let colScrollAttached = false;
 function renderColumn(keepPos){
   const s = statusInfo(currentColumn);
   const q = document.getElementById('columnSearch').value.trim();
-  colFullList = devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q))
-                       .sort((a,b) => touchedAt(b) - touchedAt(a));
+  // المهملات بتتقرا من مصفوفتها، وبترتّب بالأحدث حذفاً
+  const isTrash = currentColumn === 'trashed';
+  colFullList = isTrash
+    ? trashDevices.filter(d => matchesSearch(d, q))
+                  .sort((a,b) => new Date(b.trashedAt||0) - new Date(a.trashedAt||0))
+    : devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q))
+             .sort((a,b) => touchedAt(b) - touchedAt(a));
   document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
 
@@ -3251,7 +3570,8 @@ function renderColumn(keepPos){
   const target = keepPos
     ? Math.min(colFullList.length, Math.max(COL_PAGE, prevShown))
     : Math.min(colFullList.length, COL_PAGE);
-  listEl.innerHTML = colFullList.slice(0, target).map(d => cardHtml(d, s)).join('');
+  listEl.innerHTML = (isTrash ? `<div class="tr-note">🗑 الأجهزة هنا بتتمسح نهائي لوحدها بعد ${TRASH_DAYS} يوم من تاريخ الحذف. قبل كده تقدر ترجّعها زي ما كانت.</div>` : '')
+    + colFullList.slice(0, target).map(d => isTrash ? trashCardHtml(d) : cardHtml(d, s)).join('');
   colShown = target;
   updateColMoreFooter();
 
@@ -3746,6 +4066,7 @@ function closeDetail(){
   trackResponses = {};
   pointsBoxOpen = false;
   refreshOpenOverlays();   // يعكس أي تغيير في الحالة على الجرد المفتوح ورا التفاصيل فوراً
+  try{ prRestoreAfterDetail(); }catch(e){}   // جاي من مراجعة قطع الغيار؟ نرجّعك لنفس مكانك
 }
 // ============================================================
 // أسماء الفنيين — مصدر واحد للحقيقة
@@ -5035,16 +5356,159 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   if(stDev){ if(!stDev.trackToken){ await ensureTrackToken(stDev.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
 
+// ============================================================
+// 🗑 حذف الجهاز = نقل للمهملات
+// ------------------------------------------------------------
+// ⚠️ مفيش مسح من السيرفر هنا خالص. الجهاز بيفضل صف في
+//    devices_data بحالة 'trashed' — ده اللي بيخلّيه يرجع.
+//    المسح الحقيقي بيحصل في مكانين بس:
+//      ١) purgeOldTrash بعد ٣٠ يوم — تلقائي
+//      ٢) purgeFromTrash — الأدمن بإيده
+// ============================================================
 async function deleteDevice(){
-  const delDev = devices.find(x => x.id === selectedId);
-  if(delDev && delDev.trackToken){ try{ sb.from('public_track').delete().eq('token', delDev.trackToken); }catch(e){} }
   const d = devices.find(x => x.id === selectedId);
-  const name = d ? `${d.deviceType} ${d.model} — ${d.customerName}` : 'الجهاز ده';
-  if(!confirm(t('msg.deleteDevice',{name:name}))) return;
-  devices = devices.filter(d => d.id !== selectedId);
+  if(!d) return;
+  const name = `${d.deviceType} ${d.model} — ${d.customerName}`;
+  if(!confirm(t('msg.trashDevice', { name: name, n: TRASH_DAYS }))) return;
+
+  // صفحة متابعة العميل بتتقفل فوراً — مش منطقي يفضل يتابع جهاز اتمسح.
+  // لو رجع من المهملات، التوكن بيتعمل من أول وجديد.
+  if(d.trackToken){ try{ await sb.from('public_track').delete().eq('token', d.trackToken); }catch(e){} }
+
+  const now = new Date().toISOString();
+  const trashed = { ...d,
+    status: 'trashed',
+    trashedFrom: d.status,          // الحالة اللي هيرجعلها
+    trashedAt: now,
+    trashedBy: currentUser.name,
+    // ⚠️ الدور وقت الحذف — ده اللي الإشعار بيتبني عليه.
+    //    الأدمن وهو فاتح شاشة المحاسب دوره لسه 'super_admin'،
+    //    فمفيش إشعار. المحاسب الحقيقي بس هو اللي بيطلّع إشعار.
+    trashedByRole: myRole(),
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(d.activityNotes || []),
+      { text: '🗑 الجهاز اتنقل للمهملات', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  };
+
+  devices = devices.map(x => x.id === selectedId ? trashed : x);
   closeDetail();
+  await persist();     // نرفع الحالة الجديدة للسيرفر الأول
+  splitTrash();        // وبعدين نشيله من القايمة الحية للمهملات
+  writeCache();
   render();
+}
+
+// ---------- كارت الجهاز جوه المهملات ----------
+function trashCardHtml(d){
+  const gone = d.trashedAt ? daysSince(d.trashedAt) : 0;
+  const left = Math.max(0, TRASH_DAYS - gone);
+  const soon = left <= 5;
+  const when = d.trashedAt ? new Date(d.trashedAt).toLocaleString(getLocale()) : '—';
+  const backLbl = (statusInfo(d.trashedFrom) ? stLabel(statusInfo(d.trashedFrom)) : '');
+  return `<div class="tr-card">
+    <div class="tr-top">
+      <div class="tr-name">${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <span class="tr-left ${soon ? 'soon' : ''}">${left === 0 ? 'هيتمسح دلوقتي' : 'باقي ' + left + ' يوم'}</span>
+    </div>
+    <div class="tr-meta">
+      🗑 مسحه <b>${esc(d.trashedBy || 'مش معروف')}</b> · ${when}
+      ${backLbl ? `<br>↩️ هيرجع لـ <b>${esc(backLbl)}</b>` : ''}
+      ${d.shopName ? `<br>🏪 ${esc(d.shopName)}` : ''}
+    </div>
+    <div class="tr-acts">
+      <button class="tr-btn back" onclick="restoreFromTrash('${d.id}')">↩️ رجّعه</button>
+      ${isSuperAdmin() ? `<button class="tr-btn kill" onclick="purgeFromTrash('${d.id}')">🗑 امسح نهائي</button>` : ''}
+    </div>
+  </div>`;
+}
+
+// ---------- الرجوع من المهملات ----------
+async function restoreFromTrash(id){
+  if(!canSeeMoney()) return;
+  const d = trashDevices.find(x => x.id === id);
+  if(!d) return;
+  const now = new Date().toISOString();
+  const back = { ...d,
+    status: d.trashedFrom || 'waiting',
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(d.activityNotes || []),
+      { text: '↩️ الجهاز رجع من المهملات', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  };
+  delete back.trashedAt; delete back.trashedBy; delete back.trashedByRole; delete back.trashedFrom;
+
+  trashDevices = trashDevices.filter(x => x.id !== id);
+  devices = [back, ...devices];
+  sortDevices();
   await persist();
+  // صفحة المتابعة اتشالت وقت الحذف — نعملها من جديد
+  try{
+    if(!back.trackToken) await ensureTrackToken(back.id);
+    syncTrack(devices.find(x => x.id === id));
+  }catch(e){}
+  writeCache();
+  render();
+  if(currentColumn) renderColumn(true);
+}
+
+// ---------- المسح النهائي بإيد الأدمن ----------
+async function purgeFromTrash(id){
+  // ⚠️ الحارس ده في الواجهة بس — الأمان الحقيقي في سياسات
+  //    قاعدة البيانات على devices_data. ده للوضوح مش للحماية.
+  if(!isSuperAdmin()){ alert('المسح النهائي للأدمن بس.'); return; }
+  const d = trashDevices.find(x => x.id === id);
+  if(!d) return;
+  const name = `${d.deviceType || ''} ${d.model || ''} — ${d.customerName || ''}`;
+  if(!confirm(t('msg.purgeDevice', { name: name }))) return;
+  try{
+    if(d.trackToken){ try{ await sb.from('public_track').delete().eq('token', d.trackToken); }catch(e){} }
+    const { error } = await sb.from('devices_data').delete().eq('id', id);
+    if(error) throw error;
+    trashDevices = trashDevices.filter(x => x.id !== id);
+    render();
+    if(currentColumn) renderColumn(true);
+  }catch(e){
+    alert('فشل المسح النهائي: ' + ((e && e.message) || ''));
+  }
+}
+
+// ---------- جلب المهملات من السيرفر ----------
+// ⚠️ الكاش المحلي بيتكتب من `devices` بس، والمهملات مش فيها —
+//    فلازم تتجاب من السيرفر لوحدها. الاستعلام على data->>status
+//    مباشرة، والنتيجة صغيرة (عشرات الصفوف مش آلاف).
+async function loadTrash(){
+  if(!canSeeMoney()) return;
+  try{
+    const { data, error } = await sb.from('devices_data')
+      .select('id,data').eq('data->>status', 'trashed').limit(2000);
+    if(error) throw error;
+    const byId = new Map(trashDevices.map(d => [d.id, d]));
+    for(const r of (data || [])) if(r && r.data) byId.set(r.id, r.data);
+    trashDevices = Array.from(byId.values())
+      .sort((a, b) => new Date(b.trashedAt || 0) - new Date(a.trashedAt || 0));
+  }catch(e){
+    console.error('[المهملات] فشل التحميل:', e);
+  }
+  await purgeOldTrash();
+  render();
+}
+
+// ---------- المسح النهائي التلقائي بعد ٣٠ يوم ----------
+// بيشتغل مع كل فتح للداشبورد. لو اتنفذ من جهازين في نفس الوقت،
+// التاني هيلاقي الصف اتمسح خلاص — ومفيش ضرر.
+async function purgeOldTrash(){
+  if(!canSeeMoney()) return;
+  const cut = Date.now() - TRASH_DAYS * 86400000;
+  const old = trashDevices.filter(d => d.trashedAt && new Date(d.trashedAt).getTime() < cut);
+  if(!old.length) return;
+  for(const d of old){
+    try{
+      if(d.trackToken){ try{ await sb.from('public_track').delete().eq('token', d.trackToken); }catch(e){} }
+      const { error } = await sb.from('devices_data').delete().eq('id', d.id);
+      if(error) throw error;
+      trashDevices = trashDevices.filter(x => x.id !== d.id);
+    }catch(e){ console.error('[المهملات] فشل المسح التلقائي:', e); }
+  }
+  console.log('[المهملات] اتمسح نهائي:', old.length, 'جهاز عدّى عليهم', TRASH_DAYS, 'يوم');
 }
 
 function formatDuration(ms){
@@ -7361,6 +7825,7 @@ function openAnalytics(){
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
+  AN_PARTS.map = null;   // نعيد حساب تكلفة القطع — ممكن حد ربط قطع من آخر مرة
   renderAnalytics();
 }
 function closeAnalytics(){ document.getElementById('analyticsOverlay').classList.add('hidden'); }
@@ -7415,6 +7880,52 @@ function repairDays(d){
   return days >= 0 ? days : null;
 }
 
+// ============================================================
+// 💵 تكلفة قطع الغيار لكل جهاز
+// ------------------------------------------------------------
+// طلب واحد بيجيب عمودين بس (رقم الجهاز + التكلفة) من كل المخزن،
+// وبنعمل منه خريطة: جهاز ← إجمالي تكلفة قطعه.
+//
+// ⚠️ مش بنجيب القطع جهاز جهاز — على ٥٠٠ جهاز مسلّم في الشهر
+//    كان معناه مئات الطلبات كل ما تفتح الصفحة.
+//
+// ⚠️ بنجيب الصفوف اللي ليها device_id بس — القطع المخزنة
+//    والوارد لسه ما اتحمّلوش على جهاز، فمالهمش لازمة هنا.
+// ============================================================
+var AN_PARTS = { map: null, loading: false };
+
+async function anLoadPartsCost(force){
+  if(AN_PARTS.loading) return false;
+  if(AN_PARTS.map && !force) return false;
+  AN_PARTS.loading = true;
+  try{
+    const m = new Map();
+    const PAGE = 1000;
+    let from = 0;
+    for(let guard = 0; guard < 50; guard++){
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id,total_cost').not('device_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      for(const r of data){
+        if(!r.device_id) continue;
+        m.set(r.device_id, (m.get(r.device_id) || 0) + (Number(r.total_cost) || 0));
+      }
+      if(data.length < PAGE) break;
+      from += PAGE;
+    }
+    AN_PARTS.map = m;
+    return true;
+  }catch(e){
+    console.error('[الملخص] فشل جلب تكلفة القطع:', e);
+    AN_PARTS.map = AN_PARTS.map || new Map();
+    return false;
+  }finally{
+    AN_PARTS.loading = false;
+  }
+}
+
 function renderAnalytics(){
   const chip = (mode, label) =>
     `<button class="inv-chip ${anPeriod.mode===mode?'active':''}" onclick="setAnPeriod('${mode}')">${label}</button>`;
@@ -7450,6 +7961,43 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">${t('an.fromShops')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:var(--warn);">${fmt(deferredAdded)}</div><div class="inv-card-label">${t('an.deferredAdded')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? 'var(--danger)' : 'var(--success)'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${t('an.outstanding')}</div></div>
+    </div>`;
+
+  // ============================================================
+  // ===== 💵 الربح من الشغل =====
+  // ------------------------------------------------------------
+  // مجمل الربح = قيمة الإصلاح − تكلفة قطع الغيار.
+  //
+  // ⚠️ الأساس هو الأجهزة اللي **اتسلّمت** في الفترة — مش الكاش
+  //    المحصّل. جهاز اتسلّم آجل لسه فلوسه ما وصلتش، بس الشغل
+  //    اتعمل والقطعة اتصرفت، فالربح بتاعه بيتحسب في الفترة دي.
+  //    لو ربطناه بالتحصيل، شهر فيه تحصيل قديم كتير كان هيبان
+  //    مربح وهو مشتغلش، والعكس.
+  //
+  // ⚠️ الرقم ده **قبل** المرتبات والإيجار وأي مصاريف — عشان كده
+  //    اسمه «مجمل الربح» مش «صافي الربح». الفرق ده مش لعب
+  //    بالكلام: محل ممكن يبقى مجمل ربحه ٥٠ ألف وصافيه بالسالب.
+  // ============================================================
+  if(!AN_PARTS.map && !AN_PARTS.loading){
+    anLoadPartsCost().then(got => { if(got) renderAnalytics(); });
+  }
+  const partsReady = !!AN_PARTS.map;
+  const repairRevenue = deliveredInRange
+    .reduce((tt, d) => tt + (parseInt(enDigits(d.agreedPrice)) || 0), 0);
+  const partsSpent = partsReady
+    ? deliveredInRange.reduce((tt, d) => tt + (AN_PARTS.map.get(d.id) || 0), 0)
+    : 0;
+  const grossProfit = repairRevenue - partsSpent;
+  const margin = repairRevenue > 0 ? Math.round((grossProfit / repairRevenue) * 100) : 0;
+  const wait = '<span style="font-size:15px;color:var(--muted);">⏳ بنحسب…</span>';
+
+  const profitCards = `
+    <div class="inv-section-title">💵 ${t('an.profit')}</div>
+    <div class="inv-cards">
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--info);">${fmt(repairRevenue)}</div><div class="inv-card-label">${t('an.revenue')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--warn);">${partsReady ? '− ' + fmt(Math.round(partsSpent)) : wait}</div><div class="inv-card-label">${t('an.partsCost')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? fmt(Math.round(grossProfit)) : wait}</div><div class="inv-card-label">${t('an.gross')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${margin >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? margin + '%' : wait}</div><div class="inv-card-label">${t('an.margin')}</div></div>
     </div>`;
 
   // ============================================================
@@ -7550,6 +8098,7 @@ function renderAnalytics(){
   document.getElementById('analyticsBody').innerHTML = `
     ${filterBar}
     ${moneyCards}
+    ${profitCards}
     <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
     <div style="font-size:12.5px; color:var(--muted-2); margin:-4px 0 10px; line-height:1.9;">
       ${VIP_MIN_DEVICES} أجهزة فأكتر خلال <b>${esc(monthName)}</b>
@@ -8305,7 +8854,18 @@ requireAccess().then(ok => {
 // الصلاحية: الأدمن والمحاسب تلقائياً. الديسباتشر لازم الأدمن يفعّل
 // مفتاح الميزة 'parts_review' من الإعدادات.
 // ============================================================
-const PR = { from: '', to: '', tech: null, quick: 'today', q: '' };   // q = كلمة البحث
+const PR = { from: '', to: '', tech: null, quick: 'today', q: '', folder: null };   // q = كلمة البحث
+
+// ============================================================
+// 📁 فولدرات المراجعة
+// ------------------------------------------------------------
+// ⚠️ أرضية ثابتة: الفولدرات مبتشوفش أي جهاز قبل ١ سبتمبر ٢٠٢٦.
+//    السبب: ربط القطع بالمخزن اتفعّل بعد التاريخ ده — فكل جهاز
+//    أقدم منه هيبان "مش مربوط بيه قطع غيار" وهو مش غلطة حد.
+//    من غير الأرضية دي الفولدر كان هيبقى آلاف الأجهزة القديمة
+//    ومحدش هيبص فيه تاني.
+// ============================================================
+const PR_FLOOR = '2026-09-01';
 
 // الصلاحية: الأدمن والمحاسب تلقائياً. أي ديسباتشر لازم الأدمن يمنحه
 // صلاحية 'parts_review' من لوحة الأدمن (سويتش تحت اسمه).
@@ -8347,6 +8907,8 @@ function prSetQuick(q){
   let start = end;
   if(q === 'week')  start = prDayKey(new Date(now.getTime() - 6*86400000).toISOString());
   if(q === 'month') start = prDayKey(new Date(now.getTime() - 29*86400000).toISOString());
+  // «الكل» = من أول يوم النظام اشتغل فيه، مش من أول الدنيا
+  if(q === 'all')   start = PR_FLOOR;
   PR.from = start; PR.to = end;
   PR.tech = null;
   prRender();
@@ -8377,6 +8939,8 @@ function prTechOf(d){ return (d.technician || '').trim(); }
 function openPartsReview(){
   if(!prCanUse()){ toast('الميزة دي مقفولة — الأدمن بيفعّلها من الإعدادات'); return; }
   const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
+  PR.folder = null;
+  PR_HAS.set = null;   // نعيد كشف المربوط — ممكن حد ربط قطع من آخر مرة
   if(!PR.from) prSetQuick('today'); else prRender();
   document.getElementById('partsReviewOverlay').classList.remove('hidden');
 }
@@ -8384,6 +8948,8 @@ function closePartsReview(){
   const o = document.getElementById('partsReviewOverlay');
   if(o) o.classList.add('hidden');
   PR.tech = null;
+  PR.folder = null;
+  PR_RETURN = null;   // قفلها بإيده = مفيش رجوع
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
@@ -8459,14 +9025,17 @@ function prMatch(d, q){
 }
 
 // كارت الجهاز — كل المعلومات ظاهرة من برا من غير ما تفتحه
-function prDevHtml(d, showTech){
+// extra = محتوى بيتحط **جوه** الكارت في آخره (سطر الإجراء بتاع الفولدر).
+// ⚠️ أي زرار جواه لازم يعمل event.stopPropagation() — الكارت كله
+//    قابل للضغط، ومن غيرها الدوسة على الزرار بتفتح تفاصيل الجهاز كمان.
+function prDevHtml(d, showTech, extra){
   const cm   = (d.partsComment || '').trim();
   const shop = (d.shopName || '').trim();
   const meta = [];
   if(shop) meta.push(`🏪 <b>${esc(shop)}</b>`);
   if(showTech && prTechOf(d)) meta.push(`🔧 <b>${esc(prTechOf(d))}</b>`);
   return `
-        <div class="pr-dev" onclick="closePartsReview();openDetail('${d.id}')">
+        <div class="pr-dev" onclick="prOpenDevice('${d.id}')">
           <div class="pr-dev-t">
             <span>${esc(d.model || d.deviceType || 'جهاز')} · ${esc(d.customerName || '')}</span>
             <span class="pr-dev-s">${esc(fullStatusLabel(d))}</span>
@@ -8478,7 +9047,201 @@ function prDevHtml(d, showTech){
                    : `<div class="pr-cm">🔩 ${esc(cm)}</div>`)
                : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
           ${prLinkHtml(d.id)}
+          ${extra || ''}
         </div>`;
+}
+
+// ============================================================
+// 📁 مين مربوط بيه قطع غيار؟
+// ------------------------------------------------------------
+// ⚠️ مش بنستعمل PR_LINK هنا. PR_LINK بيجيب القطع للأجهزة الظاهرة
+//    على الشاشة بس وعلى دفعات ٦٠ — لو استعملناه للفولدر، «الكل»
+//    كان هيبعت عشرات الطلبات.
+//    بدالها: طلب واحد بيجيب عمود device_id بس من كل المخزن،
+//    وبنعمل منه Set. سؤال «الجهاز ده مربوط بيه حاجة؟» بيبقى
+//    فوري وببلاش.
+// ============================================================
+var PR_HAS = { set: null, loading: false, tried: false };
+
+async function prLoadHasParts(force){
+  if(PR_HAS.loading) return false;
+  if(PR_HAS.set && !force) return false;
+  PR_HAS.loading = true; PR_HAS.tried = true;
+  try{
+    const ids = new Set();
+    const PAGE = 1000;
+    let from = 0;
+    for(let guard = 0; guard < 50; guard++){
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id').not('device_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      data.forEach(r => { if(r.device_id) ids.add(r.device_id); });
+      if(data.length < PAGE) break;
+      from += PAGE;
+    }
+    PR_HAS.set = ids;
+    return true;
+  }catch(e){
+    console.error('[المراجعة] فشل جلب الأجهزة المربوطة:', e);
+    PR_HAS.set = PR_HAS.set || new Set();
+    return false;
+  }finally{
+    PR_HAS.loading = false;
+  }
+}
+
+// «مش محتاج قطع غيار» — من مصدرين:
+//   ١) المحاسب داس العلامة هنا            → noPartsNeeded === true
+//   ٢) الفني داس زراره في صفحته           → partsComment بيبقى «مفيش…»
+// ⚠️ الترتيب مهم: لو المحاسب رجّعه للمراجعة (noPartsNeeded === false)
+//    ده بيغلب، إلا لو الفني نفسه قايل مفيش — ساعتها الكلام كلامه.
+function prNoNeed(d){
+  if(d.noPartsNeeded === true) return true;
+  return detPartsIsNone(d.partsComment);
+}
+
+// أساس الفولدرين: أجهزة الفترة اللي ليها فني، من ١ سبتمبر وطالع
+function prFolderBase(){
+  return (devices || [])
+    .filter(prInRange)
+    .filter(d => prTechOf(d))
+    .filter(d => prDayKey(prTouched(d)) >= PR_FLOOR);
+}
+
+function prFolderLists(){
+  const base = prFolderBase();
+  const noNeed  = base.filter(prNoNeed);
+  const noParts = PR_HAS.set
+    ? base.filter(d => !prNoNeed(d) && !PR_HAS.set.has(d.id))
+    : null;                       // null = لسه بنحمّل
+  return { base, noNeed, noParts };
+}
+
+function prFolderCardsHtml(){
+  const { noNeed, noParts } = prFolderLists();
+  return `<div class="pr-folders">
+    <button class="pr-folder warn" onclick="PR.folder='noparts';PR.tech=null;prRender()">
+      <div class="pr-folder-n">📭 مش مربوط بيها قطع غيار</div>
+      <div class="pr-folder-s">${noParts ? `<b>${noParts.length}</b> جهاز` : '⏳ بنحسب…'}</div>
+    </button>
+    <button class="pr-folder ok" onclick="PR.folder='noneed';PR.tech=null;prRender()">
+      <div class="pr-folder-n">✅ مش محتاجة قطع غيار</div>
+      <div class="pr-folder-s"><b>${noNeed.length}</b> جهاز</div>
+    </button>
+  </div>`;
+}
+
+// كارت الجهاز جوه الفولدر = الكارت العادي + سطر إجراء تحته.
+// ⚠️ سطر الإجراء **بره** الكارت القابل للضغط عن قصد — لو كان
+//    جواه، أي دوسة على الزرار كانت هتفتح تفاصيل الجهاز كمان.
+function prFolderDevHtml(d, mode){
+  const stop = 'event.stopPropagation();';   // عشان الدوسة ما تفتحش التفاصيل
+  let act;
+  if(mode === 'noparts'){
+    act = `<button class="pr-mark" onclick="${stop}prMarkNoNeed('${d.id}')">✅ مش محتاج قطعة غيار</button>`;
+  }else if(d.noPartsNeeded === true && !detPartsIsNone(d.partsComment)){
+    act = `<button class="pr-mark undo" onclick="${stop}prUnmarkNoNeed('${d.id}')">↩️ رجّعه للمراجعة</button>`
+        + (d.noPartsBy ? `<span class="pr-fnote">علّمه ${esc(d.noPartsBy)}</span>` : '');
+  }else{
+    act = `<span class="pr-fnote">🔧 الفني هو اللي قال إنه مش محتاج قطع غيار</span>`;
+  }
+  // سطر الإجراء بيتبعت جوه الكارت نفسه — مش تحته
+  return prDevHtml(d, true, `<div class="pr-fact">${act}</div>`);
+}
+
+function prRenderFolder(){
+  const host = document.getElementById('prList');
+  if(!host) return;
+  const mode = PR.folder;
+  const { noNeed, noParts } = prFolderLists();
+  let list = mode === 'noparts' ? (noParts || []) : noNeed;
+
+  const q = (PR.q || '').trim();
+  if(q) list = list.filter(d => prMatch(d, q));
+  list = list.slice().sort(prByTouchedDesc);
+
+  const title = mode === 'noparts'
+    ? '📭 مش مربوط بيها قطع غيار'
+    : '✅ مش محتاجة قطع غيار';
+  const note = mode === 'noparts'
+    ? `الأجهزة دي مفيش أي قطعة من المخزن مربوطة بيها. لو الجهاز فعلاً محتاجش قطعة، دوس <b>✅ مش محتاج قطعة غيار</b> وهينتقل للفولدر التاني.`
+    : `أجهزة اتعلّم عليها إنها خلصت من غير قطع غيار — سواء من المحاسب هنا، أو من الفني بزراره في صفحته.`;
+
+  const loading = mode === 'noparts' && !noParts;
+  host.innerHTML = `
+    <button class="pr-back" onclick="PR.folder=null;prRender()">‹ رجوع للمراجعة</button>
+    <div class="pr-th">${title} <span class="pr-n">${loading ? '…' : list.length}</span></div>
+    <div class="pr-floor">${note}<br>📅 من <b>${PR_FLOOR}</b> وطالع بس — الأجهزة الأقدم من كده مش بتدخل الفولدرات.</div>
+    ${loading
+      ? `<div class="pr-empty">⏳ بنراجع المخزن…</div>`
+      : (list.length
+          ? list.map(d => prFolderDevHtml(d, mode)).join('')
+          : `<div class="pr-empty">${q ? 'مفيش نتايج لـ «' + esc(q) + '» في الفولدر ده' : 'الفولدر فاضي في الفترة دي'}</div>`)}`;
+}
+
+// ---------- العلامة ----------
+async function prMarkNoNeed(id){
+  const d = (devices || []).find(x => x.id === id);
+  if(!d) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    noPartsNeeded: true,
+    noPartsBy: currentUser.name,
+    noPartsAt: now,
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(x.activityNotes || []),
+      { text: '✅ اتعلّم: الجهاز مش محتاج قطع غيار', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  } : x);
+  prRenderList();      // الشاشة بتتحرّك فوراً
+  await persist();
+  render();
+}
+
+async function prUnmarkNoNeed(id){
+  const d = (devices || []).find(x => x.id === id);
+  if(!d) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    noPartsNeeded: false,
+    noPartsBy: '', noPartsAt: '',
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(x.activityNotes || []),
+      { text: '↩️ اترجع للمراجعة: الجهاز محتاج قطع غيار', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  } : x);
+  prRenderList();
+  await persist();
+  render();
+}
+
+// ============================================================
+// ↩️ الرجوع لنفس المكان بعد ما تقفل تفاصيل الجهاز
+// ------------------------------------------------------------
+// ⚠️ قبل كده كان بينادي closePartsReview() — ودي **بتصفّر** الفني
+//    المفتوح والفولدر وكلمة البحث. فبعد ما تخرج من الجهاز كنت
+//    بتلاقي نفسك رجعت للصفحة الرئيسية من أول وجديد.
+//    دلوقتي: بنصوّر مكانك، نخبّي الشاشة بس من غير تصفير، وأول ما
+//    تقفل التفاصيل بنرجّعك لنفس النقطة بالظبط.
+// ============================================================
+var PR_RETURN = null;
+
+function prOpenDevice(id){
+  PR_RETURN = { tech: PR.tech, folder: PR.folder, q: PR.q,
+                from: PR.from, to: PR.to, quick: PR.quick };
+  const o = document.getElementById('partsReviewOverlay');
+  if(o) o.classList.add('hidden');      // نخبّيها بس — مفيش تصفير
+  openDetail(id);
+}
+
+function prRestoreAfterDetail(){
+  if(!PR_RETURN) return;
+  const snap = PR_RETURN; PR_RETURN = null;
+  if(!prCanUse()) return;
+  Object.assign(PR, snap);
+  const o = document.getElementById('partsReviewOverlay');
+  if(o) o.classList.remove('hidden');
+  prRender();
 }
 
 function prByTouchedDesc(a, b){ return new Date(prTouched(b) || 0) - new Date(prTouched(a) || 0); }
@@ -8502,6 +9265,7 @@ function prRender(){
         <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
         <button class="pr-q${PR.quick==='week'?' on':''}"  onclick="prSetQuick('week')">أسبوع</button>
         <button class="pr-q${PR.quick==='month'?' on':''}" onclick="prSetQuick('month')">شهر</button>
+        <button class="pr-q${PR.quick==='all'?' on':''}"   onclick="prSetQuick('all')">الكل</button>
       </div>
       <div class="pr-dates">
         <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
@@ -8522,8 +9286,15 @@ function prRenderList(){
   const rows = (devices || []).filter(prInRange).filter(d => prTechOf(d));
   // القطع المربوطة بتتجاب بعد الرسم، وأول ما توصل بنعيد الرسم مرة واحدة
   prLoadLinked(rows.map(d => d.id)).then(got => { if(got) prRenderList(); });
+  // وكشف «مين مربوط بيه أصلاً» — مرة واحدة لكل فتح للشاشة
+  if(!PR_HAS.set && !PR_HAS.loading){
+    prLoadHasParts().then(got => { if(got) prRenderList(); });
+  }
 
-  // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
+  // (٠) فولدر مفتوح → عرضه لوحده
+  if(PR.folder){ prRenderFolder(); return; }
+
+  // (٠.٥) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
   if(q){
     const hits = rows.filter(d => prMatch(d, q)).sort(prByTouchedDesc);
@@ -8550,8 +9321,8 @@ function prRenderList(){
     return;
   }
 
-  // (٢) كروت الفنيين
-  host.innerHTML = techs.length ? `
+  // (٢) الفولدرات فوق، وتحتها كروت الفنيين
+  host.innerHTML = prFolderCardsHtml() + (techs.length ? `
     <div class="pr-grid">
       ${techs.map(t => {
         const l = byTech[t];
@@ -8562,7 +9333,7 @@ function prRenderList(){
           <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`;
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
 }
 // ============================================================
 // 👤 حسابي — بيانات المستخدم والاشتراك
