@@ -9102,12 +9102,35 @@ function prNoNeed(d){
   return detPartsIsNone(d.partsComment);
 }
 
-// أساس الفولدرين: أجهزة الفترة اللي ليها فني، من ١ سبتمبر وطالع
+// ⏱️ تاريخ آخر تعديل **بس** — من غير الرجوع لتاريخ الدخول.
+// ------------------------------------------------------------
+// prTouched العادية بترجع تاريخ الدخول لو الجهاز عمره ما اتعدّل.
+// ده مظبوط لشاشة المراجعة (عشان الجهاز يبان في يوم ما دخل)، بس
+// غلط للفولدرات: جهاز داخل من شهر ومحدش لمسه كان بيتحسب بتاريخ
+// دخوله ويظهر في فترة قديمة.
+// هنا: لو الجهاز عمره ما اتعدّل → مالوش تاريخ → مش بيدخل الفولدر.
+function prTouchedEdit(d){
+  let best = '';
+  for(const v of [d.lastModifiedAt, d.partsReturnAt]){
+    if(v && (!best || new Date(v) > new Date(best))) best = v;
+  }
+  return best;
+}
+
+// أساس الفولدرين
 function prFolderBase(){
   return (devices || [])
-    .filter(prInRange)
+    // ⚠️ المرفوض خرج من الشغل خالص — مش منطقي نسأل عن قطع غياره.
+    //    d.status === 'rejected' بتغطي «تم الرفض» و«درج الرفض»
+    //    الاتنين — الفرق بينهم في العرض بس (rejectedInShop).
+    .filter(d => d.status !== 'rejected')
     .filter(d => prTechOf(d))
-    .filter(d => prDayKey(prTouched(d)) >= PR_FLOOR);
+    .filter(d => {
+      const k = prDayKey(prTouchedEdit(d));
+      if(!k) return false;              // عمره ما اتعدّل
+      if(k < PR_FLOOR) return false;    // أقدم من ١ سبتمبر
+      return (!PR.from || k >= PR.from) && (!PR.to || k <= PR.to);
+    });
 }
 
 function prFolderLists(){
@@ -9160,7 +9183,9 @@ function prRenderFolder(){
 
   const q = (PR.q || '').trim();
   if(q) list = list.filter(d => prMatch(d, q));
-  list = list.slice().sort(prByTouchedDesc);
+  // الترتيب بنفس التاريخ اللي الفولدر بيفلتر بيه — آخر تعديل
+  list = list.slice().sort((a, b) =>
+    new Date(prTouchedEdit(b) || 0) - new Date(prTouchedEdit(a) || 0));
 
   const title = mode === 'noparts'
     ? '📭 مش مربوط بيها قطع غيار'
@@ -9173,7 +9198,8 @@ function prRenderFolder(){
   host.innerHTML = `
     <button class="pr-back" onclick="PR.folder=null;prRender()">‹ رجوع للمراجعة</button>
     <div class="pr-th">${title} <span class="pr-n">${loading ? '…' : list.length}</span></div>
-    <div class="pr-floor">${note}<br>📅 من <b>${PR_FLOOR}</b> وطالع بس — الأجهزة الأقدم من كده مش بتدخل الفولدرات.</div>
+    <div class="pr-floor">${note}<br>📅 الفترة محسوبة بـ<b>تاريخ آخر تعديل</b> على الجهاز، ومن <b>${PR_FLOOR}</b> وطالع بس.
+    <br>🚫 الأجهزة المرفوضة مش بتدخل الفولدرات خالص.</div>
     ${loading
       ? `<div class="pr-empty">⏳ بنراجع المخزن…</div>`
       : (list.length
