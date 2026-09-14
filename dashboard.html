@@ -1217,11 +1217,6 @@
   .pr-floor{font-size:12px;color:var(--muted);background:var(--surface-2);
     border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
     margin-bottom:12px;line-height:1.8;}
-  /* ملاحظة تحت كروت الربح */
-  .an-note{font-size:12px;color:var(--muted);background:var(--surface-2);
-    border:1px dashed var(--border);border-radius:10px;padding:10px 12px;
-    margin:8px 0 4px;line-height:1.9;}
-  .an-note b{color:var(--ink-2);font-weight:800;}
   .pr-th{font-weight:800;font-size:15px;margin:4px 0 12px;display:flex;align-items:center;gap:8px;}
   .pr-n{background:var(--surface-3);border-radius:20px;padding:2px 9px;font-size:12px;}
   .pr-dev{border:1px solid var(--border);background:var(--surface-2);border-radius:13px;
@@ -8003,8 +7998,7 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:var(--warn);">${partsReady ? '− ' + fmt(Math.round(partsSpent)) : wait}</div><div class="inv-card-label">${t('an.partsCost')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? fmt(Math.round(grossProfit)) : wait}</div><div class="inv-card-label">${t('an.gross')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:${margin >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? margin + '%' : wait}</div><div class="inv-card-label">${t('an.margin')}</div></div>
-    </div>
-    <div class="an-note">${t('an.profitNote')}</div>`;
+    </div>`;
 
   // ============================================================
   // ===== كبار العملاء =====
