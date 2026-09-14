@@ -450,7 +450,8 @@
      ما بوابته تتفتح. الستارة بتتشال أول ما الدور يتحدد. */
   html.app-booting .topbar,
   html.app-booting #board,
-  html.app-booting #approvalsHost{visibility:hidden !important;}
+  html.app-booting #approvalsHost,
+  html.app-booting #partsLogHost{visibility:hidden !important;}
   html.app-booting #bootVeil{display:flex !important;}
   /* آخر دور معروف = فني → نخفي أدوات المحاسب من قبل ما الأدوار تتحمّل */
   html.pre-technician #backupWrap,
@@ -481,6 +482,7 @@
   body.role-technician > .topbar,
   body.role-technician > #board,
   body.role-technician > #approvalsHost,
+  body.role-technician > #partsLogHost,
   body.role-technician > #detailOverlay,
   body.role-technician > #addOverlay,
   body.role-technician > #columnOverlay,
@@ -585,6 +587,38 @@
   .appr-btn-yes:hover{background:#15803D;}
   .appr-btn-no{background:var(--surface); color:var(--danger); border:1px solid var(--danger-border);}
   .appr-btn-no:hover{background:var(--danger-bg);}
+
+  /* ===== 🧰 لوحة حركة الفنيين على المخزن ===== */
+  /* نفس قياسات لوحة الاعتمادات بالظبط عشان الاتنين يقفوا تحت بعض
+     متساويين — بس بلون أزرق مش أصفر: دي خبر، مش طلب محتاج قرار. */
+  #partsLogHost:empty{display:none;}
+  .spn-panel{background:var(--surface); border:1px solid #93C5FD; border-radius:16px;
+    margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px rgba(37,99,235,.10);}
+  .spn-head{display:flex; align-items:center; gap:8px; font-family:'Cairo',sans-serif;
+    font-weight:900; font-size:15px; color:#2563EB; margin-bottom:12px;}
+  .spn-count{background:#2563EB; color:#fff; font-family:'Tajawal',sans-serif; font-weight:800;
+    font-size:12px; min-width:22px; height:22px; border-radius:11px; display:inline-flex;
+    align-items:center; justify-content:center; padding:0 6px;}
+  .spn-clear{margin-inline-start:auto; background:none; border:none; color:var(--ink-2);
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; cursor:pointer;}
+  .spn-clear:hover{color:var(--ink);}
+  .spn-row{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:11px 13px; margin-bottom:8px;}
+  .spn-row:last-child{margin-bottom:0;}
+  .spn-row.del{background:var(--danger-bg); border-color:var(--danger-border);}
+  .spn-info{flex:1; min-width:180px;}
+  .spn-t{font-weight:800; font-size:14px; color:var(--ink); line-height:1.5;}
+  .spn-m{font-size:12px; color:#78716C; margin-top:3px; line-height:1.5;}
+  .spn-kind{display:inline-block; font-size:11px; font-weight:800; border-radius:6px;
+    padding:2px 7px; margin-inline-end:6px; vertical-align:middle;}
+  .spn-kind.qty{background:#EAF1F8; color:#2B6CB0;}
+  .spn-kind.del{background:var(--danger-bg); color:var(--danger);}
+  .spn-was{color:#78716C; text-decoration:line-through; font-weight:800;}
+  .spn-now{color:#15803D; font-weight:900;}
+  .spn-ok{border:none; border-radius:9px; padding:9px 16px; font-family:'Tajawal',sans-serif;
+    font-weight:800; font-size:13.5px; cursor:pointer; background:var(--surface);
+    color:var(--ink-2); border:1px solid var(--border); flex:none;}
+  .spn-ok:hover{background:var(--surface-2,#F8FAFC);}
   .card-tech{font-size:11px; color:var(--ink-2); margin-top:6px; display:flex; align-items:center; gap:4px;}
   .card-tech::before{content:"🔧"; font-size:10px;}
   .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
@@ -1244,6 +1278,7 @@
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
 <div id="approvalsHost"></div>
+<div id="partsLogHost"></div>
 <!-- البحث الرئيسي: بيشوف كل الأجهزة، حتى اللي خرجت من اللوحة -->
 <div class="gs-wrap" id="gsWrap">
   <div class="gs-box">
@@ -1801,6 +1836,7 @@ function applyRoleVisibility(){
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
   try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
+  try{ loadPartsLog(); }catch(e){}   // 🧰 إشعار حركة الفنيين على المخزن (للمحاسب/الأدمن بس)
   // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
   // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
   try{ syncAccountMenu(); }catch(e){}
@@ -2219,6 +2255,19 @@ function startRealtimeSync(){
           try{ localStorage.setItem('ifix_ledger_cache', row.value); }catch(e){}
           if(!document.getElementById('accountsOverlay').classList.contains('hidden')) renderAccounts();
         }catch(e){}
+      })
+      .subscribe();
+
+    // 🧰 حركة الفنيين على المخزن — سطر جديد في الدفتر يطلع فوراً.
+    // ⚠️ insert بس: الدفتر مبيتعدّلش ولا بيتمسح منه (مفيش سياسة أصلاً).
+    sb.channel('spare_parts_log_sync')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'spare_parts_log' }, (payload) => {
+        const row = payload.new;
+        if(!row || !canSeeMoney()) return;
+        if(row.by_role !== 'technician') return;        // حركة المحاسب نفسه مش إشعار
+        if(splRows.some(r => r.id === row.id)) return;  // وصل قبل كده
+        splRows.unshift(row);
+        renderPartsLogPanel();
       })
       .subscribe();
   }catch(e){ /* المزامنة اللحظية اختيارية — السيستم شغال من غيرها */ }
@@ -3045,6 +3094,7 @@ function hideImportProgress(){
 function render(){
   renderBoard();
   renderApprovalsPanel();
+  renderPartsLogPanel();
   if(currentColumn) renderColumn(true);
   refreshOpenOverlays();
 }
@@ -3053,6 +3103,115 @@ function render(){
 function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
   if(host) host.innerHTML = approvalsPanelHtml();
+}
+
+// ============================================================
+// 🧰 إشعار حركة الفنيين على المخزن
+// ------------------------------------------------------------
+// الفني بقى يقدر يمسح قطعة أو يغيّر كميتها من صفحته. المحاسب
+// لازم يعرف — مش يكتشف الفرق وهو بيجرد آخر الشهر.
+//
+// المصدر: جدول spare_parts_log اللي ترايجر على السيرفر بيكتبه
+// لوحده. يعني الإشعار ده مستحيل يتفوّت: مفيش طريق لحذف قطعة
+// من غير ما السطر يتكتب في نفس اللحظة.
+//
+// ⚠️ ليه مفيش قبول/رفض زي لوحة الاعتمادات؟ لأن ده خبر مش طلب.
+//    الحركة حصلت خلاص. زرار «تمام» بيخفي السطر عن المحاسب ده
+//    بس (localStorage) — والباقي بيفضلوا شايفينه.
+//
+// ⚠️ بيختفي لوحده بعد ٣ أيام حتى لو محدش داس عليه.
+// ============================================================
+const SPL_DAYS = 3;
+const SPL_SEEN_KEY = 'ifix_spl_seen';
+let splRows = [];
+
+function splSeen(){
+  try{ return JSON.parse(localStorage.getItem(SPL_SEEN_KEY) || '[]'); }catch(e){ return []; }
+}
+function splMarkSeen(ids){
+  // بنخزّن المعرّفات اللي لسه جوه الـ ٣ أيام بس — القايمة مبتكبرش للأبد
+  const live = new Set(splRows.map(r => r.id));
+  const next = splSeen().filter(id => live.has(id)).concat(ids);
+  try{ localStorage.setItem(SPL_SEEN_KEY, JSON.stringify([...new Set(next)])); }catch(e){}
+}
+
+// السطور اللي المفروض تبان: حركة فني، جوه ٣ أيام، والمحاسب لسه ما قالش «تمام»
+function splPending(){
+  const seen = new Set(splSeen());
+  const since = Date.now() - SPL_DAYS * 86400000;
+  return splRows.filter(r =>
+    r.by_role === 'technician' &&
+    new Date(r.at).getTime() >= since &&
+    !seen.has(r.id)
+  );
+}
+
+function splAgoTxt(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  if(!(ms >= 0)) return '';
+  const m = Math.floor(ms / 60000);
+  if(m < 1)  return 'دلوقتي';
+  if(m < 60) return 'من ' + m + ' دقيقة';
+  const h = Math.floor(m / 60);
+  if(h < 24) return 'من ' + h + ' ساعة';
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'من يوم' : 'من ' + d + ' أيام';
+}
+
+function partsLogPanelHtml(){
+  if(!canSeeMoney()) return '';
+  const list = splPending();
+  if(list.length === 0) return '';
+  const rows = list.map(r => {
+    const del = r.action === 'delete';
+    const body = del
+      ? `مسح <b>${esc(r.part_name || 'قطعة')}</b>${r.old_qty == null ? '' : ` (كانت ${Number(r.old_qty) || 0} قطعة)`}`
+      : `عدّل كمية <b>${esc(r.part_name || 'قطعة')}</b>:
+         <span class="spn-was">${Number(r.old_qty) || 0}</span> ←
+         <span class="spn-now">${Number(r.new_qty) || 0}</span>`;
+    return `<div class="spn-row ${del ? 'del' : ''}">
+      <div class="spn-info">
+        <div class="spn-t"><span class="spn-kind ${del ? 'del' : 'qty'}">${del ? '🗑 حذف' : '✏️ تعديل كمية'}</span>${body}</div>
+        <div class="spn-m">🔧 ${esc(r.by_name || 'فني')} · ${splAgoTxt(r.at)} · ${new Date(r.at).toLocaleString(getLocale())}</div>
+      </div>
+      <button class="spn-ok" onclick="splDismiss('${r.id}')">✓ تمام</button>
+    </div>`;
+  }).join('');
+  return `<div class="spn-panel">
+    <div class="spn-head">🧰 حركة الفنيين على المخزن <span class="spn-count">${list.length}</span>
+      <button class="spn-clear" onclick="splDismissAll()">تمام على الكل</button></div>
+    ${rows}
+  </div>`;
+}
+
+function renderPartsLogPanel(){
+  const host = document.getElementById('partsLogHost');
+  if(host) host.innerHTML = partsLogPanelHtml();
+}
+
+function splDismiss(id){ splMarkSeen([id]); renderPartsLogPanel(); }
+function splDismissAll(){ splMarkSeen(splPending().map(r => r.id)); renderPartsLogPanel(); }
+
+// جلب الدفتر. بيتنادى مرة عند الإقلاع، والريل تايم بيكمّل بعد كده.
+// ⚠️ لو الجدول لسه مش موجود (الميجريشن ما اتشغّلش)، بنسكت —
+//    الداشبورد مايقعش عشان ميزة إشعار.
+async function loadPartsLog(){
+  if(!canSeeMoney()) return;
+  const since = new Date(Date.now() - SPL_DAYS * 86400000).toISOString();
+  try{
+    const { data, error } = await sb.from('spare_parts_log')
+      .select('id,part_id,part_name,category,action,old_qty,new_qty,by_name,by_role,at')
+      .eq('by_role', 'technician')
+      .gte('at', since)
+      .order('at', { ascending: false })
+      .limit(200);
+    if(error) throw error;
+    splRows = data || [];
+  }catch(e){
+    splRows = [];
+    console.error('[المخزن] دفتر الحركة فشل:', e);
+  }
+  renderPartsLogPanel();
 }
 
 // يحدّث صفحة الجرد المفتوحة في الخلفية لحظياً (مع الحفاظ على مكان السكرول)

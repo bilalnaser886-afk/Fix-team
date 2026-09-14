@@ -503,6 +503,45 @@
   .rw-hint{color:var(--muted);font-size:11.5px;}
   .rw-hint.err{color:var(--red);font-weight:800;}
   .rw-empty{color:var(--muted);text-align:center;padding:26px 8px;font-size:13px;}
+
+  /* ===== نافذة "📦 قطع الغيار المخزنة" (الاستوك) =====
+     بتستعمل نفس قشرة نافذة قطع الغيار (.rw-ov / .rw-sheet / .rw-head)
+     عشان الشكل يفضل واحد، وبتزوّد عليها كروت القطع بس. */
+  .st-add{display:flex;gap:6px;margin:2px 0 10px;}
+  .st-add input{border:1px solid var(--line);border-radius:10px;background:var(--card);
+    color:var(--ink);font:inherit;font-size:13px;padding:10px;min-width:0;}
+  .st-add .nm{flex:1;}
+  .st-add .qt{width:64px;text-align:center;}
+  .st-addbtn{border:none;border-radius:10px;background:var(--accent,#0891A8);color:#fff;
+    font:800 12.5px/1 inherit;padding:10px 14px;cursor:pointer;white-space:nowrap;}
+  .st-addbtn:disabled{opacity:.55;cursor:default;}
+  .st-search{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);
+    color:var(--ink);font:inherit;font-size:13px;padding:10px;margin-bottom:10px;}
+  .st-tot{font-size:12px;font-weight:800;color:var(--muted);margin:0 2px 9px;}
+  .st-card{border:1px solid var(--line);background:var(--card);border-radius:14px;
+    padding:11px 12px;margin-bottom:8px;transition:opacity .15s;}
+  .st-card.busy{opacity:.5;}
+  .st-top{display:flex;align-items:flex-start;gap:8px;}
+  .st-name{flex:1;font-weight:800;font-size:13.5px;line-height:1.6;word-break:break-word;}
+  .st-del{border:1px solid var(--line);background:var(--paper);color:var(--red);
+    border-radius:9px;font-size:13px;padding:6px 9px;cursor:pointer;}
+  .st-del:active{transform:scale(.94);}
+  .st-meta{color:var(--muted);font-size:11.5px;margin-top:3px;line-height:1.7;}
+  .st-qrow{display:flex;align-items:center;gap:8px;margin-top:9px;}
+  .st-q{width:34px;height:34px;border:1px solid var(--line);background:var(--paper);
+    color:var(--ink);border-radius:9px;font:800 16px/1 inherit;cursor:pointer;}
+  .st-q:active{transform:scale(.94);}
+  .st-qn{min-width:36px;text-align:center;font:900 15px/1 inherit;}
+  .st-qlbl{color:var(--muted);font-size:11.5px;}
+  /* أثر آخر ٣ أيام: البند المحذوف + الكمية القديمة */
+  .st-card.gone{border-style:dashed;background:transparent;opacity:.8;}
+  .st-card.gone .st-name{text-decoration:line-through;color:var(--muted);}
+  .st-trace{margin-top:8px;padding:7px 9px;border-radius:9px;font-size:11.5px;
+    line-height:1.8;background:var(--paper);border:1px solid var(--line);color:var(--ink-2);}
+  .st-trace.del{color:var(--red);border-color:var(--red);background:transparent;}
+  .st-trace b{font-weight:900;}
+  .st-was{color:var(--muted);text-decoration:line-through;font-weight:800;}
+  .st-now{color:var(--done);font-weight:900;}
 </style>
 </head>
 <body>
@@ -528,6 +567,9 @@
       <!-- 🔩 خانة قطع الغيار: كانت فولدر "شغلي آخر ٥ أيام" في الشاشة الرئيسية.
            اتنقلت هنا عشان الشاشة الرئيسية تفضل نضيفة للشغل الحالي. -->
       <button onclick="closeKebab(); openRecentWork()">🔩 قطع الغيار</button>
+      <!-- 📦 الاستوك: نفس مخزن قطع الغيار بتاع المحل (category='stored')
+           بس بشباك مبسّط للفني — اسم وكمية بس، من غير أسعار ولا ربط بأجهزة. -->
+      <button onclick="closeKebab(); openStock()">📦 قطع الغيار المخزنة</button>
       <div class="sep"></div>
       <button onclick="openSettings()" data-i18n="rp.settings">⚙️ الإعدادات</button>
       <div class="sep"></div>
@@ -2057,6 +2099,335 @@ async function doHandoff(){
     d.notes = patch.activityNotes.map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
     toast(`${esc(handTarget)} بقى ${t('tp.handAssist')} على ${t('rp.device')} 🤝`);
     render(); renderSheetKeepNote();
+  }
+}
+
+// ============================================================
+// 📦 قطع الغيار المخزنة (الاستوك) — شباك الفني على نفس المخزن
+// ------------------------------------------------------------
+// ⚠️ مفيش جدول جديد ولا نسخة تانية من البيانات. النافذة دي
+//    بتقرا وبتكتب في نفس جدول `spare_parts` وعلى القطع اللي
+//    `category = 'stored'` — نفس اللي بيظهر في «مخزن قطع الغيار»
+//    تحت تبويب «قطع غيار مخزنة» في الداشبورد.
+//    يعني: اللي الفني يضيفه هنا بيبان هناك، واللي المحاسب يحطه
+//    هناك بيبان هنا. دولاب واحد بشباكين — مش مزامنة بين اتنين.
+//
+// ⚠️ الفني بيكتب اسم + كمية بس. السعر شغل المحاسب (زي أي قطعة
+//    داخلة من فاتورة من غير سعر). وعشان كده كل ما الكمية تتغير
+//    بنعيد حساب total_cost = كمية × سعر الوحدة — من غير كده
+//    إجمالي المخزن في الداشبورد كان هيبقى غلط.
+//
+// ⚠️ دوسات + و − مش بتروح للسيرفر مع كل دوسة. بنستنى نص ثانية
+//    بعد آخر دوسة وبنبعت الرقم النهائي مرة واحدة (SK_T).
+//    من غير كده، الفني اللي بيدوس ١٠ مرات بيعمل ١٠ طلبات.
+// ============================================================
+let SK = { rows: [], loading: false, q: '', busy: false, log: [] };
+// ⏱️ مدة ظهور الأثر: ٣ أيام من وقت الحركة
+const SK_TRACE_DAYS = 3;
+const SK_T = {};            // مؤقّت تجميع دوسات الكمية لكل قطعة
+
+function skMoney(n){ return (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US'); }
+// تبسيط الاسم قبل المقارنة — «شاشة ايفون 11» و«شاشة  ايفون 11 » حاجة واحدة
+function skNorm(s){ return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+
+// ⏱️ «من إمتى» بالعربي — من غير ما نوري تاريخ كامل للفني
+function skAgo(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  if(!(ms >= 0)) return '';
+  const m = Math.floor(ms / 60000);
+  if(m < 1)  return 'دلوقتي';
+  if(m < 60) return 'من ' + m + ' دقيقة';
+  const h = Math.floor(m / 60);
+  if(h < 24) return 'من ' + h + ' ساعة';
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'من يوم' : 'من ' + d + ' أيام';
+}
+
+// آخر تعديل كمية مسجّل للقطعة دي جوه الـ ٣ أيام (أو null)
+function skLastQty(partId){
+  return SK.log.find(l => l.action === 'qty' && l.part_id === partId) || null;
+}
+
+// القطع اللي اتمسحت جوه الـ ٣ أيام ولسه مش موجودة دلوقتي.
+// ⚠️ بنستبعد أي قطعة موجودة فعلاً في القايمة — لو اتمسحت
+//    واتضافت تاني بنفس الاسم، مش منطقي نوريها محذوفة.
+function skGhosts(){
+  const live = new Set(SK.rows.map(r => r.id));
+  const seen = new Set();
+  return SK.log.filter(l => {
+    if(l.action !== 'delete') return false;
+    if(l.part_id && live.has(l.part_id)) return false;
+    if(l.part_id){ if(seen.has(l.part_id)) return false; seen.add(l.part_id); }
+    return true;
+  });
+}
+
+function skGhostHtml(l){
+  const q = (l.old_qty == null) ? '' : ` (كانت ${Number(l.old_qty) || 0} قطعة)`;
+  return `
+    <div class="st-card gone">
+      <div class="st-top"><div class="st-name">${esc(l.part_name || 'قطعة')}${q}</div></div>
+      <div class="st-trace del">🗑 <b>اتمسحت</b> — ${esc(l.by_name || 'مش معروف')} · ${skAgo(l.at)}</div>
+    </div>`;
+}
+
+function openStock(){
+  let ov = document.getElementById('skOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'skOv'; ov.className = 'rw-ov';
+    ov.onclick = e => { if(e.target === ov) closeStock(); };
+    document.body.appendChild(ov);
+  }
+  SK.q = '';
+  ov.innerHTML = skShellHtml();
+  skPaintList();
+  skLoad();
+}
+
+function closeStock(){
+  const ov = document.getElementById('skOv'); if(ov) ov.remove();
+}
+
+// القشرة بتترسم مرة واحدة بس — عشان الكلام اللي الفني كاتبه في
+// خانة الاسم ما يتمسحش كل ما القايمة تتحدّث.
+function skShellHtml(){
+  return `
+    <div class="rw-sheet" dir="rtl">
+      <div class="rw-head">
+        <h3>📦 قطع الغيار المخزنة</h3>
+        <button type="button" class="rw-x" onclick="skLoad(true)" title="تحديث">🔄</button>
+        <button type="button" class="rw-x" onclick="closeStock()">✕</button>
+      </div>
+      <div class="rw-info">
+        دي القطع المتخزّنة في المحل ومستنية أي جهاز.
+        أي حاجة تضيفها هنا بتظهر على طول في <b>مخزن قطع الغيار</b> — والعكس.
+      </div>
+      <div class="st-add">
+        <input class="nm" id="skName" maxlength="120" placeholder="اسم القطعة… مثلاً: شاشة ايفون 11"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();skAdd();}">
+        <input class="qt" id="skQty" type="number" min="1" step="1" value="1" inputmode="numeric">
+        <button type="button" class="st-addbtn" id="skAddBtn" onclick="skAdd()">➕ ضيف</button>
+      </div>
+      <input class="st-search" id="skQ" placeholder="🔍 دوّر على قطعة…" oninput="skSearch(this.value)">
+      <div class="st-tot" id="skTot"></div>
+      <div id="skList"></div>
+    </div>`;
+}
+
+// جلب القطع المخزنة. بنجيب الأعمدة اللي محتاجينها بس — مش select('*') —
+// عشان الاستهلاك (نفس درس الـ ٩٦ جيجا).
+async function skLoad(manual){
+  if(!navigator.onLine){
+    if(manual) toast('مفيش نت — مش هينفع نحدّث دلوقتي');
+    SK.loading = false; skPaintList(); return;
+  }
+  SK.loading = true; skPaintList();
+  const since = new Date(Date.now() - SK_TRACE_DAYS * 86400000).toISOString();
+  try{
+    // الاتنين مع بعض — القطع الموجودة، ودفتر آخر ٣ أيام.
+    // Promise.all عشان ما نستناش طلب ورا التاني على نت الموبايل.
+    const [parts, log] = await Promise.all([
+      sb.from('spare_parts')
+        .select('id,name,quantity,unit_cost,total_cost,created_by,created_by_name,created_at')
+        .eq('category', 'stored')
+        .order('created_at', { ascending: false })
+        .limit(500),
+      sb.from('spare_parts_log')
+        .select('id,part_id,part_name,action,old_qty,new_qty,by_name,at')
+        .eq('category', 'stored')
+        .gte('at', since)
+        .order('at', { ascending: false })
+        .limit(300)
+    ]);
+    // ⚠️ سوبابيز مبيرميش خطأ — بيرجّعه في error. لو ما شيكناش، القايمة
+    //    كانت هتفضل فاضية من غير ما حد يعرف ليه.
+    if(parts.error) throw parts.error;
+    SK.rows = parts.data || [];
+    // الدفتر مش حرج: لو فشل، القايمة تشتغل عادي من غير أثر.
+    if(log.error){ console.error('[الاستوك] الدفتر فشل:', log.error); SK.log = []; }
+    else SK.log = log.data || [];
+    if(manual) toast('اتحدّثت ✅');
+  }catch(e){
+    console.error('[الاستوك] فشل الجلب:', e);
+    toast('مقدرناش نجيب المخزن: ' + ((e && e.message) || ''));
+  }
+  SK.loading = false;
+  skPaintList();
+}
+
+function skFiltered(){
+  const q = skNorm(SK.q);
+  if(!q) return SK.rows;
+  return SK.rows.filter(p => skNorm(p.name).includes(q));
+}
+
+function skSearch(v){ SK.q = v; skPaintList(); }   // خانة البحث نفسها مش بتتلمس
+
+// سطر «الكمية كانت كام» — بيفضل ظاهر ٣ أيام بعد التعديل وبعدين بيختفي لوحده
+function skTraceHtml(p){
+  const l = skLastQty(p.id);
+  if(!l) return '';
+  return `<div class="st-trace">✏️ الكمية كانت <span class="st-was">${Number(l.old_qty) || 0}</span>
+    وبقت <span class="st-now">${Number(l.new_qty) || 0}</span> — ${esc(l.by_name || 'مش معروف')} · ${skAgo(l.at)}</div>`;
+}
+
+function skCardHtml(p){
+  const qty   = Number(p.quantity) || 0;
+  const price = Number(p.total_cost) || 0;
+  const who   = p.created_by_name ? ' · ضافها ' + esc(p.created_by_name) : '';
+  return `
+    <div class="st-card" id="skc_${p.id}">
+      <div class="st-top">
+        <div class="st-name">${esc(p.name)}</div>
+        <button type="button" class="st-del" onclick="skDel('${p.id}')" title="مسح">🗑</button>
+      </div>
+      <div class="st-meta">${price ? skMoney(price) + ' ج.م' : 'لسه من غير سعر'}${who}</div>
+      ${skTraceHtml(p)}
+      <div class="st-qrow">
+        <button type="button" class="st-q" onclick="skQty('${p.id}',-1)">−</button>
+        <span class="st-qn" id="skq_${p.id}">${qty}</span>
+        <button type="button" class="st-q" onclick="skQty('${p.id}',1)">+</button>
+        <span class="st-qlbl">قطعة</span>
+      </div>
+    </div>`;
+}
+
+function skPaintList(){
+  const tot  = document.getElementById('skTot');
+  const list = document.getElementById('skList');
+  if(!list) return;
+  const rows = skFiltered();
+  const pcs  = rows.reduce((t, p) => t + (Number(p.quantity) || 0), 0);
+  if(tot) tot.textContent = SK.loading ? 'بنجيب المخزن…' : `${rows.length} صنف · ${pcs} قطعة`;
+
+  // الكروت المحذوفة بتتحط تحت خالص — أثر بيختفي لوحده بعد ٣ أيام،
+  // مش جزء من المخزن. وبتتفلتر بنفس خانة البحث.
+  const q = skNorm(SK.q);
+  const ghosts = skGhosts().filter(l => !q || skNorm(l.part_name).includes(q));
+  const ghostBlock = ghosts.length
+    ? `<div class="rw-sep">🗑 اتمسح في آخر ٣ أيام</div>` + ghosts.map(skGhostHtml).join('')
+    : '';
+
+  list.innerHTML = SK.loading && !SK.rows.length
+    ? '<div class="rw-empty">لحظة…</div>'
+    : ((rows.length
+        ? rows.map(skCardHtml).join('')
+        : `<div class="rw-empty">${SK.q ? 'مفيش قطعة بالاسم ده' : 'المخزن فاضي — ضيف أول قطعة من فوق'}</div>`) + ghostBlock);
+}
+
+// ---------- إضافة قطعة ----------
+async function skAdd(){
+  const nEl = document.getElementById('skName');
+  const qEl = document.getElementById('skQty');
+  const bt  = document.getElementById('skAddBtn');
+  if(!nEl) return;
+  const name = (nEl.value || '').trim();
+  const qty  = Math.max(1, parseInt(qEl && qEl.value, 10) || 1);
+  if(!name){ toast('اكتب اسم القطعة الأول'); nEl.focus(); return; }
+  if(!navigator.onLine){ toast('مفيش نت — الإضافة محتاجة اتصال'); return; }
+  if(SK.busy) return;
+
+  // القطعة موجودة بنفس الاسم؟ نزوّد كميتها بدل ما نعمل صف مكرر.
+  // ⚠️ من غير كده المخزن بيمتلي «شاشة ايفون 11» أربع مرات وكل
+  //    واحدة بكمية لوحدها، ومحدش يعرف العدد الحقيقي.
+  const dup = SK.rows.find(p => skNorm(p.name) === skNorm(name));
+  if(dup){
+    if(!confirm(`«${dup.name}» موجودة بالفعل بكمية ${Number(dup.quantity) || 0}.\nنزوّدها ${qty}؟`)) return;
+    nEl.value = ''; if(qEl) qEl.value = 1;
+    skQtySet(dup.id, (Number(dup.quantity) || 0) + qty);
+    return;
+  }
+
+  SK.busy = true; if(bt){ bt.disabled = true; bt.textContent = '⏳ …'; }
+  try{
+    let uid = null;
+    try{ const { data:{ user } } = await sb.auth.getUser(); uid = user ? user.id : null; }catch(e){}
+    const { data, error } = await sb.from('spare_parts').insert({
+      name, quantity: qty,
+      unit_cost: 0, total_cost: 0,          // السعر شغل المحاسب
+      category: 'stored',
+      device_id: null, device_label: null,
+      created_by: uid,
+      created_by_name: ME || ''
+    }).select('id,name,quantity,unit_cost,total_cost,created_by,created_by_name,created_at').single();
+    if(error) throw error;
+    SK.rows.unshift(data);
+    nEl.value = ''; if(qEl) qEl.value = 1;
+    nEl.focus();
+    skPaintList();
+    toast('اتضافت للمخزن ✅');
+  }catch(e){
+    console.error('[الاستوك] فشل الإضافة:', e);
+    toast('مقدرناش نضيفها: ' + ((e && e.message) || ''));
+  }
+  SK.busy = false; if(bt){ bt.disabled = false; bt.textContent = '➕ ضيف'; }
+}
+
+// ---------- تعديل الكمية ----------
+// بنغيّر الرقم على الشاشة فوراً (عشان الدوس يحس بيه)، وبنبعت
+// للسيرفر بعد نص ثانية من آخر دوسة. لو السيرفر رفض، بنرجّع الرقم.
+function skQty(id, delta){
+  const p = SK.rows.find(x => x.id === id); if(!p) return;
+  const next = (Number(p.quantity) || 0) + delta;
+  if(next < 1){ toast('الكمية مبتنزلش عن ١ — لو خلصت امسحها 🗑'); return; }
+  skQtySet(id, next);
+}
+
+function skQtySet(id, next){
+  const p = SK.rows.find(x => x.id === id); if(!p) return;
+  p.quantity = next;
+  const el = document.getElementById('skq_' + id);
+  if(el) el.textContent = next; else skPaintList();
+  clearTimeout(SK_T[id]);
+  SK_T[id] = setTimeout(() => skQtyFlush(id), 500);
+}
+
+async function skQtyFlush(id){
+  const p = SK.rows.find(x => x.id === id); if(!p) return;
+  if(!navigator.onLine){ toast('مفيش نت — الكمية مااتحفظتش'); skLoad(); return; }
+  const qty  = Number(p.quantity) || 1;
+  const unit = Number(p.unit_cost) || 0;
+  const card = document.getElementById('skc_' + id);
+  if(card) card.classList.add('busy');
+  try{
+    const { error } = await sb.from('spare_parts')
+      .update({ quantity: qty, total_cost: +(qty * unit).toFixed(2) })
+      .eq('id', id);
+    if(error) throw error;
+    p.total_cost = +(qty * unit).toFixed(2);
+    skLoad();           // نرجّع نقرا الدفتر عشان سطر «كانت كام» يبان فوراً
+  }catch(e){
+    console.error('[الاستوك] فشل حفظ الكمية:', e);
+    toast('الكمية مااتحفظتش: ' + ((e && e.message) || ''));
+    await skLoad();                 // نرجّع الشاشة لحقيقة السيرفر
+  }
+  if(card) card.classList.remove('busy');
+  skPaintList();
+}
+
+// ---------- مسح قطعة ----------
+async function skDel(id){
+  const p = SK.rows.find(x => x.id === id); if(!p) return;
+  const price = Number(p.total_cost) || 0;
+  const warn = price
+    ? `\n\n⚠️ القطعة دي عليها سعر مسجّل (${skMoney(price)} ج.م) — يعني داخلة من فاتورة. متأكد؟`
+    : '';
+  if(!confirm(`تمسح «${p.name}» من المخزن؟\nهتتشال من مخزن قطع الغيار كمان.${warn}`)) return;
+  if(!navigator.onLine){ toast('مفيش نت — المسح محتاج اتصال'); return; }
+  const card = document.getElementById('skc_' + id);
+  if(card) card.classList.add('busy');
+  try{
+    const { error } = await sb.from('spare_parts').delete().eq('id', id);
+    if(error) throw error;
+    SK.rows = SK.rows.filter(x => x.id !== id);
+    skPaintList();
+    toast('اتمسحت 🗑');
+    skLoad();           // الدفتر بقى فيه سطر جديد — نجيبه عشان الكارت الرمادي يبان
+  }catch(e){
+    console.error('[الاستوك] فشل المسح:', e);
+    toast('مقدرناش نمسحها: ' + ((e && e.message) || ''));
+    if(card) card.classList.remove('busy');
   }
 }
 
