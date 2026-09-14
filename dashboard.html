@@ -158,6 +158,7 @@
     --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
     --rejected:#BE1D1D; --rejected-bg:#FEF2F2;
     --returned:#9333EA; --returned-bg:#F5EEFC;
+    --trashed:#64748B; --trashed-bg:#EEF1F3;
   }
 
   /* ===== الوضع الداكن ===== */
@@ -193,6 +194,7 @@
     --rejected_shop:#F472B6;    --rejected_shop-bg:rgba(244,114,182,.15);
     --rejected:#F87171;         --rejected-bg:rgba(248,113,113,.15);
     --returned:#C084FC;         --returned-bg:rgba(192,132,252,.15);
+    --trashed:#94A3B8;          --trashed-bg:rgba(148,163,184,.15);
   }
   *{box-sizing:border-box;}
   body{
@@ -626,6 +628,26 @@
     font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer;
     background:var(--surface); color:var(--ink-2); flex:none;}
   .spn-ok:hover{background:var(--surface-2);}
+
+  /* ===== 🗑 كارت المهملات ===== */
+  .tr-card{background:var(--surface); border:1px solid var(--border); border-inline-start:4px solid var(--trashed);
+    border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .tr-top{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px;}
+  .tr-name{font-family:'Cairo',sans-serif; font-weight:800; font-size:14.5px; color:var(--ink); line-height:1.5;}
+  .tr-left{font-size:11.5px; font-weight:800; white-space:nowrap; background:var(--trashed-bg);
+    color:var(--trashed); border-radius:999px; padding:3px 9px;}
+  .tr-left.soon{background:var(--danger-bg); color:var(--danger);}
+  .tr-meta{font-size:12.5px; color:var(--muted); line-height:1.8;}
+  .tr-meta b{color:var(--ink-2); font-weight:800;}
+  .tr-acts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .tr-btn{border:1px solid var(--border); background:var(--surface); color:var(--ink-2);
+    border-radius:9px; padding:9px 14px; font-family:'Tajawal',sans-serif; font-weight:800;
+    font-size:13px; cursor:pointer;}
+  .tr-btn:hover{background:var(--surface-2);}
+  .tr-btn.back{border-color:var(--success-border); color:var(--success);}
+  .tr-btn.kill{border-color:var(--danger-border); color:var(--danger);}
+  .tr-note{font-size:12px; color:var(--muted); background:var(--surface-2);
+    border:1px dashed var(--border); border-radius:10px; padding:10px 12px; margin-bottom:12px; line-height:1.8;}
   .card-tech{font-size:11px; color:var(--ink-2); margin-top:6px; display:flex; align-items:center; gap:4px;}
   .card-tech::before{content:"🔧"; font-size:10px;}
   .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
@@ -1844,6 +1866,7 @@ function applyRoleVisibility(){
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
   try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
   try{ loadPartsLog(); }catch(e){}   // 🧰 إشعار حركة الفنيين على المخزن (للمحاسب/الأدمن بس)
+  try{ loadTrash(); }catch(e){}      // 🗑 المهملات + المسح التلقائي بعد ٣٠ يوم
   // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
   // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
   try{ syncAccountMenu(); }catch(e){}
@@ -2221,6 +2244,7 @@ function startRealtimeSync(){
         devices = [row.data, ...devices.filter(d => d.id !== row.id)];
         devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
         lastSynced[row.id] = j;
+        splitTrash();          // حد تاني نقله للمهملات؟ يتفرز فوراً
         writeCache(); render();
         // الفني علّم "تم الصيانة" من صفحته → الترتيب اتغيّر → ننشره.
         // مؤجّل ٣ ثواني: التغييرات بتيجي ورا بعض، فمانكتبش مع كل واحد.
@@ -2313,6 +2337,21 @@ function effStatus(d){
 }
 const STORAGE_KEY = "repair-devices";
 let devices = [];
+
+// ============================================================
+// 🗑 المهملات
+// ------------------------------------------------------------
+// ⚠️ الأجهزة المحذوفة بتتشال من مصفوفة `devices` خالص وبتتحط في
+//    مصفوفة لوحدها. ليه؟ لأن `devices` بتتحسب فيها الإحصائيات
+//    والنقاط والتقارير والبحث في ٢٠ مكان. لو الجهاز المحذوف فضل
+//    فيها، كان لازم أضيف شرط "مش محذوف" في كل مكان منهم — وأي
+//    مكان أنساه = رقم غلط في تقرير. الفصل بيخلّي كل ده آمن لوحده.
+//
+// ⚠️ الحذف من السيرفر مبيحصلش: الجهاز بيفضل صف في devices_data
+//    بحالة 'trashed'. ده اللي بيخلّيه يرجع.
+// ============================================================
+let trashDevices = [];
+const TRASH_DAYS = 30;
 let selectedId = null;
 let currentColumn = null;
 
@@ -2595,7 +2634,30 @@ function reindexSearch(force){
   }catch(e){}
 }
 
+// بتفرز أي جهاز محذوف من `devices` وتنقله للمهملات.
+// ⚠️ بتتنادى من جوه sortDevices — ودي بتتنادى بعد كل تحميل وكل
+//    مزامنة، فالفرز بيحصل لوحده في كل الطرق من غير ما أنسى واحدة.
+function splitTrash(){
+  if(!Array.isArray(devices) || !devices.length) return;
+  const keep = [], moved = [];
+  for(const d of devices){ (d && d.status === 'trashed' ? moved : keep).push(d); }
+  if(!moved.length) return;
+  devices = keep;
+  const byId = new Map(trashDevices.map(d => [d.id, d]));
+  for(const d of moved){
+    byId.set(d.id, d);
+    // ⚠️⚠️ السطر ده حرج: persist() بتقارن lastSynced بـ devices،
+    //     وأي id موجود في lastSynced ومش موجود في devices بتعتبره
+    //     "اتمسح" وبتبعت DELETE للسيرفر. من غير السطر ده، أول حفظ
+    //     بعد النقل للمهملات كان هيمسح الجهاز من السيرفر نهائياً.
+    delete lastSynced[d.id];
+  }
+  trashDevices = Array.from(byId.values())
+    .sort((a, b) => new Date(b.trashedAt || 0) - new Date(a.trashedAt || 0));
+}
+
 function sortDevices(){
+  splitTrash();
   const ts = new Map();
   for(const d of devices) ts.set(d, Date.parse(d.intakeDate) || 0);
   devices.sort((a,b) => ts.get(b) - ts.get(a));
@@ -3193,8 +3255,65 @@ function partsLogPanelHtml(){
 
 function renderPartsLogPanel(){
   const host = document.getElementById('partsLogHost');
-  if(host) host.innerHTML = partsLogPanelHtml();
+  // اللوحتين في نفس الحاوية — كل واحدة بترجع فاضية لو مفيش عندها حاجة
+  if(host) host.innerHTML = partsLogPanelHtml() + trashPanelHtml();
 }
+
+// ============================================================
+// 🗑 إشعار: محاسب مسح جهاز
+// ------------------------------------------------------------
+// ⚠️ الشرط `trashedByRole === 'accountant'` هو كل الحكاية:
+//    الأدمن وهو فاتح شاشة المحاسب دوره لسه 'super_admin'،
+//    فحذفه مبيطلّعش إشعار. المحاسب الحقيقي بس.
+//
+// ⚠️ مفيش جدول ولا دفتر هنا — الخبر نفسه متخزّن جوه الجهاز
+//    (trashedBy / trashedAt / trashedByRole). يعني مستحيل يضيع.
+// ============================================================
+const TRASH_SEEN_KEY = 'ifix_trash_seen';
+
+function trashSeen(){
+  try{ return JSON.parse(localStorage.getItem(TRASH_SEEN_KEY) || '[]'); }catch(e){ return []; }
+}
+function trashMarkSeen(ids){
+  const live = new Set(trashDevices.map(d => d.id));
+  const next = trashSeen().filter(id => live.has(id)).concat(ids);
+  try{ localStorage.setItem(TRASH_SEEN_KEY, JSON.stringify([...new Set(next)])); }catch(e){}
+}
+
+function trashPending(){
+  const seen = new Set(trashSeen());
+  const since = Date.now() - SPL_DAYS * 86400000;
+  return trashDevices.filter(d =>
+    d.trashedByRole === 'accountant' &&
+    d.trashedAt && new Date(d.trashedAt).getTime() >= since &&
+    !seen.has(d.id)
+  );
+}
+
+function trashPanelHtml(){
+  if(!canSeeMoney()) return '';
+  const list = trashPending();
+  if(list.length === 0) return '';
+  const rows = list.map(d => `
+    <div class="spn-row del">
+      <div class="spn-info">
+        <div class="spn-t"><span class="spn-kind del">🗑 حذف جهاز</span>
+          <b>${esc(d.deviceType || '')} ${esc(d.model || '')}</b>${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">🧾 ${esc(d.trashedBy || 'محاسب')} · ${splAgoTxt(d.trashedAt)} ·
+          ${new Date(d.trashedAt).toLocaleString(getLocale())}</div>
+      </div>
+      <button class="spn-ok" onclick="trashDismiss('${d.id}')">✓ تمام</button>
+    </div>`).join('');
+  return `<div class="spn-panel" style="border-color:var(--danger-border);">
+    <div class="spn-head" style="color:var(--danger);">🗑 أجهزة اتنقلت للمهملات
+      <span class="spn-count" style="background:var(--danger);">${list.length}</span>
+      <button class="spn-clear" onclick="trashDismissAll()">تمام على الكل</button></div>
+    ${rows}
+  </div>`;
+}
+
+function trashDismiss(id){ trashMarkSeen([id]); renderPartsLogPanel(); }
+function trashDismissAll(){ trashMarkSeen(trashPending().map(d => d.id)); renderPartsLogPanel(); }
 
 function splDismiss(id){ splMarkSeen([id]); renderPartsLogPanel(); }
 function splDismissAll(){ splMarkSeen(splPending().map(r => r.id)); renderPartsLogPanel(); }
@@ -3234,8 +3353,13 @@ function refreshOpenOverlays(){
 
 function renderBoard(){
   const board = document.getElementById('board');
-  board.innerHTML = STATUSES.map(s => {
-    const count = devices.filter(d => effStatus(d) === s.key).length;
+  // خانة المهملات للمحاسب والأدمن بس — مش شغل مسؤول الحركة
+  board.innerHTML = STATUSES.filter(s => s.key !== 'trashed' || canSeeMoney()).map(s => {
+    // ⚠️ المهملات بتتعدّ من مصفوفتها هي — الأجهزة المحذوفة مش
+    //    موجودة في `devices` أصلاً، فـ effStatus مش هيلاقيها.
+    const count = (s.key === 'trashed')
+      ? trashDevices.length
+      : devices.filter(d => effStatus(d) === s.key).length;
     return `<button class="column" onclick="openColumn('${s.key}')">
       <div class="column-head">
         <span class="title" style="color:${accent(s.varname)}">${stLabel(s)}</span>
@@ -3389,8 +3513,13 @@ let colScrollAttached = false;
 function renderColumn(keepPos){
   const s = statusInfo(currentColumn);
   const q = document.getElementById('columnSearch').value.trim();
-  colFullList = devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q))
-                       .sort((a,b) => touchedAt(b) - touchedAt(a));
+  // المهملات بتتقرا من مصفوفتها، وبترتّب بالأحدث حذفاً
+  const isTrash = currentColumn === 'trashed';
+  colFullList = isTrash
+    ? trashDevices.filter(d => matchesSearch(d, q))
+                  .sort((a,b) => new Date(b.trashedAt||0) - new Date(a.trashedAt||0))
+    : devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q))
+             .sort((a,b) => touchedAt(b) - touchedAt(a));
   document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
 
@@ -3417,7 +3546,8 @@ function renderColumn(keepPos){
   const target = keepPos
     ? Math.min(colFullList.length, Math.max(COL_PAGE, prevShown))
     : Math.min(colFullList.length, COL_PAGE);
-  listEl.innerHTML = colFullList.slice(0, target).map(d => cardHtml(d, s)).join('');
+  listEl.innerHTML = (isTrash ? `<div class="tr-note">🗑 الأجهزة هنا بتتمسح نهائي لوحدها بعد ${TRASH_DAYS} يوم من تاريخ الحذف. قبل كده تقدر ترجّعها زي ما كانت.</div>` : '')
+    + colFullList.slice(0, target).map(d => isTrash ? trashCardHtml(d) : cardHtml(d, s)).join('');
   colShown = target;
   updateColMoreFooter();
 
@@ -5201,16 +5331,159 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   if(stDev){ if(!stDev.trackToken){ await ensureTrackToken(stDev.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
 
+// ============================================================
+// 🗑 حذف الجهاز = نقل للمهملات
+// ------------------------------------------------------------
+// ⚠️ مفيش مسح من السيرفر هنا خالص. الجهاز بيفضل صف في
+//    devices_data بحالة 'trashed' — ده اللي بيخلّيه يرجع.
+//    المسح الحقيقي بيحصل في مكانين بس:
+//      ١) purgeOldTrash بعد ٣٠ يوم — تلقائي
+//      ٢) purgeFromTrash — الأدمن بإيده
+// ============================================================
 async function deleteDevice(){
-  const delDev = devices.find(x => x.id === selectedId);
-  if(delDev && delDev.trackToken){ try{ sb.from('public_track').delete().eq('token', delDev.trackToken); }catch(e){} }
   const d = devices.find(x => x.id === selectedId);
-  const name = d ? `${d.deviceType} ${d.model} — ${d.customerName}` : 'الجهاز ده';
-  if(!confirm(t('msg.deleteDevice',{name:name}))) return;
-  devices = devices.filter(d => d.id !== selectedId);
+  if(!d) return;
+  const name = `${d.deviceType} ${d.model} — ${d.customerName}`;
+  if(!confirm(t('msg.trashDevice', { name: name, n: TRASH_DAYS }))) return;
+
+  // صفحة متابعة العميل بتتقفل فوراً — مش منطقي يفضل يتابع جهاز اتمسح.
+  // لو رجع من المهملات، التوكن بيتعمل من أول وجديد.
+  if(d.trackToken){ try{ await sb.from('public_track').delete().eq('token', d.trackToken); }catch(e){} }
+
+  const now = new Date().toISOString();
+  const trashed = { ...d,
+    status: 'trashed',
+    trashedFrom: d.status,          // الحالة اللي هيرجعلها
+    trashedAt: now,
+    trashedBy: currentUser.name,
+    // ⚠️ الدور وقت الحذف — ده اللي الإشعار بيتبني عليه.
+    //    الأدمن وهو فاتح شاشة المحاسب دوره لسه 'super_admin'،
+    //    فمفيش إشعار. المحاسب الحقيقي بس هو اللي بيطلّع إشعار.
+    trashedByRole: myRole(),
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(d.activityNotes || []),
+      { text: '🗑 الجهاز اتنقل للمهملات', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  };
+
+  devices = devices.map(x => x.id === selectedId ? trashed : x);
   closeDetail();
+  await persist();     // نرفع الحالة الجديدة للسيرفر الأول
+  splitTrash();        // وبعدين نشيله من القايمة الحية للمهملات
+  writeCache();
   render();
+}
+
+// ---------- كارت الجهاز جوه المهملات ----------
+function trashCardHtml(d){
+  const gone = d.trashedAt ? daysSince(d.trashedAt) : 0;
+  const left = Math.max(0, TRASH_DAYS - gone);
+  const soon = left <= 5;
+  const when = d.trashedAt ? new Date(d.trashedAt).toLocaleString(getLocale()) : '—';
+  const backLbl = (statusInfo(d.trashedFrom) ? stLabel(statusInfo(d.trashedFrom)) : '');
+  return `<div class="tr-card">
+    <div class="tr-top">
+      <div class="tr-name">${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <span class="tr-left ${soon ? 'soon' : ''}">${left === 0 ? 'هيتمسح دلوقتي' : 'باقي ' + left + ' يوم'}</span>
+    </div>
+    <div class="tr-meta">
+      🗑 مسحه <b>${esc(d.trashedBy || 'مش معروف')}</b> · ${when}
+      ${backLbl ? `<br>↩️ هيرجع لـ <b>${esc(backLbl)}</b>` : ''}
+      ${d.shopName ? `<br>🏪 ${esc(d.shopName)}` : ''}
+    </div>
+    <div class="tr-acts">
+      <button class="tr-btn back" onclick="restoreFromTrash('${d.id}')">↩️ رجّعه</button>
+      ${isSuperAdmin() ? `<button class="tr-btn kill" onclick="purgeFromTrash('${d.id}')">🗑 امسح نهائي</button>` : ''}
+    </div>
+  </div>`;
+}
+
+// ---------- الرجوع من المهملات ----------
+async function restoreFromTrash(id){
+  if(!canSeeMoney()) return;
+  const d = trashDevices.find(x => x.id === id);
+  if(!d) return;
+  const now = new Date().toISOString();
+  const back = { ...d,
+    status: d.trashedFrom || 'waiting',
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(d.activityNotes || []),
+      { text: '↩️ الجهاز رجع من المهملات', at: now, by: currentUser.name, role: currentRoleLabel() } ]
+  };
+  delete back.trashedAt; delete back.trashedBy; delete back.trashedByRole; delete back.trashedFrom;
+
+  trashDevices = trashDevices.filter(x => x.id !== id);
+  devices = [back, ...devices];
+  sortDevices();
   await persist();
+  // صفحة المتابعة اتشالت وقت الحذف — نعملها من جديد
+  try{
+    if(!back.trackToken) await ensureTrackToken(back.id);
+    syncTrack(devices.find(x => x.id === id));
+  }catch(e){}
+  writeCache();
+  render();
+  if(currentColumn) renderColumn(true);
+}
+
+// ---------- المسح النهائي بإيد الأدمن ----------
+async function purgeFromTrash(id){
+  // ⚠️ الحارس ده في الواجهة بس — الأمان الحقيقي في سياسات
+  //    قاعدة البيانات على devices_data. ده للوضوح مش للحماية.
+  if(!isSuperAdmin()){ alert('المسح النهائي للأدمن بس.'); return; }
+  const d = trashDevices.find(x => x.id === id);
+  if(!d) return;
+  const name = `${d.deviceType || ''} ${d.model || ''} — ${d.customerName || ''}`;
+  if(!confirm(t('msg.purgeDevice', { name: name }))) return;
+  try{
+    if(d.trackToken){ try{ await sb.from('public_track').delete().eq('token', d.trackToken); }catch(e){} }
+    const { error } = await sb.from('devices_data').delete().eq('id', id);
+    if(error) throw error;
+    trashDevices = trashDevices.filter(x => x.id !== id);
+    render();
+    if(currentColumn) renderColumn(true);
+  }catch(e){
+    alert('فشل المسح النهائي: ' + ((e && e.message) || ''));
+  }
+}
+
+// ---------- جلب المهملات من السيرفر ----------
+// ⚠️ الكاش المحلي بيتكتب من `devices` بس، والمهملات مش فيها —
+//    فلازم تتجاب من السيرفر لوحدها. الاستعلام على data->>status
+//    مباشرة، والنتيجة صغيرة (عشرات الصفوف مش آلاف).
+async function loadTrash(){
+  if(!canSeeMoney()) return;
+  try{
+    const { data, error } = await sb.from('devices_data')
+      .select('id,data').eq('data->>status', 'trashed').limit(2000);
+    if(error) throw error;
+    const byId = new Map(trashDevices.map(d => [d.id, d]));
+    for(const r of (data || [])) if(r && r.data) byId.set(r.id, r.data);
+    trashDevices = Array.from(byId.values())
+      .sort((a, b) => new Date(b.trashedAt || 0) - new Date(a.trashedAt || 0));
+  }catch(e){
+    console.error('[المهملات] فشل التحميل:', e);
+  }
+  await purgeOldTrash();
+  render();
+}
+
+// ---------- المسح النهائي التلقائي بعد ٣٠ يوم ----------
+// بيشتغل مع كل فتح للداشبورد. لو اتنفذ من جهازين في نفس الوقت،
+// التاني هيلاقي الصف اتمسح خلاص — ومفيش ضرر.
+async function purgeOldTrash(){
+  if(!canSeeMoney()) return;
+  const cut = Date.now() - TRASH_DAYS * 86400000;
+  const old = trashDevices.filter(d => d.trashedAt && new Date(d.trashedAt).getTime() < cut);
+  if(!old.length) return;
+  for(const d of old){
+    try{
+      if(d.trackToken){ try{ await sb.from('public_track').delete().eq('token', d.trackToken); }catch(e){} }
+      const { error } = await sb.from('devices_data').delete().eq('id', d.id);
+      if(error) throw error;
+      trashDevices = trashDevices.filter(x => x.id !== d.id);
+    }catch(e){ console.error('[المهملات] فشل المسح التلقائي:', e); }
+  }
+  console.log('[المهملات] اتمسح نهائي:', old.length, 'جهاز عدّى عليهم', TRASH_DAYS, 'يوم');
 }
 
 function formatDuration(ms){

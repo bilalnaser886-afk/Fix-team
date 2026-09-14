@@ -22,6 +22,11 @@ const STATUSES = [
   { key: "rejected_shop", label: "درج الرفض", labelKey:"status.rejected_shop", varname:"rejected_shop" },
   { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
   { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
+  // 🗑 المهملات — مش حالة شغل، دي سلة. الجهاز اللي بيتمسح بيقعد
+  // هنا ٣٠ يوم وبعدين بيتمسح نهائي لوحده.
+  // ⚠️ مقصود إنها مش في ACTION_STATUSES: مفيش زرار بيحوّل جهاز
+  //    للمهملات — الطريق الوحيد هو زرار «حذف الجهاز».
+  { key: "trashed", label: "المهملات", labelKey:"status.trashed", varname:"trashed" },
 ];
 
 // حالات الأزرار (الإجراءات)
