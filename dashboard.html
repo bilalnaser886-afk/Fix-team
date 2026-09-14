@@ -592,33 +592,40 @@
   /* نفس قياسات لوحة الاعتمادات بالظبط عشان الاتنين يقفوا تحت بعض
      متساويين — بس بلون أزرق مش أصفر: دي خبر، مش طلب محتاج قرار. */
   #partsLogHost:empty{display:none;}
-  .spn-panel{background:var(--surface); border:1px solid #93C5FD; border-radius:16px;
-    margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px rgba(37,99,235,.10);}
+  /* ⚠️ كل الألوان هنا متغيّرات ثيم — ولا لون واحد مكتوب بالإيد.
+     أول نسخة كانت فيها أزرق فاتح ثابت، فالخلفية فضلت فاتحة في
+     الثيم الداكن والكتابة (var(--ink)) بقت فاتحة عليها = مش
+     مقروءة خالص. المتغيّرات بتقلب لوحدها مع الثيم. */
+  .spn-panel{background:var(--surface); border:1px solid var(--info-border); border-radius:16px;
+    margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px var(--shadow);}
   .spn-head{display:flex; align-items:center; gap:8px; font-family:'Cairo',sans-serif;
-    font-weight:900; font-size:15px; color:#2563EB; margin-bottom:12px;}
-  .spn-count{background:#2563EB; color:#fff; font-family:'Tajawal',sans-serif; font-weight:800;
-    font-size:12px; min-width:22px; height:22px; border-radius:11px; display:inline-flex;
-    align-items:center; justify-content:center; padding:0 6px;}
+    font-weight:900; font-size:15px; color:var(--info); margin-bottom:12px;}
+  .spn-count{background:var(--info); color:var(--on-accent); font-family:'Tajawal',sans-serif;
+    font-weight:800; font-size:12px; min-width:22px; height:22px; border-radius:11px;
+    display:inline-flex; align-items:center; justify-content:center; padding:0 6px;}
   .spn-clear{margin-inline-start:auto; background:none; border:none; color:var(--ink-2);
     font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; cursor:pointer;}
   .spn-clear:hover{color:var(--ink);}
   .spn-row{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-    background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:11px 13px; margin-bottom:8px;}
+    background:var(--info-bg); border:1px solid var(--info-border); border-radius:12px;
+    padding:11px 13px; margin-bottom:8px;}
   .spn-row:last-child{margin-bottom:0;}
   .spn-row.del{background:var(--danger-bg); border-color:var(--danger-border);}
   .spn-info{flex:1; min-width:180px;}
   .spn-t{font-weight:800; font-size:14px; color:var(--ink); line-height:1.5;}
-  .spn-m{font-size:12px; color:#78716C; margin-top:3px; line-height:1.5;}
+  .spn-m{font-size:12px; color:var(--muted); margin-top:3px; line-height:1.5;}
+  /* الشارة بتقف على خلفية الصف الملوّنة — فخلفيتها لون السطح
+     نفسه عشان تفضل بارزة في الثيمين */
   .spn-kind{display:inline-block; font-size:11px; font-weight:800; border-radius:6px;
-    padding:2px 7px; margin-inline-end:6px; vertical-align:middle;}
-  .spn-kind.qty{background:#EAF1F8; color:#2B6CB0;}
-  .spn-kind.del{background:var(--danger-bg); color:var(--danger);}
-  .spn-was{color:#78716C; text-decoration:line-through; font-weight:800;}
-  .spn-now{color:#15803D; font-weight:900;}
-  .spn-ok{border:none; border-radius:9px; padding:9px 16px; font-family:'Tajawal',sans-serif;
-    font-weight:800; font-size:13.5px; cursor:pointer; background:var(--surface);
-    color:var(--ink-2); border:1px solid var(--border); flex:none;}
-  .spn-ok:hover{background:var(--surface-2,#F8FAFC);}
+    padding:2px 7px; margin-inline-end:6px; vertical-align:middle; background:var(--surface);}
+  .spn-kind.qty{color:var(--info);}
+  .spn-kind.del{color:var(--danger);}
+  .spn-was{color:var(--muted); text-decoration:line-through; font-weight:800;}
+  .spn-now{color:var(--success); font-weight:900;}
+  .spn-ok{border:1px solid var(--border); border-radius:9px; padding:9px 16px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer;
+    background:var(--surface); color:var(--ink-2); flex:none;}
+  .spn-ok:hover{background:var(--surface-2);}
   .card-tech{font-size:11px; color:var(--ink-2); margin-top:6px; display:flex; align-items:center; gap:4px;}
   .card-tech::before{content:"🔧"; font-size:10px;}
   .pay-badge{display:inline-block; margin-top:6px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;}
