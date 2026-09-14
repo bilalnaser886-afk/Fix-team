@@ -1655,8 +1655,80 @@
     tab: 'unallocated',
     list: [], loaded: false, q: '',
     adding: false, form: { name: '', quantity: 1, unit_cost: 0 },
-    allocId: null, allocQuery: ''
+    allocId: null, allocQuery: '',
+    log: []                                   // دفتر حركة آخر ٣ أيام
   };
+
+  // ============================================================
+  //  أثر الحركة — من جدول spare_parts_log
+  // ------------------------------------------------------------
+  //  الترايجر على السيرفر بيكتب سطر كل ما قطعة تتمسح أو كميتها
+  //  تتغيّر. الشاشة بتقرا آخر ٣ أيام بس وبتوري:
+  //    · القطعة المحذوفة ككارت رمادي مشطوب (مش بتختفي فجأة)
+  //    · الكمية القديمة جنب الجديدة ومين عدّلها
+  //  بعد ٣ أيام بيختفي الأثر لوحده — الدفتر نفسه بيفضل في القاعدة.
+  // ============================================================
+  const SPL_DAYS = 3;
+
+  function splAgo(iso) {
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!(ms >= 0)) return '';
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return 'دلوقتي';
+    if (m < 60) return 'من ' + m + ' دقيقة';
+    const h = Math.floor(m / 60);
+    if (h < 24) return 'من ' + h + ' ساعة';
+    const d = Math.floor(h / 24);
+    return d === 1 ? 'من يوم' : 'من ' + d + ' أيام';
+  }
+
+  // آخر تعديل كمية للقطعة دي (أو null)
+  function splLastQty(partId) {
+    return IS.log.find(l => l.action === 'qty' && l.part_id === partId) || null;
+  }
+
+  // سطر «الكمية كانت كام» تحت اسم القطعة
+  function splTraceHtml(p) {
+    const l = splLastQty(p.id);
+    if (!l) return '';
+    return `<div class="spl-trace">✏️ الكمية كانت <span class="spl-was">${Number(l.old_qty) || 0}</span>
+      وبقت <span class="spl-now">${Number(l.new_qty) || 0}</span> —
+      <span class="spl-who">${esc(l.by_name || 'مش معروف')}</span> · ${splAgo(l.at)}</div>`;
+  }
+
+  // القطع اللي اتمسحت من التبويب ده جوه الـ ٣ أيام ولسه مش موجودة
+  function splGhosts(tab) {
+    const live = new Set(IS.list.map(p => p.id));
+    const seen = new Set();
+    const q = String(IS.q || '').trim().toLowerCase();
+    return IS.log.filter(l => {
+      if (l.action !== 'delete') return false;
+      if (l.category !== tab) return false;
+      if (l.part_id && live.has(l.part_id)) return false;
+      if (l.part_id) { if (seen.has(l.part_id)) return false; seen.add(l.part_id); }
+      if (q && !String(l.part_name || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  function splGhostHtml(l) {
+    const qty = (l.old_qty == null) ? '' : `${Number(l.old_qty) || 0} قطعة`;
+    return `<div class="inv-card gone">
+      <div class="inv-card-top">
+        <div class="inv-card-name">${esc(l.part_name || 'قطعة')}</div>
+        <div class="inv-card-cost" style="color:var(--muted,#64748B);">${qty}</div>
+      </div>
+      <div class="spl-trace del">🗑 <b>اتمسحت</b> —
+        <span class="spl-who">${esc(l.by_name || 'مش معروف')}</span> · ${splAgo(l.at)}</div>
+    </div>`;
+  }
+
+  // بلوك المحذوفات تحت القايمة (فاضي لو مفيش)
+  function splGhostBlock(tab) {
+    const g = splGhosts(tab);
+    if (!g.length) return '';
+    return `<div class="spl-sep">🗑 اتمسح في آخر ${SPL_DAYS} أيام</div>` + g.map(splGhostHtml).join('');
+  }
 
   // حالة قطع الغيار المعروضة جوه شاشة الجهاز (كاش لكل جهاز)
   // openId = الجهاز المفتوح حالياً (بنمسكه بنفسنا لأن selectedId في dashboard
@@ -1783,6 +1855,19 @@
     margin-bottom:8px; font-family:inherit; font-size:13.5px; color:var(--ink,#1A2332); cursor:pointer; font-weight:700;}
   .dp-pick-opt:hover{background:var(--surface-3,#F0F9FB); border-color:var(--accent,#0891A8);}
   .dp-pick-cost{font-family:'Cairo',sans-serif; font-weight:800; color:var(--warn,#B45309); white-space:nowrap;}
+
+  /* ===== أثر آخر ٣ أيام (من spare_parts_log) ===== */
+  .spl-sep{font-size:12.5px; font-weight:800; color:var(--muted,#64748B); margin:16px 2px 8px;
+    display:flex; align-items:center; gap:8px;}
+  .spl-sep::after{content:""; flex:1; height:1px; background:var(--border,#E2E8F0);}
+  .inv-card.gone{border-style:dashed; background:none; opacity:.85;}
+  .inv-card.gone .inv-card-name{text-decoration:line-through; color:var(--muted,#64748B);}
+  .spl-trace{margin-top:8px; padding:7px 10px; border-radius:9px; font-size:12px; line-height:1.8;
+    background:var(--surface-2,#F8FAFC); border:1px solid var(--border,#E2E8F0); color:var(--ink-2,#475569);}
+  .spl-trace.del{color:var(--danger,#DC2626); border-color:var(--danger-border,#FECACA); background:none;}
+  .spl-was{color:var(--muted,#64748B); text-decoration:line-through; font-weight:800;}
+  .spl-now{color:var(--success,#15803D); font-weight:900;}
+  .spl-who{font-weight:800;}
   `;
     document.head.appendChild(s);
   }
@@ -1882,6 +1967,7 @@
         <div class="inv-card-cost"${noPrice ? ' style="color:#B45309;"' : ''}>${noPrice ? 'من غير سعر' : money(p.total_cost) + ' ج.م'}</div>
       </div>
       <div class="inv-card-meta">${meta.join(' — ')}</div>
+      ${splTraceHtml(p)}
       <div class="inv-actions">
         <button class="inv-btn" onclick="INV.editCost('${esc(p.id)}')">${noPrice ? '💰 اكتب السعر' : '✏️ عدّل السعر'}</button>
         ${actions}</div>
@@ -1902,7 +1988,8 @@
     const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
       : IS.tab === 'supplies' ? 'inv.emptySupplies'
       : IS.tab === 'stored' ? 'inv.emptyStored' : 'inv.emptyUnallocated';
-    const list = rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`;
+    const list = (rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`)
+      + splGhostBlock(IS.tab);
 
     // الإضافة اليدوية متاحة في المخزن العام واللوازم بس (الموجه بيتربط من الجهاز)
     const add = IS.tab === 'allocated' ? '' : invAddHtml();
@@ -1929,7 +2016,8 @@
     const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
       : IS.tab === 'supplies' ? 'inv.emptySupplies'
       : IS.tab === 'stored' ? 'inv.emptyStored' : 'inv.emptyUnallocated';
-    return rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`;
+    return (rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`)
+      + splGhostBlock(IS.tab);
   }
 
   function invRender() {
@@ -2066,12 +2154,22 @@
     },
 
     async loadParts() {
+      const since = new Date(Date.now() - SPL_DAYS * 86400000).toISOString();
       try {
         const { data, error } = await sb.from(CFG.partsTable).select('*')
           .order('created_at', { ascending: false }).limit(3000);
         if (error) throw error;
         IS.list = data || []; IS.loaded = true;
       } catch (e) { IS.list = []; }
+      // الدفتر مش حرج — لو فشل (مثلاً الميجريشن لسه ما اتشغّلش)،
+      // المخزن بيشتغل عادي من غير أثر بدل ما الشاشة كلها تقع.
+      try {
+        const { data, error } = await sb.from('spare_parts_log')
+          .select('id,part_id,part_name,category,action,old_qty,new_qty,by_name,by_role,at')
+          .gte('at', since).order('at', { ascending: false }).limit(400);
+        if (error) throw error;
+        IS.log = data || [];
+      } catch (e) { IS.log = []; console.error('[المخزن] الدفتر فشل:', e); }
       if (isInvOpen()) invRender();
     },
 
