@@ -42,9 +42,12 @@ let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
+// ⚠️ wd_* = المسحوبات (فلوس الموظف أخدها مقدّم) — دي **مش** خصم.
+//    الاتنين بيقلّلوا الصافي، بس الخصم عقوبة والمسحوبات فلوسه هو.
+//    دمجهم في رقم واحد بيخلّي الموظف يعترض على حاجة مالهاش لزمة.
 const PAY_EMPTY = { total_all:0, total_month:0, unseen_count:0, unseen_amount:0,
                     salary:0, has_salary:false, late_month:0, late_all:0,
-                    late_unseen_count:0, net_month:0 };
+                    late_unseen_count:0, net_month:0, wd_month:0, wd_all:0 };
 let _payTotals = Object.assign({}, PAY_EMPTY);
 let _payErr    = '';
 let _payBusy   = false;
@@ -394,6 +397,9 @@ function paySlipCard(p, big){
     <div class="pay-calc">
       <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
       <div><span>− خصومات يدوية</span><b class="minus">${payMoney(p.manual_ded)}</b></div>
+      ${Number(p.withdraw_ded) ? `<div><span>− مسحوبات
+        <small style="opacity:.75;">فلوس خدتها مقدّم</small></span>
+        <b class="minus">${payMoney(p.withdraw_ded)}</b></div>` : ''}
       <div><span>− خصومات تأخير</span><b class="minus">${payMoney(p.late_ded)}</b></div>
       ${paySlipOvertime(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
@@ -420,6 +426,8 @@ function payPaidSlipCard(p){
       <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
       <div><span>− الخصومات</span><b class="minus">${payMoney(
         Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>
+      ${Number(p.withdraw_ded) ? `<div><span>− مسحوبات</span>
+        <b class="minus">${payMoney(p.withdraw_ded)}</b></div>` : ''}
       ${Number(p.overtime_amt) ? `<div><span>${
         Number(p.overtime_amt) >= 0 ? '+ أوفر تايم' : '− عجز ساعات'}</span>
         <b style="color:${Number(p.overtime_amt) >= 0 ? 'var(--p-green)' : 'var(--p-red)'}">${
