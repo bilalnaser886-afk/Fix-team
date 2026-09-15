@@ -607,6 +607,11 @@ function _payHm(mins){
 
 function payCard(r){
   const isNew = !r.seen_at;
+  // ⚠️ مبلغ بالسالب = سداد: الموظف رجّع فلوس، فمسحوباته قلّت.
+  //    بنعرضه بعلامة + وبلون مختلف، ومبنعرضش «− -200» —
+  //    الإشارتين ورا بعض بتخلّي الموظف يحسب بدل ما يقرا.
+  const isBack = Number(r.amount) < 0;
+  const amtTxt = (isBack ? '+ ' : '− ') + payMoney(Math.abs(Number(r.amount) || 0));
   const d = new Date(r.created_at).toLocaleDateString('ar-EG',
     { weekday:'long', day:'numeric', month:'long' });
   const t = new Date(r.created_at).toLocaleTimeString('ar-EG',
@@ -614,7 +619,7 @@ function payCard(r){
   return `
   <div class="pay-card${isNew ? ' new' : ''}">
     <div class="pay-card-top">
-      <div class="pay-amt">− ${payMoney(r.amount)} <small>ج.م</small></div>
+      <div class="pay-amt"${isBack ? ' style="color:var(--done);"' : ''}>${amtTxt} <small>ج.م</small></div>
       <div class="pay-when">${_payEsc(d)}<br><span>${_payEsc(t)}</span></div>
     </div>
     <div class="pay-why"><b>السبب:</b> ${_payEsc(r.reason)}</div>
