@@ -2184,6 +2184,9 @@ function slipCard(r){
     <div class="slip-lines">
       <div><span>المرتب</span><b>${n(r.salary)}</b></div>
       <div><span>− خصومات يدوية</span><b class="minus">${n(r.manual_ded)}</b></div>
+      ${Number(r.withdraw_ded) ? `<div><span>− مسحوبات
+        <small style="opacity:.75;">من ملف الإكسل</small></span>
+        <b class="minus">${n(r.withdraw_ded)}</b></div>` : ''}
       <div><span>− خصومات تأخير</span><b class="minus">${n(r.late_ded)}</b></div>
       ${slipOvertimeLines(r)}
       <div class="eq"><span>= الصافي</span><b>${n(r.net)} ج.م</b></div>
