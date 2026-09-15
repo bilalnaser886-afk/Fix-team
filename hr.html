@@ -279,6 +279,7 @@
     <button class="icon-btn" title="القايمة" onclick="toggleMenu(event)">⋮</button>
     <div class="menu-drop" id="menuDrop">
       <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
+      <button onclick="closeMenu(); openExcelW()">🔩 مسحوبات الإكسل</button>
       <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
       <button onclick="closeMenu(); openGeneral()">⚙️ الإعدادات العامة</button>
       <hr>
@@ -359,6 +360,19 @@
             onclick="closeSheet('dedSheet')">×</button>
   </div>
   <div class="sheet-body" id="dedBody"></div>
+</div>
+
+<!-- ===== 🔩 مسحوبات الإكسل ===== -->
+<!-- ⚠️ الشاشة دي **مبتسجّلش خصومات**. هي بتربط الأسماء بس.
+     التسجيل بيحصل لما الإكسل يبعت — عشان يفضل فيه طريق واحد
+     للفلوس، مش اتنين ممكن يختلفوا. -->
+<div class="sheet" id="exwSheet" style="z-index:58;">
+  <div class="sheet-head">
+    <h2>🔩 مسحوبات الإكسل</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('exwSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="exwBody"></div>
 </div>
 
 <!-- ===== 🏖️ مراجعة الغياب ===== -->
@@ -3017,6 +3031,165 @@ const STATE_LBL = {
   backup: { t:'المعاد الاحتياطي', c:'var(--waiting)' },
   late:   { t:'متأخر', c:'var(--red)' }
 };
+
+// ============================================================
+// 🔩 مسحوبات الإكسل — ربط الأسماء
+// ------------------------------------------------------------
+// ملف الإكسل بيبعت أسماء زي «كريم» و«ميدو». النظام عنده إيميلات.
+// الشاشة دي هي اللي بتقول للنظام: «كريم ده هو فلان».
+//
+// 🔴 قاعدة أساسية: **مفيش اسم بيتخصم منه غير لو إنسان ربطه.**
+//    قفلنا المطابقة الأوتوماتيكية بالاسم عن قصد — «عمر» ممكن
+//    يبقى أي عمر، والخصم اللي بيروح لواحد شبهه غلط شكله سليم،
+//    وده أصعب غلط يتكتشف.
+//
+// 🔴 والشاشة دي **مبتسجّلش خصومات ولا بتمسحها**. بتربط بس.
+//    التسجيل بيحصل لما الإكسل يبعت. السبب: يفضل فيه طريق واحد
+//    بيحرّك الفلوس (hr_excel_sync) — لو عملنا تاني، الاتنين
+//    هيختلفوا في يوم من الأيام ومحدش هيعرف مين الصح.
+//
+// ⚠️ استثناء واحد: فك الربط بيشيل الخصومات اللي طلعت من الاسم ده،
+//    ماعدا الشهور اللي اتصرفت خلاص — دي مبتتلمسش.
+// ============================================================
+let EXW = { pending: [], linked: [], busy: false };
+
+async function openExcelW(){
+  const box = document.getElementById('exwBody');
+  if(box) box.innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('exwSheet');
+  await loadExcelW();
+  renderExcelW();
+}
+
+async function loadExcelW(){
+  EXW.pending = []; EXW.linked = [];
+  try{
+    const [p, l] = await Promise.all([
+      sb.rpc('hr_excel_pending', { p_month: null }),
+      sb.rpc('hr_excel_linked',  { p_month: null })
+    ]);
+    if(p.error) throw p.error;
+    if(l.error) throw l.error;
+    EXW.pending = p.data || [];
+    EXW.linked  = l.data || [];
+  }catch(e){
+    // بنقول بصوت عالي — الشاشة الفاضية هنا معناها «مفيش أسماء واقفة»
+    // وهي حاجة مطمّنة بالغلط
+    console.error('loadExcelW failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    const box = document.getElementById('exwBody');
+    if(box) box.innerHTML =
+      '<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">' +
+      (/does not exist|42883|42P01/i.test(t)
+        ? '❌ الميزة لسه ماتركبتش — شغّل ملفات 46 SQL'
+        : '❌ مقدرناش نقرا البيانات: ' + esc(t)) + '</div>';
+    throw e;
+  }
+}
+
+function exwMoney(n){ return Number(n || 0).toLocaleString('ar-EG'); }
+
+function renderExcelW(){
+  const box = document.getElementById('exwBody');
+  if(!box) return;
+
+  const people = allPeople();
+  const opts = people.map(e =>
+    `<option value="${esc(e)}">${esc(nameOf(e))}</option>`).join('');
+
+  const pend = EXW.pending.map((r, i) => `
+    <div class="ded-row" style="flex-wrap:wrap; border-color:var(--waiting);">
+      <div class="ded-amt" style="color:var(--waiting);">${exwMoney(r.total)}</div>
+      <div class="ded-mid">
+        <b>${esc(r.raw_name)}</b>
+        <span>${r.rows_cnt} سحبة · ${esc(r.months || '')}</span>
+      </div>
+      <div style="flex-basis:100%; display:flex; gap:7px; margin-top:9px;">
+        <select id="exwSel${i}" style="flex:1; min-width:0; border:1px solid var(--border);
+          background:var(--surface-2); color:var(--ink); border-radius:10px;
+          padding:10px; font-family:inherit; font-size:13.5px;">
+          <option value="">— اختار الموظف —</option>
+          ${opts}
+        </select>
+        <button class="mini-btn" style="flex:none; padding:10px 15px;"
+                onclick="exwLink('${esc(r.raw_name)}', ${i})">🔗 اربط</button>
+      </div>
+    </div>`).join('');
+
+  const lnk = EXW.linked.map(r => `
+    <div class="ded-row">
+      <div class="ded-amt" style="color:var(--done);">${exwMoney(r.total)}</div>
+      <div class="ded-mid">
+        <b>${esc(r.raw_name)} ← ${esc(nameOf(r.user_email))}</b>
+        <span>${r.rows_cnt} سحبة · ${esc(r.user_email)}</span>
+      </div>
+      <button class="ded-del" title="فك الربط"
+              onclick="exwUnmap('${esc(r.raw_name)}')">✖</button>
+    </div>`).join('');
+
+  box.innerHTML = `
+    <div class="hintbox">
+      🔩 الأسماء اللي في ملف الإكسل لازم تقول للنظام هي مين.
+      <b>أي اسم مش مربوط، مبيتخصمش من حد</b> — بيقف ويستنى.
+      <br><br>
+      ⚠️ الربط لوحده مبيسجّلش الخصم. بعد ما تربط، <b>احفظ ملف الإكسل
+      تاني</b> (أو شغّل IFix_Send) والخصومات تتسجّل لوحدها.
+    </div>
+
+    <div style="font-weight:900; font-size:13.5px; margin:4px 0 10px; color:var(--waiting);">
+      ⏳ مستنية ربط (${EXW.pending.length})</div>
+    ${EXW.pending.length ? pend
+      : '<div class="empty" style="padding:18px;">مفيش أسماء واقفة ✅</div>'}
+
+    <div style="font-weight:900; font-size:13.5px; margin:20px 0 10px; color:var(--done);">
+      ✅ مربوطة ومتخصومة (${EXW.linked.length})</div>
+    ${EXW.linked.length ? lnk
+      : '<div class="empty" style="padding:18px;">لسه مفيش</div>'}`;
+}
+
+async function exwLink(alias, idx){
+  if(EXW.busy) return;
+  const sel = document.getElementById('exwSel' + idx);
+  const email = sel ? sel.value : '';
+  if(!email){ alert('اختار الموظف الأول'); return; }
+
+  // ⚠️ تأكيد بالاسم الكامل — الربط الغلط بيخصم من الغلطان،
+  //    وبيفضل غلط لحد ما حد ياخد باله
+  if(!confirm('هتربط «' + alias + '» اللي في الإكسل بـ:\n' +
+              nameOf(email) + '\n(' + email + ')\n\nمتأكد إنه هو؟')) return;
+
+  EXW.busy = true;
+  try{
+    const { error } = await sb.rpc('hr_excel_map_name',
+      { p_alias: alias, p_email: email });
+    if(error) throw error;
+    await loadExcelW();
+    renderExcelW();
+    alert('اتربط ✅\n\nدلوقتي احفظ ملف الإكسل تاني عشان الخصومات تتسجّل.');
+  }catch(e){
+    alert('❌ ' + (e.message || e));
+  }finally{ EXW.busy = false; }
+}
+
+async function exwUnmap(alias){
+  if(EXW.busy) return;
+  if(!confirm('هتفك ربط «' + alias + '»؟\n\n' +
+              'الخصومات اللي طلعت منه هتتشال — ماعدا الشهور اللي ' +
+              'اتصرفت خلاص، دي هتفضل زي ما هي.')) return;
+
+  EXW.busy = true;
+  try{
+    const { data, error } = await sb.rpc('hr_excel_unmap_name', { p_alias: alias });
+    if(error) throw error;
+    await loadExcelW();
+    renderExcelW();
+    const d = data || {};
+    alert('اتفك ✅\n\nخصومات اتشالت: ' + (d.unlinked || 0) +
+          '\nفضلت (شهور اتصرفت): ' + (d.kept_paid || 0));
+  }catch(e){
+    alert('❌ ' + (e.message || e));
+  }finally{ EXW.busy = false; }
+}
 </script>
 </body>
 </html>
