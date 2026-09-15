@@ -2535,13 +2535,20 @@ function pendingCount(){
 function updateOfflineBar(){
   let bar = document.getElementById('offlineBar');
   const n = pendingCount();
-  const show = offlineMode || n > 0 || (typeof lastLoadError !== 'undefined' && !!lastLoadError);
+  const show = offlineMode || n > 0 || (typeof lastLoadError !== 'undefined' && !!lastLoadError)
+    || (typeof lastSaveError !== 'undefined' && !!lastSaveError);
   if(!show){ if(bar) bar.remove(); return; }
   if(!bar){
     bar = document.createElement('div');
     bar.id = 'offlineBar';
     bar.className = 'offline-bar';
     document.body.appendChild(bar);
+  }
+  // السيرفر رفض الحفظ (مش مشكلة نت) — نعرض السبب الحقيقي بالأحمر
+  if(typeof lastSaveError !== 'undefined' && lastSaveError){
+    bar.textContent = `⚠️ السيرفر رفض الحفظ${n ? ` (${n} تعديل مستني)` : ''}: ` + lastSaveError;
+    bar.style.background = '#B91C1C';
+    return;
   }
   // فيه سبب فشل محدد؟ نعرضه — أنفع بكتير من "مفيش نت" لما النت شغال
   if(typeof lastLoadError !== 'undefined' && lastLoadError){
@@ -2565,6 +2572,40 @@ function exitOfflineMode(){
 
 // آخر سبب فشل — بيظهر في الشريط عشان المستخدم يعرف المشكلة الحقيقية
 let lastLoadError = '';
+// آخر سبب رفض من السيرفر وقت الحفظ (صلاحيات/اشتراك/ترايجر...) — مش مشكلة نت
+let lastSaveError = '';
+
+// هل الغلطة دي "النت فاصل" ولا "السيرفر رد وقال لأ"؟
+// Supabase لما النت يقع بيرجّع رسالة زي Failed to fetch من غير code.
+// لما السيرفر نفسه يرفض بيرجّع code (زي 42501 للصلاحيات).
+function isNetworkError(e){
+  if(!isOnline()) return true;
+  if(!e) return false;
+  if(e.code && !/^(ECONN|ETIMEDOUT)/.test(String(e.code))) return false;
+  const m = String(e.message || e.details || e || '');
+  return /Failed to fetch|NetworkError|Load failed|network|fetch failed|اتأخر أكتر من/i.test(m);
+}
+// نص واضح للغلطة: الرسالة + الكود + التلميح
+function describeError(e){
+  if(!e) return 'خطأ غير معروف';
+  const parts = [e.message || String(e)];
+  if(e.code) parts.push('كود ' + e.code);
+  if(e.hint) parts.push(e.hint);
+  if(e.details && e.details !== e.message) parts.push(e.details);
+  return parts.filter(Boolean).join(' — ');
+}
+// بيقرر نعمل إيه لما الحفظ يفشل
+function handleSaveFailure(e, where){
+  console.error('فشل ' + where + ':', e);
+  if(isNetworkError(e)){
+    lastSaveError = '';
+    enterOfflineMode();
+  } else {
+    lastSaveError = describeError(e);
+    offlineMode = false;   // النت شغال — مش هنقول «أوفلاين» ونكدب
+    updateOfflineBar();
+  }
+}
 
 // ============================================================
 // تحميل الأجهزة — مزامنة تزايدية
@@ -2799,28 +2840,36 @@ async function persist(){
 
   try{
     if(changed.length){
-      const { error } = await sb.from('devices_data').upsert(
+      const { error } = await withTimeout(sb.from('devices_data').upsert(
         changed.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
-      );
+      ), 20000, 'حفظ التعديل');
       if(error) throw error;
     }
     for(const id of removed){
-      await sb.from('devices_data').delete().eq('id', id);
+      const { error } = await withTimeout(sb.from('devices_data').delete().eq('id', id), 20000, 'حذف جهاز');
+      if(error) throw error;
     }
     changed.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
     removed.forEach(id => { delete lastSynced[id]; });
+    if(lastSaveError){ lastSaveError = ''; updateOfflineBar(); }
   }catch(e){
-    // فشل الحفظ = نعامله كأوفلاين: التعديل ميضيعش أبداً
+    // التعديل ميضيعش أبداً — بيستنى في الطابور في الحالتين.
+    // بس بنفرّق: نت فاصل (برتقاني) ولا السيرفر رفض (أحمر بالسبب الحقيقي)
     queueOps(changed, removed);
-    enterOfflineMode();
+    handleSaveFailure(e, 'الحفظ');
   }finally{
     setSaving(false);
   }
 }
 
 // رفع الطابور المعلّق أول ما النت يرجع
+let _flushing = false;   // منع تشغيل الرفع مرتين في نفس الوقت (المؤقت + رجوع النت)
 async function flushQueue(){
-  if(!isOnline()) return;
+  if(!isOnline() || _flushing) return;
+  _flushing = true;
+  try{ await _flushQueueInner(); } finally { _flushing = false; }
+}
+async function _flushQueueInner(){
   const q = readQueue();
   const ups = Object.values(q.upserts);
   if(!ups.length && !q.deletes.length){
@@ -2829,20 +2878,26 @@ async function flushQueue(){
   }
   try{
     if(ups.length){
-      const { error } = await sb.from('devices_data').upsert(
+      const { error } = await withTimeout(sb.from('devices_data').upsert(
         ups.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
-      );
+      ), 30000, 'رفع التعديلات المعلّقة');
       if(error) throw error;
     }
     for(const id of q.deletes){
-      await sb.from('devices_data').delete().eq('id', id);
+      const { error } = await withTimeout(sb.from('devices_data').delete().eq('id', id), 20000, 'حذف جهاز');
+      if(error) throw error;
     }
     writeQueue({upserts:{}, deletes:[]});
+    ups.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
+    lastSaveError = '';
     exitOfflineMode();
     // نحدّث صفحات متابعة الأجهزة اللي اترفعت
     ups.forEach(d => { if(d.trackToken) syncTrack(d); });
     await loadDevices();   // نجيب أحدث نسخة من السيرفر (فيها شغل باقي الموظفين)
-  }catch(e){ /* لسه مفيش نت فعلي — هنحاول تاني */ }
+  }catch(e){
+    // قبل كده كانت الغلطة بتتبلع هنا — دلوقتي بتظهر لو مش مشكلة نت
+    handleSaveFailure(e, 'رفع المعلّق');
+  }
 }
 if(typeof window !== 'undefined'){
   window.addEventListener('online', () => setTimeout(flushQueue, 1500));
