@@ -173,8 +173,20 @@ function accEntryHtml(e){
     </div>`;
   }
   // debit (جهاز آجل)
+  // العطل واللون بيبانوا تحت اسم الجهاز على طول — المحل بيسأل
+  // عليهم كل شوية، وقبل كده كان لازم يفتح الكشف كـ PDF عشان يشوف
+  // العطل، واللون مكانش بيبان خالص.
+  const issue = stmtIssue(e);
+  const color = stmtColor(e);
+  const bits = [];
+  if(issue) bits.push(`⚠️ ${esc(issue)}`);
+  if(color) bits.push(`🎨 ${esc(color)}`);
+  const extra = bits.length
+    ? `<div class="acc-entry-meta" style="color:var(--ink-2);">${bits.join(' <span style="opacity:.5;">·</span> ')}</div>`
+    : '';
   return `<div class="acc-entry">
     <div><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
+      ${extra}
       <div class="acc-entry-meta">${new Date(e.date).toLocaleString(accLocale())} — ${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
     <div style="text-align:left;"><div style="font-weight:800; color:var(--warn);">+ ${amt} ج.م</div>
       ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ ${t('acc.moveShop')}</button>` : ''}</div>
@@ -396,6 +408,19 @@ function stmtDate(e){
   return e && e.date;
 }
 
+// 🎨 لون الجهاز في كشف الحساب.
+// نفس منطق stmtIssue بالظبط: القيود الجديدة ممكن تحفظه جواها،
+// والقديمة بنجيبه من الجهاز نفسه. والحركات اللي مش أجهزة
+// (دفعة/خصم/رصيد افتتاحي) مالهاش لون.
+// ⚠️ اللون مهم للمحل عشان يفرّق بين جهازين نفس الموديل لنفس
+//    العميل — «ايفون ١٤ أسود» و«ايفون ١٤ أبيض».
+function stmtColor(e){
+  if(e.type !== 'debit') return '';
+  if(e.color) return String(e.color).trim();
+  const d = accDevices().find(x => x.id === e.deviceId);
+  return (d && d.deviceColor) ? String(d.deviceColor).trim() : '';
+}
+
 function stmtIssue(e){
   if(e.type !== 'debit') return '';
   if(e.issue) return e.issue;
@@ -471,11 +496,13 @@ function exportShopPdf(shop){
   const { entries, debit, credit, balance } = shopStatementRows(shop);
   const rowsHtml = entries.map((e,i) => {
     const issue = stmtIssue(e);
+    const color = stmtColor(e);
     return `
     <tr style="background:${i%2 ? '#F8FAFC' : '#FFFFFF'};">
       <td>${new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
+      <td style="color:#475569;">${color ? esc(color) : '—'}</td>
       <td style="color:#B45309; font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
       <td style="color:#16A34A; font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
     </tr>`;
@@ -500,7 +527,7 @@ function exportShopPdf(shop){
     th{background:#101014; color:#fff; padding:11px 8px; font-size:13px;}
     td{padding:10px 8px; border-bottom:1px solid #E5E7EB; text-align:center;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
-    /* الجدول بقى خمسة أعمدة — الأفقي بيدي مساحة أريح للعطل */
+    /* الجدول بقى ستة أعمدة (العطل + اللون) — الأفقي ضروري */
     @page{ size:A4 landscape; margin:10mm; }
     @media print{ body{padding:12px;} }
   </style></head><body>
@@ -514,8 +541,8 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:20%;">تاريخ التسليم</th><th style="width:32%;">البيان</th><th style="width:24%;">العطل</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
-      ${rowsHtml || '<tr><td colspan="5">مفيش حركات متسجلة</td></tr>'}
+      <tr><th style="width:18%;">تاريخ التسليم</th><th style="width:28%;">البيان</th><th style="width:22%;">العطل</th><th style="width:10%;">اللون</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      ${rowsHtml || '<tr><td colspan="6">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
   </body></html>`, 'كشف حساب — ' + shop);
