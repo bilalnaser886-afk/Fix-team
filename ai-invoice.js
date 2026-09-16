@@ -135,6 +135,18 @@
       'inv.tab.stored': 'قطع غيار مخزنة',
       'inv.tab.allocated': 'قطع غيار موجهة',
       'inv.tab.supplies': 'لوازم الصيانة',
+      'inv.tab.deleted': 'قطع غيار محذوفة',
+      'inv.emptyDeleted': 'مفيش قطع محذوفة.',
+      'inv.trashNote': '🗑 القطع هنا بتتمسح نهائي لوحدها بعد {d} يوم من تاريخ الحذف — ومينفعش تتمسح قبل كده. تقدر ترجّعها مكانها في أي وقت خلال المدة.',
+      'inv.restore': '↩️ رجّعها',
+      'inv.restored': 'رجعت مكانها ✅',
+      'inv.purgeIn': 'هتتمسح نهائي بعد {n} يوم',
+      'inv.purgeToday': 'هتتمسح نهائي النهارده',
+      'inv.deletedBy': 'اتحذفت بواسطة {w} · {d}',
+      'inv.wasIn': 'كانت في: {c}',
+      'inv.invoice': '🧾 فاتورة: {n}',
+      'inv.manual': '✍️ إضافة يدوي',
+      'inv.entered': '📅 دخلت: {d}',
       'inv.count': 'قطعة',
       'inv.totalCost': 'إجمالي التكلفة (ج.م)',
       'inv.searchPh': 'ابحث باسم القطعة أو الجهاز...',
@@ -159,7 +171,7 @@
       'inv.delete': 'حذف',
       'inv.save': 'حفظ',
       'inv.cancel': 'إلغاء',
-      'inv.confirmDelete': 'تحذف القطعة دي نهائياً؟',
+      'inv.confirmDelete': 'تحذف القطعة دي؟\nهتتنقل لـ«قطع غيار محذوفة» وتتمسح نهائي بعد ٣٠ يوم.',
       'inv.needName': 'اكتب اسم القطعة الأول',
       'inv.linked': 'تم الربط بالجهاز ✅',
       'inv.unlinked': 'رجعت للمخزن العام ✅',
@@ -168,16 +180,16 @@
       'inv.movedStored': 'اتخزّنت — مستنية جهاز ✅',
       'inv.movedInbox': 'رجعت للوارد ✅',
       'inv.added': 'اتضافت للمخزن ✅',
-      'inv.deleted': 'اتحذفت',
+      'inv.deleted': 'اتنقلت لقطع الغيار المحذوفة 🗑',
       'inv.errNet': 'العملية دي محتاجة نت — استنى النت يرجع.',
       'inv.errGeneric': 'العملية ما تمّتش: {m}',
       // حذف فاتورة كاملة
       'pur.del': '🗑 حذف الفاتورة',
       'pur.delTitle': 'حذف الفاتورة نهائياً',
-      'pur.delIntro': 'هتتحذف الفاتورة، ومعاها كل قطع الغيار اللي جت منها.',
+      'pur.delIntro': 'هتتحذف الفاتورة، وكل قطع الغيار اللي جت منها هتتنقل لـ«قطع غيار محذوفة» (بتتمسح نهائي بعد ٣٠ يوم).',
       'pur.delNoParts': 'مفيش قطع غيار متبقية من الفاتورة دي.',
-      'pur.delCount': '{n} قطعة هتتحذف من المخزن',
-      'pur.delAllocWarn': '⚠️ فيهم {n} قطعة **مركّبة على أجهزة**. الأجهزة دي هتفضل من غير سجل قطع الغيار بتاعها:',
+      'pur.delCount': '{n} قطعة هتتنقل للمحذوفات',
+      'pur.delAllocWarn': '⚠️ فيهم {n} قطعة **مركّبة على أجهزة**. هتتفك من الأجهزة دي (وتقدر ترجّعها من المحذوفات):',
       'pur.delType': 'اكتب كلمة «حذف» بالعربي عشان تأكّد:',
       'pur.delTypeWord': 'حذف',
       'pur.delGo': 'احذف نهائياً',
@@ -282,6 +294,18 @@
       'inv.tab.stored': 'Stored parts',
       'inv.tab.allocated': 'Allocated parts',
       'inv.tab.supplies': 'Maintenance supplies',
+      'inv.tab.deleted': 'Deleted parts',
+      'inv.emptyDeleted': 'No deleted parts.',
+      'inv.trashNote': '🗑 Parts here are permanently removed {d} days after deletion — not before. You can restore them any time until then.',
+      'inv.restore': '↩️ Restore',
+      'inv.restored': 'Restored ✅',
+      'inv.purgeIn': 'Permanently removed in {n} day(s)',
+      'inv.purgeToday': 'Permanently removed today',
+      'inv.deletedBy': 'Deleted by {w} · {d}',
+      'inv.wasIn': 'Was in: {c}',
+      'inv.invoice': '🧾 Invoice: {n}',
+      'inv.manual': '✍️ Added manually',
+      'inv.entered': '📅 Entered: {d}',
       'inv.count': 'items',
       'inv.totalCost': 'Total cost (EGP)',
       'inv.searchPh': 'Search by part or device...',
@@ -306,7 +330,7 @@
       'inv.delete': 'Delete',
       'inv.save': 'Save',
       'inv.cancel': 'Cancel',
-      'inv.confirmDelete': 'Delete this part permanently?',
+      'inv.confirmDelete': 'Delete this part?\nIt moves to "Deleted parts" and is permanently removed after 30 days.',
       'inv.needName': 'Enter the part name first',
       'inv.linked': 'Linked to device ✅',
       'inv.unlinked': 'Returned to general stock ✅',
@@ -315,15 +339,15 @@
       'inv.movedStored': 'Stored — waiting for a device ✅',
       'inv.movedInbox': 'Returned to inbox ✅',
       'inv.added': 'Added to stock ✅',
-      'inv.deleted': 'Deleted',
+      'inv.deleted': 'Moved to deleted parts 🗑',
       'inv.errNet': 'This action needs an internet connection.',
       'inv.errGeneric': 'Action failed: {m}',
       'pur.del': '🗑 Delete invoice',
       'pur.delTitle': 'Delete invoice permanently',
-      'pur.delIntro': 'The invoice and every spare part that came from it will be deleted.',
+      'pur.delIntro': 'The invoice will be deleted and all its parts moved to "Deleted parts" (removed after 30 days).',
       'pur.delNoParts': 'No parts remain from this invoice.',
-      'pur.delCount': '{n} part(s) will be removed from stock',
-      'pur.delAllocWarn': '⚠️ {n} of them are installed on devices. Those devices will lose their parts record:',
+      'pur.delCount': '{n} part(s) will move to deleted parts',
+      'pur.delAllocWarn': '⚠️ {n} of them are installed on devices. They will be unlinked (restorable from deleted parts):',
       'pur.delType': 'Type the word below to confirm:',
       'pur.delTypeWord': 'حذف',
       'pur.delGo': 'Delete permanently',
@@ -1550,7 +1574,8 @@
         //    اللي هيتحذف هو **الموجود فعلاً**، وده اللي بنوريه.
         const { data, error } = await sb.from(CFG.partsTable)
           .select('id,name,category,device_label')
-          .eq('source_invoice_id', id);
+          .eq('source_invoice_id', id)
+          .neq('category', 'deleted');      // اللي في السلة أصلاً مش هنعدّه
         if (error) throw error;
         if (!S.del || S.del.id !== id) return;   // المستخدم قفلها في الوقت ده
         S.del.parts = data || [];
@@ -1596,8 +1621,11 @@
         //    بالترتيب ده، لو القطع فشلت الفاتورة بتفضل مكانها
         //    وتقدر تعيد المحاولة.
         if (n > 0) {
-          const { error: pe } = await sb.from(CFG.partsTable)
-            .delete().eq('source_invoice_id', st.id);
+          // ⚠️ مش delete — القطع بتروح «قطع غيار محذوفة» ٣٠ يوم.
+          //    اسم الفاتورة محفوظ على كل قطعة، فبيفضل ظاهر بعد حذفها.
+          const { error: pe } = await sb.rpc('trash_spare_parts', {
+            p_ids: st.parts.map(p => p.id), p_by_name: meName()
+          });
           if (pe) throw pe;
         }
 
@@ -1647,8 +1675,35 @@
     { key: 'unallocated', k: 'inv.tab.unallocated', color: 'var(--info,#2563EB)' },
     { key: 'stored', k: 'inv.tab.stored', color: 'var(--accent,#0891A8)' },
     { key: 'allocated', k: 'inv.tab.allocated', color: 'var(--success,#15803D)' },
-    { key: 'supplies', k: 'inv.tab.supplies', color: 'var(--warn,#B45309)' }
+    { key: 'supplies', k: 'inv.tab.supplies', color: 'var(--warn,#B45309)' },
+    // سلة المهملات — آخر تبويب. القطعة بتقعد هنا ٣٠ يوم وبعدين تتمسح.
+    { key: 'deleted', k: 'inv.tab.deleted', color: 'var(--danger,#DC2626)' }
   ];
+  const PART_TRASH_DAYS = 30;
+
+  // تاريخ قصير بالعربي/الإنجليزي حسب لغة الصفحة
+  function shortDate(v) {
+    if (!v) return '';
+    const d = new Date(v);
+    if (isNaN(d)) return String(v);
+    let loc = 'ar-EG';
+    try { if (typeof window.getLocale === 'function') loc = window.getLocale(); } catch (e) {}
+    return d.toLocaleDateString(loc, { day: 'numeric', month: 'numeric', year: 'numeric' });
+  }
+  // اسم الفاتورة = المورد + رقمها (من النسخة المحفوظة على القطعة)
+  function invoiceNameOf(p) {
+    const parts = [];
+    if (p.source_supplier) parts.push(p.source_supplier);
+    if (p.source_invoice_no) parts.push('#' + p.source_invoice_no);
+    if (!parts.length && p.source_invoice_date) parts.push(shortDate(p.source_invoice_date));
+    return parts.join(' ');
+  }
+  // فاضل كام يوم على المسح النهائي
+  function purgeDaysLeft(p) {
+    if (!p.deleted_at) return PART_TRASH_DAYS;
+    const end = new Date(p.deleted_at).getTime() + PART_TRASH_DAYS * 86400000;
+    return Math.max(0, Math.ceil((end - Date.now()) / 86400000));
+  }
 
   // حالة شاشة المخزن
   const IS = {
@@ -1781,7 +1836,7 @@
   /* تبويبات المخزن */
   /* ⚠️ العدد هنا لازم يساوي عدد التبويبات في TABS. بقوا ٤ بعد ما
      اتزاد "قطع غيار مخزنة". وعلى الموبايل بيبقوا تحت بعض. */
-  .inv-tabs{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px;}
+  .inv-tabs{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:14px;}
   @media (max-width:560px){ .inv-tabs{grid-template-columns:1fr;} }
   .inv-tab{background:var(--surface,#fff); border:1.5px solid var(--border,#E2E8F0); border-radius:10px; padding:11px 8px;
     font-family:'Cairo',sans-serif; font-size:13.5px; font-weight:800; color:var(--muted,#64748B); cursor:pointer;
@@ -1860,6 +1915,14 @@
   .spl-sep{font-size:12.5px; font-weight:800; color:var(--muted,#64748B); margin:16px 2px 8px;
     display:flex; align-items:center; gap:8px;}
   .spl-sep::after{content:""; flex:1; height:1px; background:var(--border,#E2E8F0);}
+  .inv-card.trash{border-style:dashed; border-color:var(--danger-border,#FECACA);}
+  .inv-card.trash .inv-card-name{text-decoration:line-through; color:var(--muted,#64748B);}
+  .inv-src{margin-top:6px; font-size:12px; color:var(--muted,#64748B); display:flex; flex-wrap:wrap; gap:4px 12px;}
+  .inv-src b{color:var(--ink-2,#475569); font-weight:700;}
+  .inv-purge{display:inline-block; margin-top:8px; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:800;
+    color:var(--danger,#DC2626); background:var(--danger-bg,rgba(220,38,38,.12));}
+  .inv-note{font-size:12.5px; line-height:1.8; color:var(--muted,#64748B); background:var(--surface,#fff);
+    border:1px dashed var(--border,#E2E8F0); border-radius:10px; padding:9px 12px; margin-bottom:10px;}
   .inv-card.gone{border-style:dashed; background:none; opacity:.85;}
   .inv-card.gone .inv-card-name{text-decoration:line-through; color:var(--muted,#64748B);}
   .spl-trace{margin-top:8px; padding:7px 10px; border-radius:9px; font-size:12px; line-height:1.8;
@@ -1930,6 +1993,32 @@
     if (p.category === 'allocated' && p.device_label) meta.push(esc(T('inv.forDevice')) + ': ' + esc(p.device_label));
     if (p.created_by_name) meta.push(esc(T('inv.by')) + ' ' + esc(p.created_by_name));
 
+    // اسم الفاتورة + تاريخ دخول القطعة — بيظهر في كل التبويبات
+    const invName = invoiceNameOf(p);
+    const srcHtml = `<div class="inv-src">
+      <span>${invName ? esc(T('inv.invoice', { n: '' })) + '<b>' + esc(invName) + '</b>' : esc(T('inv.manual'))}</span>
+      <span>${esc(T('inv.entered', { d: shortDate(p.created_at) }))}</span></div>`;
+
+    // ---- كارت في سلة المحذوفات: رجوع بس، مفيش حذف قبل المدة ----
+    if (p.category === 'deleted') {
+      const left = purgeDaysLeft(p);
+      const wasTab = TABS.find(t => t.key === p.prev_category);
+      const trashMeta = [T('inv.deletedBy', { w: p.deleted_by_name || '—', d: shortDate(p.deleted_at) })];
+      if (wasTab) trashMeta.push(T('inv.wasIn', { c: T(wasTab.k) }) + (p.prev_device_label ? ' — ' + p.prev_device_label : ''));
+      return `<div class="inv-card trash">
+        <div class="inv-card-top">
+          <div class="inv-card-name">${esc(p.name)}</div>
+          <div class="inv-card-cost">${num(p.total_cost) ? money(p.total_cost) + ' ج.م' : 'من غير سعر'}</div>
+        </div>
+        <div class="inv-card-meta">${meta.join(' — ')}<br>${trashMeta.map(esc).join('<br>')}</div>
+        ${srcHtml}
+        <span class="inv-purge">⏳ ${esc(left > 0 ? T('inv.purgeIn', { n: left }) : T('inv.purgeToday'))}</span>
+        <div class="inv-actions">
+          <button class="inv-btn primary" onclick="INV.restore('${esc(p.id)}')">${esc(T('inv.restore'))}</button>
+        </div>
+      </div>`;
+    }
+
     let actions;
     if (IS.allocId === p.id) {
       actions = `<div class="inv-alloc">
@@ -1967,6 +2056,7 @@
         <div class="inv-card-cost"${noPrice ? ' style="color:#B45309;"' : ''}>${noPrice ? 'من غير سعر' : money(p.total_cost) + ' ج.م'}</div>
       </div>
       <div class="inv-card-meta">${meta.join(' — ')}</div>
+      ${srcHtml}
       ${splTraceHtml(p)}
       <div class="inv-actions">
         <button class="inv-btn" onclick="INV.editCost('${esc(p.id)}')">${noPrice ? '💰 اكتب السعر' : '✏️ عدّل السعر'}</button>
@@ -1986,13 +2076,17 @@
       <div class="inv-tot-l">${esc(T('inv.totalCost'))}</div></div>`;
 
     const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
+      : IS.tab === 'deleted' ? 'inv.emptyDeleted'
       : IS.tab === 'supplies' ? 'inv.emptySupplies'
       : IS.tab === 'stored' ? 'inv.emptyStored' : 'inv.emptyUnallocated';
     const list = (rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`)
-      + splGhostBlock(IS.tab);
+      + (IS.tab === 'deleted' ? '' : splGhostBlock(IS.tab));
 
     // الإضافة اليدوية متاحة في المخزن العام واللوازم بس (الموجه بيتربط من الجهاز)
-    const add = IS.tab === 'allocated' ? '' : invAddHtml();
+    const add = (IS.tab === 'allocated' || IS.tab === 'deleted') ? ''
+      : invAddHtml();
+    const note = IS.tab === 'deleted'
+      ? `<div class="inv-note">${esc(T('inv.trashNote', { d: PART_TRASH_DAYS }))}</div>` : '';
 
     return `
       ${tabBar}
@@ -2000,7 +2094,7 @@
       <div class="modal-search" style="position:static;padding:0 0 10px;">
         <input value="${esc(IS.q)}" oninput="INV.search(this.value)" placeholder="${esc(T('inv.searchPh'))}" />
       </div>
-      ${add}
+      ${note}${add}
       <div id="invListBody">${list}</div>`;
   }
 
@@ -2014,10 +2108,11 @@
   function invListBodyHtml() {
     const rows = invFiltered();
     const emptyKey = IS.tab === 'allocated' ? 'inv.emptyAllocated'
+      : IS.tab === 'deleted' ? 'inv.emptyDeleted'
       : IS.tab === 'supplies' ? 'inv.emptySupplies'
       : IS.tab === 'stored' ? 'inv.emptyStored' : 'inv.emptyUnallocated';
     return (rows.length ? rows.map(invItemHtml).join('') : `<div class="empty-col">${esc(T(emptyKey))}</div>`)
-      + splGhostBlock(IS.tab);
+      + (IS.tab === 'deleted' ? '' : splGhostBlock(IS.tab));
   }
 
   function invRender() {
@@ -2155,6 +2250,12 @@
 
     async loadParts() {
       const since = new Date(Date.now() - SPL_DAYS * 86400000).toISOString();
+      // المسح النهائي للي خلص مدته (السيرفر هو اللي بيقرر — مستحيل يمسح قبل ٣٠ يوم).
+      // لو الميجريشن لسه ما اتشغّلش، نكمّل عادي.
+      try {
+        const { error: pe } = await sb.rpc('purge_spare_parts_trash');
+        if (pe) console.warn('[المخزن] المسح الدوري:', pe.message);
+      } catch (e) {}
       try {
         const { data, error } = await sb.from(CFG.partsTable).select('*')
           .order('created_at', { ascending: false }).limit(3000);
@@ -2227,12 +2328,26 @@
       if (!confirm(T('inv.confirmDelete'))) return;
       if (!online()) { toast(T('inv.errNet'), false); return; }
       try {
-        const { error } = await sb.from(CFG.partsTable).delete().eq('id', id);
+        // ⚠️ مش delete — السيرفر بينقلها لسلة المحذوفات ويحفظ كانت فين
+        const { data, error } = await sb.rpc('trash_spare_parts', { p_ids: [id], p_by_name: meName() });
         if (error) throw error;
+        if (!data) throw new Error('القطعة ما اتنقلتش');
         toast(T('inv.deleted'), true);
-        IS.list = IS.list.filter(p => p.id !== id);
-        invRender();
+        await INV.loadParts();
         if (DP.openId) { DP.deviceId = null; injectDeviceParts(); }
+        try { if (typeof window.prOnPartsChanged === 'function') window.prOnPartsChanged(); } catch (e) {}
+      } catch (e) { toast(T('inv.errGeneric', { m: (e && e.message) || '' }), false); }
+    },
+
+    async restore(id) {
+      if (!online()) { toast(T('inv.errNet'), false); return; }
+      try {
+        const { data, error } = await sb.rpc('restore_spare_part', { p_id: id });
+        if (error) throw error;
+        toast(T('inv.restored'), true);
+        await INV.loadParts();
+        if (data === 'allocated' && DP.openId) { DP.deviceId = null; injectDeviceParts(); }
+        try { if (typeof window.prOnPartsChanged === 'function') window.prOnPartsChanged(); } catch (e) {}
       } catch (e) { toast(T('inv.errGeneric', { m: (e && e.message) || '' }), false); }
     },
 
