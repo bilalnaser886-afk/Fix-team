@@ -2413,13 +2413,15 @@ async function skDel(id){
   const warn = price
     ? `\n\n⚠️ القطعة دي عليها سعر مسجّل (${skMoney(price)} ج.م) — يعني داخلة من فاتورة. متأكد؟`
     : '';
-  if(!confirm(`تمسح «${p.name}» من المخزن؟\nهتتشال من مخزن قطع الغيار كمان.${warn}`)) return;
+  if(!confirm(`تحذف «${p.name}»؟\nهتتنقل لـ«قطع غيار محذوفة» عند المحاسب، وتتمسح نهائي بعد ٣٠ يوم.${warn}`)) return;
   if(!navigator.onLine){ toast('مفيش نت — المسح محتاج اتصال'); return; }
   const card = document.getElementById('skc_' + id);
   if(card) card.classList.add('busy');
   try{
-    const { error } = await sb.from('spare_parts').delete().eq('id', id);
+    // ⚠️ مش delete — السيرفر بينقلها لسلة المحذوفات (٣٠ يوم) ويسجّلها في الدفتر
+    const { data, error } = await sb.rpc('trash_spare_parts', { p_ids: [id], p_by_name: ME || '' });
     if(error) throw error;
+    if(!data) throw new Error('القطعة ما اتنقلتش');
     SK.rows = SK.rows.filter(x => x.id !== id);
     skPaintList();
     toast('اتمسحت 🗑');

@@ -315,7 +315,7 @@ const PRICES = {
       water:   null
     },
     android: {
-      screen:  [700, 1800, 'لو الشاشة سوبر أموليد بتكون أعلى — حوالي ١٢٠٠ أو ٢٦٠٠ أو ٤٢٠٠ حسب الموديل'],
+      screen:  [700, 1800],
       battery: [600, 1150],
       charge:  [150, 800],
       software:[100, 350],
@@ -355,6 +355,239 @@ function appleTier(model){
 function resolveTier(){
   if(S.brand && S.brand.k === 'apple') return appleTier(S.model);
   return 'android';
+}
+
+// ============================================================
+// أسعار لكل موديل — من شيت «أسعار الأعطال 2026»
+// ------------------------------------------------------------
+// ترتيب البحث عن السعر (لكل مشكلة لوحدها):
+//   ١) الموديل بالظبط  (PRICE_MODELS)
+//   ٢) الماركة كلها    (PRICE_BRANDS) — مش للايفون، لأن جدول
+//      الفئات (جديد/قديم) أدق من متوسط كل الايفونات
+//   ٣) جدول الفئات القديم (PRICES.table) — آخر حل
+//
+// تحويل أعطال الشيت لمشاكل البوت:
+//   screen   = سطر «شاشة» العام، ولو مش موجود → من أقل لأعلى درجة
+//   charge   = فلاتة شحن · سوكت شحن · شحن · ic شحن · بوردة شحن
+//   sound    = سماعة · مايك · جرس · ic صوت · فلاتة سماعة
+//   dead     = ميت · واقف لوجو
+//   battery / software / camera = بطارية / سوفت / كاميرا
+//   water    = مفيش — بيفضل «بعد الكشف» عن قصد
+//
+// ⚠️ متعدّلش الأرقام هنا بإيدك — عدّل الشيت واطلب توليد الجزء ده تاني.
+// ============================================================
+const PRICE_MODELS = {
+  apple: {
+    "11": {"battery":[800,1700],"charge":[900,1800],"camera":[400,1500],"software":[100,450],"dead":[2500,2500],"sound":[250,1100],"screen":[1250,3100]},
+    "11 برو": {"battery":[1300,1900],"charge":[1600,2200],"screen":[1500,4000]},
+    "11 برو ماكس": {"battery":[1300,1700],"sound":[600,1200],"charge":[1800,2000],"camera":[400,2500],"screen":[1500,6000]},
+    "12": {"sound":[600,1200],"charge":[1000,2000],"battery":[600,1400]},
+    "12 برو": {"camera":[850,3500],"battery":[900,1500],"screen":[1800,2300]},
+    "12 برو ماكس": {"battery":[1200,2200],"sound":[800,4000],"camera":[600,3200],"charge":[1000,2000],"screen":[2000,3500]},
+    "13": {"battery":[1500,2000],"software":[100,100],"sound":[800,800],"camera":[400,800],"charge":[1000,1900],"screen":[1900,7000]},
+    "13 برو": {"battery":[1600,2000],"camera":[500,4000],"sound":[700,1600]},
+    "13 برو ماكس": {"battery":[1700,2600],"camera":[750,4700],"charge":[1600,1800],"software":[100,100],"sound":[1000,1000],"dead":[1800,4000],"screen":[2200,4500]},
+    "14 برو ماكس": {"battery":[1700,2400],"camera":[1600,3000],"software":[100,100],"charge":[1500,2000],"screen":[3500,6000]},
+    "15 برو ماكس": {"battery":[2000,3000],"software":[50,50],"screen":[6000,17500]},
+    "16 برو ماكس": {"charge":[4000,15000],"screen":[5000,15000]},
+    "6": {"screen":[700,700]},
+    "6 بلس": {"screen":[700,700]},
+    "6s+": {"battery":[600,600],"screen":[700,700]},
+    "7": {"sound":[450,450],"screen":[800,800]},
+    "7 بلس": {"battery":[650,650],"sound":[450,800],"charge":[450,800],"screen":[750,750]},
+    "8": {"battery":[600,600],"screen":[800,800]},
+    "8 بلس": {"battery":[600,800],"dead":[500,1000],"software":[50,300],"screen":[700,1800]},
+    "x": {"battery":[700,1000],"sound":[600,1500],"screen":[1100,1900]},
+    "xr": {"software":[100,100],"charge":[600,900],"screen":[1000,2500]},
+    "xs": {"battery":[750,2500],"sound":[400,700],"camera":[150,900],"screen":[1100,1900]},
+    "xs max": {"battery":[800,2000],"charge":[700,900],"camera":[600,1300],"screen":[1800,2800]},
+  },
+  huawei: {
+    "y7-19": {"screen":[700,1100]},
+    "y9 2019": {"screen":[850,850]},
+    "y9-19": {"screen":[850,850]},
+  },
+  infinix: {
+    "سمارت 8": {"screen":[800,800]},
+  },
+  oppo: {
+    "12f": {"screen":[700,3500]},
+    "2f": {"screen":[1500,3800]},
+    "a12": {"screen":[850,850]},
+    "a15": {"software":[50,600],"charge":[150,150],"screen":[700,950]},
+    "a16": {"software":[150,350],"screen":[750,1200]},
+    "a16k": {"screen":[800,800]},
+    "a17": {"screen":[700,3200]},
+    "a18": {"screen":[700,1200]},
+    "a1k": {"software":[100,100],"screen":[700,950]},
+    "a3": {"software":[100,100],"screen":[850,850]},
+    "a31": {"screen":[700,1200]},
+    "a38": {"screen":[700,4200]},
+    "a3s": {"screen":[700,900]},
+    "a5": {"screen":[700,1200]},
+    "a5 2020": {"screen":[850,850]},
+    "a52": {"screen":[800,800]},
+    "a53": {"screen":[700,900]},
+    "a54": {"software":[150,150],"screen":[700,950]},
+    "a55": {"screen":[900,4350]},
+    "a58": {"screen":[850,1200]},
+    "a5s": {"software":[150,150],"screen":[750,750]},
+    "a60": {"screen":[1000,1200]},
+    "a73": {"screen":[800,800]},
+    "a74": {"screen":[1000,3800]},
+    "a77": {"screen":[800,1200]},
+    "a94": {"screen":[700,4000]},
+    "a96": {"screen":[750,1200]},
+    "f11": {"screen":[700,1200]},
+    "f11 pro": {"screen":[750,750]},
+    "f7": {"screen":[800,800]},
+    "f9": {"software":[200,200],"screen":[700,900]},
+    "رينو 5": {"screen":[800,1200]},
+    "رينو 6": {"screen":[1000,3450]},
+    "رينو 8": {"screen":[1900,3800]},
+    "رينو5": {"screen":[1000,1000]},
+    "رينو6": {"screen":[1200,3600]},
+  },
+  realme: {
+    "10": {"screen":[800,3700]},
+    "12x": {"screen":[700,1600]},
+    "3": {"screen":[700,950]},
+    "5": {"software":[150,900],"screen":[700,1100]},
+    "6": {"screen":[800,1200]},
+    "6i": {"software":[200,200],"screen":[800,800]},
+    "7": {"screen":[700,950]},
+    "8": {"screen":[1150,3200]},
+    "9i": {"screen":[1000,1000]},
+    "c11": {"software":[100,100],"screen":[700,1000]},
+    "c12": {"screen":[700,700]},
+    "c15": {"screen":[700,900]},
+    "c17": {"screen":[850,850]},
+    "c2": {"screen":[850,850]},
+    "c21": {"screen":[750,750]},
+    "c21y": {"screen":[700,1000]},
+    "c25y": {"screen":[1000,1000]},
+    "c3": {"screen":[700,950]},
+    "c30": {"charge":[200,200]},
+    "c30s": {"dead":[50,400],"screen":[750,750]},
+    "c33": {"screen":[1000,1000]},
+    "c35": {"screen":[800,1200]},
+    "c51": {"screen":[700,1000]},
+    "c53": {"software":[250,250],"screen":[700,1200]},
+    "c55": {"screen":[700,950]},
+    "c61": {"screen":[800,1500]},
+    "c65": {"screen":[700,1300]},
+    "c67": {"screen":[700,1000]},
+    "c75": {"screen":[700,1200]},
+    "c75x": {"screen":[700,1500]},
+    "نوت 50": {"software":[200,200],"screen":[700,950]},
+    "نوت 60": {"screen":[700,700]},
+    "نوت50": {"screen":[800,800]},
+  },
+  samsung: {
+    "a02": {"screen":[700,1100]},
+    "a03": {"screen":[750,1000]},
+    "a04": {"screen":[750,1000]},
+    "a05": {"screen":[900,1150]},
+    "a05s": {"screen":[700,700]},
+    "a06": {"screen":[1000,1000]},
+    "a10": {"screen":[700,1300]},
+    "a12": {"charge":[250,250],"screen":[700,950]},
+    "a13": {"screen":[800,1100]},
+    "a14": {"dead":[700,1000],"screen":[700,1350]},
+    "a16": {"screen":[700,1200]},
+    "a16 sam": {"screen":[700,1200]},
+    "a21s": {"software":[200,200],"screen":[750,1200]},
+    "a23": {"charge":[250,250],"screen":[800,1200]},
+    "a24": {"screen":[1300,1850]},
+    "a25": {"screen":[3500,4200]},
+    "a51": {"screen":[1000,2000]},
+    "a52": {"screen":[900,4000]},
+    "a9": {"screen":[750,750]},
+    "m12": {"screen":[800,800]},
+    "m51": {"screen":[800,1050]},
+    "tab a7": {"software":[250,250]},
+    "تاب a6": {"software":[200,200]},
+    "تاب a7": {"software":[200,200],"screen":[1600,2500]},
+    "تاب a9": {"screen":[800,2200]},
+    "نوت 20": {"battery":[600,1000]},
+    "نوت 20 الترا": {"battery":[800,1150],"screen":[2500,5000]},
+  },
+  xiaomi: {
+    "9t": {"battery":[600,600],"screen":[750,750]},
+    "ريدمي نوت 11": {"screen":[850,1200]},
+    "ريدمي9": {"screen":[700,700]},
+    "نوت 10": {"screen":[1600,3500]},
+    "نوت 10s": {"screen":[900,1700]},
+    "نوت 11": {"screen":[1300,3000]},
+    "نوت 14": {"screen":[3500,4000]},
+    "نوت 9": {"screen":[700,2500]},
+  },
+};
+const PRICE_BRANDS = {
+  huawei: {"software":[100,300],"battery":[700,700],"charge":[200,450],"dead":[250,2000],"screen":[700,1150]},
+  infinix: {"charge":[250,600],"software":[200,200],"battery":[600,600],"screen":[700,1000]},
+  oppo: {"software":[100,350],"battery":[600,600],"charge":[150,800],"dead":[150,1150],"sound":[400,400],"screen":[700,1850]},
+  realme: {"software":[250,250],"battery":[600,800],"charge":[200,800],"dead":[150,1700],"sound":[50,350],"screen":[700,1350]},
+  samsung: {"software":[100,400],"battery":[600,1200],"charge":[300,1700],"dead":[700,1200],"camera":[200,900],"sound":[300,500],"screen":[750,2800]},
+  xiaomi: {"battery":[700,700],"software":[100,400],"charge":[150,750],"dead":[500,1100],"sound":[100,450],"screen":[750,2500]},
+};
+
+// توحيد كتابة الموديل: «ايفون ١٣ برو ماكس» = «13 pro max» = «13promax»
+// «أوبو A15» = «a 15» = «a15» · «ريلمي نوت ٥٠» = «note50»
+const MODEL_WORDS = {
+  'نوت':'note','رينو':'reno','تاب':'tab','ريدمي':'redmi','بوكو':'poco',
+  'سمارت':'smart','الترا':'ultra','اكس':'x','إكس':'x','ار':'r'
+};
+const BRAND_WORDS = ['iphone','ايفون','أيفون','samsung','سامسونج','sam','galaxy','جالكسي',
+  'oppo','اوبو','أوبو','realme','ريلمي','xiaomi','شاومي','infinix','انفنكس','انفينكس',
+  'huawei','هواوي','mi'];
+function modelKeyFull(input){
+  var s = String(input || '').toLowerCase().trim();
+  s = s.replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); });
+  s = s.replace(/\+/g, ' plus ').replace(/[-_.،,]/g, ' ');
+  s = s.replace(/برو\s*ماكس|بروماكس/g, 'promax')
+       .replace(/ماكس/g, 'max').replace(/برو/g, 'pro')
+       .replace(/بلس|بلص|بلاس/g, 'plus');
+  // حروف لاتيني لازقة في رقم أو كلمة عربي: «تابa7» → «تاب a7»
+  s = s.replace(/([a-z0-9])([\u0600-\u06FF])/g, '$1 $2').replace(/([\u0600-\u06FF])([a-z0-9])/g, '$1 $2');
+  var parts = s.split(/\s+/).filter(Boolean)
+    .map(function(w){ return MODEL_WORDS[w] || w; })
+    .filter(function(w){ return BRAND_WORDS.indexOf(w) === -1; });
+  var k = parts.join('');
+  k = k.replace(/^redminote/, 'note');   // «ريدمي نوت 11» = «نوت 11»
+  return k;
+}
+// فهرس بيتبني مرة واحدة: ماركة → موديل موحّد → أسعار
+// لو نفس الموديل مكتوب بطريقتين في الشيت، بندمج النطاقين.
+const MODEL_INDEX = (function(){
+  var idx = {};
+  Object.keys(PRICE_MODELS).forEach(function(b){
+    idx[b] = {};
+    Object.keys(PRICE_MODELS[b]).forEach(function(name){
+      var k = modelKeyFull(name);
+      if(!k) return;
+      var cur = idx[b][k] || {}, add = PRICE_MODELS[b][name];
+      Object.keys(add).forEach(function(i){
+        var r = add[i], c = cur[i];
+        cur[i] = c ? [Math.min(c[0], r[0]), Math.max(c[1], r[1])] : r.slice();
+      });
+      idx[b][k] = cur;
+    });
+  });
+  return idx;
+})();
+
+function findPrice(issueKey){
+  var b = S.brand ? S.brand.k : '';
+  // ١) الموديل
+  var byModel = (MODEL_INDEX[b] || {})[modelKeyFull(S.model)];
+  if(byModel && byModel[issueKey]) return byModel[issueKey];
+  // ٢) الماركة (مش للايفون)
+  if(b !== 'apple'){
+    var byBrand = PRICE_BRANDS[b];
+    if(byBrand && byBrand[issueKey]) return byBrand[issueKey];
+  }
+  return null;
 }
 
 const BRANDS = [
@@ -718,8 +951,13 @@ function stepIssue(){
 
 function priceLine(){
   if(!PRICES.enabled) return null;
+  if(S.issue.k === 'water') return null;          // الميّة: بعد الكشف دايماً
   const tier = resolveTier();
-  const r = (PRICES.table[tier] || {})[S.issue.k];
+  const tierRow = (PRICES.table[tier] || {})[S.issue.k];
+  // الأولوية للموديل/الماركة — وجدول الفئات احتياطي.
+  // التنويه (زي «الشاشة الأصلية أغلى») بييجي من جدول الفئات في الحالتين.
+  const found = findPrice(S.issue.k);
+  const r = found ? [found[0], found[1], tierRow && tierRow[2]] : tierRow;
   if(!r || (!r[0] && !r[1])) return null;
   const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[+d]);   // أرقام عربية
   const range = r[0] === r[1] ? `${ar(r[0])} ج.م` : `من ${ar(r[0])} إلى ${ar(r[1])} ج.م`;
